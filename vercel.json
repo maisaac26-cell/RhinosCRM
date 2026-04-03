@@ -1,7 +1,11 @@
 {
+  "functions": {
+    "api/api.js": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/auth/callback", "destination": "/index.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
