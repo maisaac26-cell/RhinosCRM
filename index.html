@@ -795,6 +795,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="metric-card"><div class="m-label">Balance</div><div class="m-val" id="fin-balance">$0</div><div class="m-sub">Ingresos - Gastos</div></div>
       </div>
 
+      <div class="card" id="pendientes-card" style="border-color:rgba(245,158,11,0.3);display:none">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>⏳ Gastos pendientes <span id="pendientes-total" style="color:var(--amber)"></span></span>
+          <span style="font-size:11px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">Comprometidos pero aún no pagados</span>
+        </div>
+        <div id="fin-pendientes"></div>
+      </div>
+
       <div class="grid2">
         <div class="card">
           <div class="card-title">Gastos por categoría</div>
@@ -833,6 +841,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <option value="ingreso">Ingreso</option>
               <option value="gasto">Gasto</option>
               <option value="inversion">Inversión</option>
+              <option value="pendiente">⏳ Gasto pendiente</option>
             </select>
           </div>
           <div class="field" style="margin:0"><label>Monto (USD)</label>
@@ -886,7 +895,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             </select>
           </div>
         </div>
-        <button class="btn btn-green" id="btn-add-tx">+ Agregar transacción</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-green" id="btn-add-tx" style="flex:1;justify-content:center">+ Agregar transacción</button>
+          <button class="btn" id="btn-cancel-edit" style="display:none" onclick="resetTxForm()">✕ Cancelar</button>
+        </div>
       </div>
 
       <div class="card" id="recurring-card">
@@ -2592,7 +2604,47 @@ function renderResumen() {
   const ingresos = finTx.filter(t => t.type === 'ingreso').reduce((a, t) => a + +t.amount, 0);
   const gastos = finTx.filter(t => t.type === 'gasto').reduce((a, t) => a + +t.amount, 0);
   const inversiones = finTx.filter(t => t.type === 'inversion').reduce((a, t) => a + +t.amount, 0);
+  const pendientes = finTx.filter(t => t.type === 'pendiente');
   const balance = ingresos - gastos;
+
+  // Pendientes
+  const pendCard = document.getElementById('pendientes-card');
+  const pendEl = document.getElementById('fin-pendientes');
+  if (pendientes.length) {
+    pendCard.style.display = 'block';
+    const totalPend = pendientes.reduce((a, t) => a + +t.amount, 0);
+    document.getElementById('pendientes-total').textContent = '— ' + fmtUSD(totalPend) + ' comprometidos';
+    pendEl.innerHTML = pendientes.map(t => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:13px;color:var(--text)">${t.description}</div>
+          <div style="font-size:11px;color:var(--text3)">${t.category} · ${t.partner||'empresa'} · ${t.date}</div>
+          ${t.notes ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">${t.notes}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:500;color:var(--amber)">−${fmtUSD(+t.amount)}</span>
+          <button class="btn btn-sm" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);padding:4px 10px;font-size:11px" data-pagar="${t.id}">✓ Pagar</button>
+        </div>
+      </div>`).join('');
+    pendEl.querySelectorAll('[data-pagar]').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const id = this.dataset.pagar;
+        const tx = finTx.find(t => t.id === id);
+        if (!tx) return;
+        if (!confirm(`¿Marcar "${tx.description}" como pagado?`)) return;
+        this.disabled = true;
+        try {
+          const today = new Date().toISOString().slice(0,10);
+          const [updated] = await sbFetch(`rhinos_transactions?id=eq.${id}`, 'PATCH', { type: 'gasto', date: today });
+          finTx = finTx.map(t => t.id === id ? {...t, type:'gasto', date: today} : t);
+          renderResumen(); renderTransacciones(); renderSocios();
+          showToast('Gasto marcado como pagado 🦏');
+        } catch(e) { showToast('Error: ' + e.message); this.disabled = false; }
+      });
+    });
+  } else {
+    pendCard.style.display = 'none';
+  }
 
   document.getElementById('fin-ingresos').textContent = fmtUSD(ingresos);
   document.getElementById('fin-gastos').textContent = fmtUSD(gastos);
@@ -2658,6 +2710,12 @@ function renderTransacciones() {
   const list = document.getElementById('tx-list');
   let txs = filter ? finTx.filter(t => t.type === filter) : finTx;
   if (!txs.length) { list.innerHTML = '<div class="empty">Sin transacciones</div>'; return; }
+  const typeStyle = t => {
+    if (t.type==='ingreso') return {bg:'rgba(34,197,94,0.12)',color:'var(--green)',label:'ingreso'};
+    if (t.type==='inversion') return {bg:'rgba(0,229,204,0.12)',color:'var(--cyan)',label:'inversión'};
+    if (t.type==='pendiente') return {bg:'rgba(245,158,11,0.12)',color:'var(--amber)',label:'⏳ pendiente'};
+    return {bg:'rgba(239,68,68,0.12)',color:'var(--red)',label:'gasto'};
+  };
   list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="border-bottom:1px solid var(--border)">
       <th style="text-align:left;padding:6px 8px;color:var(--text2);font-size:11px;font-weight:500">Tipo</th>
@@ -2668,16 +2726,21 @@ function renderTransacciones() {
       <th style="text-align:right;padding:6px 8px;color:var(--text2);font-size:11px;font-weight:500">Monto</th>
       <th style="padding:6px 8px"></th>
     </tr></thead>
-    <tbody>${txs.map(t => `
-      <tr style="border-bottom:1px solid var(--border)" id="tx-row-${t.id}">
-        <td style="padding:8px"><span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${t.type==='ingreso'?'rgba(34,197,94,0.12)':t.type==='inversion'?'rgba(0,229,204,0.12)':'rgba(239,68,68,0.12)'};color:${t.type==='ingreso'?'var(--green)':t.type==='inversion'?'var(--cyan)':'var(--red)'}">${t.type}</span></td>
+    <tbody>${txs.map(t => {
+      const s = typeStyle(t);
+      return `<tr style="border-bottom:1px solid var(--border)" id="tx-row-${t.id}">
+        <td style="padding:8px"><span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${s.bg};color:${s.color}">${s.label}</span></td>
         <td style="padding:8px;color:var(--text)">${t.description}</td>
         <td style="padding:8px;color:var(--text2)">${t.category}</td>
         <td style="padding:8px;color:var(--text2)">${t.partner||'empresa'}</td>
         <td style="padding:8px;color:var(--text2)">${t.date}</td>
-        <td style="padding:8px;text-align:right;font-weight:500;color:${t.type==='ingreso'?'var(--green)':'var(--red)'}">${t.type==='ingreso'?'+':'−'}${fmtUSD(+t.amount)}</td>
-        <td style="padding:8px"><button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-del-tx="${t.id}">✕</button></td>
-      </tr>`).join('')}
+        <td style="padding:8px;text-align:right;font-weight:500;color:${s.color}">${t.type==='ingreso'?'+':'−'}${fmtUSD(+t.amount)}</td>
+        <td style="padding:8px;display:flex;gap:4px">
+          <button class="btn btn-sm" style="color:var(--cyan);padding:3px 8px;border-color:rgba(0,229,204,0.2)" data-edit-tx="${t.id}">✏</button>
+          <button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-del-tx="${t.id}">✕</button>
+        </td>
+      </tr>`;
+    }).join('')}
     </tbody></table>`;
 
   list.querySelectorAll('[data-del-tx]').forEach(btn => {
@@ -2692,9 +2755,51 @@ function renderTransacciones() {
       } catch(e) { showToast('Error: ' + e.message); }
     });
   });
+
+  list.querySelectorAll('[data-edit-tx]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.dataset.editTx;
+      const t = finTx.find(x => x.id === id);
+      if (!t) return;
+      document.getElementById('tx-type').value = t.type;
+      document.getElementById('tx-amount').value = t.amount;
+      document.getElementById('tx-date').value = t.date;
+      document.getElementById('tx-desc').value = t.description;
+      document.getElementById('tx-cat').value = t.category;
+      document.getElementById('tx-partner').value = t.partner || 'empresa';
+      document.getElementById('tx-notes').value = t.notes || '';
+      document.getElementById('tx-recurring').checked = false;
+      document.getElementById('tx-recurring-day-wrap').style.display = 'none';
+      txEditId = id;
+      const btn = document.getElementById('btn-add-tx');
+      btn.textContent = '✓ Guardar cambios';
+      btn.style.background = 'rgba(0,229,204,0.15)';
+      btn.style.color = 'var(--cyan)';
+      btn.style.borderColor = 'rgba(0,229,204,0.3)';
+      document.getElementById('btn-cancel-edit').style.display = 'block';
+      document.querySelector('#ftab-transacciones .card-title').textContent = '✏ Editando transacción';
+      document.getElementById('ftab-transacciones').scrollIntoView({ behavior: 'smooth' });
+    });
+  });
 }
 
 document.getElementById('tx-filter')?.addEventListener('change', renderTransacciones);
+
+let txEditId = null;
+
+function resetTxForm() {
+  txEditId = null;
+  ['tx-amount','tx-desc','tx-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('tx-type').value = 'gasto';
+  document.getElementById('tx-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('tx-recurring').checked = false;
+  document.getElementById('tx-recurring-day-wrap').style.display = 'none';
+  const btn = document.getElementById('btn-add-tx');
+  btn.textContent = '+ Agregar transacción';
+  btn.style.background = 'var(--green)'; btn.style.color = '#000'; btn.style.borderColor = 'var(--green)';
+  document.getElementById('btn-cancel-edit').style.display = 'none';
+  document.querySelector('#ftab-transacciones .card-title').textContent = 'Nueva transacción';
+}
 
 // ── GASTOS FIJOS (RECURRENTES) ───────────────────────
 const RECURRING_KEY = 'rhinos_recurring_txs';
@@ -2786,24 +2891,31 @@ document.getElementById('btn-add-tx').addEventListener('click', async function()
   if (!amount || !description || !date) { showToast('Completá monto, descripción y fecha'); return; }
   this.disabled = true;
   try {
-    const [newTx] = await sbFetch('rhinos_transactions', 'POST', { type, amount, date, description, category, partner, notes, currency: 'USD' });
-    finTx.unshift(newTx);
-
-    if (isRecurring) {
-      const recurring = getRecurring();
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      recurring.push({ id: Date.now().toString(), type, amount, description, category, partner, notes, day: recurringDay, last_applied: currentMonth });
-      saveRecurring(recurring);
-      renderRecurring();
-      showToast('Transacción y gasto fijo guardados 🦏');
+    if (txEditId) {
+      // MODO EDICIÓN — PATCH
+      await sbFetch(`rhinos_transactions?id=eq.${txEditId}`, 'PATCH', { type, amount, date, description, category, partner, notes });
+      finTx = finTx.map(t => t.id === txEditId ? {...t, type, amount, date, description, category, partner, notes} : t);
+      showToast('Transacción actualizada 🦏');
+      resetTxForm();
     } else {
-      showToast('Transacción agregada 🦏');
+      // MODO NUEVO — POST
+      const [newTx] = await sbFetch('rhinos_transactions', 'POST', { type, amount, date, description, category, partner, notes, currency: 'USD' });
+      finTx.unshift(newTx);
+      if (isRecurring) {
+        const recurring = getRecurring();
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        recurring.push({ id: Date.now().toString(), type, amount, description, category, partner, notes, day: recurringDay, last_applied: currentMonth });
+        saveRecurring(recurring);
+        renderRecurring();
+        showToast('Transacción y gasto fijo guardados 🦏');
+      } else {
+        showToast('Transacción agregada 🦏');
+      }
+      ['tx-amount','tx-desc','tx-notes'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('tx-recurring').checked = false;
+      document.getElementById('tx-recurring-day-wrap').style.display = 'none';
     }
-
     renderResumen(); renderTransacciones(); renderSocios();
-    ['tx-amount','tx-desc','tx-notes'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('tx-recurring').checked = false;
-    document.getElementById('tx-recurring-day-wrap').style.display = 'none';
   } catch(e) { showToast('Error: ' + e.message); }
   this.disabled = false;
 });
