@@ -5,7 +5,7 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 const WA_RECIPIENTS = [
   { name: 'Rami', phone: '33617877791', apikey: '9953390' },
-  // { name: 'Manu', phone: 'NUMERO', apikey: 'APIKEY' },
+  { name: 'Manu', phone: '5491126856731', apikey: '6022688' },
   // { name: 'Guille', phone: 'NUMERO', apikey: 'APIKEY' },
   // { name: 'Poli', phone: 'NUMERO', apikey: 'APIKEY' },
 ];
