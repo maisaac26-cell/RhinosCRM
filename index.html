@@ -2698,7 +2698,7 @@ function renderResumen() {
     ultEl.innerHTML = ultimas.map(t => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
         <div>
-          <div style="font-size:12px;color:var(--text)">${t.description}</div>
+          <div style="font-size:12px;color:var(--text)">${t.description}${isMonthly(t) ? MONTHLY_BADGE : ''}</div>
           <div style="font-size:11px;color:var(--text3)">${t.date} · ${t.category}</div>
         </div>
         <span style="font-size:13px;font-weight:500;color:${t.type==='ingreso'?'var(--green)':'var(--red)'}">${t.type==='ingreso'?'+':'−'}${fmtUSD(+t.amount)}</span>
@@ -2729,6 +2729,14 @@ function updateSimulator(gastosTotales) {
   });
 });
 
+function isMonthly(t) {
+  if (!t.notes) return false;
+  const n = t.notes.toLowerCase();
+  return n.includes('fijo') || n.includes('mensual') || n.includes('recurrente');
+}
+
+const MONTHLY_BADGE = `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,204,0.1);color:var(--cyan);border:1px solid rgba(0,229,204,0.2);margin-left:6px;vertical-align:middle">↻ mensual</span>`;
+
 function renderTransacciones() {
   const filter = document.getElementById('tx-filter')?.value || '';
   const list = document.getElementById('tx-list');
@@ -2752,9 +2760,10 @@ function renderTransacciones() {
     </tr></thead>
     <tbody>${txs.map(t => {
       const s = typeStyle(t);
-      return `<tr style="border-bottom:1px solid var(--border)" id="tx-row-${t.id}">
+      const monthly = isMonthly(t);
+      return `<tr style="border-bottom:1px solid var(--border);${monthly?'background:rgba(0,229,204,0.02)':''}" id="tx-row-${t.id}">
         <td style="padding:8px"><span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${s.bg};color:${s.color}">${s.label}</span></td>
-        <td style="padding:8px;color:var(--text)">${t.description}</td>
+        <td style="padding:8px;color:var(--text)">${t.description}${monthly ? MONTHLY_BADGE : ''}</td>
         <td style="padding:8px;color:var(--text2)">${t.category}</td>
         <td style="padding:8px;color:var(--text2)">${t.partner||'empresa'}</td>
         <td style="padding:8px;color:var(--text2)">${t.date}</td>
