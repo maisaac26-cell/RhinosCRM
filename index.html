@@ -2611,6 +2611,7 @@ async function loadFinanzas() {
       sbFetch('rhinos_transactions?order=date.desc'),
       sbFetch('rhinos_partners?order=name.asc')
     ]);
+    syncRecurringFromSupabase();
     await applyRecurring();
     renderResumen();
     renderTransacciones();
@@ -2836,6 +2837,43 @@ function resetTxForm() {
   btn.style.background = 'var(--green)'; btn.style.color = '#000'; btn.style.borderColor = 'var(--green)';
   document.getElementById('btn-cancel-edit').style.display = 'none';
   document.querySelector('#ftab-transacciones .card-title').textContent = 'Nueva transacción';
+}
+
+function syncRecurringFromSupabase() {
+  const existing = getRecurring();
+  const existingDescs = new Set(existing.map(r => r.description.trim().toLowerCase()));
+  const recurringTxs = finTx.filter(t => isMonthly(t) && t.type !== 'pendiente');
+
+  // Agrupar por descripción para detectar plantillas únicas
+  const groups = {};
+  recurringTxs.forEach(t => {
+    const key = t.description.trim().toLowerCase();
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+
+  let added = 0;
+  Object.entries(groups).forEach(([key, txs]) => {
+    if (existingDescs.has(key)) return;
+    // Usar la transacción más reciente como plantilla
+    const latest = txs.sort((a, b) => b.date.localeCompare(a.date))[0];
+    const day = String(+latest.date.slice(8, 10)); // "01" → "1"
+    const lastApplied = latest.date.slice(0, 7);
+    existing.push({
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      type: latest.type,
+      amount: latest.amount,
+      description: latest.description,
+      category: latest.category || 'Tecnología',
+      partner: latest.partner || 'empresa',
+      notes: latest.notes || '',
+      day,
+      last_applied: lastApplied
+    });
+    added++;
+  });
+
+  if (added > 0) saveRecurring(existing);
 }
 
 // ── GASTOS FIJOS (RECURRENTES) ───────────────────────
