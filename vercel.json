@@ -1,9 +1,14 @@
 {
   "functions": {
-    "api/api.js": {
-      "maxDuration": 30
-    }
+    "api/api.js": { "maxDuration": 30 },
+    "api/weekly-report.js": { "maxDuration": 30 }
   },
+  "crons": [
+    {
+      "path": "/api/weekly-report",
+      "schedule": "0 13 * * 1"
+    }
+  ],
   "rewrites": [
     { "source": "/auth/callback", "destination": "/index.html" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
