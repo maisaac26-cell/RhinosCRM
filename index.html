@@ -1106,12 +1106,36 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
       <div>
         <div class="card" style="padding:0;overflow:hidden">
-          <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:0.08em;text-transform:uppercase">Vista previa</span>
-            <button class="btn btn-green btn-sm" id="btn-print-pres">⬇ Descargar PDF</button>
+          <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:0.08em;text-transform:uppercase">Vista previa</span>
+              <span id="pres-edit-badge" style="display:none;font-size:10px;background:rgba(0,229,204,0.12);color:var(--cyan);border:1px solid rgba(0,229,204,0.2);border-radius:4px;padding:2px 7px">✏ Edición activa — clickeá cualquier texto</span>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-sm" id="btn-print-pres" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3)">⬇ Descargar PDF</button>
+              <button class="btn btn-sm" id="btn-gmail-pres" style="background:rgba(99,102,241,0.12);color:#818cf8;border-color:rgba(99,102,241,0.3);display:none">📧 Enviar por Gmail</button>
+            </div>
           </div>
           <div id="pres-preview" style="min-height:400px;background:white">
             <div class="empty" style="color:#888">Completá los datos y generá la vista previa</div>
+          </div>
+        </div>
+
+        <!-- Gmail send modal -->
+        <div id="pres-gmail-modal" style="display:none;margin-top:1rem">
+          <div class="card" style="border-color:rgba(99,102,241,0.3)">
+            <div class="card-title" style="color:#818cf8">📧 Enviar presupuesto por Gmail</div>
+            <div class="field"><label>Email del cliente</label><input id="pres-to" placeholder="cliente@empresa.com"/></div>
+            <div class="field"><label>Asunto</label><input id="pres-subject" placeholder="Generando..."/></div>
+            <div class="field"><label>Cuerpo del email</label><textarea id="pres-body" rows="8" placeholder="Generando con IA..."></textarea></div>
+            <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:var(--r);padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--amber)">
+              💡 Descargá el PDF con el botón de arriba y adjuntalo al email antes de enviarlo.
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn" id="btn-pres-ai-email" style="background:rgba(99,102,241,0.12);color:#818cf8;border-color:rgba(99,102,241,0.3)">🦏 Generar email con IA</button>
+              <button class="btn btn-green" id="btn-pres-send-gmail">Enviar email</button>
+              <button class="btn" id="btn-pres-cancel-gmail">Cancelar</button>
+            </div>
           </div>
         </div>
       </div>
@@ -3336,18 +3360,89 @@ document.getElementById('btn-preview-pres').addEventListener('click', () => {
       </div>
     </div>`;
 
-  document.getElementById('pres-preview').innerHTML = html;
+  const preview = document.getElementById('pres-preview');
+  preview.innerHTML = html;
+  preview.contentEditable = 'true';
+  preview.style.outline = 'none';
+  document.getElementById('pres-edit-badge').style.display = 'inline-block';
+  document.getElementById('btn-gmail-pres').style.display = 'inline-flex';
 });
 
 document.getElementById('btn-print-pres').addEventListener('click', () => {
-  const content = document.getElementById('pres-preview').innerHTML;
-  if (!content || content.includes('Completá los datos')) { showToast('Generá la vista previa primero'); return; }
-  const cliente = document.getElementById('pres-cliente').value.trim() || 'presupuesto';
-  const win = window.open('', '_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Presupuesto - ${cliente}</title>
-    <style>body{margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif} @page{margin:15mm} @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>
-    </head><body>${content}<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script></body></html>`);
-  win.document.close();
+  const preview = document.getElementById('pres-preview');
+  if (!preview.innerHTML || preview.innerHTML.includes('Completá los datos')) { showToast('Generá la vista previa primero'); return; }
+  const printStyle = document.createElement('style');
+  printStyle.id = 'pres-print-style';
+  printStyle.textContent = `@media print {
+    body > *:not(#app-wrap) { display: none !important; }
+    #app-wrap > *:not(#s-presupuestos) { display: none !important; }
+    #s-presupuestos > *:not(.grid2) { display: none !important; }
+    .grid2 > *:first-child { display: none !important; }
+    #pres-gmail-modal { display: none !important; }
+    #pres-preview { min-height: unset !important; }
+    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
+    @page { margin: 12mm; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }`;
+  document.head.appendChild(printStyle);
+  window.print();
+  setTimeout(() => { const s = document.getElementById('pres-print-style'); if (s) s.remove(); }, 1000);
+});
+
+document.getElementById('btn-gmail-pres').addEventListener('click', () => {
+  document.getElementById('pres-gmail-modal').style.display = 'block';
+  document.getElementById('pres-gmail-modal').scrollIntoView({ behavior: 'smooth' });
+  const cliente = document.getElementById('pres-cliente').value.trim() || 'Cliente';
+  const empresa = document.getElementById('pres-empresa').value.trim();
+  document.getElementById('pres-subject').value = `Propuesta RhinosApp — ${empresa || cliente}`;
+});
+
+document.getElementById('btn-pres-cancel-gmail').addEventListener('click', () => {
+  document.getElementById('pres-gmail-modal').style.display = 'none';
+});
+
+document.getElementById('btn-pres-ai-email').addEventListener('click', async function() {
+  const cliente = document.getElementById('pres-cliente').value.trim() || 'Cliente';
+  const empresa = document.getElementById('pres-empresa').value.trim();
+  const validez = document.getElementById('pres-validez').value;
+  this.disabled = true; this.textContent = 'Generando...';
+  try {
+    const r = await callAPI('ai_agent', {
+      system: `Sos el agente comercial de RhinosApp — CRM/ERP para distribuidoras de alimentos en Argentina. Redactás emails de ventas en español rioplatense, tono profesional y directo. Firmá siempre como: Equipo RhinosApp 🦏 | comercial@rhinosapp.com | +54 9 11 6822-3306`,
+      messages: [{ role: 'user', content: `Escribí un email comercial para enviar junto con un presupuesto de RhinosApp a:
+Cliente: ${cliente}${empresa ? '\nEmpresa: ' + empresa : ''}
+Validez del presupuesto: ${validez}
+
+El email debe:
+- Tener un asunto de apertura cálido pero profesional
+- Presentar brevemente el presupuesto adjunto
+- Remarcar que la implementación es sin costo
+- Invitar a agendar una demo o llamada: calendly.com/comercial-rhinosapp o WhatsApp +54 9 11 6822-3306
+- Máximo 5 párrafos cortos
+- Terminar con firma completa
+Solo el cuerpo del email, sin asunto.` }]
+    });
+    document.getElementById('pres-body').value = r.reply;
+  } catch(e) { showToast('Error generando email: ' + e.message); }
+  this.disabled = false; this.textContent = '🦏 Generar email con IA';
+});
+
+document.getElementById('btn-pres-send-gmail').addEventListener('click', async function() {
+  const to = document.getElementById('pres-to').value.trim();
+  const subject = document.getElementById('pres-subject').value.trim();
+  const body = document.getElementById('pres-body').value.trim();
+  if (!to || !subject || !body) { showToast('Completá destinatario, asunto y cuerpo'); return; }
+  const tokens = (() => { try { return JSON.parse(localStorage.getItem('rhinos_gmail_tokens')); } catch(e) { return null; } })();
+  if (!tokens?.access_token) { showToast('Conectá Gmail primero desde la sección Gmail'); return; }
+  this.disabled = true; this.textContent = 'Enviando...';
+  try {
+    await callAPI('gmail_send', { access_token: tokens.access_token, to, subject, body });
+    showToast('Email enviado 🦏');
+    document.getElementById('pres-gmail-modal').style.display = 'none';
+    document.getElementById('pres-to').value = '';
+    document.getElementById('pres-body').value = '';
+  } catch(e) { showToast('Error: ' + e.message); }
+  this.disabled = false; this.textContent = 'Enviar email';
 });
 
 document.querySelector('.nav-btn[data-sec="presupuestos"]').addEventListener('click', () => {
