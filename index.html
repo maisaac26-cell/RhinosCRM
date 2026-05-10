@@ -2659,8 +2659,10 @@ function renderResumen() {
         this.disabled = true;
         try {
           const today = new Date().toISOString().slice(0,10);
-          const [updated] = await sbFetch(`rhinos_transactions?id=eq.${id}`, 'PATCH', { type: 'gasto', date: today });
-          finTx = finTx.map(t => t.id === id ? {...t, type:'gasto', date: today} : t);
+          await sbFetch(`rhinos_transactions?id=eq.${id}`, 'PATCH', { type: 'gasto', date: today });
+          const pagado = {...tx, type:'gasto', date: today};
+          finTx = finTx.map(t => t.id === id ? pagado : t);
+          notifyFinanzas('Pendiente pagado', pagado);
           renderResumen(); renderTransacciones(); renderSocios();
           showToast('Gasto marcado como pagado 🦏');
         } catch(e) { showToast('Error: ' + e.message); this.disabled = false; }
@@ -2781,8 +2783,10 @@ function renderTransacciones() {
       if (!confirm('¿Eliminar esta transacción?')) return;
       const id = this.dataset.delTx;
       try {
+        const deleted = finTx.find(t => t.id === id);
         await sbFetch(`rhinos_transactions?id=eq.${id}`, 'DELETE');
         finTx = finTx.filter(t => t.id !== id);
+        if (deleted) notifyFinanzas('Eliminada', deleted);
         renderResumen(); renderTransacciones(); renderSocios();
         showToast('Transacción eliminada');
       } catch(e) { showToast('Error: ' + e.message); }
@@ -2911,6 +2915,38 @@ document.getElementById('tx-recurring').addEventListener('change', function() {
   document.getElementById('tx-recurring-day-wrap').style.display = this.checked ? 'block' : 'none';
 });
 
+// ── NOTIFICACIONES DE FINANZAS POR EMAIL ─────────────
+async function notifyFinanzas(accion, tx) {
+  try {
+    const tokens = JSON.parse(localStorage.getItem('rhinos_gmail_tokens') || 'null');
+    if (!tokens?.access_token) return;
+    const icons = { ingreso: '💰', gasto: '💸', inversion: '📈', pendiente: '⏳' };
+    const icon = icons[tx.type] || '💳';
+    const monthly = (tx.notes || '').toLowerCase().includes('fijo') ? ' (↻ mensual)' : '';
+    const session = getCRMSession();
+    const quien = session?.user?.name || session?.user?.email || 'alguien del equipo';
+    const subject = `${icon} RhinosApp Finanzas — ${accion}: ${tx.description}`;
+    const body = `Hola equipo 🦏,
+
+Se registró un movimiento en Finanzas de RhinosApp:
+
+Acción: ${accion.toUpperCase()}
+Tipo: ${tx.type}${monthly}
+Descripción: ${tx.description}
+Monto: ${tx.type === 'ingreso' ? '+' : '−'}$${Number(tx.amount).toFixed(2)} USD
+Categoría: ${tx.category || '—'}
+Socio: ${tx.partner || 'empresa'}
+Fecha: ${tx.date}${tx.notes ? '\nNotas: ' + tx.notes : ''}
+
+Registrado por: ${quien}
+Fecha/hora: ${new Date().toLocaleString('es-AR')}
+
+—
+RhinosApp · Sistema de notificaciones automáticas`;
+    await callAPI('gmail_send', { access_token: tokens.access_token, to: 'comercial@rhinosapp.com', subject, body });
+  } catch(e) { console.warn('Notificación de finanzas no enviada:', e.message); }
+}
+
 document.getElementById('btn-add-tx').addEventListener('click', async function() {
   const type = document.getElementById('tx-type').value;
   const amount = +document.getElementById('tx-amount').value;
@@ -2927,13 +2963,16 @@ document.getElementById('btn-add-tx').addEventListener('click', async function()
     if (txEditId) {
       // MODO EDICIÓN — PATCH
       await sbFetch(`rhinos_transactions?id=eq.${txEditId}`, 'PATCH', { type, amount, date, description, category, partner, notes });
-      finTx = finTx.map(t => t.id === txEditId ? {...t, type, amount, date, description, category, partner, notes} : t);
+      const updated = {...finTx.find(t => t.id === txEditId), type, amount, date, description, category, partner, notes};
+      finTx = finTx.map(t => t.id === txEditId ? updated : t);
+      notifyFinanzas('Editada', updated);
       showToast('Transacción actualizada 🦏');
       resetTxForm();
     } else {
       // MODO NUEVO — POST
       const [newTx] = await sbFetch('rhinos_transactions', 'POST', { type, amount, date, description, category, partner, notes, currency: 'USD' });
       finTx.unshift(newTx);
+      notifyFinanzas('Nueva transacción', newTx);
       if (isRecurring) {
         const recurring = getRecurring();
         const currentMonth = new Date().toISOString().slice(0, 7);
