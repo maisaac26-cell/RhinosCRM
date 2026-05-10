@@ -2664,6 +2664,7 @@ function renderResumen() {
           const pagado = {...tx, type:'gasto', date: today};
           finTx = finTx.map(t => t.id === id ? pagado : t);
           notifyFinanzas('Pendiente pagado', pagado);
+          notifyWhatsApp('Pendiente pagado', pagado);
           renderResumen(); renderTransacciones(); renderSocios();
           showToast('Gasto marcado como pagado 🦏');
         } catch(e) { showToast('Error: ' + e.message); this.disabled = false; }
@@ -2787,7 +2788,7 @@ function renderTransacciones() {
         const deleted = finTx.find(t => t.id === id);
         await sbFetch(`rhinos_transactions?id=eq.${id}`, 'DELETE');
         finTx = finTx.filter(t => t.id !== id);
-        if (deleted) notifyFinanzas('Eliminada', deleted);
+        if (deleted) { notifyFinanzas('Eliminada', deleted); notifyWhatsApp('Eliminada', deleted); }
         renderResumen(); renderTransacciones(); renderSocios();
         showToast('Transacción eliminada');
       } catch(e) { showToast('Error: ' + e.message); }
@@ -2953,6 +2954,29 @@ document.getElementById('tx-recurring').addEventListener('change', function() {
   document.getElementById('tx-recurring-day-wrap').style.display = this.checked ? 'block' : 'none';
 });
 
+// ── NOTIFICACIONES WHATSAPP (CALLMEBOT) ──────────────
+const WA_RECIPIENTS = [
+  { name: 'Rami', phone: '33617877791', apikey: '9953390' },
+  // { name: 'Manu', phone: 'NUMERO', apikey: 'APIKEY' },
+  // { name: 'Guille', phone: 'NUMERO', apikey: 'APIKEY' },
+  // { name: 'Poli', phone: 'NUMERO', apikey: 'APIKEY' },
+];
+
+async function notifyWhatsApp(accion, tx) {
+  if (!WA_RECIPIENTS.length) return;
+  const icons = { ingreso: '💰', gasto: '💸', inversion: '📈', pendiente: '⏳' };
+  const icon = icons[tx.type] || '💳';
+  const monthly = isMonthly(tx) ? ' ↻ mensual' : '';
+  const signo = tx.type === 'ingreso' ? '+' : '−';
+  const text = `${icon} *RhinosApp Finanzas*\n\n*${accion}*\n📋 ${tx.description}${monthly}\n💵 ${signo}$${Number(tx.amount).toFixed(2)} USD\n🏷 ${tx.category || '—'} · ${tx.partner || 'empresa'}\n📅 ${tx.date}`;
+  const encoded = encodeURIComponent(text);
+  for (const r of WA_RECIPIENTS) {
+    try {
+      await fetch(`https://api.callmebot.com/whatsapp.php?phone=${r.phone}&text=${encoded}&apikey=${r.apikey}`);
+    } catch(e) { console.warn('WhatsApp notify failed for', r.name, e.message); }
+  }
+}
+
 // ── NOTIFICACIONES DE FINANZAS POR EMAIL ─────────────
 async function notifyFinanzas(accion, tx) {
   try {
@@ -3004,6 +3028,7 @@ document.getElementById('btn-add-tx').addEventListener('click', async function()
       const updated = {...finTx.find(t => t.id === txEditId), type, amount, date, description, category, partner, notes};
       finTx = finTx.map(t => t.id === txEditId ? updated : t);
       notifyFinanzas('Editada', updated);
+      notifyWhatsApp('Editada', updated);
       showToast('Transacción actualizada 🦏');
       resetTxForm();
     } else {
@@ -3011,6 +3036,7 @@ document.getElementById('btn-add-tx').addEventListener('click', async function()
       const [newTx] = await sbFetch('rhinos_transactions', 'POST', { type, amount, date, description, category, partner, notes, currency: 'USD' });
       finTx.unshift(newTx);
       notifyFinanzas('Nueva transacción', newTx);
+      notifyWhatsApp('Nueva transacción', newTx);
       if (isRecurring) {
         const recurring = getRecurring();
         const currentMonth = new Date().toISOString().slice(0, 7);
