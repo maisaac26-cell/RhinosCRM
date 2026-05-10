@@ -870,7 +870,31 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="field"><label>Notas (opcional)</label>
           <input id="tx-notes" placeholder="Notas adicionales..."/>
         </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;background:rgba(0,229,204,0.05);border:1px solid rgba(0,229,204,0.2);border-radius:var(--r);padding:10px 14px">
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;margin:0;color:var(--text)">
+            <input type="checkbox" id="tx-recurring" style="width:auto;padding:0;accent-color:var(--cyan)"/>
+            <span>↻ Gasto fijo mensual</span>
+          </label>
+          <div id="tx-recurring-day-wrap" style="display:none;flex:1">
+            <select id="tx-recurring-day" style="font-size:12px;padding:5px 10px">
+              <option value="1">Día 1 de cada mes</option>
+              <option value="5">Día 5 de cada mes</option>
+              <option value="10">Día 10 de cada mes</option>
+              <option value="15">Día 15 de cada mes</option>
+              <option value="20">Día 20 de cada mes</option>
+              <option value="25">Día 25 de cada mes</option>
+            </select>
+          </div>
+        </div>
         <button class="btn btn-green" id="btn-add-tx">+ Agregar transacción</button>
+      </div>
+
+      <div class="card" id="recurring-card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          ↻ Gastos fijos configurados
+          <span id="recurring-badge" style="font-size:10px;background:rgba(0,229,204,0.1);color:var(--cyan);border:1px solid rgba(0,229,204,0.2);border-radius:10px;padding:2px 8px">0 activos</span>
+        </div>
+        <div id="recurring-list"><div class="empty" style="font-size:12px">No hay gastos fijos configurados aún.</div></div>
       </div>
 
       <div class="card">
@@ -2551,9 +2575,11 @@ async function loadFinanzas() {
       sbFetch('rhinos_transactions?order=date.desc'),
       sbFetch('rhinos_partners?order=name.asc')
     ]);
+    await applyRecurring();
     renderResumen();
     renderTransacciones();
     renderSocios();
+    renderRecurring();
   } catch(e) { showToast('Error cargando finanzas: ' + e.message); }
 }
 
@@ -2670,6 +2696,83 @@ function renderTransacciones() {
 
 document.getElementById('tx-filter')?.addEventListener('change', renderTransacciones);
 
+// ── GASTOS FIJOS (RECURRENTES) ───────────────────────
+const RECURRING_KEY = 'rhinos_recurring_txs';
+
+function getRecurring() {
+  try { return JSON.parse(localStorage.getItem(RECURRING_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveRecurring(list) {
+  localStorage.setItem(RECURRING_KEY, JSON.stringify(list));
+}
+
+function renderRecurring() {
+  const list = getRecurring();
+  const el = document.getElementById('recurring-list');
+  const badge = document.getElementById('recurring-badge');
+  badge.textContent = list.length + ' activo' + (list.length !== 1 ? 's' : '');
+  if (!list.length) { el.innerHTML = '<div class="empty" style="font-size:12px">No hay gastos fijos configurados aún.</div>'; return; }
+  el.innerHTML = list.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,0.12);color:var(--red)">↻ fijo</span>
+        <div>
+          <div style="font-size:13px;color:var(--text)">${r.description}</div>
+          <div style="font-size:11px;color:var(--text3)">${r.category} · ${r.partner} · día ${r.day} de cada mes</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:13px;font-weight:500;color:var(--red)">−${fmtUSD(+r.amount)}</span>
+        <button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-del-recurring="${r.id}">✕</button>
+      </div>
+    </div>`).join('');
+
+  el.querySelectorAll('[data-del-recurring]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (!confirm('¿Eliminar este gasto fijo? No borra las transacciones ya generadas.')) return;
+      const updated = getRecurring().filter(r => r.id !== this.dataset.delRecurring);
+      saveRecurring(updated);
+      renderRecurring();
+      showToast('Gasto fijo eliminado');
+    });
+  });
+}
+
+async function applyRecurring() {
+  const list = getRecurring();
+  if (!list.length) return;
+  const now = new Date();
+  const currentMonth = now.toISOString().slice(0, 7); // "YYYY-MM"
+  const today = now.getDate();
+  let applied = 0;
+
+  for (const r of list) {
+    if (r.last_applied === currentMonth) continue;
+    if (today < +r.day) continue; // esperar al día configurado
+    const txDate = `${currentMonth}-${String(r.day).padStart(2, '0')}`;
+    try {
+      const [newTx] = await sbFetch('rhinos_transactions', 'POST', {
+        type: r.type, amount: r.amount, date: txDate,
+        description: r.description + ' (fijo)', category: r.category,
+        partner: r.partner, notes: 'Gasto fijo automático', currency: 'USD'
+      });
+      finTx.unshift(newTx);
+      r.last_applied = currentMonth;
+      applied++;
+    } catch(e) { console.error('Error aplicando recurrente:', e); }
+  }
+
+  if (applied > 0) {
+    saveRecurring(list);
+    showToast(`↻ ${applied} gasto${applied > 1 ? 's' : ''} fijo${applied > 1 ? 's' : ''} aplicado${applied > 1 ? 's' : ''} automáticamente`);
+    renderResumen(); renderTransacciones(); renderSocios();
+  }
+}
+
+document.getElementById('tx-recurring').addEventListener('change', function() {
+  document.getElementById('tx-recurring-day-wrap').style.display = this.checked ? 'block' : 'none';
+});
+
 document.getElementById('btn-add-tx').addEventListener('click', async function() {
   const type = document.getElementById('tx-type').value;
   const amount = +document.getElementById('tx-amount').value;
@@ -2678,14 +2781,29 @@ document.getElementById('btn-add-tx').addEventListener('click', async function()
   const category = document.getElementById('tx-cat').value;
   const partner = document.getElementById('tx-partner').value;
   const notes = document.getElementById('tx-notes').value.trim();
+  const isRecurring = document.getElementById('tx-recurring').checked;
+  const recurringDay = document.getElementById('tx-recurring-day').value;
   if (!amount || !description || !date) { showToast('Completá monto, descripción y fecha'); return; }
   this.disabled = true;
   try {
     const [newTx] = await sbFetch('rhinos_transactions', 'POST', { type, amount, date, description, category, partner, notes, currency: 'USD' });
     finTx.unshift(newTx);
+
+    if (isRecurring) {
+      const recurring = getRecurring();
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      recurring.push({ id: Date.now().toString(), type, amount, description, category, partner, notes, day: recurringDay, last_applied: currentMonth });
+      saveRecurring(recurring);
+      renderRecurring();
+      showToast('Transacción y gasto fijo guardados 🦏');
+    } else {
+      showToast('Transacción agregada 🦏');
+    }
+
     renderResumen(); renderTransacciones(); renderSocios();
     ['tx-amount','tx-desc','tx-notes'].forEach(id => document.getElementById(id).value = '');
-    showToast('Transacción agregada 🦏');
+    document.getElementById('tx-recurring').checked = false;
+    document.getElementById('tx-recurring-day-wrap').style.display = 'none';
   } catch(e) { showToast('Error: ' + e.message); }
   this.disabled = false;
 });
