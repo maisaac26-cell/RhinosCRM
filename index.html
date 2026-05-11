@@ -3544,22 +3544,27 @@ document.getElementById('btn-preview-pres').addEventListener('click', () => {
 document.getElementById('btn-print-pres').addEventListener('click', () => {
   const preview = document.getElementById('pres-preview');
   if (!preview.innerHTML || preview.innerHTML.includes('Completá los datos')) { showToast('Generá la vista previa primero'); return; }
-  const printStyle = document.createElement('style');
-  printStyle.id = 'pres-print-style';
-  printStyle.textContent = `@media print {
-    body > *:not(#app-wrap) { display: none !important; }
-    #app-wrap > *:not(#s-presupuestos) { display: none !important; }
-    #s-presupuestos > *:not(.grid2) { display: none !important; }
-    .grid2 > *:first-child { display: none !important; }
-    #pres-gmail-modal { display: none !important; }
-    #pres-preview { min-height: unset !important; }
-    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
-    @page { margin: 12mm; }
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }`;
-  document.head.appendChild(printStyle);
-  window.print();
-  setTimeout(() => { const s = document.getElementById('pres-print-style'); if (s) s.remove(); }, 1000);
+  const cliente = document.getElementById('pres-cliente').value.trim() || 'presupuesto';
+  const win = window.open('', '_blank', 'width=960,height=800');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8"/>
+    <title>Presupuesto RhinosApp - ${cliente}</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Segoe UI', Arial, sans-serif; background: white; color: #111; }
+      @page { margin: 12mm; }
+      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+    </style>
+  </head><body>
+    ${preview.innerHTML}
+    <script>
+      window.onload = function() {
+        window.print();
+        window.onafterprint = function() { window.close(); };
+      };
+    <\/script>
+  </body></html>`);
+  win.document.close();
 });
 
 document.getElementById('btn-gmail-pres').addEventListener('click', () => {
