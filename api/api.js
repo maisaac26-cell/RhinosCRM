@@ -516,8 +516,27 @@ Respondé SOLO con el prompt en inglés, sin explicaciones ni comillas.`;
 
     else if (action === 'gmail_send') {
       const { access_token, to, subject, body: emailBody, thread_id, in_reply_to, references } = body;
+
+      // Obtener email del usuario para el header From (necesario para guardar en Enviados)
+      let senderEmail = '';
+      try {
+        const profile = await new Promise((resolve, reject) => {
+          const req = https.request({
+            hostname: 'gmail.googleapis.com', path: '/gmail/v1/users/me/profile', method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + access_token }
+          }, (res) => {
+            let raw = ''; res.on('data', c => raw += c);
+            res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { resolve({}); } });
+          });
+          req.on('error', () => resolve({})); req.end();
+        });
+        senderEmail = profile.emailAddress || '';
+      } catch(e) {}
+
       const encodedSubject = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
-      let rawEmail = `To: ${to}\r\nSubject: ${encodedSubject}\r\nContent-Type: text/plain; charset=utf-8\r\n`;
+      let rawEmail = `MIME-Version: 1.0\r\n`;
+      if (senderEmail) rawEmail += `From: ${senderEmail}\r\n`;
+      rawEmail += `To: ${to}\r\nSubject: ${encodedSubject}\r\nContent-Type: text/plain; charset=utf-8\r\n`;
       if (thread_id) rawEmail += `In-Reply-To: ${in_reply_to || ''}\r\nReferences: ${references || ''}\r\n`;
       rawEmail += `\r\n${emailBody}`;
       const encoded = Buffer.from(rawEmail).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
