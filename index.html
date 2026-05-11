@@ -3025,10 +3025,10 @@ async function notifyWhatsApp(accion, tx) {
   const icons = { ingreso: '💰', gasto: '💸', inversion: '📈', pendiente: '⏳' };
   const icon = icons[tx.type] || '💳';
   const monthly = isMonthly(tx) ? ' ↻ mensual' : '';
-  const signo = tx.type === 'ingreso' ? '+' : '−';
+  const signo = tx.type === 'ingreso' ? '+' : '-';
   const monto = parseFloat(tx.amount) || 0;
-  const montoFmt = `${signo}$${monto.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
-  const text = `${icon} *RhinosApp Finanzas*\n\n*${accion}*\n- ${tx.description}${monthly}\n- ${montoFmt}\n- ${tx.category || '—'} · ${tx.partner || 'empresa'}\n- ${tx.date}`;
+  const montoFmt = `${signo}${monto.toFixed(2)} USD`;
+  const text = `${icon} *RhinosApp Finanzas*\n\n*${accion}*\n\n📋 ${tx.description}${monthly}\n💵 ${montoFmt}\n🏷 ${tx.category || '—'} · ${tx.partner || 'empresa'}\n📅 ${tx.date}`;
   const encoded = encodeURIComponent(text);
   for (const r of WA_RECIPIENTS) {
     try {
