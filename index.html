@@ -3618,21 +3618,24 @@ document.getElementById('btn-pres-send-gmail').addEventListener('click', async f
 
   this.disabled = true; this.textContent = 'Generando PDF...';
   try {
-    // Generar PDF desde el preview
+    // Generar PDF desde el preview usando contenedor temporal
     const cliente = document.getElementById('pres-cliente').value.trim() || 'cliente';
     const filename = `Presupuesto_RhinosApp_${cliente}.pdf`;
-    const wasEditable = preview.contentEditable;
-    preview.contentEditable = 'false';
+
+    const tempDiv = document.createElement('div');
+    tempDiv.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white;font-family:Segoe UI,Arial,sans-serif;';
+    tempDiv.innerHTML = preview.innerHTML;
+    document.body.appendChild(tempDiv);
 
     const pdfBlob = await html2pdf().set({
       margin: [10, 10, 10, 10],
       filename,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, windowWidth: 794 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(preview).outputPdf('blob');
+    }).from(tempDiv).outputPdf('blob');
 
-    preview.contentEditable = wasEditable;
+    document.body.removeChild(tempDiv);
 
     // Convertir PDF a base64
     const pdfBase64 = await new Promise(resolve => {
