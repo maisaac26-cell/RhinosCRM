@@ -284,33 +284,45 @@ Respondé SOLO con el prompt en inglés, sin explicaciones ni comillas.`;
     }
 
     else if (action === 'generate_image') {
-      const { prompt } = body;
+      const { prompt, size = '1024x1024', quality = 'hd', variations = 1 } = body;
       const OPENAI_KEY = process.env.OPENAI_API_KEY;
-      const payload = JSON.stringify({
-        model: 'dall-e-3',
-        prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'standard'
-      });
-      const imgData = await new Promise((resolve, reject) => {
-        const req = https.request({
-          hostname: 'api.openai.com',
-          path: '/v1/images/generations',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + OPENAI_KEY,
-            'Content-Length': Buffer.byteLength(payload)
-          }
-        }, (res) => {
-          let raw = ''; res.on('data', c => raw += c);
-          res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0,200))); } });
+
+      const sizeMap = {
+        'square': '1024x1024',
+        'portrait': '1024x1792',
+        'landscape': '1792x1024'
+      };
+      const finalSize = sizeMap[size] || size;
+      const count = Math.min(Math.max(1, +variations), 3);
+
+      // DALL-E 3 solo acepta n=1, generamos en paralelo
+      const requests = Array.from({ length: count }, () => {
+        const payload = JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size: finalSize, quality });
+        return new Promise((resolve, reject) => {
+          const req = https.request({
+            hostname: 'api.openai.com',
+            path: '/v1/images/generations',
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + OPENAI_KEY,
+              'Content-Length': Buffer.byteLength(payload)
+            }
+          }, (res) => {
+            let raw = ''; res.on('data', c => raw += c);
+            res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0, 200))); } });
+          });
+          req.on('error', reject); req.write(payload); req.end();
         });
-        req.on('error', reject); req.write(payload); req.end();
       });
-      if (imgData.error) throw new Error(imgData.error.message);
-      result = { url: imgData.data?.[0]?.url };
+
+      const results = await Promise.all(requests);
+      const urls = results.map(r => {
+        if (r.error) throw new Error(r.error.message);
+        return r.data?.[0]?.url;
+      }).filter(Boolean);
+
+      result = { urls, url: urls[0] };
     }
 
     else if (action === 'gmail_get_client_id') {

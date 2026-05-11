@@ -422,10 +422,42 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           </select>
         </div>
         <button class="btn btn-green btn-full" id="btn-gen-content">Generar contenido 🦏</button>
-        <button class="btn btn-full" id="btn-gen-image" style="margin-top:6px;background:rgba(139,92,246,0.1);color:#a78bfa;border-color:rgba(139,92,246,0.3)">🎨 Generar imagen con IA (DALL-E 3)</button>
+
+        <!-- Opciones imagen -->
+        <div style="margin-top:10px;padding:10px 14px;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.2);border-radius:var(--r)">
+          <div style="font-size:10px;color:#a78bfa;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">🎨 Opciones de imagen DALL-E 3</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+            <div class="field" style="margin:0">
+              <label style="color:var(--text3)">Formato</label>
+              <select id="img-size" style="font-size:12px;padding:6px 8px">
+                <option value="square">⬜ Feed 1:1</option>
+                <option value="portrait">📱 Stories 9:16</option>
+                <option value="landscape">🖼 Banner 16:9</option>
+              </select>
+            </div>
+            <div class="field" style="margin:0">
+              <label style="color:var(--text3)">Calidad</label>
+              <select id="img-quality" style="font-size:12px;padding:6px 8px">
+                <option value="hd">⭐ HD</option>
+                <option value="standard">Standard</option>
+              </select>
+            </div>
+            <div class="field" style="margin:0">
+              <label style="color:var(--text3)">Variaciones</label>
+              <select id="img-variations" style="font-size:12px;padding:6px 8px">
+                <option value="1">1 imagen</option>
+                <option value="2">2 imágenes</option>
+                <option value="3">3 imágenes</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-full" id="btn-gen-image" style="background:rgba(139,92,246,0.2);color:#a78bfa;border-color:rgba(139,92,246,0.4);font-weight:600">🎨 Generar imagen con DALL-E 3</button>
+        </div>
       </div>
-      <div id="content-output"><div class="empty">Completá el formulario</div></div>
-      <div id="image-output" style="margin-top:1rem"></div>
+      <div>
+        <div id="content-output"><div class="empty">Completá el formulario y generá contenido</div></div>
+        <div id="image-output" style="margin-top:1rem"></div>
+      </div>
     </div>
   </div>
 
@@ -1551,49 +1583,64 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
   const angulo = document.getElementById('c-angulo').value.trim();
   const formato = document.getElementById('c-formato').value;
   const tono = document.getElementById('c-tono').value;
+  const size = document.getElementById('img-size').value;
+  const quality = document.getElementById('img-quality').value;
+  const variations = +document.getElementById('img-variations').value;
   const out = document.getElementById('image-output');
+
+  const sizeLabel = { square: 'Feed 1:1', portrait: 'Stories 9:16', landscape: 'Banner 16:9' };
   out.innerHTML = `<div class="card" style="border-color:rgba(139,92,246,0.3)"><div class="empty"><div class="loader"></div><br>Generando prompt con IA...<br><span style="font-size:11px;color:var(--text3)">Claude está diseñando el prompt visual</span></div></div>`;
   this.disabled = true;
 
   try {
     const promptRes = await callAPI('generate_image_prompt', {
-      modulo: modulo.options[modulo.selectedIndex].text,
-      angulo, formato, tono
+      modulo: modulo.options[modulo.selectedIndex].text, angulo, formato, tono
     });
     const imagePrompt = promptRes.prompt;
 
-    // Show prompt editor before generating
     out.innerHTML = `
       <div class="card" style="border-color:rgba(139,92,246,0.3)">
         <div class="output-head" style="margin-bottom:10px">
-          <span class="output-label" style="color:#a78bfa">Prompt generado — podés editarlo</span>
+          <span class="output-label" style="color:#a78bfa">Prompt — podés editarlo antes de generar</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:10px;background:rgba(139,92,246,0.15);color:#a78bfa;border-radius:4px;padding:2px 7px">${sizeLabel[size]}</span>
+            <span style="font-size:10px;background:rgba(139,92,246,0.15);color:#a78bfa;border-radius:4px;padding:2px 7px">${quality.toUpperCase()}</span>
+            <span style="font-size:10px;background:rgba(139,92,246,0.15);color:#a78bfa;border-radius:4px;padding:2px 7px">${variations} var.</span>
+          </div>
         </div>
-        <textarea id="img-prompt-edit" style="width:100%;min-height:120px;font-size:12px;font-family:var(--mono);line-height:1.6;margin-bottom:10px;resize:vertical">${imagePrompt}</textarea>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-full" id="btn-fire-image" style="background:rgba(139,92,246,0.2);color:#a78bfa;border-color:rgba(139,92,246,0.4);font-weight:600">🎨 Generar imagen con este prompt</button>
-        </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--text3)">💡 Tip: podés editar el prompt antes de generar para ajustar detalles</div>
+        <textarea id="img-prompt-edit" style="width:100%;min-height:110px;font-size:12px;font-family:var(--mono);line-height:1.6;margin-bottom:10px;resize:vertical">${imagePrompt}</textarea>
+        <button class="btn btn-full" id="btn-fire-image" style="background:rgba(139,92,246,0.2);color:#a78bfa;border-color:rgba(139,92,246,0.4);font-weight:600">🎨 Generar ${variations > 1 ? variations + ' variaciones' : 'imagen'}</button>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)">💡 Editá el prompt para ajustar detalles antes de generar</div>
       </div>
       <div id="img-result" style="margin-top:1rem"></div>`;
 
     document.getElementById('btn-fire-image').addEventListener('click', async function() {
       const finalPrompt = document.getElementById('img-prompt-edit').value.trim();
       const imgOut = document.getElementById('img-result');
-      imgOut.innerHTML = `<div class="card" style="border-color:rgba(139,92,246,0.3)"><div class="empty"><div class="loader"></div><br>Generando imagen con DALL-E 3...<br><span style="font-size:11px;color:var(--text3)">Puede tardar 15-30 segundos</span></div></div>`;
+      const tiempoEst = variations * 20;
+      imgOut.innerHTML = `<div class="card" style="border-color:rgba(139,92,246,0.3)"><div class="empty"><div class="loader"></div><br>Generando ${variations > 1 ? variations + ' imágenes' : 'imagen'} en HD...<br><span style="font-size:11px;color:var(--text3)">~${tiempoEst} segundos · calidad ${quality.toUpperCase()} · ${sizeLabel[size]}</span></div></div>`;
       this.disabled = true;
       try {
-        const imgRes = await callAPI('generate_image', { prompt: finalPrompt });
-        if (imgRes.url) {
-          imgOut.innerHTML = `
-            <div class="card" style="border-color:rgba(139,92,246,0.3)">
-              <div class="output-head" style="margin-bottom:1rem">
-                <span class="output-label" style="color:#a78bfa">✓ Imagen generada</span>
-                <a href="${imgRes.url}" target="_blank" download class="copy-btn">⬇️ Descargar</a>
-              </div>
-              <img src="${imgRes.url}" style="width:100%;border-radius:var(--r);margin-bottom:10px;border:1px solid rgba(139,92,246,0.3)"/>
-              <div style="font-size:11px;color:var(--amber)">⚠️ La URL expira en 1 hora — descargala antes de que venza.</div>
-            </div>`;
-        } else { throw new Error('No se generó la imagen'); }
+        const imgRes = await callAPI('generate_image', { prompt: finalPrompt, size, quality, variations });
+        const urls = imgRes.urls || (imgRes.url ? [imgRes.url] : []);
+        if (!urls.length) throw new Error('No se generaron imágenes');
+
+        const cols = urls.length > 1 ? `grid-template-columns:repeat(${urls.length},1fr)` : '';
+        imgOut.innerHTML = `
+          <div class="card" style="border-color:rgba(139,92,246,0.3)">
+            <div class="output-head" style="margin-bottom:1rem">
+              <span class="output-label" style="color:#a78bfa">✓ ${urls.length} imagen${urls.length > 1 ? 'es' : ''} generada${urls.length > 1 ? 's' : ''} · ${quality.toUpperCase()} · ${sizeLabel[size]}</span>
+            </div>
+            <div style="display:grid;${cols};gap:10px;margin-bottom:12px">
+              ${urls.map((url, i) => `
+                <div style="position:relative">
+                  <img src="${url}" style="width:100%;border-radius:var(--r);border:1px solid rgba(139,92,246,0.3);display:block"/>
+                  <a href="${url}" target="_blank" class="btn btn-sm" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.7);border:none;color:white;backdrop-filter:blur(4px)">⬇ Descargar</a>
+                  ${urls.length > 1 ? `<div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:#a78bfa;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px">V${i+1}</div>` : ''}
+                </div>`).join('')}
+            </div>
+            <div style="font-size:11px;color:var(--amber)">⚠️ Las URLs expiran en 1 hora — descargalas antes de que venzan.</div>
+          </div>`;
       } catch(e) {
         imgOut.innerHTML = `<div class="card" style="border-color:var(--red)"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
       }
