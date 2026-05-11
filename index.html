@@ -3405,23 +3405,63 @@ async function searchProspects(loadMore) {
   btn.disabled = false;
 }
 
+// Emails persistidos por place_id
+const PROSPECT_EMAILS_KEY = 'rhinos_prospect_emails';
+function getProspectEmails() { try { return JSON.parse(localStorage.getItem(PROSPECT_EMAILS_KEY) || '{}'); } catch(e) { return {}; } }
+function saveProspectEmail(id, email) { const e = getProspectEmails(); e[id] = email; localStorage.setItem(PROSPECT_EMAILS_KEY, JSON.stringify(e)); }
+
+let selectedProspects = new Set();
+
+function updateCampaignBar() {
+  const bar = document.getElementById('campaign-bar');
+  if (!bar) return;
+  const count = selectedProspects.size;
+  const withEmail = [...selectedProspects].filter(i => {
+    const p = prospectsData[i];
+    return getProspectEmails()[p?.id];
+  }).length;
+  if (count === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  document.getElementById('campaign-count').textContent = `${count} seleccionado${count > 1 ? 's' : ''}${withEmail > 0 ? ` · ${withEmail} con email` : ' · ninguno con email'}`;
+}
+
 function renderProspects() {
   const out = document.getElementById('prospects-results');
   if (!prospectsData.length) { out.innerHTML = '<div class="empty">Sin resultados. Probá con otra búsqueda.</div>'; return; }
+  const savedEmails = getProspectEmails();
+  selectedProspects.clear();
 
   out.innerHTML = `
+    <!-- Barra de campaña -->
+    <div id="campaign-bar" style="display:none;position:sticky;top:60px;z-index:50;background:rgba(13,17,23,0.95);border:1px solid rgba(0,229,204,0.3);border-radius:var(--r);padding:10px 16px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:12px;backdrop-filter:blur(8px)">
+      <span id="campaign-count" style="font-size:13px;color:var(--cyan);font-weight:500"></span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" id="btn-deselect-all">Deseleccionar todo</button>
+        <button class="btn btn-sm" id="btn-campaign-send" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">📧 Enviar campaña</button>
+      </div>
+    </div>
+
     <div style="display:flex;flex-direction:column;gap:8px">
-      ${prospectsData.map((p, i) => `
+      ${prospectsData.map((p, i) => {
+        const savedEmail = savedEmails[p.id] || '';
+        return `
         <div class="card" style="padding:1rem;margin-bottom:0" id="prospect-${i}">
           <div style="display:flex;align-items:flex-start;gap:12px">
-            <div style="width:36px;height:36px;border-radius:8px;background:rgba(0,229,204,0.1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏭</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0">
+              <input type="checkbox" class="prospect-check" data-idx="${i}" style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer"/>
+              <div style="width:36px;height:36px;border-radius:8px;background:rgba(0,229,204,0.1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px">🏭</div>
+            </div>
             <div style="flex:1;min-width:0">
               <div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:2px">${p.name}</div>
               <div style="font-size:12px;color:var(--text2);margin-bottom:6px">${p.address || '—'}</div>
-              <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;margin-bottom:8px">
                 ${p.phone ? `<span style="color:var(--green)">📞 ${p.phone}</span>` : '<span style="color:var(--text3)">Sin teléfono</span>'}
                 ${p.website ? `<a href="${p.website}" target="_blank" style="color:var(--cyan)">🌐 Website</a>` : ''}
                 ${p.rating ? `<span style="color:var(--amber)">⭐ ${p.rating} (${p.reviews} reseñas)</span>` : ''}
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="email" class="prospect-email-input" data-pid="${p.id}" placeholder="📧 Email del contacto" value="${savedEmail}" style="flex:1;font-size:12px;padding:5px 10px;max-width:280px"/>
+                <button class="btn btn-sm" data-email-idx="${i}" style="background:rgba(99,102,241,0.12);color:#818cf8;border-color:rgba(99,102,241,0.3);white-space:nowrap;${!savedEmail?'opacity:0.5':''}">📧 Enviar email</button>
               </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
@@ -3430,10 +3470,52 @@ function renderProspects() {
             </div>
           </div>
           <div id="enrich-${i}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
       ${nextPageToken ? `<button class="btn btn-full" id="btn-load-more" style="margin-top:4px">Cargar más resultados</button>` : ''}
     </div>`;
 
+  // Checkboxes
+  out.querySelectorAll('.prospect-check').forEach(cb => {
+    cb.addEventListener('change', function() {
+      const i = +this.dataset.idx;
+      if (this.checked) selectedProspects.add(i); else selectedProspects.delete(i);
+      document.getElementById(`prospect-${i}`).style.borderColor = this.checked ? 'rgba(0,229,204,0.4)' : '';
+      updateCampaignBar();
+    });
+  });
+
+  // Guardar email al escribir
+  out.querySelectorAll('.prospect-email-input').forEach(input => {
+    input.addEventListener('blur', function() {
+      const email = this.value.trim();
+      saveProspectEmail(this.dataset.pid, email);
+      // Actualizar opacidad del botón de email
+      const card = this.closest('[id^="prospect-"]');
+      if (card) {
+        const btn = card.querySelector('[data-email-idx]');
+        if (btn) btn.style.opacity = email ? '1' : '0.5';
+      }
+    });
+    input.addEventListener('input', function() {
+      const card = this.closest('[id^="prospect-"]');
+      if (card) { const btn = card.querySelector('[data-email-idx]'); if (btn) btn.style.opacity = this.value.trim() ? '1' : '0.5'; }
+    });
+  });
+
+  // Botón enviar email individual
+  out.querySelectorAll('[data-email-idx]').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const i = +this.dataset.emailIdx;
+      const p = prospectsData[i];
+      const emailInput = document.querySelector(`.prospect-email-input[data-pid="${p.id}"]`);
+      const email = emailInput?.value.trim() || getProspectEmails()[p.id];
+      if (!email) { showToast('Ingresá el email del contacto primero'); emailInput?.focus(); return; }
+      openProspectEmailModal([{ ...p, email }]);
+    });
+  });
+
+  // Analizar
   out.querySelectorAll('[data-enrich-idx]').forEach(btn => {
     btn.addEventListener('click', async function() {
       const i = +this.dataset.enrichIdx;
@@ -3452,6 +3534,112 @@ function renderProspects() {
 
   const loadMoreBtn = document.getElementById('btn-load-more');
   if (loadMoreBtn) loadMoreBtn.addEventListener('click', () => searchProspects(true));
+
+  // Campaña
+  const deselBtn = document.getElementById('btn-deselect-all');
+  if (deselBtn) deselBtn.addEventListener('click', () => {
+    out.querySelectorAll('.prospect-check').forEach(cb => { cb.checked = false; });
+    prospectsData.forEach((_, i) => { document.getElementById(`prospect-${i}`).style.borderColor = ''; });
+    selectedProspects.clear();
+    updateCampaignBar();
+  });
+
+  const campBtn = document.getElementById('btn-campaign-send');
+  if (campBtn) campBtn.addEventListener('click', () => {
+    const savedEmails = getProspectEmails();
+    const targets = [...selectedProspects].map(i => {
+      const p = prospectsData[i];
+      const emailInput = document.querySelector(`.prospect-email-input[data-pid="${p.id}"]`);
+      const email = emailInput?.value.trim() || savedEmails[p.id];
+      return email ? { ...p, email } : null;
+    }).filter(Boolean);
+    if (!targets.length) { showToast('Ningún prospecto seleccionado tiene email cargado'); return; }
+    openProspectEmailModal(targets);
+  });
+}
+
+// Modal email prospecto
+function openProspectEmailModal(targets) {
+  const tokens = (() => { try { return JSON.parse(localStorage.getItem('rhinos_gmail_tokens')); } catch(e) { return null; } })();
+  if (!tokens?.access_token) { showToast('Conectá Gmail primero desde la sección Gmail'); return; }
+
+  const isCampaign = targets.length > 1;
+  const existing = document.getElementById('prospect-email-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'prospect-email-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid rgba(99,102,241,0.4);border-radius:16px;padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
+      <div style="font-family:var(--display);font-size:20px;font-weight:800;color:#818cf8;margin-bottom:4px">
+        📧 ${isCampaign ? `Campaña a ${targets.length} prospectos` : `Email a ${targets[0].name}`}
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">${isCampaign ? targets.map(t=>t.email).join(', ') : targets[0].email}</div>
+      <div class="field"><label>Asunto</label><input id="pemail-subject" value="¿Conocés RhinosApp? El ERP para distribuidoras como la tuya"/></div>
+      <div class="field"><label>Cuerpo del email</label><textarea id="pemail-body" rows="8" placeholder="Generá con IA o escribí manualmente..."></textarea></div>
+      <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:var(--r);padding:10px 12px;margin-bottom:12px;font-size:12px;color:#818cf8">
+        ${isCampaign ? `💡 Se enviará el mismo email personalizado con el nombre de cada empresa a los ${targets.length} contactos.` : '💡 El email se personalizará con los datos del prospecto.'}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="pemail-ai-btn" class="btn" style="background:rgba(99,102,241,0.12);color:#818cf8;border-color:rgba(99,102,241,0.3)">🦏 Generar con IA</button>
+        <button id="pemail-send-btn" class="btn btn-green">Enviar${isCampaign ? ` (${targets.length})` : ''}</button>
+        <button id="pemail-cancel-btn" class="btn">Cancelar</button>
+      </div>
+      <div id="pemail-progress" style="display:none;margin-top:12px;font-size:12px;color:var(--text2)"></div>
+    </div>`;
+
+  document.body.appendChild(modal);
+
+  document.getElementById('pemail-cancel-btn').onclick = () => modal.remove();
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+
+  document.getElementById('pemail-ai-btn').addEventListener('click', async function() {
+    const p = targets[0];
+    this.disabled = true; this.textContent = 'Generando...';
+    try {
+      const r = await callAPI('ai_agent', {
+        system: `Sos el agente comercial de RhinosApp — ERP/CRM para distribuidoras de alimentos en Argentina. Escribís emails de cold outreach profesionales, directos y sin spam. Español rioplatense. Firmá como: Equipo RhinosApp 🦏 | comercial@rhinosapp.com | +54 9 11 6822-3306`,
+        messages: [{ role: 'user', content: `Escribí un email de cold outreach para:
+Empresa: ${p.name}
+Dirección: ${p.address || 'Argentina'}
+${p.website ? 'Website: ' + p.website : ''}
+
+El email debe:
+- Ser corto (máx 4 párrafos)
+- Presentar RhinosApp como solución a sus problemas de gestión (stock, cobros, ventas)
+- Mencionar que la implementación es sin costo
+- CTA claro: agendar una demo (calendly.com/comercial-rhinosapp o WhatsApp +54 9 11 6822-3306)
+- Tono profesional pero cercano, no spam
+Solo el cuerpo del email, sin asunto.` }]
+      });
+      document.getElementById('pemail-body').value = r.reply;
+    } catch(e) { showToast('Error: ' + e.message); }
+    this.disabled = false; this.textContent = '🦏 Generar con IA';
+  });
+
+  document.getElementById('pemail-send-btn').addEventListener('click', async function() {
+    const subject = document.getElementById('pemail-subject').value.trim();
+    const bodyTemplate = document.getElementById('pemail-body').value.trim();
+    if (!subject || !bodyTemplate) { showToast('Completá asunto y cuerpo'); return; }
+    this.disabled = true;
+    const progress = document.getElementById('pemail-progress');
+    progress.style.display = 'block';
+    let sent = 0, errors = 0;
+
+    for (const p of targets) {
+      const personalizedBody = bodyTemplate.replace(/\[empresa\]/gi, p.name).replace(/\[nombre\]/gi, p.name);
+      progress.textContent = `Enviando a ${p.email}... (${sent + 1}/${targets.length})`;
+      try {
+        await callAPI('gmail_send', { access_token: tokens.access_token, to: p.email, subject, body: personalizedBody });
+        sent++;
+      } catch(e) { errors++; }
+      if (targets.length > 1) await new Promise(r => setTimeout(r, 500));
+    }
+
+    showToast(`✅ ${sent} email${sent !== 1 ? 's' : ''} enviado${sent !== 1 ? 's' : ''}${errors ? ` · ${errors} error${errors !== 1 ? 'es' : ''}` : ''} 🦏`);
+    modal.remove();
+  });
 }
 
 document.getElementById('btn-export-prospects').addEventListener('click', () => {
