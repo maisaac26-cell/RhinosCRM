@@ -1129,8 +1129,16 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <div class="field"><label>Email del cliente</label><input id="pres-to" placeholder="cliente@empresa.com"/></div>
             <div class="field"><label>Asunto</label><input id="pres-subject" placeholder="Generando..."/></div>
             <div class="field"><label>Cuerpo del email</label><textarea id="pres-body" rows="8" placeholder="Generando con IA..."></textarea></div>
-            <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:var(--r);padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--amber)">
-              💡 Descargá el PDF con el botón de arriba y adjuntalo al email antes de enviarlo.
+            <!-- Adjunto PDF -->
+            <div class="field">
+              <label>Adjunto PDF</label>
+              <div style="display:flex;align-items:center;gap:10px">
+                <label for="pres-pdf-input" style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;background:var(--surface2);border:1px dashed var(--border2);border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--text2);transition:all 0.15s;text-transform:none;letter-spacing:0;margin:0" id="pres-pdf-label">
+                  📎 Adjuntar PDF
+                </label>
+                <input type="file" id="pres-pdf-input" accept=".pdf,application/pdf" style="display:none"/>
+                <span id="pres-pdf-name" style="font-size:12px;color:var(--text3)">Sin archivo seleccionado</span>
+              </div>
             </div>
             <div style="display:flex;gap:8px">
               <button class="btn" id="btn-pres-ai-email" style="background:rgba(99,102,241,0.12);color:#818cf8;border-color:rgba(99,102,241,0.3)">🦏 Generar email con IA</button>
@@ -3579,6 +3587,25 @@ document.getElementById('btn-pres-cancel-gmail').addEventListener('click', () =>
   document.getElementById('pres-gmail-modal').style.display = 'none';
 });
 
+document.getElementById('pres-pdf-input').addEventListener('change', function() {
+  const file = this.files[0];
+  const label = document.getElementById('pres-pdf-label');
+  const name = document.getElementById('pres-pdf-name');
+  if (file) {
+    name.textContent = file.name;
+    name.style.color = 'var(--green)';
+    label.style.borderColor = 'rgba(34,197,94,0.4)';
+    label.style.color = 'var(--green)';
+    label.textContent = '✅ PDF adjunto';
+  } else {
+    name.textContent = 'Sin archivo seleccionado';
+    name.style.color = 'var(--text3)';
+    label.style.borderColor = 'var(--border2)';
+    label.style.color = 'var(--text2)';
+    label.innerHTML = '📎 Adjuntar PDF';
+  }
+});
+
 document.getElementById('btn-pres-ai-email').addEventListener('click', async function() {
   const cliente = document.getElementById('pres-cliente').value.trim() || 'Cliente';
   const empresa = document.getElementById('pres-empresa').value.trim();
@@ -3613,51 +3640,50 @@ document.getElementById('btn-pres-send-gmail').addEventListener('click', async f
   const tokens = (() => { try { return JSON.parse(localStorage.getItem('rhinos_gmail_tokens')); } catch(e) { return null; } })();
   if (!tokens?.access_token) { showToast('Conectá Gmail primero desde la sección Gmail'); return; }
 
-  const preview = document.getElementById('pres-preview');
-  if (!preview.innerHTML || preview.innerHTML.includes('Completá los datos')) { showToast('Generá la vista previa primero'); return; }
-
-  this.disabled = true; this.textContent = 'Preparando...';
+  this.disabled = true; this.textContent = 'Enviando...';
   try {
+    const pdfFile = document.getElementById('pres-pdf-input').files[0];
     const cliente = document.getElementById('pres-cliente').value.trim() || 'presupuesto';
+    const filename = pdfFile ? pdfFile.name : `Presupuesto_RhinosApp_${cliente}.pdf`;
+    const boundary = 'rhinos_' + Date.now();
+    const subjectB64 = `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
+    const bodyB64 = btoa(unescape(encodeURIComponent(emailBody)));
 
-    // 1. Descargar el PDF automáticamente
-    const win = window.open('', '_blank', 'width=1,height=1');
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-      <style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:white}
-      @page{margin:12mm}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>
-      </head><body>${preview.innerHTML}
-      <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>
-      </body></html>`);
-    win.document.close();
+    let raw = `MIME-Version: 1.0\r\nTo: ${to}\r\nSubject: ${subjectB64}\r\n`;
 
-    // 2. Abrir Gmail compose pre-completado
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
-    window.open(gmailUrl, '_blank');
+    if (pdfFile) {
+      // Email con adjunto
+      const pdfBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(pdfFile);
+      });
+      const pdfWrapped = pdfBase64.match(/.{1,76}/g).join('\r\n');
+      raw += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n`;
+      raw += `--${boundary}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${bodyB64}\r\n\r\n`;
+      raw += `--${boundary}\r\nContent-Type: application/pdf; name="${filename}"\r\nContent-Disposition: attachment; filename="${filename}"\r\nContent-Transfer-Encoding: base64\r\n\r\n${pdfWrapped}\r\n--${boundary}--`;
+    } else {
+      // Email sin adjunto
+      raw += `Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${bodyB64}`;
+    }
 
-    // 3. Mostrar instrucción clara
+    const encoded = btoa(unescape(encodeURIComponent(raw))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + tokens.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw: encoded })
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || 'Error Gmail'); }
+
+    showToast(pdfFile ? 'Email con PDF enviado 🦏' : 'Email enviado (sin PDF) 🦏');
     document.getElementById('pres-gmail-modal').style.display = 'none';
     document.getElementById('pres-to').value = '';
     document.getElementById('pres-body').value = '';
-
-    // Mostrar card de instrucción
-    const instrDiv = document.getElementById('pres-send-instruccion') || (() => {
-      const d = document.createElement('div');
-      d.id = 'pres-send-instruccion';
-      document.getElementById('pres-gmail-modal').parentNode.appendChild(d);
-      return d;
-    })();
-    instrDiv.innerHTML = `<div class="card" style="border-color:rgba(34,197,94,0.4);margin-top:1rem">
-      <div class="card-title" style="color:var(--green)">✅ Casi listo — 1 paso más</div>
-      <div style="font-size:13px;color:var(--text);line-height:1.8">
-        <div style="margin-bottom:8px">1. Se descargó el PDF — <strong>guardalo</strong> cuando aparezca el diálogo de impresión (elegí "Guardar como PDF")</div>
-        <div style="margin-bottom:8px">2. En la ventana de Gmail que se abrió, hacé clic en el <strong>clip 📎</strong> y adjuntá el PDF</div>
-        <div>3. <strong>Enviá</strong> el mail</div>
-      </div>
-      <button class="btn btn-sm" style="margin-top:12px" onclick="document.getElementById('pres-send-instruccion').style.display='none'">Entendido</button>
-    </div>`;
-    instrDiv.style.display = 'block';
-
-    showToast('Gmail abierto — adjuntá el PDF 📎');
+    document.getElementById('pres-pdf-input').value = '';
+    document.getElementById('pres-pdf-name').textContent = 'Sin archivo seleccionado';
+    document.getElementById('pres-pdf-label').innerHTML = '📎 Adjuntar PDF';
+    document.getElementById('pres-pdf-label').style.cssText = '';
   } catch(e) { showToast('Error: ' + e.message); }
   this.disabled = false; this.textContent = 'Enviar email';
 });
