@@ -233,6 +233,27 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <button class="nav-btn" data-sec="presupuestos" style="background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.2)">📄 Presupuestos</button>
   </div>
   <div id="crm-user"></div>
+  <button id="btn-guide" onclick="startGuide()" style="margin-left:8px;width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;display:none;flex-shrink:0" title="Guía de uso">?</button>
+</div>
+
+<!-- GUIDE OVERLAY -->
+<div id="guide-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;pointer-events:all"></div>
+
+<!-- GUIDE CARD -->
+<div id="guide-card" style="display:none;position:fixed;bottom:32px;left:50%;transform:translateX(-50%);z-index:9001;background:var(--surface);border:1px solid rgba(0,229,204,0.3);border-radius:16px;padding:24px 28px;width:420px;max-width:90vw;box-shadow:0 16px 48px rgba(0,0,0,0.5)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <span id="guide-counter" style="font-size:10px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;font-weight:600"></span>
+    <div style="display:flex;gap:4px" id="guide-dots"></div>
+  </div>
+  <div id="guide-title" style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--cyan);margin-bottom:8px;letter-spacing:0.02em"></div>
+  <div id="guide-desc" style="font-size:13px;color:var(--text2);line-height:1.8;margin-bottom:20px"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <button onclick="endGuide()" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;font-family:var(--font);padding:0">Omitir tour</button>
+    <div style="display:flex;gap:8px">
+      <button id="guide-prev" class="btn btn-sm" onclick="guideStep(-1)">← Anterior</button>
+      <button id="guide-next" class="btn btn-sm" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600" onclick="guideStep(1)">Siguiente →</button>
+    </div>
+  </div>
 </div>
 
 <div class="wrap" id="app-wrap" style="display:none">
@@ -3705,12 +3726,166 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
 }
+// ── GUIDE / TOUR ─────────────────────────────────────
+const GUIDE_STEPS = [
+  {
+    title: '¡Bienvenido a RhinosApp CRM! 🦏',
+    desc: 'Este tour rápido te muestra las funciones principales del sistema. Dura menos de 2 minutos.',
+    target: null
+  },
+  {
+    title: 'Dashboard',
+    desc: 'Métricas en tiempo real de Instagram: seguidores, alcance e impresiones de los últimos 7 días. Hacé clic en cualquier post para ver y responder comentarios.',
+    target: '[data-sec="dashboard"]'
+  },
+  {
+    title: 'Posts — Comentarios',
+    desc: 'Gestioná los comentarios de todos tus posts. Seleccioná un post a la izquierda y respondé con IA o manualmente con un solo clic.',
+    target: '[data-sec="posts"]'
+  },
+  {
+    title: 'DMs — Mensajes directos',
+    desc: 'Generador de respuestas con IA para DMs de Instagram. Pegás el mensaje recibido, elegís el objetivo (precio, demo, objeción) y la IA te escribe la respuesta.',
+    target: '[data-sec="dms"]'
+  },
+  {
+    title: 'Gmail',
+    desc: 'Bandeja de entrada integrada. Leé, respondé y enviá emails de comercial@rhinosapp.com sin salir del CRM. La IA puede generar respuestas automáticas.',
+    target: '[data-sec="gmail"]'
+  },
+  {
+    title: 'Generador de Contenido',
+    desc: 'Creá captions, hashtags e ideas visuales para Instagram con IA. También genera imágenes con DALL-E 3 con la identidad visual de RhinosApp.',
+    target: '[data-sec="contenido"]'
+  },
+  {
+    title: 'Calendario',
+    desc: 'Google Calendar integrado. Creá eventos, visualizá el mes y generá un plan de contenido mensual con IA según el foco de la semana.',
+    target: '[data-sec="calendario"]'
+  },
+  {
+    title: '🎯 Leads — Pipeline de ventas',
+    desc: 'Seguimiento de todos los prospectos calientes. Estados: Nuevo → Contactado → Demo → Cliente. Te avisa automáticamente cuando hay leads sin contactar hace días.',
+    target: '[data-sec="leads"]'
+  },
+  {
+    title: 'Prospectos',
+    desc: 'Buscá distribuidoras de alimentos en toda Argentina con Google Maps. Filtrá por provincia, ciudad y tipo de negocio. La IA analiza cada prospecto y sugiere cómo contactarlo.',
+    target: '[data-sec="prospectos"]'
+  },
+  {
+    title: '💰 Finanzas',
+    desc: 'Registrá ingresos, gastos, inversiones y gastos pendientes. Los gastos fijos (Vercel, Gmail, AFIP) se aplican solos cada mes. Recibís un resumen semanal por WhatsApp los lunes.',
+    target: '[data-sec="finanzas"]'
+  },
+  {
+    title: '📋 Tareas',
+    desc: 'Agenda del equipo. Asigná tareas a Manu, Guille, Poli o Rami con prioridad, fecha límite y categoría. Vista de estado: pendiente, en progreso, completada.',
+    target: '[data-sec="tareas"]'
+  },
+  {
+    title: 'Agente IA',
+    desc: 'Especialista en marketing de RhinosApp. Conoce el producto, el cliente objetivo y la marca. Preguntale ideas de posts, estrategias, cómo manejar objeciones o cualquier cosa.',
+    target: '[data-sec="agente"]'
+  },
+  {
+    title: '📄 Presupuestos',
+    desc: 'Generá presupuestos profesionales en segundos. Editá el texto directo en la vista previa, descargá el PDF y envialo por Gmail con el cuerpo generado por IA.',
+    target: '[data-sec="presupuestos"]'
+  },
+  {
+    title: '¡Listo! Ya sabés todo 🦏',
+    desc: 'Podés relanzar este tour en cualquier momento con el botón <strong style="color:var(--cyan)">?</strong> en la barra superior. Cualquier duda, el Agente IA está para ayudarte.',
+    target: null
+  }
+];
+
+let guideCurrentStep = 0;
+let guidePrevHighlight = null;
+
+function startGuide() {
+  guideCurrentStep = 0;
+  document.getElementById('guide-overlay').style.display = 'block';
+  document.getElementById('guide-card').style.display = 'block';
+  renderGuideStep();
+}
+
+function endGuide() {
+  document.getElementById('guide-overlay').style.display = 'none';
+  document.getElementById('guide-card').style.display = 'none';
+  clearGuideHighlight();
+  localStorage.setItem('rhinos_guide_done', '1');
+}
+
+function guideStep(dir) {
+  guideCurrentStep = Math.max(0, Math.min(GUIDE_STEPS.length - 1, guideCurrentStep + dir));
+  renderGuideStep();
+}
+
+function clearGuideHighlight() {
+  if (guidePrevHighlight) {
+    guidePrevHighlight.style.position = '';
+    guidePrevHighlight.style.zIndex = '';
+    guidePrevHighlight.style.boxShadow = '';
+    guidePrevHighlight.style.borderRadius = '';
+    guidePrevHighlight.style.outline = '';
+    guidePrevHighlight = null;
+  }
+}
+
+function renderGuideStep() {
+  const step = GUIDE_STEPS[guideCurrentStep];
+  const total = GUIDE_STEPS.length;
+
+  clearGuideHighlight();
+
+  // Highlight target element
+  if (step.target) {
+    const el = document.querySelector(step.target);
+    if (el) {
+      el.style.position = 'relative';
+      el.style.zIndex = '9002';
+      el.style.boxShadow = '0 0 0 4px rgba(0,229,204,0.6), 0 0 0 8px rgba(0,229,204,0.2)';
+      el.style.borderRadius = '6px';
+      guidePrevHighlight = el;
+    }
+  }
+
+  // Update card content
+  document.getElementById('guide-title').textContent = step.title;
+  document.getElementById('guide-desc').innerHTML = step.desc;
+  document.getElementById('guide-counter').textContent = `Paso ${guideCurrentStep + 1} de ${total}`;
+
+  // Dots
+  const dots = document.getElementById('guide-dots');
+  dots.innerHTML = GUIDE_STEPS.map((_, i) => `
+    <div style="width:6px;height:6px;border-radius:50%;background:${i === guideCurrentStep ? 'var(--cyan)' : 'var(--surface3)'}"></div>
+  `).join('');
+
+  // Buttons
+  document.getElementById('guide-prev').style.display = guideCurrentStep === 0 ? 'none' : 'inline-flex';
+  const nextBtn = document.getElementById('guide-next');
+  if (guideCurrentStep === total - 1) {
+    nextBtn.textContent = 'Finalizar ✓';
+    nextBtn.onclick = endGuide;
+  } else {
+    nextBtn.textContent = 'Siguiente →';
+    nextBtn.onclick = () => guideStep(1);
+  }
+}
+
 // ── INIT ──────────────────────
 initCRMAuth().then(() => {
   const session = getCRMSession();
   if (session) {
     loadDashboard();
     initGmail();
+    // Mostrar botón guía
+    document.getElementById('btn-guide').style.display = 'flex';
+    // Auto-lanzar en primera visita
+    if (!localStorage.getItem('rhinos_guide_done')) {
+      setTimeout(startGuide, 800);
+    }
   }
 });
 </script>
