@@ -3359,8 +3359,15 @@ async function searchProspects(loadMore) {
   const out = document.getElementById('prospects-results');
   const btn = document.getElementById('btn-search-prospects');
 
-  if (!loadMore) { prospectsData = []; nextPageToken = null; }
-  setLoading(out, 'Buscando distribuidoras...');
+  if (!loadMore) {
+    prospectsData = [];
+    nextPageToken = null;
+    setLoading(out, 'Buscando distribuidoras...');
+  } else {
+    // Solo mostrar loading en el botón, sin borrar los resultados
+    const loadBtn = document.getElementById('btn-load-more');
+    if (loadBtn) { loadBtn.textContent = '⏳ Cargando más...'; loadBtn.disabled = true; }
+  }
   btn.disabled = true;
 
   try {
@@ -3380,10 +3387,13 @@ async function searchProspects(loadMore) {
           <div style="font-size:13px;color:var(--text2);line-height:1.7">
             Posibles causas:<br>
             • <strong style="color:var(--cyan)">Billing no activado</strong> en Google Cloud Console — es el más común<br>
-            • La búsqueda es muy específica para esa zona — probá con otra provincia o ciudad<br>
+            • La búsqueda es muy específica — probá con otra provincia o ciudad<br>
             • La API key no tiene Places habilitado
           </div>
         </div>`;
+      } else {
+        const loadBtn = document.getElementById('btn-load-more');
+        if (loadBtn) loadBtn.replaceWith((() => { const d = document.createElement('div'); d.style.cssText='text-align:center;padding:12px;font-size:12px;color:var(--text3)'; d.textContent='No hay más resultados'; return d; })());
       }
       btn.disabled = false;
       return;
@@ -3395,14 +3405,130 @@ async function searchProspects(loadMore) {
     if (sortBy === 'rating') places.sort((a,b) => (b.rating||0)-(a.rating||0));
     if (sortBy === 'reviews') places.sort((a,b) => (b.reviews||0)-(a.reviews||0));
 
+    const startIdx = prospectsData.length;
     prospectsData = [...prospectsData, ...places];
+
     document.getElementById('p-count').textContent = `${prospectsData.length} prospectos encontrados`;
     document.getElementById('btn-export-prospects').style.display = prospectsData.length ? 'inline-flex' : 'none';
-    renderProspects();
+
+    if (!loadMore) {
+      renderProspects();
+    } else {
+      appendProspects(places, startIdx);
+    }
   } catch(e) {
-    out.innerHTML = `<div class="empty" style="color:var(--red)">Error: ${e.message}</div>`;
+    if (!loadMore) out.innerHTML = `<div class="empty" style="color:var(--red)">Error: ${e.message}</div>`;
+    else showToast('Error cargando más resultados: ' + e.message);
   }
   btn.disabled = false;
+}
+
+function appendProspects(newPlaces, startIdx) {
+  const savedEmails = getProspectEmails();
+  const container = document.querySelector('#prospects-results > div');
+  if (!container) { renderProspects(); return; }
+
+  // Quitar botón "Cargar más" existente
+  const oldLoadBtn = document.getElementById('btn-load-more');
+  if (oldLoadBtn) oldLoadBtn.remove();
+
+  // Agregar nuevas cards
+  newPlaces.forEach((p, offset) => {
+    const i = startIdx + offset;
+    const savedEmail = savedEmails[p.id] || '';
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.id = `prospect-${i}`;
+    div.style.cssText = 'padding:1rem;margin-bottom:0';
+    div.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0">
+          <input type="checkbox" class="prospect-check" data-idx="${i}" style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer"/>
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(0,229,204,0.1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px">🏭</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:2px">${p.name}</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px">${p.address || '—'}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;margin-bottom:8px">
+            ${p.phone ? `<span style="color:var(--green)">📞 ${p.phone}</span>` : '<span style="color:var(--text3)">Sin teléfono</span>'}
+            ${p.website ? `<a href="${p.website}" target="_blank" style="color:var(--cyan)">🌐 Website</a>` : ''}
+            ${p.rating ? `<span style="color:var(--amber)">⭐ ${p.rating} (${p.reviews} reseñas)</span>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <input type="email" class="prospect-email-input" data-pid="${p.id}" placeholder="📧 Email del contacto" value="${savedEmail}" style="flex:1;font-size:12px;padding:5px 10px;min-width:180px"/>
+            ${p.website ? `<button class="btn btn-sm prospect-find-email" data-idx="${i}" data-website="${p.website}" data-pid="${p.id}" title="Buscar email en la web">🔍 Auto</button>` : ''}
+            <button class="btn btn-sm" data-email-idx="${i}" style="background:rgba(99,102,241,0.12);color:#818cf8;border-color:rgba(99,102,241,0.3);white-space:nowrap;${!savedEmail?'opacity:0.5':''}">📧 Enviar</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+          ${p.phone ? `<a href="https://wa.me/${formatWhatsApp(p.phone)}" target="_blank" class="btn btn-green btn-sm">💬 WhatsApp</a>` : ''}
+          <button class="btn btn-cyan btn-sm" data-enrich-idx="${i}">🦏 Analizar</button>
+        </div>
+      </div>
+      <div id="enrich-${i}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>`;
+
+    // Agregar listeners
+    div.querySelector('.prospect-check').addEventListener('change', function() {
+      const idx = +this.dataset.idx;
+      if (this.checked) selectedProspects.add(idx); else selectedProspects.delete(idx);
+      div.style.borderColor = this.checked ? 'rgba(0,229,204,0.4)' : '';
+      updateCampaignBar();
+    });
+    div.querySelector('.prospect-email-input').addEventListener('blur', function() {
+      const email = this.value.trim();
+      saveProspectEmail(this.dataset.pid, email);
+      const sendBtn = div.querySelector('[data-email-idx]');
+      if (sendBtn) sendBtn.style.opacity = email ? '1' : '0.5';
+    });
+    div.querySelector('.prospect-email-input').addEventListener('input', function() {
+      const sendBtn = div.querySelector('[data-email-idx]');
+      if (sendBtn) sendBtn.style.opacity = this.value.trim() ? '1' : '0.5';
+    });
+    const findBtn = div.querySelector('.prospect-find-email');
+    if (findBtn) findBtn.addEventListener('click', async function() {
+      const pid = this.dataset.pid; const website = this.dataset.website;
+      const input = div.querySelector(`.prospect-email-input[data-pid="${pid}"]`);
+      this.disabled = true; this.textContent = '⏳';
+      try {
+        const r = await callAPI('find_prospect_email', { website });
+        if (r.emails?.length) {
+          input.value = r.emails[0]; saveProspectEmail(pid, r.emails[0]);
+          input.style.borderColor = 'rgba(34,197,94,0.5)';
+          const sendBtn = div.querySelector('[data-email-idx]');
+          if (sendBtn) sendBtn.style.opacity = '1';
+          showToast(`Email encontrado 🦏`);
+        } else { showToast('No se encontró email'); }
+      } catch(e) { showToast('Error buscando email'); }
+      this.disabled = false; if (this.textContent === '⏳') this.textContent = '🔍 Auto';
+    });
+    div.querySelector('[data-email-idx]').addEventListener('click', function() {
+      const email = div.querySelector('.prospect-email-input')?.value.trim() || getProspectEmails()[p.id];
+      if (!email) { showToast('Ingresá el email primero'); return; }
+      openProspectEmailModal([{ ...p, email }]);
+    });
+    div.querySelector('[data-enrich-idx]').addEventListener('click', async function() {
+      const el = document.getElementById('enrich-' + i);
+      el.style.display = 'block'; el.innerHTML = '<div class="loader"></div>'; this.disabled = true;
+      try {
+        const r = await callAPI('prospect_enrich', { name: p.name, website: p.website, address: p.address });
+        el.innerHTML = makeOutput('Análisis IA — ' + p.name, r.reply);
+      } catch(e) { el.innerHTML = `<span style="font-size:12px;color:var(--red)">${e.message}</span>`; }
+      this.disabled = false;
+    });
+
+    container.appendChild(div);
+  });
+
+  // Reagregar botón Cargar más si hay más páginas
+  if (nextPageToken) {
+    const loadBtn = document.createElement('button');
+    loadBtn.id = 'btn-load-more';
+    loadBtn.className = 'btn btn-full';
+    loadBtn.style.marginTop = '4px';
+    loadBtn.textContent = 'Cargar más resultados';
+    loadBtn.addEventListener('click', () => searchProspects(true));
+    container.appendChild(loadBtn);
+  }
 }
 
 // Emails persistidos por place_id
