@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Rhinos CRM — Marketing</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -3566,7 +3567,7 @@ document.getElementById('btn-gmail-pres').addEventListener('click', () => {
   document.getElementById('pres-gmail-modal').scrollIntoView({ behavior: 'smooth' });
   const cliente = document.getElementById('pres-cliente').value.trim() || 'Cliente';
   const empresa = document.getElementById('pres-empresa').value.trim();
-  document.getElementById('pres-subject').value = `Propuesta RhinosApp — ${empresa || cliente}`;
+  document.getElementById('pres-subject').value = `Propuesta RhinosApp - ${empresa || cliente}`;
 });
 
 document.getElementById('btn-pres-cancel-gmail').addEventListener('click', () => {
@@ -3602,14 +3603,70 @@ Solo el cuerpo del email, sin asunto.` }]
 document.getElementById('btn-pres-send-gmail').addEventListener('click', async function() {
   const to = document.getElementById('pres-to').value.trim();
   const subject = document.getElementById('pres-subject').value.trim();
-  const body = document.getElementById('pres-body').value.trim();
-  if (!to || !subject || !body) { showToast('Completá destinatario, asunto y cuerpo'); return; }
+  const emailBody = document.getElementById('pres-body').value.trim();
+  if (!to || !subject || !emailBody) { showToast('Completá destinatario, asunto y cuerpo'); return; }
   const tokens = (() => { try { return JSON.parse(localStorage.getItem('rhinos_gmail_tokens')); } catch(e) { return null; } })();
   if (!tokens?.access_token) { showToast('Conectá Gmail primero desde la sección Gmail'); return; }
-  this.disabled = true; this.textContent = 'Enviando...';
+
+  const preview = document.getElementById('pres-preview');
+  if (!preview.innerHTML || preview.innerHTML.includes('Completá los datos')) { showToast('Generá la vista previa primero'); return; }
+
+  this.disabled = true; this.textContent = 'Generando PDF...';
   try {
-    await callAPI('gmail_send', { access_token: tokens.access_token, to, subject, body });
-    showToast('Email enviado 🦏');
+    // Generar PDF desde el preview
+    const cliente = document.getElementById('pres-cliente').value.trim() || 'cliente';
+    const filename = `Presupuesto_RhinosApp_${cliente}.pdf`;
+    const wasEditable = preview.contentEditable;
+    preview.contentEditable = 'false';
+
+    const pdfBlob = await html2pdf().set({
+      margin: [10, 10, 10, 10],
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(preview).outputPdf('blob');
+
+    preview.contentEditable = wasEditable;
+
+    // Convertir PDF a base64
+    const pdfBase64 = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(pdfBlob);
+    });
+
+    // Construir email multipart con adjunto
+    this.textContent = 'Enviando...';
+    const boundary = 'rhinos_' + Date.now();
+    const bodyB64 = btoa(unescape(encodeURIComponent(emailBody)));
+    const subjectB64 = `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
+
+    let raw = `MIME-Version: 1.0\r\n`;
+    raw += `To: ${to}\r\n`;
+    raw += `Subject: ${subjectB64}\r\n`;
+    raw += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n`;
+    raw += `--${boundary}\r\n`;
+    raw += `Content-Type: text/plain; charset=utf-8\r\n`;
+    raw += `Content-Transfer-Encoding: base64\r\n\r\n`;
+    raw += `${bodyB64}\r\n\r\n`;
+    raw += `--${boundary}\r\n`;
+    raw += `Content-Type: application/pdf; name="${filename}"\r\n`;
+    raw += `Content-Disposition: attachment; filename="${filename}"\r\n`;
+    raw += `Content-Transfer-Encoding: base64\r\n\r\n`;
+    raw += `${pdfBase64}\r\n`;
+    raw += `--${boundary}--`;
+
+    const encoded = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + tokens.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw: encoded })
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || 'Error Gmail'); }
+
+    showToast('Email con PDF enviado 🦏');
     document.getElementById('pres-gmail-modal').style.display = 'none';
     document.getElementById('pres-to').value = '';
     document.getElementById('pres-body').value = '';
