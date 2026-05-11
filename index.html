@@ -3616,68 +3616,48 @@ document.getElementById('btn-pres-send-gmail').addEventListener('click', async f
   const preview = document.getElementById('pres-preview');
   if (!preview.innerHTML || preview.innerHTML.includes('Completá los datos')) { showToast('Generá la vista previa primero'); return; }
 
-  this.disabled = true; this.textContent = 'Generando PDF...';
+  this.disabled = true; this.textContent = 'Preparando...';
   try {
-    // Generar PDF desde el preview usando contenedor temporal
-    const cliente = document.getElementById('pres-cliente').value.trim() || 'cliente';
-    const filename = `Presupuesto_RhinosApp_${cliente}.pdf`;
+    const cliente = document.getElementById('pres-cliente').value.trim() || 'presupuesto';
 
-    const tempDiv = document.createElement('div');
-    tempDiv.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white;font-family:Segoe UI,Arial,sans-serif;';
-    tempDiv.innerHTML = preview.innerHTML;
-    document.body.appendChild(tempDiv);
+    // 1. Descargar el PDF automáticamente
+    const win = window.open('', '_blank', 'width=1,height=1');
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+      <style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:white}
+      @page{margin:12mm}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>
+      </head><body>${preview.innerHTML}
+      <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>
+      </body></html>`);
+    win.document.close();
 
-    const pdfBlob = await html2pdf().set({
-      margin: [10, 10, 10, 10],
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, windowWidth: 794 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(tempDiv).outputPdf('blob');
+    // 2. Abrir Gmail compose pre-completado
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+    window.open(gmailUrl, '_blank');
 
-    document.body.removeChild(tempDiv);
-
-    // Convertir PDF a base64
-    const pdfBase64 = await new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.readAsDataURL(pdfBlob);
-    });
-
-    // Construir email multipart con adjunto
-    this.textContent = 'Enviando...';
-    const boundary = 'rhinos_' + Date.now();
-    const bodyB64 = btoa(unescape(encodeURIComponent(emailBody)));
-    const subjectB64 = `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
-
-    let raw = `MIME-Version: 1.0\r\n`;
-    raw += `To: ${to}\r\n`;
-    raw += `Subject: ${subjectB64}\r\n`;
-    raw += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n`;
-    raw += `--${boundary}\r\n`;
-    raw += `Content-Type: text/plain; charset=utf-8\r\n`;
-    raw += `Content-Transfer-Encoding: base64\r\n\r\n`;
-    raw += `${bodyB64}\r\n\r\n`;
-    raw += `--${boundary}\r\n`;
-    raw += `Content-Type: application/pdf; name="${filename}"\r\n`;
-    raw += `Content-Disposition: attachment; filename="${filename}"\r\n`;
-    raw += `Content-Transfer-Encoding: base64\r\n\r\n`;
-    raw += `${pdfBase64}\r\n`;
-    raw += `--${boundary}--`;
-
-    const encoded = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + tokens.access_token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ raw: encoded })
-    });
-    if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || 'Error Gmail'); }
-
-    showToast('Email con PDF enviado 🦏');
+    // 3. Mostrar instrucción clara
     document.getElementById('pres-gmail-modal').style.display = 'none';
     document.getElementById('pres-to').value = '';
     document.getElementById('pres-body').value = '';
+
+    // Mostrar card de instrucción
+    const instrDiv = document.getElementById('pres-send-instruccion') || (() => {
+      const d = document.createElement('div');
+      d.id = 'pres-send-instruccion';
+      document.getElementById('pres-gmail-modal').parentNode.appendChild(d);
+      return d;
+    })();
+    instrDiv.innerHTML = `<div class="card" style="border-color:rgba(34,197,94,0.4);margin-top:1rem">
+      <div class="card-title" style="color:var(--green)">✅ Casi listo — 1 paso más</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.8">
+        <div style="margin-bottom:8px">1. Se descargó el PDF — <strong>guardalo</strong> cuando aparezca el diálogo de impresión (elegí "Guardar como PDF")</div>
+        <div style="margin-bottom:8px">2. En la ventana de Gmail que se abrió, hacé clic en el <strong>clip 📎</strong> y adjuntá el PDF</div>
+        <div>3. <strong>Enviá</strong> el mail</div>
+      </div>
+      <button class="btn btn-sm" style="margin-top:12px" onclick="document.getElementById('pres-send-instruccion').style.display='none'">Entendido</button>
+    </div>`;
+    instrDiv.style.display = 'block';
+
+    showToast('Gmail abierto — adjuntá el PDF 📎');
   } catch(e) { showToast('Error: ' + e.message); }
   this.disabled = false; this.textContent = 'Enviar email';
 });
