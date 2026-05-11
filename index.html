@@ -1095,10 +1095,30 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- PRESUPUESTOS -->
   <div class="section" id="s-presupuestos">
-    <div class="section-header">
-      <div class="page-title">PRESU<span>PUESTOS</span></div>
-      <div class="page-sub">Generá presupuestos profesionales de RhinosApp en PDF.</div>
+    <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">PRESU<span>PUESTOS</span></div>
+        <div class="page-sub">Generá presupuestos profesionales de RhinosApp en PDF.</div>
+      </div>
+      <div class="tab-row" style="width:auto;margin:0">
+        <button class="tab-btn active" data-ptab="nuevo" style="padding:6px 18px">Nuevo</button>
+        <button class="tab-btn" data-ptab="historial" style="padding:6px 18px">📋 Historial</button>
+      </div>
     </div>
+
+    <!-- HISTORIAL TAB -->
+    <div id="ptab-historial" style="display:none">
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          Presupuestos generados
+          <button class="btn btn-sm" style="color:var(--red);font-size:11px" id="btn-clear-pres-history">Limpiar historial</button>
+        </div>
+        <div id="pres-history-list"><div class="empty">No hay presupuestos guardados aún.</div></div>
+      </div>
+    </div>
+
+    <!-- NUEVO TAB -->
+    <div id="ptab-nuevo">
     <div class="grid2">
       <div>
         <div class="card">
@@ -1170,6 +1190,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         </div>
       </div>
     </div>
+    </div> <!-- /ptab-nuevo -->
   </div>
 
 </div>
@@ -3568,6 +3589,9 @@ document.getElementById('btn-preview-pres').addEventListener('click', () => {
   preview.style.outline = 'none';
   document.getElementById('pres-edit-badge').style.display = 'inline-block';
   document.getElementById('btn-gmail-pres').style.display = 'inline-flex';
+
+  // Guardar en historial
+  savePresToHistory({ cliente, empresa, validez, tc, nota, tiers: presupuestoTiers.map(t => ({...t})) });
 });
 
 document.getElementById('btn-print-pres').addEventListener('click', () => {
@@ -3715,6 +3739,104 @@ document.querySelector('.nav-btn[data-sec="presupuestos"]').addEventListener('cl
 
 // Init tiers on load
 renderTiersTable();
+
+// ── TABS PRESUPUESTOS ─────────────────────────────────
+document.querySelectorAll('.tab-btn[data-ptab]').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn[data-ptab]').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const tab = this.dataset.ptab;
+    document.getElementById('ptab-nuevo').style.display = tab === 'nuevo' ? 'block' : 'none';
+    document.getElementById('ptab-historial').style.display = tab === 'historial' ? 'block' : 'none';
+    if (tab === 'historial') renderPresHistory();
+  });
+});
+
+// ── HISTORIAL DE PRESUPUESTOS ─────────────────────────
+const PRES_HISTORY_KEY = 'rhinos_pres_history';
+
+function getPresHistory() {
+  try { return JSON.parse(localStorage.getItem(PRES_HISTORY_KEY) || '[]'); } catch(e) { return []; }
+}
+
+function savePresToHistory(data) {
+  const history = getPresHistory();
+  history.unshift({ ...data, id: Date.now(), fecha: new Date().toLocaleDateString('es-AR') });
+  localStorage.setItem(PRES_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
+}
+
+function fmtARS(n) {
+  return '$' + Number(n).toLocaleString('es-AR');
+}
+
+function renderPresHistory() {
+  const list = document.getElementById('pres-history-list');
+  const history = getPresHistory();
+  if (!history.length) { list.innerHTML = '<div class="empty">No hay presupuestos guardados aún.<br><small style="color:var(--text3)">Se guardan automáticamente al generar la vista previa.</small></div>'; return; }
+
+  list.innerHTML = history.map(p => {
+    const totalMin = p.tiers?.length ? Math.min(...p.tiers.map(t => +t.price)) : 0;
+    const totalMax = p.tiers?.length ? Math.max(...p.tiers.map(t => +t.price)) : 0;
+    const tiersResumen = p.tiers?.map(t => `<span style="font-size:11px;background:var(--surface3);border-radius:4px;padding:2px 7px;color:var(--text2)">${t.desc}: ${fmtARS(t.price)}/mes</span>`).join(' ') || '';
+    return `
+    <div style="padding:14px 0;border-bottom:1px solid var(--border)" id="pres-hist-${p.id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--text)">${p.cliente}${p.empresa ? ` <span style="font-size:12px;color:var(--text3)">· ${p.empresa}</span>` : ''}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">📅 ${p.fecha} · Validez: ${p.validez} · TC: $${Number(p.tc).toLocaleString('es-AR')} ARS/USD</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:12px">
+          <div style="font-size:13px;font-weight:600;color:var(--cyan)">${fmtARS(totalMin)}${totalMax !== totalMin ? ` — ${fmtARS(totalMax)}` : ''}/mes</div>
+          <div style="font-size:10px;color:var(--text3)">rango de precios</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">${tiersResumen}</div>
+      ${p.nota ? `<div style="font-size:11px;color:var(--amber);margin-bottom:8px">📝 ${p.nota}</div>` : ''}
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-cyan" data-load-pres='${JSON.stringify(p).replace(/'/g,"&#39;")}'>↩ Cargar</button>
+        <button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-del-pres="${p.id}">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-load-pres]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const p = JSON.parse(this.dataset.loadPres.replace(/&#39;/g, "'"));
+      document.getElementById('pres-cliente').value = p.cliente || '';
+      document.getElementById('pres-empresa').value = p.empresa || '';
+      document.getElementById('pres-validez').value = p.validez || '30 días';
+      document.getElementById('pres-tc').value = p.tc || '1400';
+      document.getElementById('pres-nota').value = p.nota || '';
+      if (p.tiers) {
+        presupuestoTiers = p.tiers.map(t => ({...t}));
+        saveTiers();
+        renderTiersTable();
+      }
+      // Cambiar a tab nuevo
+      document.querySelectorAll('.tab-btn[data-ptab]').forEach(b => b.classList.remove('active'));
+      document.querySelector('.tab-btn[data-ptab="nuevo"]').classList.add('active');
+      document.getElementById('ptab-nuevo').style.display = 'block';
+      document.getElementById('ptab-historial').style.display = 'none';
+      showToast('Presupuesto cargado — generá la vista previa 🦏');
+    });
+  });
+
+  list.querySelectorAll('[data-del-pres]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (!confirm('¿Eliminar este presupuesto del historial?')) return;
+      const id = +this.dataset.delPres;
+      const updated = getPresHistory().filter(p => p.id !== id);
+      localStorage.setItem(PRES_HISTORY_KEY, JSON.stringify(updated));
+      renderPresHistory();
+    });
+  });
+}
+
+document.getElementById('btn-clear-pres-history').addEventListener('click', () => {
+  if (!confirm('¿Limpiar todo el historial de presupuestos?')) return;
+  localStorage.removeItem(PRES_HISTORY_KEY);
+  renderPresHistory();
+});
 
 // ── COPY / TOAST ─────────────────────────────────────
 document.addEventListener('click', function(e) {
