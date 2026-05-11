@@ -229,6 +229,72 @@ Entregá:
       }
     }
 
+    else if (action === 'find_prospect_email') {
+      const { website } = body;
+      if (!website) { result = { emails: [] }; }
+      else {
+        const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+        const skipDomains = /\.(png|jpg|jpeg|gif|svg|webp|css|js|pdf)$/i;
+        const skipWords = /noreply|no-reply|donotreply|example\.com|sentry\.|wix\.|wordpress\.|schema\.|googleapis/i;
+
+        async function fetchPage(pageUrl) {
+          return new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(''), 6000);
+            try {
+              const u = new URL(pageUrl.startsWith('http') ? pageUrl : 'https://' + pageUrl);
+              const isHttps = u.protocol === 'https:';
+              const lib = isHttps ? https : require('http');
+              const req = lib.request({
+                hostname: u.hostname, path: u.pathname || '/', method: 'GET',
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; bot)', 'Accept': 'text/html' },
+                timeout: 5000
+              }, (res) => {
+                // Follow redirects
+                if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
+                  clearTimeout(timeout);
+                  const loc = res.headers.location.startsWith('http') ? res.headers.location : `${u.origin}${res.headers.location}`;
+                  fetchPage(loc).then(resolve);
+                  return;
+                }
+                let html = '';
+                res.on('data', c => { html += c; if (html.length > 300000) res.destroy(); });
+                res.on('end', () => { clearTimeout(timeout); resolve(html); });
+                res.on('error', () => { clearTimeout(timeout); resolve(''); });
+              });
+              req.on('error', () => { clearTimeout(timeout); resolve(''); });
+              req.on('timeout', () => { req.destroy(); clearTimeout(timeout); resolve(''); });
+              req.end();
+            } catch(e) { clearTimeout(timeout); resolve(''); }
+          });
+        }
+
+        function extractEmails(html) {
+          return [...new Set((html.match(emailRegex) || [])
+            .filter(e => !skipWords.test(e) && !skipDomains.test(e) && e.includes('.') && e.length < 80)
+          )];
+        }
+
+        let emails = [];
+        const base = website.startsWith('http') ? new URL(website).origin : 'https://' + website;
+
+        // Buscar en página principal y /contacto en paralelo
+        const [mainHtml, contactHtml] = await Promise.all([
+          fetchPage(base),
+          fetchPage(base + '/contacto').catch(() => '')
+        ]);
+
+        emails = [...new Set([...extractEmails(mainHtml), ...extractEmails(contactHtml)])];
+
+        // Si no encontró nada, probar /contact
+        if (!emails.length) {
+          const contactEnHtml = await fetchPage(base + '/contact').catch(() => '');
+          emails = extractEmails(contactEnHtml);
+        }
+
+        result = { emails: emails.slice(0, 5) };
+      }
+    }
+
     else if (action === 'prospect_enrich') {
       const { name, website, address } = body;
       const SYSTEM = `Sos un asistente de prospección comercial para RhinosApp, un CRM para distribuidoras de alimentos en Argentina.`;
