@@ -1897,11 +1897,9 @@ function showCompareResult(dalleUrl, geminiUrl, prompt) {
   document.getElementById('btn-regen-compare')?.addEventListener('click', () => document.getElementById('btn-gen-compare').click());
 }
 
-document.getElementById('btn-gen-gemini-compare').addEventListener('click', async function() {
+async function _unusedGeminiCompare() {
   const { size } = getImageParams();
   const out = document.getElementById('image-output');
-  out.innerHTML = `<div class="card" style="border-color:rgba(15,157,88,0.3)"><div class="empty"><div class="loader"></div><br>Generando prompt con IA...<br><span style="font-size:11px;color:var(--text3)">Luego genera con Imagen 3 e Imagen 3 Fast en paralelo</span></div></div>`;
-  this.disabled = true;
   try {
     const prompt = await getImagePrompt();
     out.innerHTML = `<div class="card" style="border-color:rgba(15,157,88,0.3)"><div class="empty"><div class="loader"></div><br>Generando con Imagen 3 e Imagen 3 Fast...<br><span style="font-size:11px;color:var(--text3)">Ambos gratis · ~20 segundos</span></div></div>`;
@@ -1962,50 +1960,10 @@ document.getElementById('btn-gen-gemini-compare').addEventListener('click', asyn
       });
     });
     document.getElementById('btn-pub-gc')?.addEventListener('click', () => openIgPublishModal(caption, selectedUrl));
-    document.getElementById('btn-regen-gc')?.addEventListener('click', () => document.getElementById('btn-gen-gemini-compare').click());
   } catch(e) {
     out.innerHTML = `<div class="card" style="border-color:var(--red)"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
   }
-  this.disabled = false;
-});
-
-document.getElementById('btn-gen-gemini').addEventListener('click', async function() {
-  const { size } = getImageParams();
-  const out = document.getElementById('image-output');
-  out.innerHTML = `<div class="card" style="border-color:rgba(66,133,244,0.3)"><div class="empty"><div class="loader"></div><br>Generando prompt con IA...<br><span style="font-size:11px;color:var(--text3)">Luego genera con Gemini Imagen 3</span></div></div>`;
-  this.disabled = true;
-  try {
-    const prompt = await getImagePrompt();
-    out.innerHTML = `<div class="card" style="border-color:rgba(66,133,244,0.3)"><div class="empty"><div class="loader"></div><br>Generando con Gemini Imagen 3...<br><span style="font-size:11px;color:var(--text3)">Gratuito · puede tardar ~15 segundos</span></div></div>`;
-    const url = await generarImagenGemini(prompt, size);
-    showImageResult([url], 'Gemini Imagen 3', '#4285f4', '✦');
-  } catch(e) {
-    out.innerHTML = `<div class="card" style="border-color:var(--red)"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
-  }
-  this.disabled = false;
-});
-
-document.getElementById('btn-gen-compare').addEventListener('click', async function() {
-  const { size, quality } = getImageParams();
-  const out = document.getElementById('image-output');
-  out.innerHTML = `<div class="card" style="border-color:rgba(0,229,204,0.3)"><div class="empty"><div class="loader"></div><br>Generando prompt con IA...<br><span style="font-size:11px;color:var(--text3)">Luego genera con DALL-E y Gemini en paralelo</span></div></div>`;
-  this.disabled = true;
-  try {
-    const prompt = await getImagePrompt();
-    out.innerHTML = `<div class="card" style="border-color:rgba(0,229,204,0.3)"><div class="empty"><div class="loader"></div><br>Generando con DALL-E y Gemini en paralelo...<br><span style="font-size:11px;color:var(--text3)">~20-30 segundos</span></div></div>`;
-    const [dalleRes, geminiRes] = await Promise.allSettled([
-      callAPI('generate_image', { prompt, size, quality, variations: 1 }),
-      generarImagenGemini(prompt, size)
-    ]);
-    const dalleUrl = dalleRes.status === 'fulfilled' ? (dalleRes.value.urls?.[0] || dalleRes.value.url) : null;
-    const geminiUrl = geminiRes.status === 'fulfilled' ? geminiRes.value : null;
-    if (!dalleUrl && !geminiUrl) throw new Error('Ambos modelos fallaron. Verificá las API keys.');
-    showCompareResult(dalleUrl, geminiUrl, prompt);
-  } catch(e) {
-    out.innerHTML = `<div class="card" style="border-color:var(--red)"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
-  }
-  this.disabled = false;
-});
+}
 
 // ── PUBLICAR EN INSTAGRAM ────────────────────────────
 let igPublishData = { caption: '', imageUrl: '' };
