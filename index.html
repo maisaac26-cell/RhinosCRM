@@ -458,10 +458,11 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               </select>
             </div>
           </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn" id="btn-gen-image" style="flex:1;justify-content:center;background:rgba(139,92,246,0.2);color:#a78bfa;border-color:rgba(139,92,246,0.4);font-weight:600">🎨 DALL-E</button>
-            <button class="btn" id="btn-gen-gemini" style="flex:1;justify-content:center;background:rgba(66,133,244,0.15);color:#4285f4;border-color:rgba(66,133,244,0.3);font-weight:600">✦ Gemini</button>
-            <button class="btn" id="btn-gen-compare" style="flex:1;justify-content:center;background:rgba(0,229,204,0.1);color:var(--cyan);border-color:rgba(0,229,204,0.25);font-weight:600">🆚 Comparar</button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <button class="btn" id="btn-gen-image" style="justify-content:center;background:rgba(139,92,246,0.2);color:#a78bfa;border-color:rgba(139,92,246,0.4);font-weight:600">🎨 DALL-E</button>
+            <button class="btn" id="btn-gen-gemini" style="justify-content:center;background:rgba(66,133,244,0.15);color:#4285f4;border-color:rgba(66,133,244,0.3);font-weight:600">✦ Gemini Imagen 3</button>
+            <button class="btn" id="btn-gen-gemini-compare" style="justify-content:center;background:rgba(15,157,88,0.12);color:#0f9d58;border-color:rgba(15,157,88,0.3);font-weight:600">⚡ Gemini vs Gemini Fast</button>
+            <button class="btn" id="btn-gen-compare" style="justify-content:center;background:rgba(0,229,204,0.1);color:var(--cyan);border-color:rgba(0,229,204,0.25);font-weight:600">🆚 DALL-E vs Gemini</button>
           </div>
         </div>
       </div>
@@ -1871,6 +1872,78 @@ function showCompareResult(dalleUrl, geminiUrl, prompt) {
   document.getElementById('btn-publish-compare')?.addEventListener('click', () => openIgPublishModal(caption, selectedUrl));
   document.getElementById('btn-regen-compare')?.addEventListener('click', () => document.getElementById('btn-gen-compare').click());
 }
+
+document.getElementById('btn-gen-gemini-compare').addEventListener('click', async function() {
+  const { size } = getImageParams();
+  const out = document.getElementById('image-output');
+  out.innerHTML = `<div class="card" style="border-color:rgba(15,157,88,0.3)"><div class="empty"><div class="loader"></div><br>Generando prompt con IA...<br><span style="font-size:11px;color:var(--text3)">Luego genera con Imagen 3 e Imagen 3 Fast en paralelo</span></div></div>`;
+  this.disabled = true;
+  try {
+    const prompt = await getImagePrompt();
+    out.innerHTML = `<div class="card" style="border-color:rgba(15,157,88,0.3)"><div class="empty"><div class="loader"></div><br>Generando con Imagen 3 e Imagen 3 Fast...<br><span style="font-size:11px;color:var(--text3)">Ambos gratis · ~20 segundos</span></div></div>`;
+    const [r1, r2] = await Promise.allSettled([
+      callAPI('generate_image_gemini', { prompt, size, gemini_model: 'imagen-3.0-generate-002' }),
+      callAPI('generate_image_gemini', { prompt, size, gemini_model: 'imagen-3.0-fast-generate-001' })
+    ]);
+    const url1 = r1.status === 'fulfilled' ? r1.value.url : null;
+    const url2 = r2.status === 'fulfilled' ? r2.value.url : null;
+    if (!url1 && !url2) throw new Error('Ambos modelos fallaron');
+
+    const captionEl = document.querySelector('#content-output .ig-caption-ready');
+    const hashEl = document.querySelector('#content-output .ig-caption-ready + div');
+    const caption = (captionEl?.textContent.trim() || '') + (hashEl ? '\n\n' + hashEl.textContent.trim() : '');
+    let selectedUrl = url1 || url2;
+
+    const models = [
+      { url: url1, label: '✦ Imagen 3', sublabel: 'Mayor calidad', color: '#4285f4', id: 'img3' },
+      { url: url2, label: '⚡ Imagen 3 Fast', sublabel: 'Más rápido', color: '#0f9d58', id: 'img3fast' }
+    ];
+
+    out.innerHTML = `
+      <div class="card" style="border-color:rgba(15,157,88,0.3)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <span style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.1em;color:#0f9d58;text-transform:uppercase">⚡ Paso 2 — Imagen 3 vs Imagen 3 Fast</span>
+          <button class="btn btn-sm" id="btn-regen-gc" style="font-size:11px">↺ Regenerar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          ${models.map(m => m.url ? `
+            <div>
+              <div style="font-size:11px;font-weight:700;color:${m.color};text-align:center;margin-bottom:4px">${m.label}</div>
+              <div style="font-size:10px;color:var(--text3);text-align:center;margin-bottom:6px">${m.sublabel}</div>
+              <div style="position:relative">
+                <img src="${m.url}" id="gcimg-${m.id}" style="width:100%;border-radius:var(--r);border:2px solid ${m.color}55;display:block;cursor:pointer" class="gc-sel" data-url="${m.url}" data-id="${m.id}"/>
+                <a href="${m.url}" target="_blank" class="btn btn-sm" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.75);border:none;color:white">⬇</a>
+              </div>
+              <button class="btn btn-full btn-sm gc-choose" data-url="${m.url}" data-id="${m.id}" style="margin-top:6px;background:${m.color}22;color:${m.color};border-color:${m.color}44">Elegir esta</button>
+            </div>` : `<div style="display:flex;align-items:center;justify-content:center;height:200px;background:var(--surface2);border-radius:var(--r);color:var(--text3);font-size:12px">${m.label}<br>no disponible</div>`
+          ).join('')}
+        </div>
+        <div id="gc-cta" style="display:none;background:linear-gradient(135deg,rgba(131,58,180,0.1),rgba(253,29,29,0.06));border:1px solid rgba(139,92,246,0.3);border-radius:var(--r);padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+          <span id="gc-chosen" style="font-size:12px;color:#a78bfa"></span>
+          <button id="btn-pub-gc" class="btn btn-sm" style="background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);color:white;border:none;font-weight:600">📸 Publicar ahora</button>
+        </div>
+      </div>`;
+
+    out.querySelectorAll('.gc-choose').forEach(btn => {
+      btn.addEventListener('click', function() {
+        selectedUrl = this.dataset.url;
+        const selId = this.dataset.id;
+        models.forEach(m => {
+          const img = document.getElementById('gcimg-' + m.id);
+          if (img) img.style.border = m.id === selId ? `2px solid ${m.color}` : `2px solid ${m.color}33`;
+        });
+        document.getElementById('gc-cta').style.display = 'flex';
+        document.getElementById('gc-chosen').textContent = `✓ Elegiste ${selId === 'img3' ? 'Imagen 3' : 'Imagen 3 Fast'}`;
+        showIgPublishBar(caption, selectedUrl);
+      });
+    });
+    document.getElementById('btn-pub-gc')?.addEventListener('click', () => openIgPublishModal(caption, selectedUrl));
+    document.getElementById('btn-regen-gc')?.addEventListener('click', () => document.getElementById('btn-gen-gemini-compare').click());
+  } catch(e) {
+    out.innerHTML = `<div class="card" style="border-color:var(--red)"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
+  }
+  this.disabled = false;
+});
 
 document.getElementById('btn-gen-gemini').addEventListener('click', async function() {
   const { size } = getImageParams();

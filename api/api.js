@@ -441,10 +441,11 @@ Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
         parameters: { sampleCount: 1, aspectRatio: aspect, safetySetting: 'block_few' }
       });
 
+      const geminiModel = body.gemini_model || 'imagen-3.0-generate-002';
       const imgData = await new Promise((resolve, reject) => {
         const req = https.request({
           hostname: 'generativelanguage.googleapis.com',
-          path: `/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_KEY}`,
+          path: `/v1beta/models/${geminiModel}:predict?key=${GEMINI_KEY}`,
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
         }, (res) => {
