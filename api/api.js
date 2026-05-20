@@ -386,27 +386,37 @@ Sé concreto y accionable. Español rioplatense.`;
 
 PRODUCTO: RhinosApp es un CRM/ERP para distribuidoras de alimentos en Argentina. Reemplaza Excel con una plataforma tech que da control total de stock, pedidos, cobranzas y facturación AFIP.
 
+LOGO DE RHINOSAPP — SIEMPRE PRESENTE (elemento central o secundario en TODAS las imágenes):
+El logo es un rinoceronte mecánico-cibernético con estas características EXACTAS que SIEMPRE deben aparecer:
+• Cabeza de rinoceronte armada con placas de metal hexagonales y paneles geométricos, vista 3/4 mirando hacia la derecha
+• Un ojo único circular cibernético con glow cyan brillante (#00e5cc)
+• Cuerno masivo estilo cristal/holográfico con neón cyan luminoso, como una espada de luz
+• Marco hexagonal geométrico rodeando la cabeza, con trazos de circuito electrónico en los bordes y nodos luminosos en los vértices
+• Partículas y chispas cyan dispersas en la esquina superior derecha del hexágono
+• Paleta: acero oscuro metálico + placas grises + brillo cyan/teal intenso como neón
+• El rinoceronte emana energía y control — es poderoso, tech, dominante
+
 ESTILO DE FEED (SIEMPRE consistente en TODAS las imágenes):
 - Fondo: negro azulado profundo (#0d1117) — SIEMPRE este fondo, nunca blanco ni gris
 - Acento principal: turquesa/cyan brillante con efecto glow (#00e5cc)
 - Acento secundario: verde lima solo para elementos de éxito/CTA (#22c55e)
-- Estilo: tech industrial premium — como un dashboard futurista de alta tecnología
-- Iluminación: dramática, rim lighting en cyan, sombras profundas, efectos neon suaves
-- Elementos recurrentes de marca: rinoceronte mecánico/robótico, hexágonos geométricos, circuitos electrónicos, partículas de datos flotantes, pantallas holográficas
-- Composición: minimalista, mucho espacio negativo, UN elemento central dominante
-- Calidad: ultra-detailed 3D render, cinematic depth of field, photorealistic materials
+- Estilo: tech industrial premium — cyberpunk sofisticado, futurista pero sobrio
+- Iluminación: dramática, rim lighting en cyan sobre el rinoceronte, sombras profundas, efectos neon suaves
+- El logo del rinoceronte en hexágono SIEMPRE aparece — puede ser el elemento central dominante o integrado como marca de agua poderosa en una esquina
+- Composición: minimalista, espacio negativo, el rinoceronte anclado visualmente con los otros elementos del post
+- Calidad: ultra-detailed 3D render, cinematic depth of field, photorealistic metal materials
 - NUNCA texto, letras, palabras ni números en la imagen
 
-TABLA DE REFERENCIAS POR MÓDULO (usá para elegir el elemento visual central):
-- Stock/productos → cajas de cartón flotantes con auras cyan, gráficos de inventario holográficos
-- Ventas/pedidos → maletines digitales, rutas de entrega con nodos luminosos, cartas de pedido flotantes
-- Cobranzas → monedas y billetes digitalizados, flujos de dinero en circuitos, contadores flotantes
-- Clientes → red de conexiones humanas digitalizadas, perfiles en hexágonos
-- Panel/reportes → múltiples pantallas holográficas con gráficos, datos en el aire
-- AFIP/facturación → documentos digitales sellados, escudos de seguridad glowing
-- Proveedores → cadena de suministro digital, engranajes mecánicos
-- Comparación Excel → hoja Excel fragmentándose/quemándose, renaciendo como interfaz tech
-- General/IA → cerebro mecánico de rinoceronte con conexiones neurales cyan`;
+TABLA DE REFERENCIAS POR MÓDULO (el logo del rhino siempre presente + estos elementos secundarios):
+- Stock/productos → cajas de cartón flotantes con auras cyan, gráficos de inventario holográficos alrededor del rhino
+- Ventas/pedidos → rutas de entrega digitales con nodos luminosos, el rhino en el centro coordinando
+- Cobranzas → flujos de dinero digitalizados en circuitos, monedas flotantes, el rhino controlando el caos
+- Clientes → red de conexiones hexagonales emanando desde el rhino
+- Panel/reportes → pantallas holográficas con datos flotando alrededor del rhino
+- AFIP/facturación → documentos digitales sellados con el escudo del rhino
+- Proveedores → cadena de suministro digital con el rhino como nodo central
+- Comparación Excel → planilla Excel fragmentándose/quemándose mientras el rhino emerge victorioso
+- General/IA → el cerebro del rhino con conexiones neurales cyan expandiéndose`;
 
       const { caption } = body;
       const captionContext = caption
@@ -424,11 +434,11 @@ ${caption ? `IMPORTANTE: La imagen debe ser la expresión VISUAL del mensaje del
 
 El prompt DEBE:
 1. Empezar SIEMPRE con: "Cinematic 3D render, ultra-detailed, deep dark navy-black background (#0d1117), glowing cyan neon accents (#00e5cc), dramatic rim lighting,"
-2. Describir UN elemento visual central que represente el mensaje específico del caption (no solo el módulo genérico)
-3. Incluir: mechanical robotic rhino silhouette OR hexagonal geometric structures, floating data particles, electronic circuit patterns
-4. Especificar: deep shadows, cyan rim lighting, bokeh depth of field, volumetric fog with cyan glow
+2. Incluir OBLIGATORIAMENTE la descripción del logo: "cyberpunk mechanical armored rhinoceros head with hexagonal metal plates, 3/4 view facing right, single glowing cyan cybernetic eye, massive crystal-like luminous horn with intense cyan neon glow, surrounded by a geometric hexagonal frame with circuit board traces along the edges and glowing node dots at each vertex, cyan sparks and particles dispersing from upper-right corner of the hexagon, dark steel and metallic gray armor with cyan (#00e5cc) energy accents"
+3. Describir el elemento visual temático del caption/módulo que rodea o complementa al rhino
+4. Especificar: deep shadows, cyan rim lighting on the rhino, bokeh depth of field, volumetric cyan fog
 5. Terminar SIEMPRE con: "no text, no letters, no words, no numbers, minimalist premium B2B tech aesthetic, cohesive Instagram feed visual"
-6. Máximo 200 palabras
+6. Máximo 220 palabras
 
 Respondé SOLO con el prompt en inglés, listo para usar.`;
       const imagePromptText = await anthropicFetch([{ role: 'user', content: pr }], SYS);
