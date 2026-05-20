@@ -3350,7 +3350,11 @@ document.querySelector('.nav-btn[data-sec="tareas"]').addEventListener('click', 
 // ── FINANZAS ─────────────────────────────────────────
 // Supabase va por el servidor Vercel para evitar problemas SSL/CORS en el browser
 async function sbFetch(endpoint, method, body) {
-  return callAPI('supabase_proxy', { endpoint, method: method || 'GET', body });
+  const result = await callAPI('supabase_proxy', { endpoint, method: method || 'GET', body });
+  if (!result) return (!method || method === 'GET') ? [] : null;
+  // Si Supabase devuelve un error en lugar de datos
+  if (!Array.isArray(result) && result.code && result.message) throw new Error('DB: ' + result.message);
+  return result;
 }
 
 let finTx = [], finPartners = [];
