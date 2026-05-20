@@ -462,10 +462,14 @@ Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
       });
 
       const results = await Promise.all(requests);
-      const urls = results.map(r => {
-        if (r.error) throw new Error(r.error.message);
-        return r.data?.[0]?.url;
-      }).filter(Boolean);
+
+      // Verificar errores de OpenAI y mostrarlos claramente
+      for (const r of results) {
+        if (r.error) throw new Error('OpenAI: ' + (r.error.message || JSON.stringify(r.error)));
+      }
+
+      const urls = results.map(r => r.data?.[0]?.url).filter(Boolean);
+      if (!urls.length) throw new Error('OpenAI no devolvió imágenes. Verificá que OPENAI_API_KEY esté configurada en Vercel.');
 
       result = { urls, url: urls[0] };
     }
@@ -655,55 +659,6 @@ La respuesta debe:
 - Máximo 5 párrafos cortos`;
       const reply = await anthropicFetch([{ role: 'user', content: prompt }], SYSTEM);
       result = { reply };
-    }
-
-    else if (action === 'generate_image') {
-      const { prompt } = body;
-      const OPENAI_KEY = process.env.OPENAI_API_KEY;
-      if (!OPENAI_KEY) throw new Error('Missing OPENAI_API_KEY');
-      const payload = JSON.stringify({
-        model: 'dall-e-3',
-        prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'standard'
-      });
-      const imgData = await new Promise((resolve, reject) => {
-        const req = https.request({
-          hostname: 'api.openai.com', path: '/v1/images/generations', method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + OPENAI_KEY, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
-        }, (res) => {
-          let raw = ''; res.on('data', c => raw += c);
-          res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0,200))); } });
-        });
-        req.on('error', reject); req.write(payload); req.end();
-      });
-      if (imgData.error) throw new Error(imgData.error.message);
-      result = { url: imgData.data?.[0]?.url, revised_prompt: imgData.data?.[0]?.revised_prompt };
-    }
-
-    else if (action === 'generate_image_prompt') {
-      const { modulo, angulo, formato, tono } = body;
-      const SYSTEM = `Sos experto en crear prompts para DALL-E 3 para contenido de redes sociales de RhinosApp.
-RhinosApp: CRM para distribuidoras de alimentos en Argentina. Dark theme, cyan #00e5cc, verde #22c55e.
-Creás prompts en inglés, muy detallados, optimizados para DALL-E 3.`;
-      const prompt = `Creá un prompt en inglés para DALL-E 3 para una imagen de Instagram de RhinosApp:
-MÓDULO: ${modulo}
-ÁNGULO: ${angulo||'libre'}
-FORMATO: ${formato}
-TONO: ${tono}
-
-El prompt debe:
-- Estar en inglés
-- Especificar estilo visual: dark background #0d1117, cyan accents #00e5cc, professional tech aesthetic
-- Ser específico sobre la composición y elementos visuales
-- Máximo 200 palabras
-- NO incluir texto/letras en la imagen (DALL-E no lo hace bien)
-- Orientado a post cuadrado de Instagram
-
-Devolvé SOLO el prompt, sin explicaciones.`;
-      const reply = await anthropicFetch([{ role: 'user', content: prompt }], SYSTEM);
-      result = { prompt: reply };
     }
 
     else {
