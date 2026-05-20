@@ -97,8 +97,8 @@ module.exports = async function handler(req, res) {
     if (action === 'upload_image_public') {
       // Sube una imagen base64 a imgbb y devuelve una URL pública para Instagram
       const { imageBase64, mime = 'image/png' } = body;
-      const IMGBB_KEY = process.env.IMGBB_API_KEY;
-      if (!IMGBB_KEY) throw new Error('IMGBB_API_KEY no configurada — conseguí tu clave gratis en api.imgbb.com');
+      const IMGBB_KEY = process.env.IMGBB_API_KEY || '4823ec0cd2cbdbcd056011baf20c1830';
+      if (!IMGBB_KEY) throw new Error('IMGBB_API_KEY no configurada');
 
       const formData = `key=${IMGBB_KEY}&image=${encodeURIComponent(imageBase64)}`;
       const uploadData = await new Promise((resolve, reject) => {
