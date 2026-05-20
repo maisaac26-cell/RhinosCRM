@@ -507,7 +507,7 @@ Respondé SOLO con JSON válido, sin markdown:
 
     else if (action === 'generate_image_gemini') {
       const { prompt } = body;
-      const GEMINI_KEY = process.env.GEMINI_API_KEY || 'AIzaSyBEZCYeSTB3_oe1nFLSlq8jlYrWmvixKWg';
+      const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
       // Modelos disponibles en plan gratuito (usan generateContent)
       const modelAliases = {
