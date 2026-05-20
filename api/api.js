@@ -480,6 +480,31 @@ Respondé SOLO con el prompt en inglés, listo para usar.`;
       result = { prompt: imagePromptText };
     }
 
+    else if (action === 'extract_image_text') {
+      const { caption } = body;
+      const SYSTEM = `Sos especialista en marketing visual para RhinosApp — CRM para distribuidoras de alimentos en Argentina.
+Extraés frases impactantes de captions para usar como texto sobre imágenes de Instagram.
+Reglas: máximo 5 palabras para el titular, directo al dolor o beneficio, en español rioplatense, TODO EN MAYÚSCULAS.`;
+      const prompt = `Del siguiente caption de Instagram, extraé el texto más impactante para poner sobre una imagen.
+
+CAPTION:
+"${caption.slice(0, 800)}"
+
+Respondé SOLO con JSON válido, sin markdown:
+{
+  "titular": "3-5 PALABRAS EN MAYÚSCULAS que representen el mensaje central (ej: 'SIN EXCEL. SIN CAOS.' o '¿SABÉS CUÁNTO TE DEBEN?')",
+  "subtitulo": "Una línea corta opcional de contexto en minúsculas (máx 6 palabras) o null",
+  "cta": "rhinosapp.vercel.app"
+}`;
+      const raw = await anthropicFetch([{ role: 'user', content: prompt }], SYSTEM);
+      try {
+        const clean = raw.replace(/```json|```/g, '').trim();
+        result = JSON.parse(clean);
+      } catch(e) {
+        result = { titular: 'CONTROLÁ TU NEGOCIO', subtitulo: 'Con RhinosApp', cta: 'rhinosapp.vercel.app' };
+      }
+    }
+
     else if (action === 'generate_image_gemini') {
       const { prompt } = body;
       const GEMINI_KEY = process.env.GEMINI_API_KEY || 'AIzaSyBEZCYeSTB3_oe1nFLSlq8jlYrWmvixKWg';

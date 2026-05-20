@@ -1715,6 +1715,28 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
                 </div>`).join('')}
             </div>
             ${urls.length > 1 ? '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">👆 Clickeá la imagen que más te gusta para seleccionarla</div>' : ''}
+
+            <!-- AGREGAR TEXTO -->
+            <div style="margin-bottom:10px">
+              <button id="btn-add-text" class="btn btn-full btn-sm" style="background:rgba(0,229,204,0.08);color:var(--cyan);border-color:rgba(0,229,204,0.2)">Aa Agregar texto a la imagen</button>
+              <div id="img-text-editor" style="display:none;margin-top:10px;padding:12px;background:var(--surface2);border-radius:var(--r);border:1px solid var(--border)">
+                <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;font-weight:600">Texto sobre la imagen</div>
+                <div class="field" style="margin-bottom:8px">
+                  <label style="font-size:10px">Titular (ALL CAPS, impacto)</label>
+                  <input id="img-text-titular" placeholder="EJ: ¿SABÉS CUÁNTO TE DEBEN?" style="font-size:13px;font-weight:600;text-transform:uppercase"/>
+                </div>
+                <div class="field" style="margin-bottom:8px">
+                  <label style="font-size:10px">Subtítulo (opcional)</label>
+                  <input id="img-text-subtitulo" placeholder="Ej: Controlá tu distribuidora con IA"/>
+                </div>
+                <div class="field" style="margin-bottom:10px">
+                  <label style="font-size:10px">CTA / Link</label>
+                  <input id="img-text-cta" value="rhinosapp.vercel.app"/>
+                </div>
+                <button id="btn-apply-text" class="btn btn-cyan btn-full btn-sm">✓ Aplicar texto a la imagen</button>
+              </div>
+            </div>
+
             <div style="background:linear-gradient(135deg,rgba(131,58,180,0.1),rgba(253,29,29,0.06),rgba(252,176,69,0.06));border:1px solid rgba(139,92,246,0.3);border-radius:var(--r);padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
               <span style="font-size:12px;color:#a78bfa">👇 Paso 3: publicá en Instagram</span>
               <button id="btn-publish-step3" class="btn btn-sm" style="background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);color:white;border:none;font-weight:600">📸 Publicar ahora</button>
@@ -1734,6 +1756,51 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
             });
             showIgPublishBar(caption, selectedImageUrl);
           });
+        });
+
+        // Botón agregar texto
+        document.getElementById('btn-add-text').addEventListener('click', async function() {
+          this.disabled = true; this.textContent = '⏳ Extrayendo frase...';
+          try {
+            const captionEl = document.querySelector('#content-output .ig-caption-ready');
+            const captionText = captionEl ? captionEl.textContent.trim() : '';
+            let textData = { titular: 'CONTROLÁ TU NEGOCIO', subtitulo: null, cta: 'rhinosapp.vercel.app' };
+            if (captionText) {
+              textData = await callAPI('extract_image_text', { caption: captionText });
+            }
+            // Mostrar editor de texto
+            document.getElementById('img-text-editor').style.display = 'block';
+            document.getElementById('img-text-titular').value = textData.titular || '';
+            document.getElementById('img-text-subtitulo').value = textData.subtitulo || '';
+            document.getElementById('img-text-cta').value = textData.cta || 'rhinosapp.vercel.app';
+            this.textContent = '✓ Texto listo — editalo abajo';
+            this.style.background = 'rgba(0,229,204,0.15)';
+            this.style.color = 'var(--cyan)';
+          } catch(e) {
+            this.disabled = false; this.textContent = 'Aa Agregar texto';
+            showToast('Error: ' + e.message);
+          }
+        });
+
+        // Preview y aplicar texto sobre imagen
+        document.getElementById('btn-apply-text').addEventListener('click', async function() {
+          this.disabled = true; this.textContent = 'Aplicando...';
+          try {
+            const titular = document.getElementById('img-text-titular').value.trim();
+            const subtitulo = document.getElementById('img-text-subtitulo').value.trim();
+            const cta = document.getElementById('img-text-cta').value.trim();
+            const newUrl = await addTextToImage(selectedImageUrl, titular, subtitulo, cta);
+            selectedImageUrl = newUrl;
+            // Actualizar la imagen preview
+            const imgEl = imgOut.querySelector('.img-selectable');
+            if (imgEl) imgEl.src = newUrl;
+            showIgPublishBar(caption, newUrl);
+            showToast('Texto aplicado a la imagen 🦏');
+            this.textContent = '✓ Texto aplicado';
+          } catch(e) {
+            showToast('Error: ' + e.message);
+          }
+          this.disabled = false;
         });
 
         // Botón publicar del paso 3
@@ -1973,6 +2040,84 @@ async function _unusedGeminiCompare() {
   } catch(e) {
     out.innerHTML = `<div class="card" style="border-color:var(--red)"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
   }
+}
+
+// ── TEXTO SOBRE IMAGEN (canvas) ──────────────────────
+async function addTextToImage(imageUrl, titular, subtitulo, cta) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+
+      // Dibujar imagen original
+      ctx.drawImage(img, 0, 0);
+
+      const W = canvas.width;
+      const H = canvas.height;
+      const barH = Math.round(H * 0.28); // barra inferior 28% de la imagen
+
+      // Barra oscura degradé en la parte inferior
+      const grad = ctx.createLinearGradient(0, H - barH, 0, H);
+      grad.addColorStop(0, 'rgba(13,17,23,0)');
+      grad.addColorStop(0.3, 'rgba(13,17,23,0.85)');
+      grad.addColorStop(1, 'rgba(13,17,23,0.97)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, H - barH, W, barH);
+
+      // Línea decorativa cyan
+      ctx.strokeStyle = '#00e5cc';
+      ctx.lineWidth = Math.max(2, W * 0.003);
+      ctx.beginPath();
+      ctx.moveTo(W * 0.06, H - barH + ctx.lineWidth);
+      ctx.lineTo(W * 0.94, H - barH + ctx.lineWidth);
+      ctx.stroke();
+
+      const padding = W * 0.06;
+      let yPos = H - barH + Math.round(barH * 0.25);
+
+      // Titular en blanco — grande y bold
+      if (titular) {
+        const titleSize = Math.round(W * 0.068);
+        ctx.font = `900 ${titleSize}px 'Barlow Condensed', 'Arial Black', Arial, sans-serif`;
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'left';
+        // Sombra sutil
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 8;
+        ctx.fillText(titular.toUpperCase(), padding, yPos);
+        ctx.shadowBlur = 0;
+        yPos += Math.round(titleSize * 1.2);
+      }
+
+      // Subtítulo en cyan tenue
+      if (subtitulo) {
+        const subSize = Math.round(W * 0.038);
+        ctx.font = `500 ${subSize}px 'DM Sans', Arial, sans-serif`;
+        ctx.fillStyle = 'rgba(0,229,204,0.85)';
+        ctx.fillText(subtitulo, padding, yPos);
+        yPos += Math.round(subSize * 1.5);
+      }
+
+      // CTA con punto cyan
+      if (cta) {
+        const ctaSize = Math.round(W * 0.032);
+        ctx.font = `600 ${ctaSize}px 'DM Mono', monospace, Arial`;
+        // Punto cyan antes del CTA
+        ctx.fillStyle = '#00e5cc';
+        ctx.fillText('▸', padding, yPos);
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.fillText(cta, padding + ctaSize * 1.4, yPos);
+      }
+
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('No se pudo cargar la imagen para agregar texto'));
+    img.src = imageUrl;
+  });
 }
 
 // ── PUBLICAR EN INSTAGRAM ────────────────────────────
