@@ -1575,24 +1575,36 @@ document.querySelectorAll('.dm-tpl[data-tipo]').forEach(el => {
 });
 
 // ── CONTENIDO ────────────────────────────────────────
-document.getElementById('btn-gen-content').addEventListener('click', async function() {
+async function generarContenido() {
   const modulo = document.getElementById('c-modulo');
   const angulo = document.getElementById('c-angulo').value.trim();
   const formato = document.getElementById('c-formato').value;
   const tono = document.getElementById('c-tono').value;
   const cta = document.getElementById('c-cta').value;
   const out = document.getElementById('content-output');
-  setLoading(out, 'Generando contenido...');
-  this.disabled = true;
+  setLoading(out, 'Generando contenido con IA...');
   try {
     const r = await callAPI('generate_content', {
-      modulo: modulo.options[modulo.selectedIndex].text,
-      angulo, formato, tono, cta
+      modulo: modulo.options[modulo.selectedIndex].text, angulo, formato, tono, cta
     });
-    out.innerHTML = makeOutput('Contenido listo para publicar', r.reply);
+    out.innerHTML = `
+      <div class="card" style="border-color:rgba(34,197,94,0.3)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.1em;color:var(--green);text-transform:uppercase">✓ Paso 1 — Caption listo</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" id="btn-regen-content" style="font-size:11px">↺ Regenerar</button>
+            <button class="copy-btn" data-content="${encodeURIComponent(r.reply)}" style="font-size:11px;padding:4px 10px;border:1px solid var(--border2);border-radius:4px;background:transparent;cursor:pointer;color:var(--text2)">Copiar</button>
+          </div>
+        </div>
+        <div class="output-body" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text2);font-family:var(--mono)">${r.reply}</div>
+      </div>
+      <div style="margin-top:10px;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.15);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--text3)">
+        👇 <strong style="color:#a78bfa">Paso 2:</strong> Generá la imagen con DALL-E abajo para poder publicar en Instagram
+      </div>`;
+    document.getElementById('btn-regen-content').addEventListener('click', generarContenido);
   } catch(e) { out.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
-  this.disabled = false;
-});
+}
+document.getElementById('btn-gen-content').addEventListener('click', generarContenido);
 
 // ── GENERACIÓN DE IMÁGENES ───────────────────────────
 document.getElementById('btn-gen-image').addEventListener('click', async function() {
@@ -1642,26 +1654,56 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
         const urls = imgRes.urls || (imgRes.url ? [imgRes.url] : []);
         if (!urls.length) throw new Error('No se generaron imágenes');
 
-        // Mostrar barra de publicación con la primera imagen
         const captionEl = document.querySelector('#content-output .output-body');
-        showIgPublishBar(captionEl ? captionEl.textContent.trim().slice(0, 2000) : '', urls[0]);
+        const caption = captionEl ? captionEl.textContent.trim().slice(0, 2000) : '';
+        showIgPublishBar(caption, urls[0]);
 
         const cols = urls.length > 1 ? `grid-template-columns:repeat(${urls.length},1fr)` : '';
         imgOut.innerHTML = `
           <div class="card" style="border-color:rgba(139,92,246,0.3)">
-            <div class="output-head" style="margin-bottom:1rem">
-              <span class="output-label" style="color:#a78bfa">✓ ${urls.length} imagen${urls.length > 1 ? 'es' : ''} generada${urls.length > 1 ? 's' : ''} · ${quality.toUpperCase()} · ${sizeLabel[size]}</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+              <span style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.1em;color:#a78bfa;text-transform:uppercase">✓ Paso 2 — Imagen lista</span>
+              <button class="btn btn-sm" id="btn-regen-image" style="font-size:11px">↺ Nueva imagen</button>
             </div>
             <div style="display:grid;${cols};gap:10px;margin-bottom:12px">
               ${urls.map((url, i) => `
-                <div style="position:relative">
-                  <img src="${url}" style="width:100%;border-radius:var(--r);border:1px solid rgba(139,92,246,0.3);display:block"/>
-                  <a href="${url}" target="_blank" class="btn btn-sm" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.7);border:none;color:white;backdrop-filter:blur(4px)">⬇ Descargar</a>
-                  ${urls.length > 1 ? `<div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:#a78bfa;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px">V${i+1}</div>` : ''}
+                <div style="position:relative" id="img-option-${i}">
+                  <img src="${url}" style="width:100%;border-radius:var(--r);border:2px solid ${i===0?'rgba(139,92,246,0.6)':'rgba(139,92,246,0.2)'};display:block;cursor:pointer" class="img-selectable" data-url="${url}" data-idx="${i}"/>
+                  <a href="${url}" target="_blank" class="btn btn-sm" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.75);border:none;color:white;backdrop-filter:blur(4px)">⬇</a>
+                  ${urls.length > 1 ? `<div style="position:absolute;top:8px;left:8px;background:${i===0?'rgba(139,92,246,0.9)':'rgba(0,0,0,0.6)'};color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px" id="img-badge-${i}">${i===0?'✓ Seleccionada':'V'+(i+1)}</div>` : ''}
                 </div>`).join('')}
             </div>
-            <div style="font-size:11px;color:var(--amber)">⚠️ Las URLs expiran en 1 hora — descargalas antes de que venzan.</div>
+            ${urls.length > 1 ? '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">👆 Clickeá la imagen que más te gusta para seleccionarla</div>' : ''}
+            <div style="background:linear-gradient(135deg,rgba(131,58,180,0.1),rgba(253,29,29,0.06),rgba(252,176,69,0.06));border:1px solid rgba(139,92,246,0.3);border-radius:var(--r);padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12px;color:#a78bfa">👇 Paso 3: publicá en Instagram</span>
+              <button id="btn-publish-step3" class="btn btn-sm" style="background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);color:white;border:none;font-weight:600">📸 Publicar ahora</button>
+            </div>
+            <div style="font-size:11px;color:var(--amber);margin-top:8px">⚠️ URLs expiran en 1 hora — publicá o descargá antes</div>
           </div>`;
+
+        // Selección de imagen
+        let selectedImageUrl = urls[0];
+        imgOut.querySelectorAll('.img-selectable').forEach(img => {
+          img.addEventListener('click', function() {
+            selectedImageUrl = this.dataset.url;
+            imgOut.querySelectorAll('.img-selectable').forEach((el, j) => {
+              el.style.border = el === this ? '2px solid rgba(139,92,246,0.8)' : '2px solid rgba(139,92,246,0.2)';
+              const badge = document.getElementById('img-badge-' + j);
+              if (badge) badge.textContent = el === this ? '✓ Seleccionada' : 'V'+(j+1), badge.style.background = el === this ? 'rgba(139,92,246,0.9)' : 'rgba(0,0,0,0.6)';
+            });
+            showIgPublishBar(caption, selectedImageUrl);
+          });
+        });
+
+        // Botón publicar del paso 3
+        document.getElementById('btn-publish-step3').addEventListener('click', () => {
+          openIgPublishModal(caption, selectedImageUrl);
+        });
+
+        // Botón regenerar imagen
+        document.getElementById('btn-regen-image').addEventListener('click', () => {
+          document.getElementById('btn-gen-image').click();
+        });
       } catch(e) {
         imgOut.innerHTML = `<div class="card" style="border-color:var(--red)"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
       }
