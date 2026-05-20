@@ -94,7 +94,34 @@ module.exports = async function handler(req, res) {
   try {
     let result;
 
-    if (action === 'get_metrics') {
+    if (action === 'ig_publish') {
+      const { image_url, caption } = body;
+      if (!image_url) throw new Error('Se requiere image_url');
+
+      // 1. Crear container
+      const containerPath = `${IG_ID}/media?image_url=${encodeURIComponent(image_url)}&caption=${encodeURIComponent(caption || '')}`;
+      const container = await igFetch(containerPath, 'POST');
+      if (!container.id) throw new Error('Error creando container: ' + JSON.stringify(container));
+
+      // 2. Esperar a que Instagram procese la imagen (status FINISHED)
+      let status = 'IN_PROGRESS';
+      let attempts = 0;
+      while (status !== 'FINISHED' && attempts < 12) {
+        await new Promise(r => setTimeout(r, 3000));
+        const check = await igFetch(`${container.id}?fields=status_code`);
+        status = check.status_code || 'IN_PROGRESS';
+        if (status === 'ERROR' || status === 'EXPIRED') throw new Error('Instagram rechazó la imagen: ' + status);
+        attempts++;
+      }
+      if (status !== 'FINISHED') throw new Error('Timeout procesando imagen en Instagram');
+
+      // 3. Publicar
+      const published = await igFetch(`${IG_ID}/media_publish?creation_id=${container.id}`, 'POST');
+      if (!published.id) throw new Error('Error publicando: ' + JSON.stringify(published));
+      result = { id: published.id, success: true };
+    }
+
+    else if (action === 'get_metrics') {
       const [profile, insights] = await Promise.all([
         igFetch(`${IG_ID}?fields=username,followers_count,media_count,profile_picture_url,biography,website`),
         igFetch(`${IG_ID}/insights?metric=impressions,reach,profile_views,follower_count&period=day&since=${Math.floor(Date.now()/1000) - 604800}&until=${Math.floor(Date.now()/1000)}`)

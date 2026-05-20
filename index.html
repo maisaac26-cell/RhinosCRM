@@ -457,6 +457,16 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div>
         <div id="content-output"><div class="empty">Completá el formulario y generá contenido</div></div>
         <div id="image-output" style="margin-top:1rem"></div>
+        <!-- Botón publicar en Instagram -->
+        <div id="ig-publish-bar" style="display:none;margin-top:1rem">
+          <div style="background:linear-gradient(135deg,rgba(131,58,180,0.1),rgba(253,29,29,0.08),rgba(252,176,69,0.08));border:1px solid rgba(131,58,180,0.3);border-radius:var(--rl);padding:14px 16px">
+            <div style="font-size:11px;color:rgba(252,176,69,0.8);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">📸 Listo para publicar</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Tenés el caption y la imagen generados. Publicá directo en Instagram o editá el caption primero.</div>
+            <div style="display:flex;gap:8px">
+              <button id="btn-ig-publish-now" class="btn btn-full" style="background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);color:white;border:none;font-weight:600">📸 Publicar en Instagram ahora</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1625,6 +1635,10 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
         const urls = imgRes.urls || (imgRes.url ? [imgRes.url] : []);
         if (!urls.length) throw new Error('No se generaron imágenes');
 
+        // Mostrar barra de publicación con la primera imagen
+        const captionEl = document.querySelector('#content-output .output-body');
+        showIgPublishBar(captionEl ? captionEl.textContent.trim().slice(0, 2000) : '', urls[0]);
+
         const cols = urls.length > 1 ? `grid-template-columns:repeat(${urls.length},1fr)` : '';
         imgOut.innerHTML = `
           <div class="card" style="border-color:rgba(139,92,246,0.3)">
@@ -1652,6 +1666,102 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
   }
   this.disabled = false;
 });
+
+// ── PUBLICAR EN INSTAGRAM ────────────────────────────
+let igPublishData = { caption: '', imageUrl: '' };
+
+function showIgPublishBar(caption, imageUrl) {
+  igPublishData = { caption, imageUrl };
+  const bar = document.getElementById('ig-publish-bar');
+  if (bar) bar.style.display = 'block';
+}
+
+document.getElementById('btn-ig-publish-now').addEventListener('click', () => {
+  openIgPublishModal(igPublishData.caption, igPublishData.imageUrl);
+});
+
+function openIgPublishModal(caption, imageUrl) {
+  const existing = document.getElementById('ig-publish-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'ig-publish-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid rgba(131,58,180,0.4);border-radius:16px;padding:24px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto">
+      <div style="font-family:var(--display);font-size:22px;font-weight:800;margin-bottom:4px;background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);-webkit-background-clip:text;-webkit-text-fill-color:transparent">📸 Publicar en Instagram</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">@rhinosapp</div>
+
+      ${imageUrl ? `
+      <div style="margin-bottom:16px">
+        <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;font-weight:500;margin-bottom:6px;display:block">Imagen</label>
+        <img src="${imageUrl}" style="width:100%;max-height:280px;object-fit:cover;border-radius:var(--r);border:1px solid var(--border)"/>
+        <div style="font-size:11px;color:var(--amber);margin-top:4px">⚠️ La URL expira en 1 hora — publicá antes de que venza</div>
+      </div>` : `
+      <div class="field">
+        <label>URL de imagen (requerida)</label>
+        <input id="ig-img-url" placeholder="https://... (debe ser una URL pública de imagen)" value="${imageUrl || ''}"/>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Generá una imagen con DALL-E arriba, o pegá una URL de imagen pública</div>
+      </div>`}
+
+      <div class="field">
+        <label>Caption</label>
+        <textarea id="ig-caption" rows="7" style="font-size:13px;line-height:1.6">${caption || ''}</textarea>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px" id="ig-caption-count">${(caption||'').length}/2200 caracteres</div>
+      </div>
+
+      <div style="background:rgba(131,58,180,0.08);border:1px solid rgba(131,58,180,0.2);border-radius:var(--r);padding:10px 12px;margin-bottom:16px;font-size:12px;color:rgba(252,176,69,0.8)">
+        📌 El post se publicará inmediatamente en <strong>@rhinosapp</strong>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button id="ig-publish-btn" class="btn btn-full" style="background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);color:white;border:none;font-weight:600;font-size:14px">📸 Publicar ahora</button>
+        <button class="btn" onclick="document.getElementById('ig-publish-modal').remove()">Cancelar</button>
+      </div>
+      <div id="ig-publish-progress" style="display:none;margin-top:12px;text-align:center">
+        <div class="loader" style="margin:0 auto 8px"></div>
+        <div id="ig-publish-status" style="font-size:12px;color:var(--text2)">Creando container en Instagram...</div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+
+  // Contador de caracteres
+  document.getElementById('ig-caption').addEventListener('input', function() {
+    document.getElementById('ig-caption-count').textContent = `${this.value.length}/2200 caracteres`;
+    document.getElementById('ig-caption-count').style.color = this.value.length > 2200 ? 'var(--red)' : 'var(--text3)';
+  });
+
+  document.getElementById('ig-publish-btn').addEventListener('click', async function() {
+    const caption = document.getElementById('ig-caption').value.trim();
+    const finalImageUrl = imageUrl || document.getElementById('ig-img-url')?.value.trim();
+    if (!finalImageUrl) { showToast('Necesitás una imagen para publicar'); return; }
+    if (!caption) { showToast('Escribí un caption'); return; }
+    if (caption.length > 2200) { showToast('El caption supera 2200 caracteres'); return; }
+
+    this.style.display = 'none';
+    document.getElementById('ig-publish-progress').style.display = 'block';
+
+    try {
+      document.getElementById('ig-publish-status').textContent = '📤 Subiendo imagen a Instagram...';
+      const r = await callAPI('ig_publish', { image_url: finalImageUrl, caption });
+      if (r.success) {
+        document.getElementById('ig-publish-progress').innerHTML = `
+          <div style="font-size:32px;margin-bottom:8px">✅</div>
+          <div style="font-size:14px;font-weight:600;color:var(--green)">¡Publicado en Instagram!</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px">Post ID: ${r.id}</div>
+          <button class="btn btn-sm" style="margin-top:12px" onclick="document.getElementById('ig-publish-modal').remove()">Cerrar</button>`;
+        showToast('¡Post publicado en @rhinosapp! 🦏');
+        document.getElementById('ig-publish-bar').style.display = 'none';
+      }
+    } catch(e) {
+      document.getElementById('ig-publish-progress').innerHTML = `
+        <div style="font-size:13px;color:var(--red);margin-bottom:8px">❌ Error: ${e.message}</div>
+        <button class="btn btn-sm" onclick="document.getElementById('ig-publish-modal').remove()">Cerrar</button>`;
+    }
+  });
+}
 
 // ── CALENDARIO GOOGLE ────────────────────────────────
 let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
