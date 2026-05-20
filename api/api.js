@@ -183,22 +183,51 @@ Usá 🦏 solo cuando sea natural. No uses signos de exclamación en exceso.`;
 
     else if (action === 'generate_content') {
       const { modulo, angulo, formato, tono, cta } = body;
-      const SYSTEM = `Sos el agente de marketing de RhinosApp — CRM para distribuidores de alimentos (quesos, fiambres, bebidas) en Argentina.
-Identidad visual: fondo oscuro #0d1117, acento turquesa #00e5cc, verde CTA #22c55e. Logo: rinoceronte robótico en hexágono.
-Cliente objetivo: dueño de distribuidora, 35-55 años, acostumbrado a Excel y WhatsApp.
-Tono: profesional, disruptivo, minimalista premium. Nunca corporativo.`;
+      const SYSTEM = `Sos el agente de marketing de RhinosApp — CRM/ERP para pymes y distribuidoras en Argentina.
+
+PRODUCTO REAL (rhinosapp.vercel.app):
+- Tagline: "Controlá pedidos, stock y cobranzas con inteligencia artificial"
+- Propuesta: Reemplaza Excel y procesos manuales por una sola plataforma con visibilidad total en tiempo real
+- Plan único con usuarios ilimitados + app móvil para vendedores + IA + soporte WhatsApp
+- Bonus: migración gratuita desde Excel/papel + capacitación del equipo incluida
+- AFIP/ARCA integrado (facturación electrónica automática)
+
+MÓDULOS REALES:
+1. Inteligencia comercial y reportes automáticos
+2. Panel principal con indicadores del negocio
+3. Clientes y cuentas corrientes
+4. Proveedores
+5. Productos y stock en tiempo real
+6. Ventas y pedidos
+7. Cobranzas y cuentas por cobrar
+8. Compras y cuentas por pagar
+9. ARCA — Integración automática con AFIP
+
+DOLORES REALES del cliente (lo que dicen hoy):
+- "Tengo el stock en Excel y siempre está desactualizado"
+- "No sé cuánto me deben mis clientes hasta que llamo uno por uno"
+- "Mis vendedores anotan los pedidos en papel y se pierden cosas"
+- "La facturación me lleva horas y siempre hay errores"
+- "No tengo reportes — todo está en mi cabeza"
+
+CLIENTE: dueño de distribuidora (quesos, fiambres, bebidas, alimentos), 35-55 años, Argentina, acostumbrado a Excel/WhatsApp, no tech-savvy, valora el orden y el control.
+
+IDENTIDAD: fondo #0d1117, acento #00e5cc, verde CTA #22c55e. Logo: 🦏 rinoceronte robótico. Tono: profesional, directo, disruptivo. Nunca corporativo.
+
+CONTACTO: WhatsApp +54 9 11 6822-3306 | calendly.com/comercial-rhinosapp | comercial@rhinosapp.com`;
+
       const prompt = `Generá contenido para Instagram de RhinosApp:
-MÓDULO: ${modulo}
-ÁNGULO: ${angulo || 'libre'}
+MÓDULO/TEMA: ${modulo}
+ÁNGULO ESPECÍFICO: ${angulo || 'libre — elegí el más impactante'}
 FORMATO: ${formato}
 TONO: ${tono}
 CTA: ${cta}
 
 Entregá:
-1. CAPTION COMPLETO (listo para copiar, con emojis estratégicos)
-2. HASHTAGS (15-20)
-3. IDEAS VISUALES (2-3 opciones concretas para el diseño en Canva con colores de marca: fondo #0d1117, acento #00e5cc)
-4. TIMING (mejor día y hora)`;
+1. CAPTION COMPLETO (listo para copiar, con emojis estratégicos, en español rioplatense)
+2. HASHTAGS (15-20, mezcla de #distribuidoras #gestion #pyme #argentina + nicho)
+3. IDEAS VISUALES (2-3 opciones concretas para el diseño con colores de marca: fondo #0d1117, acento #00e5cc — describí qué mostrar en la imagen)
+4. TIMING (mejor día y hora para este tipo de contenido)`;
       const reply = await anthropicFetch([{ role: 'user', content: prompt }], SYSTEM);
       result = { reply };
     }
@@ -343,35 +372,48 @@ Sé concreto y accionable. Español rioplatense.`;
 
     else if (action === 'generate_image_prompt') {
       const { modulo, angulo, formato, tono } = body;
-      const SYS = `Sos experto en prompt engineering para DALL-E 3, especializado en crear imágenes de marca consistentes para RhinosApp.
+      const SYS = `Sos experto en prompt engineering para DALL-E 3, especializado en crear un feed de Instagram cohesivo y premium para RhinosApp.
 
-IDENTIDAD VISUAL DE RHINOSAPP (SIEMPRE aplicar):
-- Fondo: negro azulado muy oscuro, casi negro (#0d1117)
-- Acento principal: turquesa/cyan brillante y luminoso (#00e5cc), con efecto glow/neon
-- Acento secundario: verde (#22c55e) solo para CTAs
-- Estilo: cyberpunk industrial minimalista, tech premium, futurista pero sobrio
-- Elementos de marca: circuitos electrónicos, hexágonos geométricos, líneas de datos, rinoceronte mecánico/robótico
-- Iluminación: dramática, con luz de borde cyan sobre fondo oscuro, efectos de neón suaves
-- Composición: minimalista, mucho espacio negativo, un elemento central dominante
-- NUNCA incluir texto, letras, palabras o números en la imagen
-- Calidad: ultra-detailed, photorealistic 3D render o cinematic digital art`;
+PRODUCTO: RhinosApp es un CRM/ERP para distribuidoras de alimentos en Argentina. Reemplaza Excel con una plataforma tech que da control total de stock, pedidos, cobranzas y facturación AFIP.
 
-      const pr = `Generá un prompt en inglés para DALL-E 3 para una imagen de marketing de RhinosApp en Instagram.
+ESTILO DE FEED (SIEMPRE consistente en TODAS las imágenes):
+- Fondo: negro azulado profundo (#0d1117) — SIEMPRE este fondo, nunca blanco ni gris
+- Acento principal: turquesa/cyan brillante con efecto glow (#00e5cc)
+- Acento secundario: verde lima solo para elementos de éxito/CTA (#22c55e)
+- Estilo: tech industrial premium — como un dashboard futurista de alta tecnología
+- Iluminación: dramática, rim lighting en cyan, sombras profundas, efectos neon suaves
+- Elementos recurrentes de marca: rinoceronte mecánico/robótico, hexágonos geométricos, circuitos electrónicos, partículas de datos flotantes, pantallas holográficas
+- Composición: minimalista, mucho espacio negativo, UN elemento central dominante
+- Calidad: ultra-detailed 3D render, cinematic depth of field, photorealistic materials
+- NUNCA texto, letras, palabras ni números en la imagen
 
-TEMA DEL POST: ${modulo}
-ÁNGULO: ${angulo || 'concepto general del módulo'}
+TABLA DE REFERENCIAS POR MÓDULO (usá para elegir el elemento visual central):
+- Stock/productos → cajas de cartón flotantes con auras cyan, gráficos de inventario holográficos
+- Ventas/pedidos → maletines digitales, rutas de entrega con nodos luminosos, cartas de pedido flotantes
+- Cobranzas → monedas y billetes digitalizados, flujos de dinero en circuitos, contadores flotantes
+- Clientes → red de conexiones humanas digitalizadas, perfiles en hexágonos
+- Panel/reportes → múltiples pantallas holográficas con gráficos, datos en el aire
+- AFIP/facturación → documentos digitales sellados, escudos de seguridad glowing
+- Proveedores → cadena de suministro digital, engranajes mecánicos
+- Comparación Excel → hoja Excel fragmentándose/quemándose, renaciendo como interfaz tech
+- General/IA → cerebro mecánico de rinoceronte con conexiones neurales cyan`;
+
+      const pr = `Generá un prompt en inglés para DALL-E 3 para una imagen de Instagram de RhinosApp.
+
+MÓDULO/TEMA: ${modulo}
+ÁNGULO: ${angulo || 'el más impactante visualmente para este módulo'}
 FORMATO: ${formato}
 TONO: ${tono}
 
-El prompt debe:
-1. Empezar SIEMPRE con: "Dark cinematic digital art, ultra-detailed 3D render, deep dark navy-black background (#0d1117), glowing cyan/teal neon accents (#00e5cc),"
-2. Incluir elementos visuales que representen el tema del módulo de forma abstracta o conceptual (ej: para stock → cajas/envases flotantes con datos; para cobranzas → monedas/flujos de dinero digitalizados)
-3. Incluir elementos de marca: circuitos electrónicos, estructuras hexagonales, partículas de datos
-4. Especificar iluminación: rim lighting en cyan, profundidad de campo cinematográfica
-5. Terminar con: "no text, no letters, no words, minimalist composition, professional B2B marketing visual"
-6. Máximo 180 palabras
+El prompt DEBE:
+1. Empezar SIEMPRE con: "Cinematic 3D render, ultra-detailed, deep dark navy-black background (#0d1117), glowing cyan neon accents (#00e5cc), dramatic rim lighting,"
+2. Describir UN elemento visual central específico y poderoso basado en el módulo (ver tabla de referencias)
+3. Incluir: mechanical robotic rhino silhouette OR hexagonal geometric structures, floating data particles, electronic circuit patterns
+4. Especificar: deep shadows, cyan rim lighting, bokeh depth of field, volumetric fog with cyan glow
+5. Terminar SIEMPRE con: "no text, no letters, no words, no numbers, minimalist premium B2B tech aesthetic, cohesive Instagram feed visual"
+6. Máximo 200 palabras
 
-Respondé SOLO con el prompt en inglés, sin explicaciones ni comillas.`;
+Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
       const imagePromptText = await anthropicFetch([{ role: 'user', content: pr }], SYS);
       result = { prompt: imagePromptText };
     }
