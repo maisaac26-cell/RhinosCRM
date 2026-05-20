@@ -428,6 +428,39 @@ Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
       result = { prompt: imagePromptText };
     }
 
+    else if (action === 'generate_image_gemini') {
+      const { prompt, size = 'square' } = body;
+      const GEMINI_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY no configurada en Vercel');
+
+      const aspectMap = { square: '1:1', portrait: '9:16', landscape: '16:9' };
+      const aspect = aspectMap[size] || '1:1';
+
+      const payload = JSON.stringify({
+        instances: [{ prompt }],
+        parameters: { sampleCount: 1, aspectRatio: aspect, safetySetting: 'block_few' }
+      });
+
+      const imgData = await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: 'generativelanguage.googleapis.com',
+          path: `/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_KEY}`,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+        }, (res) => {
+          let raw = ''; res.on('data', c => raw += c);
+          res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0,300))); } });
+        });
+        req.on('error', reject); req.write(payload); req.end();
+      });
+
+      if (imgData.error) throw new Error('Gemini: ' + (imgData.error.message || JSON.stringify(imgData.error)));
+      const b64 = imgData.predictions?.[0]?.bytesBase64Encoded;
+      const mime = imgData.predictions?.[0]?.mimeType || 'image/png';
+      if (!b64) throw new Error('Gemini no devolvió imagen. Respuesta: ' + JSON.stringify(imgData).slice(0,200));
+      result = { url: `data:${mime};base64,${b64}`, b64: true };
+    }
+
     else if (action === 'generate_image') {
       const { prompt, size = 'square', quality = 'hd', variations = 1 } = body;
       const OPENAI_KEY = process.env.OPENAI_API_KEY;
