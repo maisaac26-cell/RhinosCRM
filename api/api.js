@@ -429,49 +429,60 @@ Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
     }
 
     else if (action === 'generate_image') {
-      const { prompt, size = '1024x1024', quality = 'hd', variations = 1 } = body;
+      const { prompt, size = 'square', quality = 'hd', variations = 1 } = body;
       const OPENAI_KEY = process.env.OPENAI_API_KEY;
+      if (!OPENAI_KEY) throw new Error('OPENAI_API_KEY no configurada en Vercel → Settings → Environment Variables');
 
-      const sizeMap = {
-        'square': '1024x1024',
-        'portrait': '1024x1792',
-        'landscape': '1792x1024'
-      };
-      const finalSize = sizeMap[size] || size;
-      const count = Math.min(Math.max(1, +variations), 3);
-
-      // DALL-E 3 solo acepta n=1, generamos en paralelo
-      const requests = Array.from({ length: count }, () => {
-        const payload = JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size: finalSize, quality });
+      async function openAIImage(model, imgSize, imgQuality) {
+        const payloadObj = { model, prompt, n: 1, size: imgSize };
+        if (model === 'dall-e-3') { payloadObj.quality = imgQuality; }
+        const payload = JSON.stringify(payloadObj);
         return new Promise((resolve, reject) => {
           const req = https.request({
-            hostname: 'api.openai.com',
-            path: '/v1/images/generations',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + OPENAI_KEY,
-              'Content-Length': Buffer.byteLength(payload)
-            }
+            hostname: 'api.openai.com', path: '/v1/images/generations', method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY, 'Content-Length': Buffer.byteLength(payload) }
           }, (res) => {
             let raw = ''; res.on('data', c => raw += c);
-            res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0, 200))); } });
+            res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0,200))); } });
           });
           req.on('error', reject); req.write(payload); req.end();
         });
-      });
-
-      const results = await Promise.all(requests);
-
-      // Verificar errores de OpenAI y mostrarlos claramente
-      for (const r of results) {
-        if (r.error) throw new Error('OpenAI: ' + (r.error.message || JSON.stringify(r.error)));
       }
 
-      const urls = results.map(r => r.data?.[0]?.url).filter(Boolean);
-      if (!urls.length) throw new Error('OpenAI no devolvió imágenes. Verificá que OPENAI_API_KEY esté configurada en Vercel.');
+      // DALL-E 3 soporta portrait/landscape, DALL-E 2 solo 1024x1024
+      const sizeMapD3 = { square:'1024x1024', portrait:'1024x1792', landscape:'1792x1024' };
+      const count = Math.min(Math.max(1, +variations), 3);
 
-      result = { urls, url: urls[0] };
+      // Intentar DALL-E 3 primero, caer a DALL-E 2 si no está disponible
+      let model = 'dall-e-3', finalSize = sizeMapD3[size] || '1024x1024';
+      const testR = await openAIImage(model, finalSize, quality);
+      if (testR.error?.message?.includes('does not exist') || testR.error?.message?.includes('deprecated')) {
+        model = 'dall-e-2'; finalSize = '1024x1024'; // dall-e-2 solo soporta cuadrado
+      } else if (testR.error) {
+        throw new Error('OpenAI: ' + testR.error.message);
+      }
+
+      // Si ya tenemos resultado del test, usarlo. Si necesitamos más variaciones, pedir el resto
+      const firstUrl = testR.data?.[0]?.url;
+      let urls = firstUrl ? [firstUrl] : [];
+
+      if (firstUrl && count > 1) {
+        const extra = await Promise.all(
+          Array.from({ length: count - 1 }, () => openAIImage(model, finalSize, quality))
+        );
+        for (const r of extra) {
+          if (r.error) break; // ignorar errores en variaciones adicionales
+          if (r.data?.[0]?.url) urls.push(r.data[0].url);
+        }
+      } else if (!firstUrl && model === 'dall-e-2') {
+        // Reintentar con dall-e-2
+        const r2 = await openAIImage('dall-e-2', '1024x1024', quality);
+        if (r2.error) throw new Error('OpenAI: ' + r2.error.message);
+        if (r2.data?.[0]?.url) urls = [r2.data[0].url];
+      }
+
+      if (!urls.length) throw new Error('No se pudo generar la imagen. Verificá el crédito en platform.openai.com/billing');
+      result = { urls, url: urls[0], model_used: model };
     }
 
     else if (action === 'gmail_get_client_id') {
