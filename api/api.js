@@ -429,23 +429,27 @@ Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
     }
 
     else if (action === 'generate_image_gemini') {
-      const { prompt, size = 'square' } = body;
+      const { prompt } = body;
       const GEMINI_KEY = process.env.GEMINI_API_KEY || 'AIzaSyBEZCYeSTB3_oe1nFLSlq8jlYrWmvixKWg';
-      if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY no configurada');
 
-      const aspectMap = { square: '1:1', portrait: '9:16', landscape: '16:9' };
-      const aspect = aspectMap[size] || '1:1';
+      // Modelos disponibles en plan gratuito (usan generateContent)
+      const modelAliases = {
+        'imagen-3.0-generate-002':        'gemini-2.5-flash-image',
+        'imagen-3.0-fast-generate-001':   'gemini-3.1-flash-image-preview',
+        'gemini-fast':                    'gemini-3.1-flash-image-preview',
+        'gemini-pro':                     'gemini-3-pro-image-preview'
+      };
+      const geminiModel = modelAliases[body.gemini_model] || body.gemini_model || 'gemini-2.5-flash-image';
 
       const payload = JSON.stringify({
-        instances: [{ prompt }],
-        parameters: { sampleCount: 1, aspectRatio: aspect, safetySetting: 'block_few' }
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
       });
 
-      const geminiModel = body.gemini_model || 'imagen-3.0-generate-002';
       const imgData = await new Promise((resolve, reject) => {
         const req = https.request({
           hostname: 'generativelanguage.googleapis.com',
-          path: `/v1beta/models/${geminiModel}:predict?key=${GEMINI_KEY}`,
+          path: `/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_KEY}`,
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
         }, (res) => {
@@ -456,11 +460,12 @@ Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
       });
 
       if (imgData.error) throw new Error('Gemini: ' + (imgData.error.message || JSON.stringify(imgData.error)));
-      const b64 = imgData.predictions?.[0]?.bytesBase64Encoded;
-      const mime = imgData.predictions?.[0]?.mimeType || 'image/png';
-      if (!b64) throw new Error('Gemini no devolvió imagen. Respuesta: ' + JSON.stringify(imgData).slice(0,200));
-      // Devolver b64 separado para que el frontend cree un Blob URL
-      result = { imageBase64: b64, mime, isBase64: true };
+
+      const parts = imgData.candidates?.[0]?.content?.parts || [];
+      const imgPart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
+      if (!imgPart) throw new Error('Gemini no generó imagen. Modelo: ' + geminiModel);
+
+      result = { imageBase64: imgPart.inlineData.data, mime: imgPart.inlineData.mimeType, isBase64: true };
     }
 
     else if (action === 'generate_image') {
