@@ -94,12 +94,36 @@ module.exports = async function handler(req, res) {
   try {
     let result;
 
-    if (action === 'ig_create_container') {
+    if (action === 'upload_image_public') {
+      // Sube una imagen base64 a imgbb y devuelve una URL pública para Instagram
+      const { imageBase64, mime = 'image/png' } = body;
+      const IMGBB_KEY = process.env.IMGBB_API_KEY;
+      if (!IMGBB_KEY) throw new Error('IMGBB_API_KEY no configurada — conseguí tu clave gratis en api.imgbb.com');
+
+      const formData = `key=${IMGBB_KEY}&image=${encodeURIComponent(imageBase64)}`;
+      const uploadData = await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: 'api.imgbb.com',
+          path: '/1/upload',
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(formData) }
+        }, (res) => {
+          let raw = ''; res.on('data', c => raw += c);
+          res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0,200))); } });
+        });
+        req.on('error', reject); req.write(formData); req.end();
+      });
+
+      if (!uploadData.success) throw new Error('imgbb error: ' + JSON.stringify(uploadData.error || uploadData));
+      result = { url: uploadData.data.url, display_url: uploadData.data.display_url };
+    }
+
+    else if (action === 'ig_create_container') {
       // Paso 1: Solo crea el container y devuelve el ID (rápido, < 5 segundos)
       const { image_url, caption } = body;
       if (!image_url) throw new Error('Se requiere image_url');
       if (image_url.startsWith('blob:') || image_url.startsWith('data:')) {
-        throw new Error('La imagen de Gemini no se puede subir directamente. Descargala primero con el botón ⬇ y luego volvé a publicar usando la URL pública de la imagen descargada.');
+        throw new Error('URL local — necesita subirse a un host público primero');
       }
       const containerPath = `${IG_ID}/media?image_url=${encodeURIComponent(image_url)}&caption=${encodeURIComponent(caption || '')}`;
       const container = await igFetch(containerPath, 'POST');
