@@ -1681,11 +1681,11 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
       try {
         let imgRes;
         if (modelSel === 'gemini3') {
-          imgRes = await callAPI('generate_image_gemini', { prompt: finalPrompt, size, gemini_model: 'imagen-3.0-generate-002' });
-          imgRes = { urls: [imgRes.url], url: imgRes.url };
+          const url = await generarImagenGemini(finalPrompt, size, 'imagen-3.0-generate-002');
+          imgRes = { urls: [url], url };
         } else if (modelSel === 'gemini3fast') {
-          imgRes = await callAPI('generate_image_gemini', { prompt: finalPrompt, size, gemini_model: 'imagen-3.0-fast-generate-001' });
-          imgRes = { urls: [imgRes.url], url: imgRes.url };
+          const url = await generarImagenGemini(finalPrompt, size, 'imagen-3.0-fast-generate-001');
+          imgRes = { urls: [url], url };
         } else {
           imgRes = await callAPI('generate_image', { prompt: finalPrompt, size, quality, variations });
         }
@@ -1767,10 +1767,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── GENERADOR GEMINI ─────────────────────────────────
-async function generarImagenGemini(prompt, size) {
-  const r = await callAPI('generate_image_gemini', { prompt, size });
-  if (!r.url) throw new Error('Gemini no devolvió imagen');
-  return r.url;
+async function generarImagenGemini(prompt, size, geminiModel) {
+  const params = { prompt, size };
+  if (geminiModel) params.gemini_model = geminiModel;
+  const r = await callAPI('generate_image_gemini', params);
+  if (!r.imageBase64) throw new Error('Gemini no devolvió imagen');
+  // Convertir base64 a Blob URL para que el browser lo muestre correctamente
+  const byteChars = atob(r.imageBase64);
+  const byteArr = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+  const blob = new Blob([byteArr], { type: r.mime || 'image/png' });
+  return URL.createObjectURL(blob);
 }
 
 function getImageParams() {

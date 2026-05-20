@@ -459,7 +459,8 @@ Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
       const b64 = imgData.predictions?.[0]?.bytesBase64Encoded;
       const mime = imgData.predictions?.[0]?.mimeType || 'image/png';
       if (!b64) throw new Error('Gemini no devolvió imagen. Respuesta: ' + JSON.stringify(imgData).slice(0,200));
-      result = { url: `data:${mime};base64,${b64}`, b64: true };
+      // Devolver b64 separado para que el frontend cree un Blob URL
+      result = { imageBase64: b64, mime, isBase64: true };
     }
 
     else if (action === 'generate_image') {
