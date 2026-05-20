@@ -94,7 +94,30 @@ module.exports = async function handler(req, res) {
   try {
     let result;
 
-    if (action === 'upload_image_public') {
+    if (action === 'supabase_proxy') {
+      const { endpoint, method: m = 'GET', body: b } = body;
+      const SB_URL_P = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
+      const SB_KEY_P = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
+      const payload = b ? JSON.stringify(b) : undefined;
+      const hdrs = {
+        'apikey': SB_KEY_P, 'Authorization': 'Bearer ' + SB_KEY_P, 'Content-Type': 'application/json',
+        'Prefer': m === 'POST' || m === 'PATCH' ? 'return=representation' : m === 'DELETE' ? 'return=minimal' : ''
+      };
+      if (payload) hdrs['Content-Length'] = Buffer.byteLength(payload);
+      const u = new URL(`${SB_URL_P}/rest/v1/${endpoint}`);
+      const sbRes = await new Promise((resolve, reject) => {
+        const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: m, headers: hdrs }, (res) => {
+          let raw = ''; res.on('data', c => raw += c);
+          res.on('end', () => { try { resolve(raw ? JSON.parse(raw) : null); } catch(e) { resolve(raw); } });
+        });
+        req.on('error', reject);
+        if (payload) req.write(payload);
+        req.end();
+      });
+      result = sbRes;
+    }
+
+    else if (action === 'upload_image_public') {
       // Sube una imagen base64 a imgbb y devuelve una URL pública para Instagram
       const { imageBase64, mime = 'image/png' } = body;
       const IMGBB_KEY = process.env.IMGBB_API_KEY || '4823ec0cd2cbdbcd056011baf20c1830';
