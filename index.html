@@ -458,12 +458,15 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               </select>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-            <button class="btn" id="btn-gen-image" style="justify-content:center;background:rgba(139,92,246,0.2);color:#a78bfa;border-color:rgba(139,92,246,0.4);font-weight:600">🎨 DALL-E</button>
-            <button class="btn" id="btn-gen-gemini" style="justify-content:center;background:rgba(66,133,244,0.15);color:#4285f4;border-color:rgba(66,133,244,0.3);font-weight:600">✦ Gemini Imagen 3</button>
-            <button class="btn" id="btn-gen-gemini-compare" style="justify-content:center;background:rgba(15,157,88,0.12);color:#0f9d58;border-color:rgba(15,157,88,0.3);font-weight:600">⚡ Gemini vs Gemini Fast</button>
-            <button class="btn" id="btn-gen-compare" style="justify-content:center;background:rgba(0,229,204,0.1);color:var(--cyan);border-color:rgba(0,229,204,0.25);font-weight:600">🆚 DALL-E vs Gemini</button>
+          <div class="field" style="margin-bottom:8px">
+            <label style="color:var(--text3)">Modelo de IA</label>
+            <select id="img-model" style="font-size:13px;padding:8px 10px">
+              <option value="gemini3">✦ Gemini Imagen 3 — Gratis</option>
+              <option value="gemini3fast">⚡ Gemini Imagen 3 Fast — Gratis</option>
+              <option value="dalle">🎨 DALL-E 3 — Requiere crédito OpenAI</option>
+            </select>
           </div>
+          <button class="btn btn-full" id="btn-gen-image" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600;font-size:14px;padding:11px">🎨 Generar imagen</button>
         </div>
       </div>
       <div>
@@ -1638,10 +1641,15 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
   const size = document.getElementById('img-size').value;
   const quality = document.getElementById('img-quality').value;
   const variations = +document.getElementById('img-variations').value;
+  const modelSel = document.getElementById('img-model').value;
   const out = document.getElementById('image-output');
+  const modelLabels = { gemini3: '✦ Gemini Imagen 3', gemini3fast: '⚡ Gemini Imagen 3 Fast', dalle: '🎨 DALL-E 3' };
+  const modelColors = { gemini3: '#4285f4', gemini3fast: '#0f9d58', dalle: '#a78bfa' };
 
   const sizeLabel = { square: 'Feed 1:1', portrait: 'Stories 9:16', landscape: 'Banner 16:9' };
-  out.innerHTML = `<div class="card" style="border-color:rgba(139,92,246,0.3)"><div class="empty"><div class="loader"></div><br>Generando prompt con IA...<br><span style="font-size:11px;color:var(--text3)">Claude está diseñando el prompt visual</span></div></div>`;
+  const color = modelColors[modelSel] || '#a78bfa';
+  const label = modelLabels[modelSel] || 'IA';
+  out.innerHTML = `<div class="card" style="border-color:${color}44"><div class="empty"><div class="loader"></div><br>Generando prompt con IA...<br><span style="font-size:11px;color:var(--text3)">Diseñando el prompt visual para ${label}</span></div></div>`;
   this.disabled = true;
 
   try {
@@ -1651,17 +1659,16 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
     const imagePrompt = promptRes.prompt;
 
     out.innerHTML = `
-      <div class="card" style="border-color:rgba(139,92,246,0.3)">
+      <div class="card" style="border-color:${color}44">
         <div class="output-head" style="margin-bottom:10px">
-          <span class="output-label" style="color:#a78bfa">Prompt — podés editarlo antes de generar</span>
+          <span class="output-label" style="color:${color}">Prompt para ${label} — podés editarlo</span>
           <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:10px;background:rgba(139,92,246,0.15);color:#a78bfa;border-radius:4px;padding:2px 7px">${sizeLabel[size]}</span>
-            <span style="font-size:10px;background:rgba(139,92,246,0.15);color:#a78bfa;border-radius:4px;padding:2px 7px">${quality.toUpperCase()}</span>
-            <span style="font-size:10px;background:rgba(139,92,246,0.15);color:#a78bfa;border-radius:4px;padding:2px 7px">${variations} var.</span>
+            <span style="font-size:10px;background:${color}22;color:${color};border-radius:4px;padding:2px 7px">${sizeLabel[size]}</span>
+            ${modelSel === 'dalle' ? `<span style="font-size:10px;background:${color}22;color:${color};border-radius:4px;padding:2px 7px">${quality.toUpperCase()}</span>` : ''}
           </div>
         </div>
         <textarea id="img-prompt-edit" style="width:100%;min-height:110px;font-size:12px;font-family:var(--mono);line-height:1.6;margin-bottom:10px;resize:vertical">${imagePrompt}</textarea>
-        <button class="btn btn-full" id="btn-fire-image" style="background:rgba(139,92,246,0.2);color:#a78bfa;border-color:rgba(139,92,246,0.4);font-weight:600">🎨 Generar ${variations > 1 ? variations + ' variaciones' : 'imagen'}</button>
+        <button class="btn btn-full" id="btn-fire-image" style="background:${color}22;color:${color};border-color:${color}44;font-weight:600">Generar con ${label}</button>
         <div style="margin-top:8px;font-size:11px;color:var(--text3)">💡 Editá el prompt para ajustar detalles antes de generar</div>
       </div>
       <div id="img-result" style="margin-top:1rem"></div>`;
@@ -1669,11 +1676,19 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
     document.getElementById('btn-fire-image').addEventListener('click', async function() {
       const finalPrompt = document.getElementById('img-prompt-edit').value.trim();
       const imgOut = document.getElementById('img-result');
-      const tiempoEst = variations * 20;
-      imgOut.innerHTML = `<div class="card" style="border-color:rgba(139,92,246,0.3)"><div class="empty"><div class="loader"></div><br>Generando ${variations > 1 ? variations + ' imágenes' : 'imagen'} en HD...<br><span style="font-size:11px;color:var(--text3)">~${tiempoEst} segundos · calidad ${quality.toUpperCase()} · ${sizeLabel[size]}</span></div></div>`;
+      imgOut.innerHTML = `<div class="card" style="border-color:${color}44"><div class="empty"><div class="loader"></div><br>Generando con ${label}...<br><span style="font-size:11px;color:var(--text3)">~15-30 segundos</span></div></div>`;
       this.disabled = true;
       try {
-        const imgRes = await callAPI('generate_image', { prompt: finalPrompt, size, quality, variations });
+        let imgRes;
+        if (modelSel === 'gemini3') {
+          imgRes = await callAPI('generate_image_gemini', { prompt: finalPrompt, size, gemini_model: 'imagen-3.0-generate-002' });
+          imgRes = { urls: [imgRes.url], url: imgRes.url };
+        } else if (modelSel === 'gemini3fast') {
+          imgRes = await callAPI('generate_image_gemini', { prompt: finalPrompt, size, gemini_model: 'imagen-3.0-fast-generate-001' });
+          imgRes = { urls: [imgRes.url], url: imgRes.url };
+        } else {
+          imgRes = await callAPI('generate_image', { prompt: finalPrompt, size, quality, variations });
+        }
         const urls = imgRes.urls || (imgRes.url ? [imgRes.url] : []);
         if (!urls.length) throw new Error('No se generaron imágenes');
 
@@ -1740,6 +1755,15 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
     out.innerHTML = `<div class="card" style="border-color:var(--red)"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
   }
   this.disabled = false;
+});
+
+// ── GENERADORES DE IMAGEN (botones extra, ya no usados en UI) ────────────────
+// Stubs vacíos para que no fallen referencias
+document.addEventListener('DOMContentLoaded', () => {
+  ['btn-gen-gemini','btn-gen-gemini-compare','btn-gen-compare'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
 });
 
 // ── GENERADOR GEMINI ─────────────────────────────────
