@@ -94,31 +94,42 @@ module.exports = async function handler(req, res) {
   try {
     let result;
 
-    if (action === 'ig_publish') {
+    if (action === 'ig_create_container') {
+      // Paso 1: Solo crea el container y devuelve el ID (rápido, < 5 segundos)
       const { image_url, caption } = body;
       if (!image_url) throw new Error('Se requiere image_url');
-
-      // 1. Crear container
+      if (image_url.startsWith('blob:') || image_url.startsWith('data:')) {
+        throw new Error('La imagen de Gemini no se puede subir directamente. Descargala primero con el botón ⬇ y luego volvé a publicar usando la URL pública de la imagen descargada.');
+      }
       const containerPath = `${IG_ID}/media?image_url=${encodeURIComponent(image_url)}&caption=${encodeURIComponent(caption || '')}`;
       const container = await igFetch(containerPath, 'POST');
       if (!container.id) throw new Error('Error creando container: ' + JSON.stringify(container));
+      result = { creation_id: container.id };
+    }
 
-      // 2. Esperar a que Instagram procese la imagen (status FINISHED)
-      let status = 'IN_PROGRESS';
-      let attempts = 0;
-      while (status !== 'FINISHED' && attempts < 12) {
-        await new Promise(r => setTimeout(r, 3000));
-        const check = await igFetch(`${container.id}?fields=status_code`);
-        status = check.status_code || 'IN_PROGRESS';
-        if (status === 'ERROR' || status === 'EXPIRED') throw new Error('Instagram rechazó la imagen: ' + status);
-        attempts++;
-      }
-      if (status !== 'FINISHED') throw new Error('Timeout procesando imagen en Instagram');
+    else if (action === 'ig_check_status') {
+      // Paso 2: El frontend llama esto cada 3s hasta que sea FINISHED
+      const { creation_id } = body;
+      const check = await igFetch(`${creation_id}?fields=status_code`);
+      result = { status: check.status_code || 'IN_PROGRESS', error: check.error };
+    }
 
-      // 3. Publicar
-      const published = await igFetch(`${IG_ID}/media_publish?creation_id=${container.id}`, 'POST');
+    else if (action === 'ig_publish_container') {
+      // Paso 3: Publicar el container ya procesado
+      const { creation_id } = body;
+      const published = await igFetch(`${IG_ID}/media_publish?creation_id=${creation_id}`, 'POST');
       if (!published.id) throw new Error('Error publicando: ' + JSON.stringify(published));
       result = { id: published.id, success: true };
+    }
+
+    else if (action === 'ig_publish') {
+      // Mantener compatibilidad con código anterior
+      const { image_url, caption } = body;
+      if (!image_url) throw new Error('Se requiere image_url');
+      const containerPath = `${IG_ID}/media?image_url=${encodeURIComponent(image_url)}&caption=${encodeURIComponent(caption || '')}`;
+      const container = await igFetch(containerPath, 'POST');
+      if (!container.id) throw new Error('Error creando container: ' + JSON.stringify(container));
+      result = { creation_id: container.id };
     }
 
     else if (action === 'get_metrics') {

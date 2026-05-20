@@ -2048,24 +2048,68 @@ function openIgPublishModal(caption, imageUrl) {
     if (!caption) { showToast('Escribí un caption'); return; }
     if (caption.length > 2200) { showToast('El caption supera 2200 caracteres'); return; }
 
+    // Detectar blob: URLs de Gemini — no se pueden subir a Instagram directamente
+    if (finalImageUrl.startsWith('blob:') || finalImageUrl.startsWith('data:')) {
+      document.getElementById('ig-publish-progress').style.display = 'block';
+      document.getElementById('ig-publish-progress').innerHTML = `
+        <div style="font-size:24px;margin-bottom:8px">⚠️</div>
+        <div style="font-size:13px;font-weight:600;color:var(--amber);margin-bottom:8px">Las imágenes de Gemini no se pueden publicar directamente</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:12px">
+          Instagram necesita una URL pública para acceder a la imagen.<br>
+          <strong style="color:var(--cyan)">Solución:</strong> Descargá la imagen con el botón ⬇, subila a Google Drive o Dropbox, y usá ese link público.<br><br>
+          <strong style="color:var(--green)">Alternativa más fácil:</strong> Usá DALL-E 3 para publicar directo (requiere $5 de crédito en OpenAI).
+        </div>
+        <button class="btn btn-sm" onclick="document.getElementById('ig-publish-modal').remove()">Entendido</button>`;
+      this.style.display = 'none';
+      return;
+    }
+
     this.style.display = 'none';
-    document.getElementById('ig-publish-progress').style.display = 'block';
+    const progressEl = document.getElementById('ig-publish-progress');
+    progressEl.style.display = 'block';
+
+    const setStatus = (msg) => {
+      document.getElementById('ig-publish-status').textContent = msg;
+    };
 
     try {
-      document.getElementById('ig-publish-status').textContent = '📤 Subiendo imagen a Instagram...';
-      const r = await callAPI('ig_publish', { image_url: finalImageUrl, caption });
-      if (r.success) {
-        document.getElementById('ig-publish-progress').innerHTML = `
+      // Paso 1: Crear container (rápido)
+      setStatus('📤 Paso 1/3 — Enviando imagen a Instagram...');
+      const c = await callAPI('ig_create_container', { image_url: finalImageUrl, caption });
+      const creationId = c.creation_id;
+      if (!creationId) throw new Error('No se pudo crear el container');
+
+      // Paso 2: Polling en el browser (sin límite de tiempo del servidor)
+      setStatus('⏳ Paso 2/3 — Instagram está procesando la imagen...');
+      let status = 'IN_PROGRESS';
+      let attempts = 0;
+      const maxAttempts = 40; // 40 × 4s = 2 minutos máximo
+      while (status === 'IN_PROGRESS' && attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 4000));
+        attempts++;
+        const s = await callAPI('ig_check_status', { creation_id: creationId });
+        status = s.status || 'IN_PROGRESS';
+        const segundos = attempts * 4;
+        setStatus(`⏳ Paso 2/3 — Procesando... (${segundos}s) — ${status}`);
+        if (status === 'ERROR' || status === 'EXPIRED') throw new Error(`Instagram rechazó la imagen (${status}). Verificá que la URL de la imagen sea pública y accesible.`);
+      }
+      if (status !== 'FINISHED') throw new Error('Instagram tardó demasiado en procesar. Intentá de nuevo en unos minutos.');
+
+      // Paso 3: Publicar
+      setStatus('🚀 Paso 3/3 — Publicando en @rhinosapp...');
+      const pub = await callAPI('ig_publish_container', { creation_id: creationId });
+      if (pub.success) {
+        progressEl.innerHTML = `
           <div style="font-size:32px;margin-bottom:8px">✅</div>
           <div style="font-size:14px;font-weight:600;color:var(--green)">¡Publicado en Instagram!</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:4px">Post ID: ${r.id}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px">Post ID: ${pub.id}</div>
           <button class="btn btn-sm" style="margin-top:12px" onclick="document.getElementById('ig-publish-modal').remove()">Cerrar</button>`;
         showToast('¡Post publicado en @rhinosapp! 🦏');
         document.getElementById('ig-publish-bar').style.display = 'none';
       }
     } catch(e) {
-      document.getElementById('ig-publish-progress').innerHTML = `
-        <div style="font-size:13px;color:var(--red);margin-bottom:8px">❌ Error: ${e.message}</div>
+      progressEl.innerHTML = `
+        <div style="font-size:13px;color:var(--red);margin-bottom:8px">❌ ${e.message}</div>
         <button class="btn btn-sm" onclick="document.getElementById('ig-publish-modal').remove()">Cerrar</button>`;
     }
   });
