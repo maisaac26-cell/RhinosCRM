@@ -1792,8 +1792,11 @@ function getImageParams() {
 
 async function getImagePrompt() {
   const { modulo, angulo, formato, tono } = getImageParams();
+  // Leer el caption generado en el Paso 1 para conectar imagen con texto
+  const captionEl = document.querySelector('#content-output .ig-caption-ready');
+  const caption = captionEl ? captionEl.textContent.trim().slice(0, 600) : '';
   const promptRes = await callAPI('generate_image_prompt', {
-    modulo: modulo.options[modulo.selectedIndex].text, angulo, formato, tono
+    modulo: modulo.options[modulo.selectedIndex].text, angulo, formato, tono, caption
   });
   return promptRes.prompt;
 }

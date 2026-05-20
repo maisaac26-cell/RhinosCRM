@@ -408,22 +408,29 @@ TABLA DE REFERENCIAS POR MÓDULO (usá para elegir el elemento visual central):
 - Comparación Excel → hoja Excel fragmentándose/quemándose, renaciendo como interfaz tech
 - General/IA → cerebro mecánico de rinoceronte con conexiones neurales cyan`;
 
-      const pr = `Generá un prompt en inglés para DALL-E 3 para una imagen de Instagram de RhinosApp.
+      const { caption } = body;
+      const captionContext = caption
+        ? `\nCAPTION DEL POST (el texto que va a acompañar esta imagen — la imagen DEBE reforzar visualmente este mensaje):\n"${caption}"\n`
+        : '';
 
+      const pr = `Generá un prompt en inglés para una imagen de Instagram de RhinosApp.
+${captionContext}
 MÓDULO/TEMA: ${modulo}
 ÁNGULO: ${angulo || 'el más impactante visualmente para este módulo'}
 FORMATO: ${formato}
 TONO: ${tono}
 
+${caption ? `IMPORTANTE: La imagen debe ser la expresión VISUAL del mensaje del caption. Identificá la emoción central, el dolor o la solución que describe el texto, y traducila a elementos visuales concretos. Si el caption habla de "no saber cuánto te deben", mostrá flujos de dinero caóticos transformándose en orden. Si habla de "control", mostrá un panel de control dominante. Si habla de "Excel", mostrá una planilla fragmentándose.` : ''}
+
 El prompt DEBE:
 1. Empezar SIEMPRE con: "Cinematic 3D render, ultra-detailed, deep dark navy-black background (#0d1117), glowing cyan neon accents (#00e5cc), dramatic rim lighting,"
-2. Describir UN elemento visual central específico y poderoso basado en el módulo (ver tabla de referencias)
+2. Describir UN elemento visual central que represente el mensaje específico del caption (no solo el módulo genérico)
 3. Incluir: mechanical robotic rhino silhouette OR hexagonal geometric structures, floating data particles, electronic circuit patterns
 4. Especificar: deep shadows, cyan rim lighting, bokeh depth of field, volumetric fog with cyan glow
 5. Terminar SIEMPRE con: "no text, no letters, no words, no numbers, minimalist premium B2B tech aesthetic, cohesive Instagram feed visual"
 6. Máximo 200 palabras
 
-Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
+Respondé SOLO con el prompt en inglés, listo para usar.`;
       const imagePromptText = await anthropicFetch([{ role: 'user', content: pr }], SYS);
       result = { prompt: imagePromptText };
     }
