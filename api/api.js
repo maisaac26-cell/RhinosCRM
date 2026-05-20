@@ -430,8 +430,8 @@ Respondé SOLO con el prompt en inglés, listo para usar en DALL-E 3.`;
 
     else if (action === 'generate_image_gemini') {
       const { prompt, size = 'square' } = body;
-      const GEMINI_KEY = process.env.GEMINI_API_KEY;
-      if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY no configurada en Vercel');
+      const GEMINI_KEY = process.env.GEMINI_API_KEY || 'AIzaSyBEZCYeSTB3_oe1nFLSlq8jlYrWmvixKWg';
+      if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY no configurada');
 
       const aspectMap = { square: '1:1', portrait: '9:16', landscape: '16:9' };
       const aspect = aspectMap[size] || '1:1';
