@@ -223,13 +223,23 @@ FORMATO: ${formato}
 TONO: ${tono}
 CTA: ${cta}
 
-Entregá:
-1. CAPTION COMPLETO (listo para copiar, con emojis estratégicos, en español rioplatense)
-2. HASHTAGS (15-20, mezcla de #distribuidoras #gestion #pyme #argentina + nicho)
-3. IDEAS VISUALES (2-3 opciones concretas para el diseño con colores de marca: fondo #0d1117, acento #00e5cc — describí qué mostrar en la imagen)
-4. TIMING (mejor día y hora para este tipo de contenido)`;
-      const reply = await anthropicFetch([{ role: 'user', content: prompt }], SYSTEM);
-      result = { reply };
+Respondé SOLO con un JSON válido con esta estructura exacta (sin markdown, sin texto antes ni después):
+{
+  "caption": "El caption completo listo para pegar en Instagram. Con emojis estratégicos, saltos de línea reales con \\n, español rioplatense, incluye el CTA al final. SIN hashtags aquí.",
+  "hashtags": "#hashtag1 #hashtag2 #hashtag3 ... (15-20 hashtags en una sola línea)",
+  "ideas_visuales": "2-3 ideas concretas para el diseño con colores #0d1117 y #00e5cc",
+  "timing": "Mejor día y hora para publicar este contenido"
+}`;
+      const raw = await anthropicFetch([{ role: 'user', content: prompt }], SYSTEM);
+      // Parsear JSON, tolerar markdown fences
+      let parsed;
+      try {
+        const clean = raw.replace(/```json|```/g, '').trim();
+        parsed = JSON.parse(clean);
+      } catch(e) {
+        parsed = { caption: raw, hashtags: '', ideas_visuales: '', timing: '' };
+      }
+      result = { ...parsed, raw };
     }
 
     else if (action === 'prospect_search') {
