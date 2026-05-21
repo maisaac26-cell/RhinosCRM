@@ -2311,15 +2311,30 @@ function openIgPublishModal(caption, imageUrl) {
             const canvas = document.createElement('canvas');
             canvas.width = storyW; canvas.height = storyH;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#0d1117';
+
+            // Fondo: imagen desenfocada que llena el 9:16 sin barras negras
+            const bgScale = Math.max(storyW / img.width, storyH / img.height) * 1.05;
+            const bgW = img.width * bgScale;
+            const bgH = img.height * bgScale;
+            const bgX = (storyW - bgW) / 2;
+            const bgY = (storyH - bgH) / 2;
+            ctx.filter = 'blur(18px) brightness(0.45) saturate(0.8)';
+            ctx.drawImage(img, bgX, bgY, bgW, bgH);
+            ctx.filter = 'none';
+
+            // Overlay oscuro de marca
+            ctx.fillStyle = 'rgba(13,17,23,0.35)';
             ctx.fillRect(0, 0, storyW, storyH);
+
+            // Imagen original centrada (fit dentro del 9:16)
             const scale = Math.min(storyW / img.width, storyH / img.height);
             const drawW = img.width * scale;
             const drawH = img.height * scale;
             const x = (storyW - drawW) / 2;
             const y = (storyH - drawH) / 2;
             ctx.drawImage(img, x, y, drawW, drawH);
-            resolve(canvas.toDataURL('image/jpeg', 0.92));
+
+            resolve(canvas.toDataURL('image/jpeg', 0.93));
           };
           img.onerror = reject;
           img.src = srcDataUrl;
