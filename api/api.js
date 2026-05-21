@@ -522,18 +522,29 @@ Máximo 180 palabras. Respondé SOLO el prompt en inglés, listo para usar.`;
 
     else if (action === 'extract_image_text') {
       const { caption } = body;
-      const SYSTEM = `Sos especialista en marketing visual para RhinosApp — CRM para distribuidoras de alimentos en Argentina.
-Extraés frases impactantes de captions para usar como texto sobre imágenes de Instagram.
-Reglas: máximo 5 palabras para el titular, directo al dolor o beneficio, en español rioplatense, TODO EN MAYÚSCULAS.`;
-      const prompt = `Del siguiente caption de Instagram, extraé el texto más impactante para poner sobre una imagen.
+      const SYSTEM = `Sos especialista en copywriting visual para RhinosApp — CRM para distribuidoras de alimentos en Argentina.
+Creás frases cortas e impactantes para superponer sobre imágenes de Instagram.
+Estilo: directo al dolor o beneficio, español rioplatense, máximo 5-6 palabras, TODO EN MAYÚSCULAS.
+Inspiración del feed real: "¿SABÉS CUÁNTO TE DEBEN?", "SIN CONTROL, DEPENDÉS DE LA SUERTE", "TU COMPETENCIA YA SE ORDENÓ", "DEJÁ DE IMPROVISAR.", "¿CUÁNTAS VENTAS PERDISTE HOY?"`;
+      const prompt = `Del siguiente caption de Instagram de RhinosApp, generá 4 opciones de frases diferentes para superponer sobre la imagen.
 
 CAPTION:
 "${caption.slice(0, 800)}"
 
+Cada opción debe tener un enfoque diferente:
+- Opción 1: pregunta que golpea el dolor del distribuidor
+- Opción 2: afirmación de impacto sobre el problema
+- Opción 3: frase de poder/solución (lo que logra con RhinosApp)
+- Opción 4: contraste antes/después o comparación
+
 Respondé SOLO con JSON válido, sin markdown:
 {
-  "titular": "3-5 PALABRAS EN MAYÚSCULAS que representen el mensaje central (ej: 'SIN EXCEL. SIN CAOS.' o '¿SABÉS CUÁNTO TE DEBEN?')",
-  "subtitulo": "Una línea corta opcional de contexto en minúsculas (máx 6 palabras) o null",
+  "opciones": [
+    { "titular": "FRASE OPCIÓN 1 EN MAYÚSCULAS", "subtitulo": "línea corta de apoyo o null" },
+    { "titular": "FRASE OPCIÓN 2 EN MAYÚSCULAS", "subtitulo": "línea corta de apoyo o null" },
+    { "titular": "FRASE OPCIÓN 3 EN MAYÚSCULAS", "subtitulo": "línea corta de apoyo o null" },
+    { "titular": "FRASE OPCIÓN 4 EN MAYÚSCULAS", "subtitulo": "línea corta de apoyo o null" }
+  ],
   "cta": "rhinosapp.vercel.app"
 }`;
       const raw = await anthropicFetch([{ role: 'user', content: prompt }], SYSTEM);
@@ -541,7 +552,15 @@ Respondé SOLO con JSON válido, sin markdown:
         const clean = raw.replace(/```json|```/g, '').trim();
         result = JSON.parse(clean);
       } catch(e) {
-        result = { titular: 'CONTROLÁ TU NEGOCIO', subtitulo: 'Con RhinosApp', cta: 'rhinosapp.vercel.app' };
+        result = {
+          opciones: [
+            { titular: 'CONTROLÁ TU NEGOCIO', subtitulo: 'Con RhinosApp' },
+            { titular: '¿CUÁNTAS VENTAS PERDISTE?', subtitulo: null },
+            { titular: 'SIN SISTEMA, SIN CONTROL', subtitulo: 'Ordenate con Rhinos' },
+            { titular: 'TU COMPETENCIA YA SE ORDENÓ', subtitulo: null }
+          ],
+          cta: 'rhinosapp.vercel.app'
+        };
       }
     }
 

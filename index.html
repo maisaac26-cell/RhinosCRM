@@ -1720,7 +1720,9 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
             <div style="margin-bottom:10px">
               <button id="btn-add-text" class="btn btn-full btn-sm" style="background:rgba(0,229,204,0.08);color:var(--cyan);border-color:rgba(0,229,204,0.2)">Aa Agregar texto a la imagen</button>
               <div id="img-text-editor" style="display:none;margin-top:10px;padding:12px;background:var(--surface2);border-radius:var(--r);border:1px solid var(--border)">
-                <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;font-weight:600">Texto sobre la imagen</div>
+                <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;font-weight:600">Elegí una frase</div>
+                <div id="img-text-options" style="display:none;margin-bottom:10px"></div>
+                <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;font-weight:600">O editá manualmente</div>
                 <div class="field" style="margin-bottom:8px">
                   <label style="font-size:10px">Titular (ALL CAPS, impacto)</label>
                   <input id="img-text-titular" placeholder="EJ: ¿SABÉS CUÁNTO TE DEBEN?" style="font-size:13px;font-weight:600;text-transform:uppercase"/>
@@ -1760,20 +1762,48 @@ document.getElementById('btn-gen-image').addEventListener('click', async functio
 
         // Botón agregar texto
         document.getElementById('btn-add-text').addEventListener('click', async function() {
-          this.disabled = true; this.textContent = '⏳ Extrayendo frase...';
+          this.disabled = true; this.textContent = '⏳ Generando frases...';
           try {
             const captionEl = document.querySelector('#content-output .ig-caption-ready');
             const captionText = captionEl ? captionEl.textContent.trim() : '';
-            let textData = { titular: 'CONTROLÁ TU NEGOCIO', subtitulo: null, cta: 'rhinosapp.vercel.app' };
-            if (captionText) {
-              textData = await callAPI('extract_image_text', { caption: captionText });
-            }
-            // Mostrar editor de texto
-            document.getElementById('img-text-editor').style.display = 'block';
-            document.getElementById('img-text-titular').value = textData.titular || '';
-            document.getElementById('img-text-subtitulo').value = textData.subtitulo || '';
+            let textData = { opciones: [{ titular: 'CONTROLÁ TU NEGOCIO', subtitulo: null }], cta: 'rhinosapp.vercel.app' };
+            if (captionText) textData = await callAPI('extract_image_text', { caption: captionText });
+
+            const opciones = textData.opciones || [{ titular: textData.titular || 'CONTROLÁ TU NEGOCIO', subtitulo: textData.subtitulo || null }];
+            const editor = document.getElementById('img-text-editor');
+            editor.style.display = 'block';
+
+            // Chips de opciones
+            const chipsHtml = opciones.map((op, i) => `
+              <div class="text-option-chip" data-idx="${i}" style="cursor:pointer;padding:8px 12px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface3);transition:all 0.15s;margin-bottom:6px">
+                <div style="font-size:12px;font-weight:700;color:var(--text)">${op.titular}</div>
+                ${op.subtitulo ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${op.subtitulo}</div>` : ''}
+              </div>`).join('');
+
+            editor.querySelector('#img-text-options').innerHTML = chipsHtml;
+            editor.querySelector('#img-text-options').style.display = 'block';
+
+            // Precargar primera opción
+            document.getElementById('img-text-titular').value = opciones[0].titular || '';
+            document.getElementById('img-text-subtitulo').value = opciones[0].subtitulo || '';
             document.getElementById('img-text-cta').value = textData.cta || 'rhinosapp.vercel.app';
-            this.textContent = '✓ Texto listo — editalo abajo';
+
+            // Click en chip → carga en editor
+            editor.querySelectorAll('.text-option-chip').forEach(chip => {
+              chip.addEventListener('click', function() {
+                editor.querySelectorAll('.text-option-chip').forEach(c => { c.style.borderColor = 'var(--border2)'; c.style.background = 'var(--surface3)'; });
+                this.style.borderColor = 'var(--cyan)'; this.style.background = 'rgba(0,229,204,0.08)';
+                const op = opciones[+this.dataset.idx];
+                document.getElementById('img-text-titular').value = op.titular || '';
+                document.getElementById('img-text-subtitulo').value = op.subtitulo || '';
+              });
+            });
+
+            // Seleccionar primera por defecto
+            editor.querySelector('.text-option-chip').style.borderColor = 'var(--cyan)';
+            editor.querySelector('.text-option-chip').style.background = 'rgba(0,229,204,0.08)';
+
+            this.textContent = '✓ Elegí una frase';
             this.style.background = 'rgba(0,229,204,0.15)';
             this.style.color = 'var(--cyan)';
           } catch(e) {
