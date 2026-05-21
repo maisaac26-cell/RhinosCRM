@@ -1042,15 +1042,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <!-- COBROS TAB -->
     <div class="ftab-content" id="ftab-cobros" style="display:none">
 
-      <!-- Sub-tabs internos -->
-      <div class="tab-row" style="margin-bottom:1rem">
-        <button class="ctab-btn active" data-ctab="clientes">👥 Clientes</button>
-        <button class="ctab-btn" data-ctab="periodo">💰 Cobros del mes</button>
-        <button class="ctab-btn" data-ctab="emails">📧 Emails</button>
-      </div>
-
       <!-- ── CLIENTES ── -->
-      <div class="ctab-content" id="ctab-clientes">
+      <div id="ctab-clientes">
         <div class="metrics-row" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:1rem">
           <div class="metric-card"><div class="m-label">Clientes activos</div><div class="m-val cyan" id="cob-total-clientes">0</div></div>
           <div class="metric-card"><div class="m-label">MRR mensual</div><div class="m-val green" id="cob-mrr">$0</div></div>
@@ -1093,7 +1086,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
 
       <!-- ── COBROS DEL MES ── -->
-      <div class="ctab-content" id="ctab-periodo" style="display:none">
+      <div id="ctab-periodo" style="margin-top:1.5rem">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
           <button class="btn btn-sm" id="btn-periodo-prev">← </button>
           <div style="font-family:var(--display);font-size:20px;font-weight:700;color:var(--text)" id="cob-periodo-label">Mayo 2026</div>
@@ -1108,7 +1101,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
 
       <!-- ── EMAILS ── -->
-      <div class="ctab-content" id="ctab-emails" style="display:none">
+      <div id="ctab-emails" style="margin-top:1.5rem">
         <div class="grid2">
           <div>
             <div class="card">
