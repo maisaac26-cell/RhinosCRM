@@ -2088,9 +2088,8 @@ async function addTextToImage(imageUrl, titular, subtitulo, cta) {
 
       const W = canvas.width;
       const H = canvas.height;
-      const barH = Math.round(H * 0.28); // barra inferior 28% de la imagen
+      const barH = Math.round(H * 0.28);
 
-      // Barra oscura degradé en la parte inferior
       const grad = ctx.createLinearGradient(0, H - barH, 0, H);
       grad.addColorStop(0, 'rgba(13,17,23,0)');
       grad.addColorStop(0.3, 'rgba(13,17,23,0.85)');
@@ -2098,7 +2097,6 @@ async function addTextToImage(imageUrl, titular, subtitulo, cta) {
       ctx.fillStyle = grad;
       ctx.fillRect(0, H - barH, W, barH);
 
-      // Línea decorativa cyan
       ctx.strokeStyle = '#00e5cc';
       ctx.lineWidth = Math.max(2, W * 0.003);
       ctx.beginPath();
@@ -2107,20 +2105,51 @@ async function addTextToImage(imageUrl, titular, subtitulo, cta) {
       ctx.stroke();
 
       const padding = W * 0.06;
-      let yPos = H - barH + Math.round(barH * 0.25);
+      const maxTextW = W - padding * 2;
+      let yPos = H - barH + Math.round(barH * 0.22);
 
-      // Titular en blanco — grande y bold
-      if (titular) {
-        const titleSize = Math.round(W * 0.068);
-        ctx.font = `900 ${titleSize}px 'Barlow Condensed', 'Arial Black', Arial, sans-serif`;
-        ctx.fillStyle = '#ffffff';
+      // Función para ajustar tamaño y partir en líneas
+      function drawAdaptiveText(text, maxSize, minSize, lineHeightMult) {
+        let size = maxSize;
         ctx.textAlign = 'left';
-        // Sombra sutil
-        ctx.shadowColor = 'rgba(0,0,0,0.7)';
-        ctx.shadowBlur = 8;
-        ctx.fillText(titular.toUpperCase(), padding, yPos);
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 10;
+
+        // Reducir tamaño hasta que entre en una línea o llegue al mínimo
+        while (size >= minSize) {
+          ctx.font = `900 ${size}px 'Barlow Condensed', 'Arial Black', Arial, sans-serif`;
+          if (ctx.measureText(text).width <= maxTextW) break;
+          size -= 2;
+        }
+
+        // Si aún no entra, partir en palabras y dibujar en múltiples líneas
+        const words = text.split(' ');
+        const lines = [];
+        let current = '';
+        for (const word of words) {
+          const test = current ? current + ' ' + word : word;
+          if (ctx.measureText(test).width > maxTextW && current) {
+            lines.push(current);
+            current = word;
+          } else {
+            current = test;
+          }
+        }
+        if (current) lines.push(current);
+
+        const lh = Math.round(size * lineHeightMult);
+        for (const line of lines) {
+          ctx.fillText(line, padding, yPos);
+          yPos += lh;
+        }
         ctx.shadowBlur = 0;
-        yPos += Math.round(titleSize * 1.2);
+        return lines.length * lh;
+      }
+
+      if (titular) {
+        drawAdaptiveText(titular.toUpperCase(), Math.round(W * 0.072), Math.round(W * 0.042), 1.15);
+        yPos += Math.round(W * 0.01);
       }
 
       // Subtítulo en cyan tenue
