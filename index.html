@@ -863,6 +863,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-ftab="transacciones">Transacciones</button>
       <button class="tab-btn" data-ftab="socios">Socios</button>
       <button class="tab-btn" data-ftab="proyecciones">Proyecciones</button>
+      <button class="tab-btn" data-ftab="cobros" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
     </div>
 
     <!-- RESUMEN -->
@@ -1038,6 +1039,117 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="card-title">Detalle por período</div>
         <div id="proy-table"></div>
       </div>
+    <!-- COBROS TAB -->
+    <div class="ftab-content" id="ftab-cobros" style="display:none">
+
+      <!-- Sub-tabs internos -->
+      <div class="tab-row" style="margin-bottom:1rem">
+        <button class="ctab-btn active" data-ctab="clientes">👥 Clientes</button>
+        <button class="ctab-btn" data-ctab="periodo">💰 Cobros del mes</button>
+        <button class="ctab-btn" data-ctab="emails">📧 Emails</button>
+      </div>
+
+      <!-- ── CLIENTES ── -->
+      <div class="ctab-content" id="ctab-clientes">
+        <div class="metrics-row" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:1rem">
+          <div class="metric-card"><div class="m-label">Clientes activos</div><div class="m-val cyan" id="cob-total-clientes">0</div></div>
+          <div class="metric-card"><div class="m-label">MRR mensual</div><div class="m-val green" id="cob-mrr">$0</div></div>
+          <div class="metric-card"><div class="m-label">Cobrado este mes</div><div class="m-val" id="cob-cobrado">$0</div></div>
+          <div class="metric-card"><div class="m-label">Pendiente este mes</div><div class="m-val" id="cob-pendiente" style="color:var(--amber)">$0</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+            Base de clientes
+            <button class="btn btn-cyan btn-sm" id="btn-nuevo-cliente">+ Nuevo cliente</button>
+          </div>
+
+          <!-- Formulario nuevo/editar cliente -->
+          <div id="form-cliente" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:14px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px" id="form-cliente-titulo">Nuevo cliente</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <div class="field" style="margin:0"><label>Nombre</label><input id="cli-nombre" placeholder="Juan García"/></div>
+              <div class="field" style="margin:0"><label>Empresa</label><input id="cli-empresa" placeholder="Distribuidora El Sol SRL"/></div>
+              <div class="field" style="margin:0"><label>Email</label><input id="cli-email" type="email" placeholder="juan@empresa.com"/></div>
+              <div class="field" style="margin:0"><label>Precio mensual (USD)</label><input id="cli-precio" type="number" placeholder="0" step="0.01"/></div>
+              <div class="field" style="margin:0"><label>Fecha inicio</label><input id="cli-inicio" type="date"/></div>
+              <div class="field" style="margin:0"><label>Estado</label>
+                <select id="cli-estado">
+                  <option value="activo">Activo</option>
+                  <option value="pausado">Pausado</option>
+                  <option value="inactivo">Inactivo</option>
+                </select>
+              </div>
+            </div>
+            <div class="field" style="margin-bottom:10px"><label>Notas (opcional)</label><input id="cli-notas" placeholder="Condiciones especiales, descuentos..."/></div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-green" id="btn-guardar-cliente">Guardar cliente</button>
+              <button class="btn" onclick="document.getElementById('form-cliente').style.display='none'">Cancelar</button>
+            </div>
+          </div>
+
+          <div id="clientes-lista"><div class="empty">No hay clientes cargados aún. Agregá el primero.</div></div>
+        </div>
+      </div>
+
+      <!-- ── COBROS DEL MES ── -->
+      <div class="ctab-content" id="ctab-periodo" style="display:none">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
+          <button class="btn btn-sm" id="btn-periodo-prev">← </button>
+          <div style="font-family:var(--display);font-size:20px;font-weight:700;color:var(--text)" id="cob-periodo-label">Mayo 2026</div>
+          <button class="btn btn-sm" id="btn-periodo-next"> →</button>
+          <button class="btn btn-sm btn-cyan" id="btn-generar-cobros">↺ Generar cobros del mes</button>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn btn-sm" id="btn-marcar-todos-pagados" style="background:rgba(34,197,94,0.12);color:var(--green);border-color:rgba(34,197,94,0.3)">✓ Marcar todos pagados</button>
+            <button class="btn btn-sm" id="btn-enviar-recordatorio-todos" style="background:rgba(245,158,11,0.1);color:var(--amber);border-color:rgba(245,158,11,0.2)">📧 Recordatorio a todos</button>
+          </div>
+        </div>
+        <div id="cobros-periodo-list"><div class="empty">Seleccioná un período y generá los cobros.</div></div>
+      </div>
+
+      <!-- ── EMAILS ── -->
+      <div class="ctab-content" id="ctab-emails" style="display:none">
+        <div class="grid2">
+          <div>
+            <div class="card">
+              <div class="card-title">Tipo de email</div>
+              <div style="display:flex;flex-direction:column;gap:6px" id="email-tipo-btns">
+                <button class="email-tipo-btn active" data-tipo="pago" style="text-align:left;padding:10px 14px;border:1px solid rgba(0,229,204,0.3);border-radius:var(--r);background:rgba(0,229,204,0.08);color:var(--cyan);cursor:pointer;font-family:var(--font)">💳 Solicitud de pago</button>
+                <button class="email-tipo-btn" data-tipo="recordatorio" style="text-align:left;padding:10px 14px;border:1px solid var(--border2);border-radius:var(--r);background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font)">⚠️ Recordatorio vencido</button>
+                <button class="email-tipo-btn" data-tipo="confirmacion" style="text-align:left;padding:10px 14px;border:1px solid var(--border2);border-radius:var(--r);background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font)">✅ Confirmación de pago</button>
+                <button class="email-tipo-btn" data-tipo="reembolso" style="text-align:left;padding:10px 14px;border:1px solid var(--border2);border-radius:var(--r);background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font)">↩ Reembolso / Crédito</button>
+              </div>
+              <div class="field" style="margin-top:12px"><label>Destinatario</label>
+                <select id="email-destinatario">
+                  <option value="todos">Todos los clientes activos</option>
+                  <option value="pendientes">Solo con pago pendiente</option>
+                  <option value="vencidos">Solo vencidos</option>
+                  <option value="uno">Cliente específico...</option>
+                </select>
+              </div>
+              <div id="email-cliente-especifico" style="display:none" class="field"><label>Cliente</label><select id="email-cli-sel"></select></div>
+              <div class="field"><label>Monto a mencionar (USD) — opcional</label><input id="email-monto" type="number" placeholder="Deja vacío para usar el precio del cliente"/></div>
+              <button class="btn btn-full" id="btn-gen-email-cobro" style="background:rgba(99,102,241,0.12);color:#818cf8;border-color:rgba(99,102,241,0.3)">🦏 Generar con IA</button>
+            </div>
+          </div>
+          <div>
+            <div class="card" style="border-color:rgba(99,102,241,0.2)">
+              <div class="card-title" style="display:flex;justify-content:space-between">
+                <span style="color:#818cf8">Vista previa del email</span>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-sm" id="btn-guardar-template" style="font-size:11px">💾 Guardar template</button>
+                  <button class="btn btn-sm btn-green" id="btn-enviar-email-cobro">Enviar</button>
+                </div>
+              </div>
+              <div class="field"><label>Asunto</label><input id="email-asunto" placeholder="Asunto del email"/></div>
+              <div class="field"><label>Cuerpo</label><textarea id="email-cuerpo" rows="12" style="font-size:13px;line-height:1.7" placeholder="El email aparecerá aquí..."></textarea></div>
+              <div style="font-size:11px;color:var(--text3)">Variables disponibles: <code>[nombre]</code> <code>[empresa]</code> <code>[monto]</code> <code>[periodo]</code> <code>[fecha_vencimiento]</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
     </div>
   </div>
 
@@ -5005,6 +5117,372 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
 }
+// ── CLIENTES & COBROS ────────────────────────────────
+const CLIENTS_KEY = 'rhinos_clients';
+const COBROS_KEY  = 'rhinos_cobros';
+const TEMPLATES_KEY = 'rhinos_email_templates';
+let cobCurrentPeriod = new Date().toISOString().slice(0,7);
+let clientEditId = null;
+
+const DEFAULT_TEMPLATES = {
+  pago: {
+    asunto: 'Suscripción RhinosApp — [periodo]',
+    cuerpo: `Hola [nombre],\n\nTe escribimos desde el equipo de RhinosApp para recordarte que tu suscripción del mes de [periodo] por un valor de $[monto] USD está pendiente de pago.\n\nPodés realizar el pago vía transferencia o por nuestros medios habituales. Ante cualquier consulta estamos disponibles.\n\nMuchas gracias!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`
+  },
+  recordatorio: {
+    asunto: '⚠️ Pago vencido — RhinosApp [periodo]',
+    cuerpo: `Hola [nombre],\n\nTe recordamos que tu pago de $[monto] USD correspondiente a [periodo] se encuentra vencido.\n\nTe pedimos que regularices la situación a la brevedad para continuar usando el servicio sin interrupciones.\n\nAnte cualquier inconveniente no dudes en contactarnos.\n\nEquipo RhinosApp 🦏`
+  },
+  confirmacion: {
+    asunto: '✅ Pago recibido — RhinosApp',
+    cuerpo: `Hola [nombre],\n\nConfirmamos la recepción de tu pago de $[monto] USD correspondiente a [periodo]. ¡Muchas gracias!\n\nTu acceso a RhinosApp sigue activo. Ante cualquier consulta estamos disponibles.\n\nEquipo RhinosApp 🦏`
+  },
+  reembolso: {
+    asunto: '↩ Reembolso procesado — RhinosApp',
+    cuerpo: `Hola [nombre],\n\nTe informamos que procesamos un reembolso / crédito de $[monto] USD a tu cuenta.\n\nEste ajuste se verá reflejado en los próximos días según el medio de pago utilizado.\n\nEquipo RhinosApp 🦏`
+  }
+};
+
+function getClients() { try { return JSON.parse(localStorage.getItem(CLIENTS_KEY)||'[]'); } catch(e){ return []; } }
+function saveClients(arr) { localStorage.setItem(CLIENTS_KEY, JSON.stringify(arr)); }
+function getCobros() { try { return JSON.parse(localStorage.getItem(COBROS_KEY)||'[]'); } catch(e){ return []; } }
+function saveCobros(arr) { localStorage.setItem(COBROS_KEY, JSON.stringify(arr)); }
+function getTemplates() { try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY)||'null') || DEFAULT_TEMPLATES; } catch(e){ return DEFAULT_TEMPLATES; } }
+function saveTemplates(t) { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t)); }
+
+function cobPeriodLabel(p) {
+  const [y,m] = p.split('-');
+  const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return `${months[+m-1]} ${y}`;
+}
+
+function renderClientStats() {
+  const clients = getClients().filter(c => c.estado === 'activo');
+  const cobros = getCobros().filter(c => c.periodo === cobCurrentPeriod);
+  const mrr = clients.reduce((a,c) => a + (+c.precio||0), 0);
+  const cobrado = cobros.filter(c => c.status === 'pagado').reduce((a,c) => a + (+c.monto||0), 0);
+  const pendiente = cobros.filter(c => c.status !== 'pagado' && c.status !== 'cancelado').reduce((a,c) => a + (+c.monto||0), 0);
+  document.getElementById('cob-total-clientes').textContent = clients.length;
+  document.getElementById('cob-mrr').textContent = '$'+mrr.toFixed(2);
+  document.getElementById('cob-cobrado').textContent = '$'+cobrado.toFixed(2);
+  document.getElementById('cob-pendiente').textContent = '$'+pendiente.toFixed(2);
+}
+
+function renderClientes() {
+  const clients = getClients();
+  const list = document.getElementById('clientes-lista');
+  if (!clients.length) { list.innerHTML = '<div class="empty">No hay clientes. Agregá el primero con "+ Nuevo cliente".</div>'; renderClientStats(); return; }
+  list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="border-bottom:1px solid var(--border)">
+      <th style="text-align:left;padding:6px 8px;color:var(--text2);font-size:11px">Nombre / Empresa</th>
+      <th style="text-align:left;padding:6px 8px;color:var(--text2);font-size:11px">Email</th>
+      <th style="text-align:right;padding:6px 8px;color:var(--text2);font-size:11px">Precio/mes</th>
+      <th style="text-align:center;padding:6px 8px;color:var(--text2);font-size:11px">Estado</th>
+      <th style="padding:6px 8px"></th>
+    </tr></thead>
+    <tbody>${clients.map(c => `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px"><div style="font-weight:500;color:var(--text)">${c.nombre}</div><div style="font-size:11px;color:var(--text3)">${c.empresa||'—'}</div></td>
+        <td style="padding:8px;color:var(--text2)">${c.email}</td>
+        <td style="padding:8px;text-align:right;font-weight:600;color:var(--green)">$${(+c.precio||0).toFixed(2)} USD</td>
+        <td style="padding:8px;text-align:center"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.estado==='activo'?'rgba(34,197,94,0.12)':c.estado==='pausado'?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)'};color:${c.estado==='activo'?'var(--green)':c.estado==='pausado'?'var(--amber)':'var(--red)'}">${c.estado}</span></td>
+        <td style="padding:8px;display:flex;gap:4px">
+          <button class="btn btn-sm" data-edit-cli="${c.id}" style="color:var(--cyan);padding:3px 8px;border-color:rgba(0,229,204,0.2)">✏</button>
+          <button class="btn btn-sm" data-del-cli="${c.id}" style="color:var(--red);padding:3px 8px">✕</button>
+        </td>
+      </tr>`).join('')}
+    </tbody></table>`;
+  list.querySelectorAll('[data-edit-cli]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const c = getClients().find(x => x.id === this.dataset.editCli);
+      if (!c) return;
+      clientEditId = c.id;
+      document.getElementById('cli-nombre').value = c.nombre;
+      document.getElementById('cli-empresa').value = c.empresa||'';
+      document.getElementById('cli-email').value = c.email;
+      document.getElementById('cli-precio').value = c.precio;
+      document.getElementById('cli-inicio').value = c.inicio||'';
+      document.getElementById('cli-estado').value = c.estado;
+      document.getElementById('cli-notas').value = c.notas||'';
+      document.getElementById('form-cliente-titulo').textContent = 'Editar cliente';
+      document.getElementById('form-cliente').style.display = 'block';
+    });
+  });
+  list.querySelectorAll('[data-del-cli]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (!confirm('¿Eliminar este cliente?')) return;
+      saveClients(getClients().filter(c => c.id !== this.dataset.delCli));
+      renderClientes();
+    });
+  });
+  renderClientStats();
+}
+
+function renderCobrosPeriodo() {
+  document.getElementById('cob-periodo-label').textContent = cobPeriodLabel(cobCurrentPeriod);
+  const clients = getClients().filter(c => c.estado === 'activo');
+  const cobros = getCobros().filter(c => c.periodo === cobCurrentPeriod);
+  const list = document.getElementById('cobros-periodo-list');
+  if (!clients.length) { list.innerHTML = '<div class="empty">No hay clientes activos. Agregá clientes primero.</div>'; return; }
+
+  list.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">
+    ${clients.map(c => {
+      const cobro = cobros.find(x => x.clientId === c.id) || { status: 'sin_generar', monto: c.precio };
+      const statusStyles = {
+        pagado: { bg:'rgba(34,197,94,0.12)', color:'var(--green)', label:'✓ Pagado' },
+        pendiente: { bg:'rgba(245,158,11,0.12)', color:'var(--amber)', label:'⏳ Pendiente' },
+        vencido: { bg:'rgba(239,68,68,0.12)', color:'var(--red)', label:'⚠ Vencido' },
+        sin_generar: { bg:'rgba(75,85,99,0.2)', color:'var(--text3)', label:'— Sin generar' }
+      };
+      const s = statusStyles[cobro.status] || statusStyles.sin_generar;
+      return `<div class="card" style="padding:12px;margin-bottom:0;display:flex;align-items:center;gap:12px">
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:500;color:var(--text)">${c.nombre} ${c.empresa?'<span style="font-size:11px;color:var(--text3)">· '+c.empresa+'</span>':''}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${c.email}</div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--green)">$${(+cobro.monto||+c.precio||0).toFixed(2)} USD</div>
+        <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${s.bg};color:${s.color}">${s.label}</span>
+        <div style="display:flex;gap:5px">
+          ${cobro.status !== 'pagado' ? `<button class="btn btn-sm" data-pagar="${c.id}" data-monto="${cobro.monto||c.precio}" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);font-size:11px">✓ Pagado</button>` : ''}
+          ${cobro.status === 'pendiente' ? `<button class="btn btn-sm" data-vencer="${c.id}" style="background:rgba(239,68,68,0.1);color:var(--red);border-color:rgba(239,68,68,0.2);font-size:11px">Vencido</button>` : ''}
+          <button class="btn btn-sm" data-email-cli="${c.id}" style="font-size:11px">📧</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  list.querySelectorAll('[data-pagar]').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const clientId = this.dataset.pagar;
+      const monto = +this.dataset.monto;
+      const client = getClients().find(c => c.id === clientId);
+      if (!confirm(`¿Marcar pago de ${client?.nombre} por $${monto} USD como recibido?`)) return;
+      this.disabled = true;
+      // Actualizar cobro
+      const cobros = getCobros();
+      const idx = cobros.findIndex(c => c.clientId === clientId && c.periodo === cobCurrentPeriod);
+      const today = new Date().toISOString().slice(0,10);
+      if (idx >= 0) cobros[idx] = {...cobros[idx], status:'pagado', fechaPago: today};
+      else cobros.push({ clientId, periodo: cobCurrentPeriod, status:'pagado', monto, fechaPago: today });
+      saveCobros(cobros);
+      // Registrar como ingreso en Finanzas (Supabase)
+      try {
+        const [tx] = await sbFetch('rhinos_transactions', 'POST', {
+          type: 'ingreso', amount: monto, date: today,
+          description: `Suscripción RhinosApp — ${client?.nombre||clientId} (${cobPeriodLabel(cobCurrentPeriod)})`,
+          category: 'Ventas', partner: 'empresa', notes: `Cobro mensual cliente`, currency: 'USD'
+        });
+        notifyFinanzas('Ingreso cobro', { ...tx, type:'ingreso' });
+        notifyWhatsApp('Ingreso cobro', { ...tx, type:'ingreso' });
+      } catch(e) { console.warn('No se pudo registrar en Finanzas:', e.message); }
+      renderCobrosPeriodo(); renderClientStats();
+      showToast(`Pago de ${client?.nombre} registrado 🦏`);
+    });
+  });
+
+  list.querySelectorAll('[data-vencer]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const cobros = getCobros();
+      const idx = cobros.findIndex(c => c.clientId === this.dataset.vencer && c.periodo === cobCurrentPeriod);
+      if (idx >= 0) cobros[idx].status = 'vencido';
+      saveCobros(cobros);
+      renderCobrosPeriodo();
+    });
+  });
+
+  list.querySelectorAll('[data-email-cli]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const c = getClients().find(x => x.id === this.dataset.emailCli);
+      if (!c) return;
+      // Cambiar a tab emails con ese cliente preseleccionado
+      document.querySelector('.ctab-btn[data-ctab="emails"]').click();
+      document.getElementById('email-destinatario').value = 'uno';
+      document.getElementById('email-cliente-especifico').style.display = 'block';
+      document.getElementById('email-cli-sel').value = c.id;
+    });
+  });
+}
+
+// Botones período
+document.getElementById('btn-periodo-prev').addEventListener('click', () => {
+  const [y,m] = cobCurrentPeriod.split('-').map(Number);
+  cobCurrentPeriod = m === 1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+  renderCobrosPeriodo(); renderClientStats();
+});
+document.getElementById('btn-periodo-next').addEventListener('click', () => {
+  const [y,m] = cobCurrentPeriod.split('-').map(Number);
+  cobCurrentPeriod = m === 12 ? `${y+1}-01` : `${y}-${String(m+1).padStart(2,'0')}`;
+  renderCobrosPeriodo(); renderClientStats();
+});
+
+document.getElementById('btn-generar-cobros').addEventListener('click', () => {
+  const clients = getClients().filter(c => c.estado === 'activo');
+  if (!clients.length) { showToast('No hay clientes activos'); return; }
+  const cobros = getCobros();
+  let added = 0;
+  clients.forEach(c => {
+    if (!cobros.find(x => x.clientId === c.id && x.periodo === cobCurrentPeriod)) {
+      cobros.push({ clientId: c.id, periodo: cobCurrentPeriod, status: 'pendiente', monto: +c.precio||0 });
+      added++;
+    }
+  });
+  saveCobros(cobros);
+  renderCobrosPeriodo(); renderClientStats();
+  showToast(`${added} cobros generados para ${cobPeriodLabel(cobCurrentPeriod)} 🦏`);
+});
+
+document.getElementById('btn-marcar-todos-pagados').addEventListener('click', async () => {
+  if (!confirm('¿Marcar TODOS los cobros pendientes del mes como pagados?')) return;
+  const clients = getClients().filter(c => c.estado === 'activo');
+  const cobros = getCobros();
+  const today = new Date().toISOString().slice(0,10);
+  for (const c of clients) {
+    const idx = cobros.findIndex(x => x.clientId === c.id && x.periodo === cobCurrentPeriod);
+    if (idx >= 0 && cobros[idx].status !== 'pagado') {
+      cobros[idx] = {...cobros[idx], status:'pagado', fechaPago: today};
+      try { await sbFetch('rhinos_transactions','POST',{ type:'ingreso', amount:cobros[idx].monto, date:today, description:`Suscripción — ${c.nombre} (${cobPeriodLabel(cobCurrentPeriod)})`, category:'Ventas', partner:'empresa', notes:'Cobro mensual', currency:'USD'}); } catch(e){}
+    }
+  }
+  saveCobros(cobros);
+  renderCobrosPeriodo(); renderClientStats();
+  showToast('Todos los cobros marcados como pagados 🦏');
+});
+
+document.getElementById('btn-enviar-recordatorio-todos').addEventListener('click', () => {
+  document.querySelector('.ctab-btn[data-ctab="emails"]').click();
+  document.getElementById('email-destinatario').value = 'pendientes';
+  document.querySelector('.email-tipo-btn[data-tipo="recordatorio"]').click();
+});
+
+// Sub-tabs internos de cobros
+document.querySelectorAll('.ctab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.ctab-btn').forEach(b => { b.classList.remove('active'); b.style.background='transparent'; b.style.color='var(--text2)'; b.style.borderColor='var(--border2)'; });
+    this.classList.add('active'); this.style.background='rgba(0,229,204,0.1)'; this.style.color='var(--cyan)'; this.style.borderColor='rgba(0,229,204,0.3)';
+    document.querySelectorAll('.ctab-content').forEach(c => c.style.display='none');
+    document.getElementById('ctab-'+this.dataset.ctab).style.display = 'block';
+    if (this.dataset.ctab === 'clientes') renderClientes();
+    if (this.dataset.ctab === 'periodo') { renderCobrosPeriodo(); renderClientStats(); }
+    if (this.dataset.ctab === 'emails') renderEmailTab();
+  });
+});
+
+// Formulario cliente
+document.getElementById('btn-nuevo-cliente').addEventListener('click', () => {
+  clientEditId = null;
+  ['cli-nombre','cli-empresa','cli-email','cli-precio','cli-inicio','cli-notas'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('cli-estado').value = 'activo';
+  document.getElementById('cli-inicio').value = new Date().toISOString().slice(0,10);
+  document.getElementById('form-cliente-titulo').textContent = 'Nuevo cliente';
+  document.getElementById('form-cliente').style.display = 'block';
+});
+
+document.getElementById('btn-guardar-cliente').addEventListener('click', () => {
+  const nombre = document.getElementById('cli-nombre').value.trim();
+  const email = document.getElementById('cli-email').value.trim();
+  const precio = document.getElementById('cli-precio').value;
+  if (!nombre || !email) { showToast('Nombre y email son obligatorios'); return; }
+  const clients = getClients();
+  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, precio: +precio||0, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
+  if (clientEditId) {
+    const idx = clients.findIndex(c => c.id === clientEditId);
+    if (idx >= 0) clients[idx] = {...clients[idx], ...data};
+  } else {
+    clients.push({...data, id: Date.now().toString(36)+Math.random().toString(36).slice(2), createdAt: new Date().toISOString().slice(0,10)});
+  }
+  saveClients(clients);
+  clientEditId = null;
+  document.getElementById('form-cliente').style.display = 'none';
+  renderClientes();
+  showToast(clientEditId ? 'Cliente actualizado 🦏' : 'Cliente agregado 🦏');
+});
+
+// Emails tab
+let emailCurrentTipo = 'pago';
+function renderEmailTab() {
+  const clients = getClients();
+  const sel = document.getElementById('email-cli-sel');
+  sel.innerHTML = clients.map(c => `<option value="${c.id}">${c.nombre} — ${c.email}</option>`).join('');
+  const tpl = getTemplates();
+  document.getElementById('email-asunto').value = tpl[emailCurrentTipo]?.asunto || '';
+  document.getElementById('email-cuerpo').value = tpl[emailCurrentTipo]?.cuerpo || '';
+}
+
+document.querySelectorAll('.email-tipo-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.email-tipo-btn').forEach(b => { b.style.background='transparent'; b.style.color='var(--text2)'; b.style.borderColor='var(--border2)'; });
+    this.style.background='rgba(0,229,204,0.08)'; this.style.color='var(--cyan)'; this.style.borderColor='rgba(0,229,204,0.3)';
+    emailCurrentTipo = this.dataset.tipo;
+    const tpl = getTemplates();
+    document.getElementById('email-asunto').value = tpl[emailCurrentTipo]?.asunto || '';
+    document.getElementById('email-cuerpo').value = tpl[emailCurrentTipo]?.cuerpo || '';
+  });
+});
+
+document.getElementById('email-destinatario').addEventListener('change', function() {
+  document.getElementById('email-cliente-especifico').style.display = this.value === 'uno' ? 'block' : 'none';
+});
+
+document.getElementById('btn-guardar-template').addEventListener('click', () => {
+  const tpl = getTemplates();
+  tpl[emailCurrentTipo] = { asunto: document.getElementById('email-asunto').value, cuerpo: document.getElementById('email-cuerpo').value };
+  saveTemplates(tpl);
+  showToast('Template guardado 🦏');
+});
+
+document.getElementById('btn-gen-email-cobro').addEventListener('click', async function() {
+  this.disabled = true; this.textContent = 'Generando...';
+  const tipoLabels = { pago:'solicitud de pago mensual', recordatorio:'recordatorio de pago vencido', confirmacion:'confirmación de pago recibido', reembolso:'comunicación de reembolso/crédito' };
+  try {
+    const r = await callAPI('ai_agent', {
+      system: `Sos el equipo comercial de RhinosApp — CRM/ERP para distribuidoras de alimentos en Argentina. Redactás emails de ${tipoLabels[emailCurrentTipo]} para clientes. Tono profesional, directo y cercano. Español rioplatense. Firmá como: Equipo RhinosApp 🦏 | comercial@rhinosapp.com | +54 9 11 6822-3306`,
+      messages: [{ role:'user', content:`Generá el asunto y cuerpo de un email de ${tipoLabels[emailCurrentTipo]} para un cliente de RhinosApp. El cuerpo debe usar las variables [nombre], [empresa], [monto], [periodo], [fecha_vencimiento] donde corresponda. Respondé en JSON: {"asunto":"...","cuerpo":"..."}` }]
+    });
+    try {
+      const parsed = JSON.parse(r.reply.replace(/```json|```/g,'').trim());
+      document.getElementById('email-asunto').value = parsed.asunto || '';
+      document.getElementById('email-cuerpo').value = parsed.cuerpo || '';
+    } catch(e) { document.getElementById('email-cuerpo').value = r.reply; }
+  } catch(e) { showToast('Error: ' + e.message); }
+  this.disabled = false; this.textContent = '🦏 Generar con IA';
+});
+
+document.getElementById('btn-enviar-email-cobro').addEventListener('click', async function() {
+  const tokens = (() => { try { return JSON.parse(localStorage.getItem('rhinos_gmail_tokens')); } catch(e){ return null; } })();
+  if (!tokens?.access_token) { showToast('Conectá Gmail primero'); return; }
+  const asunto = document.getElementById('email-asunto').value.trim();
+  const cuerpo = document.getElementById('email-cuerpo').value.trim();
+  if (!asunto || !cuerpo) { showToast('Completá asunto y cuerpo'); return; }
+  const dest = document.getElementById('email-destinatario').value;
+  const cobros = getCobros().filter(c => c.periodo === cobCurrentPeriod);
+  let targets = getClients().filter(c => c.estado === 'activo');
+  if (dest === 'pendientes') targets = targets.filter(c => { const co = cobros.find(x => x.clientId===c.id); return !co || co.status === 'pendiente'; });
+  if (dest === 'vencidos') targets = targets.filter(c => { const co = cobros.find(x => x.clientId===c.id); return co?.status === 'vencido'; });
+  if (dest === 'uno') { const id = document.getElementById('email-cli-sel').value; targets = targets.filter(c => c.id === id); }
+  if (!targets.length) { showToast('No hay destinatarios'); return; }
+  if (!confirm(`¿Enviar a ${targets.length} cliente${targets.length!==1?'s':''}?`)) return;
+  this.disabled = true; this.textContent = `Enviando (0/${targets.length})...`;
+  let sent = 0;
+  const periodo = cobPeriodLabel(cobCurrentPeriod);
+  for (const c of targets) {
+    const co = cobros.find(x => x.clientId === c.id);
+    const monto = (co?.monto || c.precio || 0).toFixed(2);
+    const body = cuerpo.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||'').replace(/\[monto\]/g, monto+' USD').replace(/\[periodo\]/g, periodo).replace(/\[fecha_vencimiento\]/g, cobCurrentPeriod+'-05');
+    const subject = asunto.replace(/\[nombre\]/g, c.nombre).replace(/\[periodo\]/g, periodo).replace(/\[monto\]/g, monto+' USD');
+    try { await callAPI('gmail_send', { access_token: tokens.access_token, to: c.email, subject, body }); sent++; } catch(e){}
+    this.textContent = `Enviando (${sent}/${targets.length})...`;
+    if (targets.length > 1) await new Promise(r => setTimeout(r, 500));
+  }
+  showToast(`✅ ${sent} email${sent!==1?'s':''} enviado${sent!==1?'s':''} 🦏`);
+  this.disabled = false; this.textContent = 'Enviar';
+});
+
+// Inicializar al entrar a tab Cobros
+document.querySelector('.tab-btn[data-ftab="cobros"]').addEventListener('click', () => {
+  renderClientes();
+  renderClientStats();
+});
+
 // ── GUIDE / TOUR ─────────────────────────────────────
 const GUIDE_STEPS = [
   {
