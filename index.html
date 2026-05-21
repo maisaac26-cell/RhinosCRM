@@ -863,7 +863,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-ftab="transacciones">Transacciones</button>
       <button class="tab-btn" data-ftab="socios">Socios</button>
       <button class="tab-btn" data-ftab="proyecciones">Proyecciones</button>
-      <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').style.cssText='display:block!important';renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
+      <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').setAttribute('style','display:block');renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
     </div>
 
     <!-- RESUMEN -->
@@ -1041,6 +1041,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     <!-- COBROS TAB -->
     <div class="ftab-content" id="ftab-cobros" style="display:none">
+      <div id="cobros-test" style="background:var(--cyan);color:#000;padding:16px;border-radius:8px;margin-bottom:1rem;font-weight:700">✅ MÓDULO CLIENTES Y COBROS CARGADO</div>
 
       <!-- ── CLIENTES ── -->
       <div id="ctab-clientes">
