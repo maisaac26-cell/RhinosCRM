@@ -502,8 +502,6 @@ CONSTRUÍ el prompt así:
 4. Agregar: "deep shadows, volumetric cyan fog, bokeh depth of field, photorealistic metallic materials,"
 5. Cerrar CON: "no text no letters no words no numbers, minimalist premium B2B tech aesthetic, cohesive Instagram feed visual"
 Máximo 200 palabras. Respondé SOLO el prompt en inglés.`;
-
-Respondé SOLO con el prompt en inglés, listo para usar.`;
       const imagePromptText = await anthropicFetch([{ role: 'user', content: pr }], SYS);
       result = { prompt: imagePromptText };
     }
