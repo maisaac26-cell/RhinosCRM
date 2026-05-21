@@ -863,7 +863,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-ftab="transacciones">Transacciones</button>
       <button class="tab-btn" data-ftab="socios">Socios</button>
       <button class="tab-btn" data-ftab="proyecciones">Proyecciones</button>
-      <button class="tab-btn" data-ftab="cobros" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
+      <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').style.cssText='display:block!important';renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
     </div>
 
     <!-- RESUMEN -->
