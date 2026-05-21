@@ -142,13 +142,15 @@ module.exports = async function handler(req, res) {
     }
 
     else if (action === 'ig_create_container') {
-      // Paso 1: Solo crea el container y devuelve el ID (rápido, < 5 segundos)
-      const { image_url, caption } = body;
+      const { image_url, caption, format = 'feed' } = body;
       if (!image_url) throw new Error('Se requiere image_url');
       if (image_url.startsWith('blob:') || image_url.startsWith('data:')) {
         throw new Error('URL local — necesita subirse a un host público primero');
       }
-      const containerPath = `${IG_ID}/media?image_url=${encodeURIComponent(image_url)}&caption=${encodeURIComponent(caption || '')}`;
+      const isStory = format === 'story';
+      const containerPath = isStory
+        ? `${IG_ID}/media?image_url=${encodeURIComponent(image_url)}&media_type=STORIES`
+        : `${IG_ID}/media?image_url=${encodeURIComponent(image_url)}&caption=${encodeURIComponent(caption || '')}`;
       const container = await igFetch(containerPath, 'POST');
       if (!container.id) throw new Error('Error creando container: ' + JSON.stringify(container));
       result = { creation_id: container.id };

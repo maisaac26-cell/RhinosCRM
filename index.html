@@ -2152,6 +2152,28 @@ async function addTextToImage(imageUrl, titular, subtitulo, cta) {
 
 // ── PUBLICAR EN INSTAGRAM ────────────────────────────
 let igPublishData = { caption: '', imageUrl: '' };
+let igPublishFormat = 'feed';
+
+function setIgFormat(fmt) {
+  igPublishFormat = fmt;
+  const feedBtn = document.getElementById('ig-fmt-feed');
+  const storyBtn = document.getElementById('ig-fmt-story');
+  const tip = document.getElementById('ig-story-tip');
+  const captionArea = document.querySelector('#ig-publish-modal .field:has(#ig-caption)');
+  if (!feedBtn) return;
+  if (fmt === 'story') {
+    feedBtn.style.cssText = feedBtn.style.cssText.replace(/border:[^;]+/, 'border:1px solid var(--border2)');
+    feedBtn.style.background = 'transparent'; feedBtn.style.color = 'var(--text2)';
+    storyBtn.style.border = '2px solid #4285f4'; storyBtn.style.background = 'rgba(66,133,244,0.15)'; storyBtn.style.color = '#4285f4';
+    if (tip) tip.style.display = 'block';
+    if (captionArea) captionArea.style.opacity = '0.4';
+  } else {
+    storyBtn.style.border = '1px solid var(--border2)'; storyBtn.style.background = 'transparent'; storyBtn.style.color = 'var(--text2)';
+    feedBtn.style.border = '2px solid rgba(131,58,180,0.6)'; feedBtn.style.background = 'rgba(131,58,180,0.15)'; feedBtn.style.color = '#a78bfa';
+    if (tip) tip.style.display = 'none';
+    if (captionArea) captionArea.style.opacity = '1';
+  }
+}
 
 function showIgPublishBar(caption, imageUrl) {
   igPublishData = { caption, imageUrl };
@@ -2172,7 +2194,16 @@ function openIgPublishModal(caption, imageUrl) {
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
   modal.innerHTML = `
     <div style="background:var(--surface);border:1px solid rgba(131,58,180,0.4);border-radius:16px;padding:24px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto">
-      <div style="font-family:var(--display);font-size:22px;font-weight:800;margin-bottom:4px;background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);-webkit-background-clip:text;-webkit-text-fill-color:transparent">📸 Publicar en Instagram</div>
+      <div style="font-family:var(--display);font-size:22px;font-weight:800;margin-bottom:12px;background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);-webkit-background-clip:text;-webkit-text-fill-color:transparent">📸 Publicar en Instagram</div>
+
+      <!-- Selector Feed / Historia -->
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button id="ig-fmt-feed" onclick="setIgFormat('feed')" style="flex:1;padding:10px;border-radius:var(--r);border:2px solid rgba(131,58,180,0.6);background:rgba(131,58,180,0.15);color:#a78bfa;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">📸 Post en el Feed</button>
+        <button id="ig-fmt-story" onclick="setIgFormat('story')" style="flex:1;padding:10px;border-radius:var(--r);border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer">📱 Historia</button>
+      </div>
+      <div id="ig-story-tip" style="display:none;background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.2);border-radius:var(--r);padding:8px 12px;margin-bottom:12px;font-size:12px;color:#4285f4">
+        💡 Las historias se publican sin caption. Usá una imagen vertical 9:16 para mejor resultado.
+      </div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:16px">@rhinosapp</div>
 
       ${imageUrl ? `
@@ -2250,7 +2281,7 @@ function openIgPublishModal(caption, imageUrl) {
 
       // Paso 2 (antes 1): Crear container en Instagram
       setStatus(`📤 ${finalImageUrl.startsWith('blob:') ? 'Paso 2/4' : 'Paso 1/3'} — Enviando a Instagram...`);
-      const c = await callAPI('ig_create_container', { image_url: publicImageUrl, caption });
+      const c = await callAPI('ig_create_container', { image_url: publicImageUrl, caption, format: igPublishFormat });
       const creationId = c.creation_id;
       if (!creationId) throw new Error('No se pudo crear el container');
 
