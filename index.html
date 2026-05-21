@@ -2294,14 +2294,48 @@ function openIgPublishModal(caption, imageUrl) {
     try {
       let publicImageUrl = finalImageUrl;
 
+      // Función para convertir imagen a 9:16 para Stories
+      async function convertToStoryFormat(url) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const storyW = 1080, storyH = 1920;
+            const canvas = document.createElement('canvas');
+            canvas.width = storyW; canvas.height = storyH;
+            const ctx = canvas.getContext('2d');
+            // Fondo oscuro de marca
+            ctx.fillStyle = '#0d1117';
+            ctx.fillRect(0, 0, storyW, storyH);
+            // Calcular posición centrada manteniendo proporción
+            const scale = Math.min(storyW / img.width, storyH / img.height);
+            const drawW = img.width * scale;
+            const drawH = img.height * scale;
+            const x = (storyW - drawW) / 2;
+            const y = (storyH - drawH) / 2;
+            ctx.drawImage(img, x, y, drawW, drawH);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = reject;
+          img.src = url;
+        });
+      }
+
+      // Si es Historia y la imagen no es ya 9:16, convertirla
+      let uploadUrl = finalImageUrl;
+      if (igPublishFormat === 'story') {
+        setStatus('📱 Convirtiendo imagen a formato Historia (9:16)...');
+        uploadUrl = await convertToStoryFormat(finalImageUrl);
+      }
+
       // Si es imagen local (blob: o data: con texto aplicado) → subir a imgbb primero
-      if (finalImageUrl.startsWith('blob:') || finalImageUrl.startsWith('data:')) {
+      if (uploadUrl.startsWith('blob:') || uploadUrl.startsWith('data:')) {
         setStatus('☁️ Subiendo imagen a servidor público...');
         let base64;
-        if (finalImageUrl.startsWith('data:')) {
-          base64 = finalImageUrl.split(',')[1]; // extraer base64 directo
+        if (uploadUrl.startsWith('data:')) {
+          base64 = uploadUrl.split(',')[1];
         } else {
-          const blob = await fetch(finalImageUrl).then(r => r.blob());
+          const blob = await fetch(uploadUrl).then(r => r.blob());
           base64 = await new Promise(resolve => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -2311,6 +2345,8 @@ function openIgPublishModal(caption, imageUrl) {
         const uploaded = await callAPI('upload_image_public', { imageBase64: base64 });
         publicImageUrl = uploaded.url;
         setStatus('✅ Imagen lista');
+      } else {
+        publicImageUrl = uploadUrl;
       }
 
       // Paso 2 (antes 1): Crear container en Instagram
