@@ -442,66 +442,80 @@ Sé concreto y accionable. Español rioplatense.`;
       const { modulo, angulo, formato, tono } = body;
 
       const SYS = `Sos el director creativo de RhinosApp — CRM/ERP para distribuidoras de alimentos en Argentina.
-Tu trabajo es crear prompts de imagen para el feed de Instagram @rhinosapp que sean:
-1. Visualmente consistentes con el feed existente
-2. Directamente conectados al mensaje del caption
+Creás prompts para imágenes de Instagram @rhinosapp que repliquen EXACTAMENTE el estilo visual del feed real.
 
-FEED REAL DE @rhinosapp — ESTILO A REPLICAR:
-Los posts exitosos de este feed usan estas narrativas visuales:
-• "Tu competencia vende más porque está más ordenada" → caos transformándose en orden bajo el rhino
-• "¿Cuántas ventas se te escapan?" → pedidos/monedas flotando dispersos, el rhino los captura y organiza
-• "No estás gestionando, estás improvisando" → tablero de control emergiendo del caos digital
-• "Muchos problemas en logística empiezan en la preventa" → cadena rota convirtiéndose en flujo ordenado
-• "No gana el que más trabaja, gana el que mejor decide" → datos/gráficos convergiendo hacia un punto de poder
+ESTILO VISUAL REAL DEL FEED @rhinosapp (analizá cada elemento):
 
-EL LOGO — ELEMENTO CENTRAL OBLIGATORIO EN CADA IMAGEN:
-Rinoceronte mecánico-cibernético con estas características EXACTAS:
-• Cabeza armada con placas de metal hexagonales, vista 3/4 mirando a la derecha
-• Ojo cibernético circular con glow cyan brillante (#00e5cc)
-• Cuerno masivo cristal/holográfico con neón cyan intenso
-• Marco hexagonal con trazos de circuito en los bordes, nodos luminosos en vértices
-• Chispas cyan en esquina superior derecha
-• Acero oscuro + gris metálico + brillos cyan como neón
+FONDO: Fotografía industrial realista — depósitos, centros de distribución, galpones con estantes, trabajadores con chalecos reflectantes, camiones de carga, cajas apiladas. Iluminación dramática industrial con toques de luz azul-cyan. NO renders puros — fotografía híbrida con overlay digital.
 
-PALETA Y ESTILO INAMOVIBLES:
-- Fondo: #0d1117 (negro azulado) — SIEMPRE, sin excepciones
-- Acento: #00e5cc (cyan/teal) con efecto glow
-- Verde #22c55e solo para elementos de éxito
-- Iluminación: dramática, rim lighting cyan, sombras profundas
-- Composición: minimalista, el rhino domina, elementos del tema lo rodean
-- Calidad: 3D render ultra-detallado, profundidad de campo cinemática
-- NUNCA texto, letras ni números en la imagen
+OVERLAY TECH: Sobre la foto real se aplican capas digitales:
+• Panel semitransparente oscuro (#0d1117 con 75-85% opacidad) que cubre parte de la imagen
+• Bordes/marcos con líneas cyan (#00e5cc) brillantes
+• Elementos de circuito, hexágonos y partículas de datos flotando
+• Iconos digitales, checkmarks, indicadores HUD sutiles
 
-NARRATIVA VISUAL DEL FEED — TENSION → RESOLUCIÓN:
-Cada imagen debe contar una historia visual en dos fuerzas:
-- Fuerza 1 (izquierda/fondo): el PROBLEMA → caos, desorden, datos dispersos, elementos fragmentados
-- Fuerza 2 (centro/derecha): el RHINO como SOLUCIÓN → ordena, controla, domina
-- El rhino siempre emerge victorioso del caos, nunca está en posición débil`;
+EL LOGO — SIEMPRE PRESENTE EN UNA ESQUINA O CENTRO SUPERIOR:
+• Cabeza de rinoceronte mecánico con armadura hexagonal, vista 3/4 perfil derecho
+• Ojo único cibernético con glow cyan
+• Cuerno cristalino luminoso con neón cyan
+• Marco hexagonal con trazos de circuito y nodos en vértices
+• Texto "RHINOS" con la O como engranaje cyan debajo del logo
+• Se coloca: esquina superior izquierda (pequeño) O centro superior (mediano) según composición
+
+COMPOSICIÓN:
+• Zona superior: logo del rhino + espacio oscuro para título grande
+• Zona central: elemento visual del tema (cajas, datos, trabajadores, tablero)
+• Zona inferior: panel oscuro con íconos/checkmarks + CTA
+• La imagen SIEMPRE tiene áreas oscuras para que el texto sea legible encima
+• Formato cuadrado 1:1 para feed, o 4:5
+
+PALETA EXACTA:
+• Base: foto industrial real con filtro oscuro azulado
+• #0d1117 para paneles y overlays
+• #00e5cc para bordes, íconos, glow, checkmarks positivos
+• #ef4444 (rojo) para X o problemas/errores
+• Blanco brillante para texto principal (se superpone encima)
+
+TONO NARRATIVO DE LAS IMÁGENES:
+Las mejores imágenes del feed muestran el CONTRASTE entre:
+- Lado problema (desorden, error, X roja): trabajador confundido, papeles dispersos, cajas caóticas
+- Lado solución (orden, sistema, checkmark cyan): tablero digital, flujo organizado, datos en control`;
 
       const { caption } = body;
 
-      const pr = `Generá un prompt en inglés para una imagen de Instagram de @rhinosapp.
+      const pr = `Creá un prompt en inglés para una imagen de Instagram de @rhinosapp.
 
-${caption ? `CAPTION DEL POST QUE ACOMPAÑARÁ ESTA IMAGEN:
+${caption ? `CAPTION QUE VA A ACOMPAÑAR ESTA IMAGEN:
 "${caption.slice(0, 600)}"
 
-ANÁLISIS DEL CAPTION:
-- Identificá la emoción central (dolor, frustración, esperanza, poder)
-- Identificá el contraste principal (desorden vs orden / pérdida vs control / improvisación vs sistema)
-- La imagen DEBE visualizar ese contraste con el rhino como protagonista del lado positivo
+EXTRAE del caption:
+1. El DOLOR principal que menciona (ej: "ventas que se escapan", "cobranzas desordenadas")
+2. La SOLUCIÓN que propone (ej: "control total", "sistema", "orden")
+3. El ESCENARIO FÍSICO más apropiado (depósito, camión, oficina de distribuidora, calle con vendedores)
 
 ` : ''}MÓDULO/TEMA: ${modulo}
-ÁNGULO: ${angulo || 'el que mejor traduzca el mensaje del caption a imagen'}
+ÁNGULO: ${angulo || 'contraste problema vs solución'}
 FORMATO: ${formato}
 TONO: ${tono}
 
-CONSTRUÍ el prompt así:
-1. Empezar CON: "Cinematic ultra-detailed 3D render, deep dark navy-black background (#0d1117), glowing cyan neon (#00e5cc), dramatic cinematic rim lighting,"
-2. Describir el RHINO exacto: "central cyberpunk mechanical armored rhinoceros head, hexagonal metal armor plates, 3/4 view facing right, single glowing cyan cybernetic eye, massive crystal luminous horn with intense cyan neon glow, geometric hexagonal frame with circuit board traces and glowing vertex nodes, cyan sparks upper-right,"
-3. Describir los elementos TEMÁTICOS flotando alrededor que visualizan el mensaje del caption (caos en un lado, orden emergiendo con el rhino)
-4. Agregar: "deep shadows, volumetric cyan fog, bokeh depth of field, photorealistic metallic materials,"
-5. Cerrar CON: "no text no letters no words no numbers, minimalist premium B2B tech aesthetic, cohesive Instagram feed visual"
-Máximo 200 palabras. Respondé SOLO el prompt en inglés.`;
+CONSTRUÍ el prompt siguiendo EXACTAMENTE esta estructura:
+
+APERTURA (fondo fotorrealista):
+"Photorealistic hybrid image, industrial Argentine food distribution warehouse interior, [escenario específico del tema], dramatic industrial lighting with cyan (#00e5cc) accent lights, dark blue atmospheric overlay,"
+
+LOGO (siempre presente):
+"[corner position] small-to-medium cyberpunk mechanical armored rhinoceros logo badge: hexagonal metal plated rhino head 3/4 right profile, glowing cyan cybernetic eye, crystal luminous horn with cyan neon, hexagonal frame with circuit traces and glowing vertex nodes, 'RHINOS' text with gear-O below,"
+
+ELEMENTOS DEL TEMA (conectado al caption):
+"[elementos visuales que representan el dolor del caption en un lado] transforming into [elementos que representan la solución, con iconos cyan y checkmarks],"
+
+OVERLAY DIGITAL:
+"semi-transparent dark panel overlay (#0d1117 85% opacity) with cyan bordered sections, floating holographic data indicators, circuit board edge accents, HUD-style frame elements,"
+
+CIERRE TÉCNICO:
+"high contrast dark areas for text overlay, professional B2B marketing composition, no text no letters no words no numbers, Instagram square format, photorealistic quality"
+
+Máximo 180 palabras. Respondé SOLO el prompt en inglés, listo para usar.`;
       const imagePromptText = await anthropicFetch([{ role: 'user', content: pr }], SYS);
       result = { prompt: imagePromptText };
     }
