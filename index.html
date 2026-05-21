@@ -2326,8 +2326,9 @@ function openIgPublishModal(caption, imageUrl) {
             ctx.fillStyle = 'rgba(13,17,23,0.35)';
             ctx.fillRect(0, 0, storyW, storyH);
 
-            // Imagen original centrada (fit dentro del 9:16)
-            const scale = Math.min(storyW / img.width, storyH / img.height);
+            // Imagen original centrada con margen lateral para proteger el texto de las esquinas del teléfono
+            const safeW = storyW * 0.88; // 6% de margen en cada lado
+            const scale = Math.min(safeW / img.width, storyH * 0.78 / img.height);
             const drawW = img.width * scale;
             const drawH = img.height * scale;
             const x = (storyW - drawW) / 2;
