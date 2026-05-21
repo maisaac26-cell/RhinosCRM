@@ -94,7 +94,35 @@ module.exports = async function handler(req, res) {
   try {
     let result;
 
-    if (action === 'supabase_proxy') {
+    if (action === 'convert_story_format') {
+      // Descarga la imagen y la convierte a 9:16 con barras #0d1117 arriba/abajo
+      const { image_url } = body;
+      if (!image_url) throw new Error('Se requiere image_url');
+
+      // Descargar imagen
+      const imgBuffer = await new Promise((resolve, reject) => {
+        const u = new URL(image_url);
+        const lib = u.protocol === 'https:' ? https : require('http');
+        const req = lib.get({ hostname: u.hostname, path: u.pathname + u.search, headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+          if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
+            return lib.get(res.headers.location, (r2) => {
+              const chunks = [];
+              r2.on('data', c => chunks.push(c));
+              r2.on('end', () => resolve(Buffer.concat(chunks)));
+            }).on('error', reject);
+          }
+          const chunks = [];
+          res.on('data', c => chunks.push(c));
+          res.on('end', () => resolve(Buffer.concat(chunks)));
+        });
+        req.on('error', reject);
+      });
+
+      // Devolver como base64 para que el frontend lo dibuje en canvas
+      result = { imageBase64: imgBuffer.toString('base64'), mime: 'image/png' };
+    }
+
+    else if (action === 'supabase_proxy') {
       const { endpoint, method: m = 'GET', body: b } = body;
       const SB_URL_P = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
       const SB_KEY_P = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
