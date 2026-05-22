@@ -5886,7 +5886,14 @@ let emailCurrentTipo = 'pago';
 function renderEmailTab() {
   const clients = getClients();
   const sel = document.getElementById('email-cli-sel');
-  sel.innerHTML = clients.map(c => `<option value="${c.id}">${c.nombre} — ${c.email}</option>`).join('');
+  if (!clients.length) {
+    sel.innerHTML = '<option value="">— Sin clientes cargados —</option>';
+  } else {
+    sel.innerHTML = clients.map(c => `<option value="${c.id}">${c.nombre}${c.empresa?' — '+c.empresa:''} (${c.email})</option>`).join('');
+  }
+  // Mostrar/ocultar selector según destinatario actual
+  const dest = document.getElementById('email-destinatario');
+  document.getElementById('email-cliente-especifico').style.display = dest?.value === 'uno' ? 'block' : 'none';
   const tpl = getTemplates();
   document.getElementById('email-asunto').value = tpl[emailCurrentTipo]?.asunto || '';
   document.getElementById('email-cuerpo').value = tpl[emailCurrentTipo]?.cuerpo || '';
@@ -6234,9 +6241,12 @@ function recalcBalance() {
 
 function loadBalanceDatos() {
   const d = getBalData();
+  // Default moneda ARS si no está seteada
+  if (!d['emp_moneda']) { d['emp_moneda'] = 'ARS'; saveBalData(d); }
   ['razon','cuit','actividad','domicilio','capital-inscripto','nsocios','ejercicio','inicio','cierre','moneda','contador','matricula','consejo'].forEach(id => {
     const el = document.getElementById('bal-'+id);
-    if (el && d['emp_'+id]) el.value = d['emp_'+id];
+    const val = d['emp_'+id] || (id==='moneda' ? 'ARS' : '');
+    if (el && val) el.value = val;
   });
 }
 
@@ -6309,13 +6319,18 @@ async function autoSyncBalance() {
     const catMap = { 'Tecnología':'gasto_software','Marketing':'gasto_publicidad','Honorarios':'gasto_honorarios','Legal':'gasto_honorarios','Infraestructura':'gasto_software','Ventas':'gasto_ventas','Otros Gastos':'gasto_otros_adm' };
     const txEj = txs.filter(t => t.date >= inicio && t.date <= cierre && t.type !== 'pendiente');
     const auto = {};
+    // Convertir a ARS según moneda de cada transacción
+    const amtARS = t => {
+      const raw = Math.abs(+t.amount||0);
+      return (t.currency === 'USD') ? toARS(raw, 'USD') : raw;
+    };
     txEj.forEach(t => {
-      const amt = Math.abs(+t.amount||0);
+      const amt = amtARS(t);
       if (t.type==='ingreso') auto['ventas'] = (auto['ventas']||0) + amt;
       else if (t.type==='gasto') { const k = catMap[t.category||'']||'gasto_otros_adm'; auto[k] = (auto[k]||0) + amt; }
       else if (t.type==='inversion') auto['capital_suscripto'] = (auto['capital_suscripto']||0) + amt;
     });
-    const saldo = txs.filter(t=>t.type==='ingreso').reduce((a,t)=>a+Math.abs(+t.amount||0),0) - txs.filter(t=>t.type==='gasto').reduce((a,t)=>a+Math.abs(+t.amount||0),0);
+    const saldo = txs.filter(t=>t.type==='ingreso').reduce((a,t)=>a+amtARS(t),0) - txs.filter(t=>t.type==='gasto').reduce((a,t)=>a+amtARS(t),0);
     if (saldo > 0) auto['caja'] = saldo;
     const cobros = typeof getCobros==='function' ? getCobros() : [];
     const pend = cobros.filter(c=>c.status==='pendiente'||c.status==='vencido').reduce((a,c)=>a+(+c.monto||0),0);
