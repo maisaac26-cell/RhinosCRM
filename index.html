@@ -19,12 +19,6 @@
 }
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
-/* SUB-NAV GRUPOS */
-.subnav{display:flex;align-items:center;gap:4px;padding:6px 0 12px;margin-bottom:4px;border-bottom:1px solid var(--border);flex-wrap:wrap}
-.subnav-label{font-size:10px;color:var(--text3);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-right:4px}
-.subnav-btn{padding:4px 12px;border:1px solid var(--border2);border-radius:20px;background:transparent;cursor:pointer;font-size:11px;color:var(--text2);font-family:var(--font);transition:all 0.15s}
-.subnav-btn:hover{background:var(--surface2);color:var(--text)}
-.subnav-btn.active{background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3)}
 /* TOPBAR */
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100}
 .logo{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:0.04em;display:flex;align-items:center;gap:8px}
@@ -226,13 +220,18 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   </div>
   <div class="nav">
     <button class="nav-btn active" data-sec="dashboard">Dashboard</button>
-    <button class="nav-btn nav-grupo" data-grupo="instagram" style="background:rgba(131,58,180,0.1);color:#c084fc;border:1px solid rgba(131,58,180,0.25)">📱 Instagram</button>
+    <button class="nav-btn" data-sec="posts">Posts</button>
+    <button class="nav-btn" data-sec="dms">DMs</button>
     <button class="nav-btn" data-sec="gmail">Gmail</button>
+    <button class="nav-btn" data-sec="contenido">Contenido</button>
     <button class="nav-btn" data-sec="calendario">Calendario</button>
-    <button class="nav-btn nav-grupo" data-grupo="comercial" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.2)">💼 Comercial</button>
+    <button class="nav-btn" data-sec="leads" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.2)">🎯 Leads</button>
+    <button class="nav-btn" data-sec="prospectos">Prospectos</button>
     <button class="nav-btn" data-sec="finanzas" style="background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.2)">💰 Finanzas</button>
     <button class="nav-btn" data-sec="tareas" style="background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.2)">📋 Tareas</button>
     <button class="nav-btn" data-sec="agente">Agente IA</button>
+    <button class="nav-btn" data-sec="presupuestos" style="background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.2)">📄 Presupuestos</button>
+    <button class="nav-btn" data-sec="balance" style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.2)">⚖️ Balance</button>
   </div>
   <div id="crm-user"></div>
   <button id="btn-guide" onclick="startGuide()" style="margin-left:8px;width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;display:none;flex-shrink:0" title="Guía de uso">?</button>
@@ -866,7 +865,6 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-ftab="socios">Socios</button>
       <button class="tab-btn" data-ftab="proyecciones">Proyecciones</button>
       <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').setAttribute('style','display:block');renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
-      <button class="tab-btn" id="tab-balance-embed" data-ftab="balance-embed" style="background:rgba(251,191,36,0.08);color:#fbbf24;border:1px solid rgba(251,191,36,0.2)">⚖️ Balance</button>
     </div>
 
     <!-- RESUMEN -->
@@ -6544,86 +6542,6 @@ document.getElementById('btn-balance-print').addEventListener('click', () => {
   <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>
   </body></html>`);
   win.document.close();
-});
-
-// ══════════════════════════════════════════════════
-// NAVEGACIÓN AGRUPADA — Instagram / Comercial / Balance
-// ══════════════════════════════════════════════════
-const NAV_GRUPOS = {
-  instagram: { secs: ['posts','dms','contenido'], label:'📱 Instagram', color:'#c084fc' },
-  comercial:  { secs: ['leads','prospectos','presupuestos'], label:'💼 Comercial', color:'#f59e0b' }
-};
-const SEC_LABELS = { posts:'Posts', dms:'DMs', contenido:'Contenido', leads:'Leads', prospectos:'Prospectos', presupuestos:'Presupuestos' };
-
-function injectSubNav(sec, grupo) {
-  const s = document.getElementById('s-'+sec);
-  if (!s || s.querySelector('.subnav')) return;
-  const g = NAV_GRUPOS[grupo];
-  const bar = document.createElement('div');
-  bar.className = 'subnav';
-  bar.innerHTML = `<span class="subnav-label">${g.label} ›</span>` +
-    g.secs.map(k => `<button class="subnav-btn${k===sec?' active':''}" data-goto="${k}">${SEC_LABELS[k]}</button>`).join('');
-  bar.querySelectorAll('[data-goto]').forEach(btn => {
-    btn.addEventListener('click', () => showGrupoSec(grupo, btn.dataset.goto));
-  });
-  s.insertBefore(bar, s.firstChild);
-}
-
-function showGrupoSec(grupo, sec) {
-  document.querySelectorAll('.section').forEach(s => s.style.display='none');
-  document.getElementById('s-balance').style.display='none';
-  document.getElementById('s-'+sec).style.display='block';
-  // Nav highlight
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelector(`.nav-btn[data-sec="${grupo}"]`)?.classList.add('active');
-  // Sub-nav highlight
-  injectSubNav(sec, grupo);
-  document.querySelectorAll('#s-'+sec+' .subnav-btn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.goto===sec);
-  });
-  // Run any needed init
-  if (sec==='leads' && typeof renderLeads==='function') renderLeads();
-  if (sec==='posts') loadPostsSide?.();
-}
-
-// Botones de grupos (instagram / comercial) — usan data-grupo, no data-sec
-document.querySelectorAll('.nav-grupo').forEach(btn => {
-  btn.addEventListener('click', function() {
-    const grupo = this.dataset.grupo;
-    const firstSec = NAV_GRUPOS[grupo].secs[0];
-    showGrupoSec(grupo, firstSec);
-  });
-});
-
-// Balance como tab de Finanzas
-document.getElementById('tab-balance-embed')?.addEventListener('click', function() {
-  // Ocultar contenido normal de finanzas
-  document.querySelectorAll('.ftab-content').forEach(c=>c.style.display='none');
-  // Desmarcar otros tabs de finanzas
-  document.querySelectorAll('.tab-btn[data-ftab]').forEach(b=>b.classList.remove('active'));
-  this.classList.add('active');
-  // Mostrar s-balance "dentro" de finanzas
-  document.querySelectorAll('.section').forEach(s=>s.style.display='none');
-  document.getElementById('s-finanzas').style.display='block';
-  document.getElementById('s-balance').style.display='block';
-  document.getElementById('s-balance').style.marginTop = '0';
-  // Scroll al balance
-  document.getElementById('s-balance').scrollIntoView({behavior:'smooth', block:'start'});
-  // Auto-sync
-  setTimeout(()=>autoSyncBalance(), 200);
-  loadBalanceDatos();
-});
-
-// Al clickear otro tab de Finanzas, ocultar s-balance si estaba visible
-const origFtabHandler = document.querySelectorAll('.tab-btn[data-ftab]');
-origFtabHandler.forEach(btn => {
-  if (btn.dataset.ftab !== 'balance-embed') {
-    btn.addEventListener('click', () => {
-      const bal = document.getElementById('s-balance');
-      if (bal && bal.style.display==='block') bal.style.display='none';
-      document.getElementById('s-finanzas').style.display='block';
-    });
-  }
 });
 
 // ── GUIDE / TOUR ─────────────────────────────────────
