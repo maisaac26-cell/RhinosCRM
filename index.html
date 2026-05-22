@@ -6332,106 +6332,211 @@ document.getElementById('btn-balance-print').addEventListener('click', () => {
   const d = getBalData();
   const emp = k => d['emp_'+k]||'';
   const val = k => +d[k]||0;
-  const fmt = n => '$ '+Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const negStyle = 'color:#dc2626';
+  const moneda = emp('moneda')||'ARS';
+  const simb = moneda==='USD'?'USD':'$';
+  // Formato contable: números con puntos de miles y coma decimal, negativos entre paréntesis
+  const fmtC = n => {
+    if (!n && n!==0) return '—';
+    const abs = Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    return n<0 ? `(${simb} ${abs})` : `${simb} ${abs}`;
+  };
+  const fmtZ = n => (+n||0)===0 ? '—' : fmtC(n);
 
-  // Recalculate totals
+  // Totales
   const totAC = PLAN.ac.reduce((a,c)=>a+val(c.k),0);
   const totANC = PLAN.anc.reduce((a,c)=>a+(c.neg?-val(c.k):val(c.k)),0);
-  const totActivo = totAC + totANC;
+  const totActivo = totAC+totANC;
   const totPC = PLAN.pc.reduce((a,c)=>a+val(c.k),0);
   const totPNC = PLAN.pnc.reduce((a,c)=>a+val(c.k),0);
   const totPasivo = totPC+totPNC;
   const ventas = val('ventas')-val('dev_descuentos');
   const costo = val('costo_ventas');
+  const utilBruta = ventas-costo;
   const gastosAdm = PLAN.res.filter(c=>c.tipo==='gasto_adm').reduce((a,c)=>a+val(c.k),0);
   const gastosCom = PLAN.res.filter(c=>c.tipo==='gasto_com').reduce((a,c)=>a+val(c.k),0);
   const resFin = PLAN.res.filter(c=>c.tipo==='fin_pos').reduce((a,c)=>a+val(c.k),0)-PLAN.res.filter(c=>c.tipo==='fin_neg').reduce((a,c)=>a+val(c.k),0);
   const otrosRes = PLAN.res.filter(c=>c.tipo==='otro_pos').reduce((a,c)=>a+val(c.k),0)-PLAN.res.filter(c=>c.tipo==='otro_neg').reduce((a,c)=>a+val(c.k),0);
-  const reEjercicio = ventas-costo-gastosAdm-gastosCom+resFin+otrosRes-val('iigg');
+  const reEjercicio = utilBruta-gastosAdm-gastosCom+resFin+otrosRes-val('iigg');
   const totPN = PLAN.pn.reduce((a,c)=>a+val(c.k),0)+reEjercicio;
+  const totPasivoPN = totPasivo+totPN;
+  const verificado = Math.abs(totActivo-totPasivoPN)<0.01;
 
-  const rowR = (label, val, bold=false, color='#111') => `<tr><td style="padding:3px 8px;font-size:11px;${bold?'font-weight:700':''}">${label}</td><td style="padding:3px 8px;text-align:right;font-size:11px;${bold?'font-weight:700':''}color:${color}">${fmt(val)}</td></tr>`;
+  // Generador de filas del balance (estilo contable)
+  const rA = (label,n,indent=0,bold=false,underline='') => {
+    const v = fmtZ(n);
+    const style = `font-size:9.5pt;padding:${indent?'1px 4px 1px '+(8+indent*12)+'px':'1px 4px'};${bold?'font-weight:600':'font-weight:400'};border-bottom:${underline==='double'?'3px double #1a1a2e':underline==='single'?'1px solid #1a1a2e':'none'}`;
+    return `<tr><td style="${style}">${label}</td><td style="font-size:9.5pt;text-align:right;padding:1px 6px 1px 4px;${bold?'font-weight:600':'font-weight:400'};font-family:'Courier New',monospace;border-bottom:${underline==='double'?'3px double #1a1a2e':underline==='single'?'1px solid #1a1a2e':'none'}">${n||n===0?v:''}</td></tr>`;
+  };
+  const rSec = (label) => `<tr><td colspan="2" style="font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:6px 4px 2px;border-top:1px solid #1a1a2e;color:#1a1a2e">${label}</td></tr>`;
+  const rTot = (label,n,double=false) => `<tr><td style="font-size:9.5pt;font-weight:700;padding:3px 4px;border-top:1px solid #1a1a2e;border-bottom:${double?'3px double #1a1a2e':'1px solid #1a1a2e'}">${label}</td><td style="font-size:9.5pt;text-align:right;font-weight:700;padding:3px 6px 3px 4px;font-family:'Courier New',monospace;border-top:1px solid #1a1a2e;border-bottom:${double?'3px double #1a1a2e':'1px solid #1a1a2e'}">${fmtC(n)}</td></tr>`;
+  const rBlank = () => `<tr><td colspan="2" style="padding:3px">&nbsp;</td></tr>`;
 
-  const win = window.open('','_blank','width=900,height:700');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Balance — ${emp('razon')}</title>
+  // Resultado de resultados
+  const rR = (label,n,indent=0,bold=false,underline='') => {
+    const style = `font-size:9.5pt;padding:1px 4px 1px ${8+indent*12}px;${bold?'font-weight:700':''}`;
+    const vs = `font-size:9.5pt;text-align:right;padding:1px 6px 1px 4px;font-family:'Courier New',monospace;${bold?'font-weight:700':''}border-bottom:${underline==='double'?'3px double #1a1a2e':underline==='single'?'1px solid #1a1a2e':'none'}`;
+    return `<tr><td style="${style};border-bottom:${underline==='double'?'3px double #1a1a2e':underline==='single'?'1px solid #1a1a2e':'none'}">${label}</td><td style="${vs}">${n||n===0?fmtZ(n):''}</td></tr>`;
+  };
+
+  // Notas
+  const notas = [1,2,3,4,5].map(i=>{const t=document.querySelector(`.nota-item[data-nota="${i}"] .nota-texto`)?.value;return t?`<p><strong>Nota ${i}:</strong> ${t}</p>`:''}).filter(Boolean).join('');
+
+  const win = window.open('','_blank','width=1000,height=800');
+  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
+  <title>Estados Contables — ${emp('razon')}</title>
   <style>
-    body{font-family:Arial,sans-serif;font-size:11px;color:#111;margin:0;padding:20px;background:white}
-    .header{text-align:center;border-bottom:2px solid #1e3a5f;padding-bottom:12px;margin-bottom:16px}
-    .titulo{font-size:18px;font-weight:900;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px}
-    .sub{font-size:12px;color:#444;margin-top:3px}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Times New Roman',Times,serif;font-size:10pt;color:#1a1a2e;background:white;padding:0}
+    .page{width:210mm;min-height:297mm;margin:0 auto;padding:18mm 16mm 20mm;background:white;position:relative}
+    .page+.page{page-break-before:always}
+
+    /* Encabezado */
+    .doc-header{text-align:center;padding-bottom:10px;margin-bottom:14px;border-bottom:2.5pt solid #1a1a2e}
+    .doc-header .empresa{font-size:14pt;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#1a1a2e}
+    .doc-header .datos{font-size:9pt;color:#333;margin-top:3px;line-height:1.5}
+    .doc-header .titulo-doc{font-size:11pt;font-weight:700;text-transform:uppercase;margin-top:8px;letter-spacing:0.06em;border:1.5pt solid #1a1a2e;display:inline-block;padding:3px 20px}
+    .doc-header .periodo{font-size:9pt;margin-top:4px;color:#333}
+
+    /* Columnas del balance */
+    .balance-cols{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1pt solid #ccc}
+    .col-activo{border-right:1.5pt solid #1a1a2e;padding:6px 8px}
+    .col-pasivo{padding:6px 8px}
+    .col-header{font-size:10pt;font-weight:700;text-transform:uppercase;text-align:center;padding:5px;background:#1a1a2e;color:white;letter-spacing:0.08em;margin:-6px -8px 6px -8px}
+
     table{width:100%;border-collapse:collapse}
-    th{background:#1e3a5f;color:white;padding:6px 8px;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:0.5px}
-    tr:nth-child(even){background:#f8f9fa}
-    .seccion{background:#e8f0fe;font-weight:700;font-size:11px;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px}
-    .total-row{background:#1e3a5f;color:white;font-weight:700}
-    .firma{border-top:1px solid #aaa;width:200px;text-align:center;padding-top:4px;margin-top:40px;font-size:10px}
-    @media print{body{margin:0}@page{margin:15mm;size:A4}}
+
+    /* Estado de Resultados */
+    .estado-res{margin-top:16px;padding-top:12px;border-top:2pt solid #1a1a2e}
+    .estado-res h3{font-size:10.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;text-align:center;margin-bottom:8px;border:1.5pt solid #1a1a2e;display:inline-block;padding:3px 16px}
+    .res-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+
+    /* Certificación */
+    .cert{margin-top:20px;padding-top:10px;border-top:1pt solid #aaa;font-size:8.5pt;color:#444;line-height:1.6}
+    .firmas{display:flex;justify-content:space-around;margin-top:30px;text-align:center}
+    .firma-box{width:200px}
+    .firma-linea{border-top:1pt solid #333;margin-bottom:4px}
+    .firma-text{font-size:8.5pt;line-height:1.5}
+
+    /* Verificación */
+    .verif{text-align:center;font-size:8.5pt;padding:4px 8px;margin-top:6px;border-radius:2px;display:inline-block}
+
+    /* Notas */
+    .notas{margin-top:14px;padding-top:10px;border-top:1pt solid #ccc;font-size:9pt;line-height:1.6}
+    .notas h4{font-size:9.5pt;font-weight:700;text-transform:uppercase;margin-bottom:6px}
+    .notas p{margin-bottom:5px}
+
+    /* Folio */
+    .folio{position:absolute;bottom:10mm;right:16mm;font-size:8pt;color:#888}
+
+    @page{margin:0;size:A4}
+    @media print{body{margin:0}.page{width:210mm;padding:15mm 14mm 18mm;margin:0;box-shadow:none}.page+.page{page-break-before:always}}
   </style></head><body>
-  <div class="header">
-    <div class="titulo">${emp('razon') || 'RAZÓN SOCIAL S.R.L.'}</div>
-    <div class="sub">CUIT: ${emp('cuit')} | Actividad: ${emp('actividad')}</div>
-    <div class="sub">${emp('domicilio')}</div>
-    <div class="sub" style="font-weight:700;margin-top:4px">ESTADO DE SITUACIÓN PATRIMONIAL — EJERCICIO N° ${emp('ejercicio')}</div>
-    <div class="sub">Inicio: ${emp('inicio')} | Cierre: ${emp('cierre')}</div>
-  </div>
 
-  <table style="margin-bottom:20px">
-  <tr><th style="width:50%">ACTIVO</th><th style="width:50%;background:#7f1d1d">PASIVO Y PATRIMONIO NETO</th></tr>
-  <tr><td colspan="2" style="padding:0">
-    <table style="width:100%">
-      <tr>
-        <td style="width:50%;vertical-align:top;padding:0">
-          <table style="width:100%">
-            <tr><td colspan="2" class="seccion">Activo Corriente</td></tr>
-            ${PLAN.ac.map(c=>rowR(c.n,val(c.k))).join('')}
-            <tr class="total-row"><td style="padding:5px 8px">TOTAL ACTIVO CORRIENTE</td><td style="padding:5px 8px;text-align:right">${fmt(totAC)}</td></tr>
-            <tr><td colspan="2" class="seccion" style="margin-top:8px">Activo No Corriente</td></tr>
-            ${PLAN.anc.map(c=>rowR(c.n,c.neg?-val(c.k):val(c.k),false,c.neg?'#dc2626':'#111')).join('')}
-            <tr class="total-row"><td style="padding:5px 8px">TOTAL ACTIVO NO CORRIENTE</td><td style="padding:5px 8px;text-align:right">${fmt(totANC)}</td></tr>
-            <tr style="background:#1e3a5f;color:white;font-weight:900;font-size:13px"><td style="padding:8px">TOTAL ACTIVO</td><td style="padding:8px;text-align:right">${fmt(totActivo)}</td></tr>
-          </table>
-        </td>
-        <td style="width:50%;vertical-align:top;padding:0;border-left:2px solid #1e3a5f">
-          <table style="width:100%">
-            <tr><td colspan="2" class="seccion" style="background:#fde8e8">Pasivo Corriente</td></tr>
-            ${PLAN.pc.map(c=>rowR(c.n,val(c.k))).join('')}
-            <tr style="background:#7f1d1d;color:white;font-weight:700"><td style="padding:5px 8px">TOTAL PASIVO CORRIENTE</td><td style="padding:5px 8px;text-align:right">${fmt(totPC)}</td></tr>
-            <tr><td colspan="2" class="seccion" style="background:#fde8e8">Pasivo No Corriente</td></tr>
-            ${PLAN.pnc.map(c=>rowR(c.n,val(c.k))).join('')}
-            <tr style="background:#7f1d1d;color:white;font-weight:700"><td style="padding:5px 8px">TOTAL PASIVO</td><td style="padding:5px 8px;text-align:right">${fmt(totPasivo)}</td></tr>
-            <tr><td colspan="2" class="seccion" style="background:#fef9c3">Patrimonio Neto</td></tr>
-            ${PLAN.pn.map(c=>rowR(c.n,val(c.k))).join('')}
-            ${rowR('Resultado del ejercicio',reEjercicio,false,reEjercicio>=0?'#16a34a':'#dc2626')}
-            <tr style="background:#854d0e;color:white;font-weight:700"><td style="padding:5px 8px">TOTAL PATRIMONIO NETO</td><td style="padding:5px 8px;text-align:right">${fmt(totPN)}</td></tr>
-            <tr style="background:#78350f;color:white;font-weight:900;font-size:13px"><td style="padding:8px">TOTAL PASIVO + PN</td><td style="padding:8px;text-align:right">${fmt(totPasivo+totPN)}</td></tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </td></tr></table>
+  <!-- PÁGINA 1: BALANCE Y RESULTADOS -->
+  <div class="page">
+    <div class="folio">Folio 1</div>
 
-  <div style="margin-top:24px;border-top:2px solid #1e3a5f;padding-top:12px">
-    <table style="width:60%">
-      <tr><th colspan="2">ESTADO DE RESULTADOS — ${emp('cierre')?.slice(0,4)||'202X'}</th></tr>
-      ${rowR('(+) Ventas / Ingresos netos',ventas,false,'#16a34a')}
-      ${rowR('(-) Costo de ventas',-costo,false,'#dc2626')}
-      <tr style="background:#e8f5e9;font-weight:700"><td style="padding:4px 8px">UTILIDAD BRUTA</td><td style="padding:4px 8px;text-align:right;color:${ventas-costo>=0?'#16a34a':'#dc2626'}">${fmt(ventas-costo)}</td></tr>
-      ${rowR('(-) Gastos de administración',-gastosAdm,false,'#dc2626')}
-      ${rowR('(-) Gastos de comercialización',-gastosCom,false,'#dc2626')}
-      ${rowR('Resultados financieros netos',resFin,false,resFin>=0?'#16a34a':'#dc2626')}
-      ${rowR('Otros resultados netos',otrosRes,false,otrosRes>=0?'#16a34a':'#dc2626')}
-      ${rowR('(-) Impuesto a las Ganancias',-val('iigg'),false,'#dc2626')}
-      <tr style="background:#1e3a5f;color:white;font-weight:900;font-size:13px"><td style="padding:8px">${reEjercicio>=0?'GANANCIA':'PÉRDIDA'} DEL EJERCICIO</td><td style="padding:8px;text-align:right">${fmt(reEjercicio)}</td></tr>
-    </table>
-  </div>
+    <!-- ENCABEZADO -->
+    <div class="doc-header">
+      <div class="empresa">${emp('razon')||'RAZÓN SOCIAL S.R.L.'}</div>
+      <div class="datos">CUIT: ${emp('cuit')||'—'} &nbsp;|&nbsp; ${emp('actividad')||'Actividad'} &nbsp;|&nbsp; ${emp('domicilio')||'Domicilio'}</div>
+      <div><span class="titulo-doc">ESTADO DE SITUACIÓN PATRIMONIAL</span></div>
+      <div class="periodo">
+        Ejercicio N° <strong>${emp('ejercicio')||'1'}</strong> &nbsp;·&nbsp;
+        Inicio: <strong>${emp('inicio')||'—'}</strong> &nbsp;·&nbsp;
+        Cierre: <strong>${emp('cierre')||'—'}</strong> &nbsp;·&nbsp;
+        Moneda: <strong>${moneda}</strong>
+      </div>
+    </div>
 
-  <div style="margin-top:40px;font-size:10px;color:#666;border-top:1px solid #ddd;padding-top:8px">
-    Conforme RT N° 8, 9, 16, 17, 26 y 41 FACPCE. Los presentes estados contables son expresión fiel de los registros contables de la sociedad.
-  </div>
-  <div style="display:flex;gap:80px;margin-top:40px">
-    <div><div class="firma">&nbsp;</div><div style="font-size:10px">Firma del representante legal<br>${emp('razon')}</div></div>
-    <div><div class="firma">&nbsp;</div><div style="font-size:10px">${emp('contador')||'Contador Público Nacional'}<br>${emp('matricula')||'Matrícula'}<br>${emp('consejo')||'Consejo Profesional'}</div></div>
+    <!-- BALANCE: DOS COLUMNAS -->
+    <div class="balance-cols">
+      <div class="col-activo">
+        <div class="col-header">A C T I V O</div>
+        <table>
+          ${rSec('Activo Corriente')}
+          ${PLAN.ac.filter(c=>val(c.k)!==0).map(c=>rA(c.n,val(c.k),1)).join('')}
+          ${rTot('Total del Activo Corriente',totAC)}
+          ${rBlank()}
+          ${rSec('Activo No Corriente')}
+          ${PLAN.anc.filter(c=>val(c.k)!==0).map(c=>rA(c.n,c.neg?-val(c.k):val(c.k),1,false,c.neg?'':'') ).join('')}
+          ${rTot('Total del Activo No Corriente',totANC)}
+          ${rBlank()}
+          ${rTot('TOTAL DEL ACTIVO',totActivo,true)}
+        </table>
+      </div>
+      <div class="col-pasivo">
+        <div class="col-header">PASIVO Y PATRIMONIO NETO</div>
+        <table>
+          ${rSec('Pasivo Corriente')}
+          ${PLAN.pc.filter(c=>val(c.k)!==0).map(c=>rA(c.n,val(c.k),1)).join('')}
+          ${rTot('Total del Pasivo Corriente',totPC)}
+          ${rBlank()}
+          ${rSec('Pasivo No Corriente')}
+          ${PLAN.pnc.filter(c=>val(c.k)!==0).map(c=>rA(c.n,val(c.k),1)).join('')}
+          ${rTot('Total del Pasivo No Corriente',totPNC)}
+          ${rBlank()}
+          ${rTot('TOTAL DEL PASIVO',totPasivo)}
+          ${rBlank()}
+          ${rSec('Patrimonio Neto')}
+          ${PLAN.pn.filter(c=>val(c.k)!==0).map(c=>rA(c.n,val(c.k),1)).join('')}
+          ${rA(reEjercicio>=0?'Ganancia del ejercicio':'Pérdida del ejercicio',reEjercicio,1,true,'single')}
+          ${rTot('TOTAL DEL PATRIMONIO NETO',totPN)}
+          ${rBlank()}
+          ${rTot('TOTAL PASIVO + PATRIMONIO NETO',totPasivoPN,true)}
+          <tr><td colspan="2" style="text-align:center;padding:6px 2px">
+            <span class="verif" style="background:${verificado?'#f0fdf4':'#fef2f2'};color:${verificado?'#166534':'#991b1b'};border:1pt solid ${verificado?'#bbf7d0':'#fecaca'}">
+              ${verificado?'✓ Balance cuadra correctamente':'⚠ Verificar — diferencia detectada'}
+            </span>
+          </td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ESTADO DE RESULTADOS -->
+    <div class="estado-res">
+      <h3>Estado de Resultados</h3>
+      <div style="font-size:8.5pt;color:#555;margin-bottom:8px;text-align:center">Período: ${emp('inicio')||'—'} al ${emp('cierre')||'—'}</div>
+      <table style="max-width:580px;margin:0 auto">
+        ${rR('Ventas / Ingresos por servicios',val('ventas'),0,false)}
+        ${val('dev_descuentos')?rR('(-) Devoluciones y descuentos',val('dev_descuentos'),1):''}
+        ${rR('VENTAS NETAS',ventas,0,true,'single')}
+        ${rR('(-) Costo de ventas / Costo del servicio',val('costo_ventas'),1)}
+        ${rR('UTILIDAD (PÉRDIDA) BRUTA',utilBruta,0,true,'single')}
+        ${rR('(-) Gastos de Administración',gastosAdm,1)}
+        ${PLAN.res.filter(c=>c.tipo==='gasto_adm'&&val(c.k)).map(c=>rR(c.n,val(c.k),2)).join('')}
+        ${rR('(-) Gastos de Comercialización',gastosCom,1)}
+        ${PLAN.res.filter(c=>c.tipo==='gasto_com'&&val(c.k)).map(c=>rR(c.n,val(c.k),2)).join('')}
+        ${rR('RESULTADO OPERATIVO',utilBruta-gastosAdm-gastosCom,0,true,'single')}
+        ${resFin?rR('Resultados financieros y por tenencia (netos)',resFin,1):''}
+        ${otrosRes?rR('Otros resultados (netos)',otrosRes,1):''}
+        ${rR('RESULTADO ANTES DE IMPUESTO',utilBruta-gastosAdm-gastosCom+resFin+otrosRes,0,true,'single')}
+        ${val('iigg')?rR('(-) Impuesto a las Ganancias',val('iigg'),1):''}
+        ${rR(reEjercicio>=0?'GANANCIA DEL EJERCICIO':'PÉRDIDA DEL EJERCICIO',reEjercicio,0,true,'double')}
+      </table>
+    </div>
+
+    <!-- CERTIFICACIÓN -->
+    <div class="cert">
+      Los presentes estados contables han sido preparados conforme a las Normas Contables Profesionales Argentinas, en particular las
+      Resoluciones Técnicas N° 8, 9, 16, 17, 26 y 41 de la F.A.C.P.C.E. y las Resoluciones del Consejo Profesional correspondiente.
+      Los mismos son expresión fiel de los registros contables de la sociedad al cierre del ejercicio indicado.
+    </div>
+
+    <div class="firmas">
+      <div class="firma-box">
+        <div style="height:40px"></div>
+        <div class="firma-linea"></div>
+        <div class="firma-text"><strong>Representante Legal</strong><br>${emp('razon')||'Sociedad'}<br>&nbsp;</div>
+      </div>
+      <div class="firma-box">
+        <div style="height:40px"></div>
+        <div class="firma-linea"></div>
+        <div class="firma-text"><strong>${emp('contador')||'Contador Público Nacional'}</strong><br>${emp('matricula')||'Matrícula'}<br>${emp('consejo')||'Consejo Profesional'}</div>
+      </div>
+    </div>
+
+    ${notas?`<div class="notas"><h4>Notas a los Estados Contables</h4>${notas}</div>`:''}
   </div>
 
   <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>
