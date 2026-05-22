@@ -1042,8 +1042,6 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
     <!-- COBROS TAB -->
     <div class="ftab-content" id="ftab-cobros" style="display:none">
-      <div id="cobros-test" style="background:var(--cyan);color:#000;padding:16px;border-radius:8px;margin-bottom:1rem;font-weight:700">✅ MÓDULO CLIENTES Y COBROS CARGADO</div>
-
       <!-- ── CLIENTES ── -->
       <div id="ctab-clientes">
         <div class="metrics-row" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:1rem">
@@ -5462,7 +5460,7 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
     const co = cobros.find(x => x.clientId === c.id);
     const monto = (co?.monto || c.precio || 0).toFixed(2);
     const body = cuerpo.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||'').replace(/\[monto\]/g, monto+' USD').replace(/\[periodo\]/g, periodo).replace(/\[fecha_vencimiento\]/g, cobCurrentPeriod+'-05');
-    const subject = asunto.replace(/\[nombre\]/g, c.nombre).replace(/\[periodo\]/g, periodo).replace(/\[monto\]/g, monto+' USD');
+    const subject = asunto.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||c.nombre).replace(/\[periodo\]/g, periodo).replace(/\[monto\]/g, monto+' USD');
     try { await callAPI('gmail_send', { access_token: tokens.access_token, to: c.email, subject, body }); sent++; } catch(e){}
     this.textContent = `Enviando (${sent}/${targets.length})...`;
     if (targets.length > 1) await new Promise(r => setTimeout(r, 500));
