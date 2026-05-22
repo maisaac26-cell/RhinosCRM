@@ -220,13 +220,17 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   </div>
   <div class="nav">
     <button class="nav-btn active" data-sec="dashboard">Dashboard</button>
-    <button class="nav-grupo-btn" data-grupo="instagram" style="padding:6px 14px;border:none;background:rgba(131,58,180,0.12);border-radius:var(--r);cursor:pointer;font-size:11px;color:#c084fc;font-family:var(--font);letter-spacing:0.05em;text-transform:uppercase;transition:all 0.15s;font-weight:500;border:1px solid rgba(131,58,180,0.3)">📱 Instagram</button>
+    <button class="nav-btn" data-sec="posts">Posts</button>
+    <button class="nav-btn" data-sec="dms">DMs</button>
     <button class="nav-btn" data-sec="gmail">Gmail</button>
+    <button class="nav-btn" data-sec="contenido">Contenido</button>
     <button class="nav-btn" data-sec="calendario">Calendario</button>
-    <button class="nav-grupo-btn" data-grupo="comercial" style="padding:6px 14px;border:none;background:rgba(245,158,11,0.12);border-radius:var(--r);cursor:pointer;font-size:11px;color:#f59e0b;font-family:var(--font);letter-spacing:0.05em;text-transform:uppercase;transition:all 0.15s;font-weight:500;border:1px solid rgba(245,158,11,0.2)">💼 Comercial</button>
+    <button class="nav-btn" data-sec="leads" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.2)">🎯 Leads</button>
+    <button class="nav-btn" data-sec="prospectos">Prospectos</button>
     <button class="nav-btn" data-sec="finanzas" style="background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.2)">💰 Finanzas</button>
     <button class="nav-btn" data-sec="tareas" style="background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.2)">📋 Tareas</button>
     <button class="nav-btn" data-sec="agente">Agente IA</button>
+    <button class="nav-btn" data-sec="presupuestos" style="background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.2)">📄 Presupuestos</button>
     <button class="nav-btn" data-sec="balance" style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.2)">⚖️ Balance</button>
   </div>
   <div id="crm-user"></div>
@@ -6539,77 +6543,6 @@ document.getElementById('btn-balance-print').addEventListener('click', () => {
   </body></html>`);
   win.document.close();
 });
-
-// ══════════════════════════════════════════════════
-// NAVEGACIÓN AGRUPADA — segura, no toca el handler original
-// ══════════════════════════════════════════════════
-const GRUPOS = {
-  instagram: { secs: ['posts','dms','contenido'], labels: { posts:'Posts', dms:'DMs', contenido:'Contenido' }, color:'#c084fc' },
-  comercial:  { secs: ['leads','prospectos','presupuestos'], labels: { leads:'Leads', prospectos:'Prospectos', presupuestos:'Presupuestos' }, color:'#f59e0b' }
-};
-
-// Inyectar sub-nav en cada sección agrupada (una sola vez al cargar)
-function inyectarSubNavs() {
-  Object.entries(GRUPOS).forEach(([grupo, cfg]) => {
-    cfg.secs.forEach(sec => {
-      const s = document.getElementById('s-'+sec);
-      if (!s || s.querySelector('.subnav-grupo')) return;
-      const bar = document.createElement('div');
-      bar.className = 'subnav-grupo';
-      bar.style.cssText = 'display:flex;align-items:center;gap:4px;padding:0 0 14px;margin-bottom:8px;border-bottom:1px solid var(--border);flex-wrap:wrap';
-      bar.innerHTML = `<span style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-right:4px">${grupo==='instagram'?'📱 Instagram':'💼 Comercial'} ›</span>` +
-        cfg.secs.map(k => `<button data-goto-sec="${k}" style="padding:4px 12px;border:1px solid ${k===sec?cfg.color+'66':'var(--border2)'};border-radius:20px;background:${k===sec?`rgba(${grupo==='instagram'?'131,58,180':'245,158,11'},0.1)`:'transparent'};cursor:pointer;font-size:11px;color:${k===sec?cfg.color:'var(--text2)'};font-family:var(--font);transition:all 0.15s">${cfg.labels[k]}</button>`).join('');
-      bar.querySelectorAll('[data-goto-sec]').forEach(btn => {
-        btn.addEventListener('click', () => mostrarSeccionGrupo(grupo, btn.dataset.gotoSec));
-      });
-      s.insertBefore(bar, s.firstChild);
-    });
-  });
-}
-
-function mostrarSeccionGrupo(grupo, sec) {
-  const cfg = GRUPOS[grupo];
-  // Ocultar todas las secciones
-  document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
-  // Mostrar la sección target
-  document.getElementById('s-'+sec).style.display = 'block';
-  // Nav: quitar active de nav-btn y nav-grupo-btn
-  document.querySelectorAll('.nav-btn, .nav-grupo-btn').forEach(b => b.classList.remove('active'));
-  // Marcar el botón de grupo como active
-  document.querySelector(`.nav-grupo-btn[data-grupo="${grupo}"]`)?.classList.add('active');
-  // Actualizar estilos del sub-nav
-  cfg.secs.forEach(k => {
-    const bar = document.querySelector(`#s-${k} .subnav-grupo`);
-    if (!bar) return;
-    bar.querySelectorAll('[data-goto-sec]').forEach(btn => {
-      const isActive = btn.dataset.gotoSec === sec;
-      btn.style.borderColor = isActive ? cfg.color+'66' : 'var(--border2)';
-      btn.style.background = isActive ? `rgba(${grupo==='instagram'?'131,58,180':'245,158,11'},0.1)` : 'transparent';
-      btn.style.color = isActive ? cfg.color : 'var(--text2)';
-    });
-  });
-  // Ejecutar init según sección
-  if (sec === 'posts') loadPostsSide?.();
-  if (sec === 'leads') { if(typeof renderLeads==='function') renderLeads(); }
-}
-
-// Handlers para botones de grupo
-document.querySelectorAll('.nav-grupo-btn').forEach(btn => {
-  btn.addEventListener('click', function() {
-    const grupo = this.dataset.grupo;
-    mostrarSeccionGrupo(grupo, GRUPOS[grupo].secs[0]);
-  });
-});
-
-// Cuando se hace click en un nav-btn normal, quitar active de los grupos
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-grupo-btn').forEach(b => b.classList.remove('active'));
-  });
-});
-
-// Inyectar sub-navs al cargar
-inyectarSubNavs();
 
 // ── GUIDE / TOUR ─────────────────────────────────────
 const GUIDE_STEPS = [
