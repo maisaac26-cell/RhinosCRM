@@ -1405,6 +1405,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-sub">Estados Contables SRL — Plan de Cuentas PCGAr · RT FACPCE</div>
       </div>
       <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" id="btn-balance-sync" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">🔄 Importar desde Finanzas</button>
         <button class="btn btn-sm" id="btn-balance-excel" style="background:rgba(34,197,94,0.12);color:var(--green);border-color:rgba(34,197,94,0.3);font-weight:600">📊 Exportar Excel</button>
         <button class="btn btn-sm" id="btn-balance-print" style="background:rgba(251,191,36,0.12);color:#fbbf24;border-color:rgba(251,191,36,0.3);font-weight:600">🖨 Vista previa PDF</button>
       </div>
@@ -6105,6 +6106,99 @@ document.getElementById('btn-add-nota').addEventListener('click', () => {
 // Nav balance
 document.querySelector('.nav-btn[data-sec="balance"]')?.addEventListener('click', () => {
   loadBalanceDatos();
+});
+
+// ── IMPORTAR DESDE FINANZAS ──────────────────────
+document.getElementById('btn-balance-sync').addEventListener('click', async function() {
+  this.disabled = true; this.textContent = '⏳ Importando...';
+  try {
+    // Cargar transacciones si no están en memoria
+    let txs = finTx;
+    if (!txs || !txs.length) {
+      txs = await sbFetch('rhinos_transactions?order=date.desc');
+    }
+
+    if (!txs || !txs.length) { showToast('No hay transacciones en Finanzas'); return; }
+
+    // Filtrar por año del ejercicio
+    const d = getBalData();
+    const cierre = d['emp_cierre'] || new Date().toISOString().slice(0,10);
+    const anio = cierre.slice(0,4);
+    const inicio = d['emp_inicio'] || `${anio}-01-01`;
+    const txEjercicio = txs.filter(t => t.date >= inicio && t.date <= cierre && t.type !== 'pendiente');
+
+    // Mapeo de categorías → cuentas
+    const catMap = {
+      'Tecnología':       'gasto_software',
+      'Marketing':        'gasto_publicidad',
+      'Honorarios':       'gasto_honorarios',
+      'Legal':            'gasto_honorarios',
+      'Infraestructura':  'gasto_software',
+      'Ventas':           'gasto_ventas',
+      'Otros Gastos':     'gasto_otros_adm',
+    };
+
+    // Acumular por cuenta
+    const acum = {};
+    const add = (k, v) => acum[k] = (acum[k]||0) + Math.abs(+v||0);
+
+    txEjercicio.forEach(t => {
+      const cat = t.category || 'Otros Gastos';
+      const amt = Math.abs(+t.amount||0);
+      if (t.type === 'ingreso') {
+        add('ventas', amt);
+      } else if (t.type === 'gasto') {
+        const key = catMap[cat] || 'gasto_otros_adm';
+        add(key, amt);
+      } else if (t.type === 'inversion') {
+        add('capital_suscripto', amt);
+      }
+    });
+
+    // Saldo acumulado → caja (ingresos - gastos)
+    const totalIngresos = txs.filter(t=>t.type==='ingreso').reduce((a,t)=>a+Math.abs(+t.amount||0),0);
+    const totalGastos = txs.filter(t=>t.type==='gasto').reduce((a,t)=>a+Math.abs(+t.amount||0),0);
+    const saldo = totalIngresos - totalGastos;
+    if (saldo > 0) acum['caja'] = saldo;
+
+    // Cobros de clientes → créditos por ventas (pendientes)
+    const cobros = getCobros ? getCobros() : [];
+    const pendClientes = cobros.filter(c=>c.status==='pendiente'||c.status==='vencido').reduce((a,c)=>a+(+c.monto||0),0);
+    if (pendClientes > 0) acum['cred_ventas'] = pendClientes;
+
+    // Guardar en balance data
+    const balData = getBalData();
+    Object.entries(acum).forEach(([k,v]) => { balData[k] = v; });
+    saveBalData(balData);
+
+    // Re-renderizar si las tabs están activas
+    if (document.getElementById('btab-situacion').style.display !== 'none') {
+      renderBalCuentas(PLAN.ac,'bal-activo-corriente');
+      renderBalCuentas(PLAN.anc,'bal-activo-nocorriente');
+      renderBalCuentas(PLAN.pc,'bal-pasivo-corriente');
+      renderBalCuentas(PLAN.pnc,'bal-pasivo-nocorriente');
+      renderBalCuentas(PLAN.pn,'bal-patrimonio');
+      recalcBalance();
+    }
+    if (document.getElementById('btab-resultados').style.display !== 'none') {
+      renderResultados(); recalcBalance();
+    }
+
+    const cuentasImp = Object.keys(acum).length;
+    showToast(`✅ ${cuentasImp} cuentas importadas desde Finanzas. Revisá y completá el resto manualmente.`);
+
+    // Mostrar resumen de lo importado
+    const info = document.createElement('div');
+    info.style.cssText = 'position:fixed;bottom:4rem;right:1.5rem;background:var(--surface);border:1px solid rgba(0,229,204,0.3);border-radius:var(--rl);padding:16px;max-width:320px;z-index:200;font-size:12px;color:var(--text2)';
+    info.innerHTML = `<div style="font-weight:700;color:var(--cyan);margin-bottom:8px">✓ Importado desde Finanzas</div>
+      ${Object.entries(acum).map(([k,v])=>`<div>• ${PLAN.ac.find(c=>c.k===k)?.n || PLAN.anc.find(c=>c.k===k)?.n || PLAN.res.find(c=>c.k===k)?.n || PLAN.pn.find(c=>c.k===k)?.n || k}: <strong>$${v.toLocaleString('es-AR',{minimumFractionDigits:2})}</strong></div>`).join('')}
+      <div style="margin-top:8px;color:var(--text3);font-size:11px">⚠ Revisá bienes de uso, deudas y ajustes manualmente</div>
+      <button onclick="this.parentNode.remove()" style="margin-top:8px;font-size:11px;padding:3px 8px;border:1px solid var(--border2);border-radius:4px;background:transparent;cursor:pointer;color:var(--text2)">Cerrar</button>`;
+    document.body.appendChild(info);
+    setTimeout(() => info.remove(), 15000);
+
+  } catch(e) { showToast('Error: ' + e.message); }
+  this.disabled = false; this.textContent = '🔄 Importar desde Finanzas';
 });
 
 // ── EXPORT EXCEL ─────────────────────────────────
