@@ -5934,16 +5934,40 @@ function fmtBal(n) {
 
 function renderBalCuentas(planArr, containerId) {
   const data = getBalData();
+  const overrides = data['_overrides'] || {};
   const el = document.getElementById(containerId);
   if (!el) return;
-  el.innerHTML = planArr.map(c => `
+  el.innerHTML = planArr.map(c => {
+    const autoVal = data['_auto_'+c.k];
+    const isAuto = autoVal !== undefined && !overrides[c.k];
+    const val = data[c.k] || '';
+    return `
     <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
       <label style="flex:1;font-size:12px;color:${c.neg?'var(--red)':'var(--text2)'}">${c.n}</label>
-      <input type="number" step="0.01" class="bal-input" data-key="${c.k}" value="${data[c.k]||''}" placeholder="0.00"
-        style="width:130px;font-size:12px;padding:4px 8px;text-align:right;${c.neg?'color:var(--red)':''}"/>
-    </div>`).join('');
+      ${isAuto ? `<span title="Calculado desde Finanzas — click para editar" style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,204,0.15);color:var(--cyan);cursor:pointer;white-space:nowrap" class="bal-auto-badge" data-key="${c.k}">⚡ Auto</span>` : (autoVal!==undefined ? `<span title="Valor manual — click para restaurar auto (${autoVal})" style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(245,158,11,0.15);color:var(--amber);cursor:pointer;white-space:nowrap" class="bal-reset-badge" data-key="${c.k}" data-auto="${autoVal}">↺ Reset</span>` : '')}
+      <input type="number" step="0.01" class="bal-input" data-key="${c.k}" value="${val}" placeholder="0.00"
+        style="width:120px;font-size:12px;padding:4px 8px;text-align:right;${c.neg?'color:var(--red)':''}${isAuto?';border-color:rgba(0,229,204,0.3)':''}"/>
+    </div>`}).join('');
   el.querySelectorAll('.bal-input').forEach(inp => {
-    inp.addEventListener('input', () => { const d=getBalData(); d[inp.dataset.key]=+inp.value||0; saveBalData(d); recalcBalance(); });
+    inp.addEventListener('input', () => {
+      const d=getBalData(); const ov=d['_overrides']||{};
+      d[inp.dataset.key]=+inp.value||0;
+      if (d['_auto_'+inp.dataset.key]!==undefined) ov[inp.dataset.key]=true;
+      d['_overrides']=ov; saveBalData(d); recalcBalance();
+    });
+  });
+  el.querySelectorAll('.bal-reset-badge').forEach(b => {
+    b.addEventListener('click', () => {
+      const d=getBalData(); const ov=d['_overrides']||{};
+      d[b.dataset.key]=+b.dataset.auto; delete ov[b.dataset.key];
+      d['_overrides']=ov; saveBalData(d); renderBalCuentas(planArr,containerId); recalcBalance();
+    });
+  });
+  el.querySelectorAll('.bal-auto-badge').forEach(b => {
+    b.addEventListener('click', () => {
+      const inp = el.querySelector(`.bal-input[data-key="${b.dataset.key}"]`);
+      if (inp) { inp.focus(); inp.select(); }
+    });
   });
 }
 
@@ -5964,16 +5988,33 @@ function renderResultados() {
     const cuentas = PLAN.res.filter(c => g.tipos.includes(c.tipo));
     return `<div style="margin-bottom:8px">
       <div style="font-size:10px;font-weight:700;color:${g.color};text-transform:uppercase;letter-spacing:0.08em;padding:6px 0 2px;border-bottom:1px solid ${g.color}44">${g.label}</div>
-      ${cuentas.map(c => `
+      ${cuentas.map(c => {
+        const autoVal = data['_auto_'+c.k];
+        const overrides = data['_overrides']||{};
+        const isAuto = autoVal !== undefined && !overrides[c.k];
+        return `
         <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
           <label style="flex:1;font-size:12px;color:var(--text2);padding-left:8px">${c.n}</label>
+          ${isAuto ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,204,0.15);color:var(--cyan);cursor:pointer" class="res-auto-badge" data-key="${c.k}" title="Desde Finanzas">⚡ Auto</span>` : (autoVal!==undefined?`<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(245,158,11,0.15);color:var(--amber);cursor:pointer" class="res-reset-badge" data-key="${c.k}" data-auto="${autoVal}" title="Restaurar auto (${autoVal})">↺ Reset</span>`:'') }
           <input type="number" step="0.01" class="res-input" data-key="${c.k}" value="${data[c.k]||''}" placeholder="0.00"
-            style="width:130px;font-size:12px;padding:4px 8px;text-align:right;"/>
-        </div>`).join('')}
+            style="width:120px;font-size:12px;padding:4px 8px;text-align:right;${isAuto?'border-color:rgba(0,229,204,0.3)':''}"/>
+        </div>`}).join('')}
     </div>`;
   }).join('');
   el.querySelectorAll('.res-input').forEach(inp => {
-    inp.addEventListener('input', () => { const d=getBalData(); d[inp.dataset.key]=+inp.value||0; saveBalData(d); recalcBalance(); });
+    inp.addEventListener('input', () => {
+      const d=getBalData(); const ov=d['_overrides']||{};
+      d[inp.dataset.key]=+inp.value||0;
+      if (d['_auto_'+inp.dataset.key]!==undefined) ov[inp.dataset.key]=true;
+      d['_overrides']=ov; saveBalData(d); recalcBalance();
+    });
+  });
+  el.querySelectorAll('.res-reset-badge').forEach(b => {
+    b.addEventListener('click', () => {
+      const d=getBalData(); const ov=d['_overrides']||{};
+      d[b.dataset.key]=+b.dataset.auto; delete ov[b.dataset.key];
+      d['_overrides']=ov; saveBalData(d); renderResultados(); recalcBalance();
+    });
   });
 }
 
@@ -6106,7 +6147,40 @@ document.getElementById('btn-add-nota').addEventListener('click', () => {
 // Nav balance
 document.querySelector('.nav-btn[data-sec="balance"]')?.addEventListener('click', () => {
   loadBalanceDatos();
+  // Auto-sync silencioso desde Finanzas al abrir
+  setTimeout(() => autoSyncBalance(), 300);
 });
+
+async function autoSyncBalance() {
+  try {
+    let txs = (finTx && finTx.length) ? finTx : await sbFetch('rhinos_transactions?order=date.desc');
+    if (!txs || !txs.length) return;
+    const d = getBalData();
+    const cierre = d['emp_cierre'] || new Date().toISOString().slice(0,10);
+    const inicio = d['emp_inicio'] || cierre.slice(0,4)+'-01-01';
+    const catMap = { 'Tecnología':'gasto_software','Marketing':'gasto_publicidad','Honorarios':'gasto_honorarios','Legal':'gasto_honorarios','Infraestructura':'gasto_software','Ventas':'gasto_ventas','Otros Gastos':'gasto_otros_adm' };
+    const txEj = txs.filter(t => t.date >= inicio && t.date <= cierre && t.type !== 'pendiente');
+    const auto = {};
+    txEj.forEach(t => {
+      const amt = Math.abs(+t.amount||0);
+      if (t.type==='ingreso') auto['ventas'] = (auto['ventas']||0) + amt;
+      else if (t.type==='gasto') { const k = catMap[t.category||'']||'gasto_otros_adm'; auto[k] = (auto[k]||0) + amt; }
+      else if (t.type==='inversion') auto['capital_suscripto'] = (auto['capital_suscripto']||0) + amt;
+    });
+    const saldo = txs.filter(t=>t.type==='ingreso').reduce((a,t)=>a+Math.abs(+t.amount||0),0) - txs.filter(t=>t.type==='gasto').reduce((a,t)=>a+Math.abs(+t.amount||0),0);
+    if (saldo > 0) auto['caja'] = saldo;
+    const cobros = typeof getCobros==='function' ? getCobros() : [];
+    const pend = cobros.filter(c=>c.status==='pendiente'||c.status==='vencido').reduce((a,c)=>a+(+c.monto||0),0);
+    if (pend > 0) auto['cred_ventas'] = pend;
+    // Guardar valores AUTO (solo si no hay override manual)
+    const overrides = d['_overrides'] || {};
+    Object.entries(auto).forEach(([k,v]) => { if (!overrides[k]) d[k] = v; d['_auto_'+k] = v; });
+    saveBalData(d);
+    // Re-renderizar si tab activa
+    if (document.getElementById('btab-resultados')?.style.display !== 'none') { renderResultados(); recalcBalance(); }
+    if (document.getElementById('btab-situacion')?.style.display !== 'none') { renderBalCuentas(PLAN.ac,'bal-activo-corriente'); renderBalCuentas(PLAN.anc,'bal-activo-nocorriente'); renderBalCuentas(PLAN.pc,'bal-pasivo-corriente'); renderBalCuentas(PLAN.pnc,'bal-pasivo-nocorriente'); renderBalCuentas(PLAN.pn,'bal-patrimonio'); recalcBalance(); }
+  } catch(e) { console.warn('Auto-sync balance:', e.message); }
+}
 
 // ── IMPORTAR DESDE FINANZAS ──────────────────────
 document.getElementById('btn-balance-sync').addEventListener('click', async function() {
