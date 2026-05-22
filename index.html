@@ -19,20 +19,27 @@
 }
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
-/* TOPBAR */
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100}
-.logo{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:0.04em;display:flex;align-items:center;gap:8px}
+/* SIDEBAR */
+.topbar{background:var(--surface);border-right:1px solid var(--border);width:220px;position:fixed;top:0;left:0;height:100vh;z-index:100;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+.topbar::-webkit-scrollbar{width:3px}.topbar::-webkit-scrollbar-thumb{background:var(--border2)}
+.sidebar-header{padding:20px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:0.04em;display:flex;align-items:center;gap:8px}
 .logo-accent{color:var(--cyan)}
-.logo-badge{font-size:10px;background:rgba(0,229,204,0.1);color:var(--cyan);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-family:var(--font);font-weight:500;letter-spacing:0.06em;text-transform:uppercase}
-.nav{display:flex;gap:2px}
-.nav-btn{padding:6px 14px;border:none;background:transparent;border-radius:var(--r);cursor:pointer;font-size:11px;color:var(--text2);font-family:var(--font);letter-spacing:0.05em;text-transform:uppercase;transition:all 0.15s;font-weight:500}
+.logo-badge{display:none}
+.sidebar-user{padding:10px 16px 8px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text3);flex-shrink:0}
+.nav{display:flex;flex-direction:column;gap:1px;padding:8px 8px 16px;flex:1}
+.nav-group-label{font-size:9px;font-weight:700;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;padding:12px 8px 4px;margin-top:4px}
+.nav-group-label:first-child{padding-top:4px}
+.nav-btn{padding:8px 12px;border:none;background:transparent;border-radius:var(--r);cursor:pointer;font-size:12px;color:var(--text2);font-family:var(--font);letter-spacing:0.02em;text-transform:none;transition:all 0.15s;font-weight:400;text-align:left;display:flex;align-items:center;gap:8px;width:100%}
 .nav-btn:hover{color:var(--text);background:var(--surface2)}
-.nav-btn.active{background:rgba(0,229,204,0.1);color:var(--cyan);border:1px solid var(--border)}
+.nav-btn.active{background:rgba(0,229,204,0.1);color:var(--cyan);border:1px solid rgba(0,229,204,0.15)}
+.nav-btn .nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
 .status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
-/* LAYOUT */
-.wrap{max-width:1200px;margin:0 auto;padding:1.5rem 1.25rem 5rem}
+/* LAYOUT — contenido desplazado a la derecha del sidebar */
+.wrap{max-width:none;margin-left:220px;padding:1.5rem 1.5rem 5rem}
 .section{display:none}.section.active{display:block}
 .page-title{font-family:var(--display);font-size:40px;font-weight:800;letter-spacing:0.02em;line-height:1;text-transform:uppercase;margin-bottom:4px}
 .page-title span{color:var(--cyan)}
@@ -213,28 +220,50 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 </div>
 
 <div class="topbar" id="app-topbar" style="display:none">
-  <div class="logo">
-    <span class="logo-accent">🦏</span>
-    <span>RHINOS</span>
-    <span class="logo-badge">CRM Marketing</span>
+
+  <!-- Logo -->
+  <div class="sidebar-header">
+    <div class="logo">
+      <span class="logo-accent">🦏</span>
+      <span>RHINOS</span>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:3px;letter-spacing:0.06em;text-transform:uppercase">CRM Marketing</div>
   </div>
+
+  <!-- Navegación agrupada -->
   <div class="nav">
-    <button class="nav-btn active" data-sec="dashboard">Dashboard</button>
-    <button class="nav-btn" data-sec="posts">Posts</button>
-    <button class="nav-btn" data-sec="dms">DMs</button>
-    <button class="nav-btn" data-sec="gmail">Gmail</button>
-    <button class="nav-btn" data-sec="contenido">Contenido</button>
-    <button class="nav-btn" data-sec="calendario">Calendario</button>
-    <button class="nav-btn" data-sec="leads" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.2)">🎯 Leads</button>
-    <button class="nav-btn" data-sec="prospectos">Prospectos</button>
-    <button class="nav-btn" data-sec="finanzas" style="background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.2)">💰 Finanzas</button>
-    <button class="nav-btn" data-sec="tareas" style="background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.2)">📋 Tareas</button>
-    <button class="nav-btn" data-sec="agente">Agente IA</button>
-    <button class="nav-btn" data-sec="presupuestos" style="background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.2)">📄 Presupuestos</button>
-    <button class="nav-btn" data-sec="balance" style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.2)">⚖️ Balance</button>
+
+    <div class="nav-group-label">General</div>
+    <button class="nav-btn active" data-sec="dashboard"><span class="nav-icon">📊</span>Dashboard</button>
+
+    <div class="nav-group-label">Instagram</div>
+    <button class="nav-btn" data-sec="posts"><span class="nav-icon">📸</span>Posts</button>
+    <button class="nav-btn" data-sec="dms"><span class="nav-icon">💬</span>DMs</button>
+    <button class="nav-btn" data-sec="contenido"><span class="nav-icon">🎨</span>Contenido</button>
+    <button class="nav-btn" data-sec="gmail"><span class="nav-icon">📧</span>Gmail</button>
+    <button class="nav-btn" data-sec="calendario"><span class="nav-icon">📅</span>Calendario</button>
+
+    <div class="nav-group-label">Comercial</div>
+    <button class="nav-btn" data-sec="leads"><span class="nav-icon">🎯</span>Leads</button>
+    <button class="nav-btn" data-sec="prospectos"><span class="nav-icon">🔍</span>Prospectos</button>
+    <button class="nav-btn" data-sec="presupuestos"><span class="nav-icon">📄</span>Presupuestos</button>
+
+    <div class="nav-group-label">Finanzas</div>
+    <button class="nav-btn" data-sec="finanzas"><span class="nav-icon">💰</span>Finanzas</button>
+    <button class="nav-btn" data-sec="balance"><span class="nav-icon">⚖️</span>Balance</button>
+
+    <div class="nav-group-label">Operaciones</div>
+    <button class="nav-btn" data-sec="tareas"><span class="nav-icon">📋</span>Tareas</button>
+    <button class="nav-btn" data-sec="agente"><span class="nav-icon">🤖</span>Agente IA</button>
+
   </div>
-  <div id="crm-user"></div>
-  <button id="btn-guide" onclick="startGuide()" style="margin-left:8px;width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;display:none;flex-shrink:0" title="Guía de uso">?</button>
+
+  <!-- Footer del sidebar -->
+  <div class="sidebar-footer">
+    <div id="crm-user" style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></div>
+    <button id="btn-guide" onclick="startGuide()" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;display:none;flex-shrink:0" title="Guía de uso">?</button>
+  </div>
+
 </div>
 
 <!-- GUIDE OVERLAY -->
