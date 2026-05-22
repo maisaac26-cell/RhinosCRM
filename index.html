@@ -231,6 +231,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <button class="nav-btn" data-sec="tareas" style="background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.2)">📋 Tareas</button>
     <button class="nav-btn" data-sec="agente">Agente IA</button>
     <button class="nav-btn" data-sec="presupuestos" style="background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.2)">📄 Presupuestos</button>
+    <button class="nav-btn" data-sec="balance" style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.2)">⚖️ Balance</button>
   </div>
   <div id="crm-user"></div>
   <button id="btn-guide" onclick="startGuide()" style="margin-left:8px;width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;display:none;flex-shrink:0" title="Guía de uso">?</button>
@@ -1393,6 +1394,161 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
     </div> <!-- /ptab-nuevo -->
   </div>
+
+  <!-- ══════════════════════════════════════════════════
+       BALANCE GENERAL SRL — ESTADOS CONTABLES ARGENTINA
+  ══════════════════════════════════════════════════ -->
+  <div class="section" id="s-balance">
+    <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">BALAN<span>CE</span></div>
+        <div class="page-sub">Estados Contables SRL — Plan de Cuentas PCGAr · RT FACPCE</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" id="btn-balance-excel" style="background:rgba(34,197,94,0.12);color:var(--green);border-color:rgba(34,197,94,0.3);font-weight:600">📊 Exportar Excel</button>
+        <button class="btn btn-sm" id="btn-balance-print" style="background:rgba(251,191,36,0.12);color:#fbbf24;border-color:rgba(251,191,36,0.3);font-weight:600">🖨 Vista previa PDF</button>
+      </div>
+    </div>
+
+    <div class="tab-row" id="balance-tabs">
+      <button class="tab-btn active" data-btab="empresa">🏢 Datos empresa</button>
+      <button class="tab-btn" data-btab="situacion">⚖️ Situación Patrimonial</button>
+      <button class="tab-btn" data-btab="resultados">📈 Estado de Resultados</button>
+      <button class="tab-btn" data-btab="notas">📝 Notas</button>
+    </div>
+
+    <!-- TAB: DATOS EMPRESA -->
+    <div class="btab-content" id="btab-empresa">
+      <div class="grid2" style="gap:1rem">
+        <div class="card">
+          <div class="card-title">Datos de la sociedad</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="field" style="grid-column:1/-1"><label>Razón Social</label><input id="bal-razon" placeholder="Ej: RhinosApp S.R.L."/></div>
+            <div class="field"><label>CUIT</label><input id="bal-cuit" placeholder="30-12345678-9"/></div>
+            <div class="field"><label>Actividad principal (CIIU)</label><input id="bal-actividad" placeholder="Ej: 6201 — Servicios de software"/></div>
+            <div class="field" style="grid-column:1/-1"><label>Domicilio legal</label><input id="bal-domicilio" placeholder="Av. Corrientes 1234, CABA"/></div>
+            <div class="field"><label>Capital social inscripto ($)</label><input id="bal-capital-inscripto" type="number" placeholder="0"/></div>
+            <div class="field"><label>N° de socios</label><input id="bal-nsocios" type="number" placeholder="2"/></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Período y contador</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="field"><label>Ejercicio N°</label><input id="bal-ejercicio" type="number" placeholder="1"/></div>
+            <div class="field"><label>Inicio del ejercicio</label><input id="bal-inicio" type="date"/></div>
+            <div class="field"><label>Cierre del ejercicio</label><input id="bal-cierre" type="date"/></div>
+            <div class="field"><label>Moneda de presentación</label>
+              <select id="bal-moneda"><option value="ARS">$ ARS — Pesos argentinos</option><option value="USD">USD — Dólares</option></select>
+            </div>
+            <div class="field" style="grid-column:1/-1"><label>Contador certificante</label><input id="bal-contador" placeholder="Dr/Dra. Nombre Apellido, CPN"/></div>
+            <div class="field"><label>Matrícula profesional</label><input id="bal-matricula" placeholder="T° XX F° XXX CPCE"/></div>
+            <div class="field"><label>Consejo Profesional</label><input id="bal-consejo" placeholder="CPCE CABA / CPBA..."/></div>
+          </div>
+          <button class="btn btn-cyan btn-full" id="btn-guardar-empresa" style="margin-top:8px">Guardar datos</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: SITUACIÓN PATRIMONIAL -->
+    <div class="btab-content" id="btab-situacion" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+
+        <!-- ACTIVO -->
+        <div>
+          <div style="font-family:var(--display);font-size:16px;font-weight:800;color:var(--cyan);text-transform:uppercase;letter-spacing:0.05em;padding:10px 0;border-bottom:2px solid var(--cyan);margin-bottom:8px">ACTIVO</div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.1em;padding:8px 0 4px">Activo Corriente</div>
+          <div id="bal-activo-corriente"></div>
+          <div class="bal-subtotal" style="display:flex;justify-content:space-between;padding:6px 8px;background:rgba(0,229,204,0.08);border-radius:4px;margin:6px 0;font-weight:600;font-size:13px">
+            <span style="color:var(--cyan)">Total Activo Corriente</span>
+            <span style="color:var(--cyan)" id="tot-ac">$ 0</span>
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.1em;padding:8px 0 4px;margin-top:8px">Activo No Corriente</div>
+          <div id="bal-activo-nocorriente"></div>
+          <div class="bal-subtotal" style="display:flex;justify-content:space-between;padding:6px 8px;background:rgba(0,229,204,0.08);border-radius:4px;margin:6px 0;font-weight:600;font-size:13px">
+            <span style="color:var(--cyan)">Total Activo No Corriente</span>
+            <span style="color:var(--cyan)" id="tot-anc">$ 0</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;padding:10px 12px;background:rgba(0,229,204,0.15);border:2px solid var(--cyan);border-radius:var(--r);margin-top:8px;font-family:var(--display);font-size:16px;font-weight:800">
+            <span style="color:var(--cyan)">TOTAL ACTIVO</span>
+            <span style="color:var(--cyan)" id="tot-activo">$ 0</span>
+          </div>
+        </div>
+
+        <!-- PASIVO + PN -->
+        <div>
+          <div style="font-family:var(--display);font-size:16px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:0.05em;padding:10px 0;border-bottom:2px solid var(--red);margin-bottom:8px">PASIVO</div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.1em;padding:8px 0 4px">Pasivo Corriente</div>
+          <div id="bal-pasivo-corriente"></div>
+          <div class="bal-subtotal" style="display:flex;justify-content:space-between;padding:6px 8px;background:rgba(239,68,68,0.08);border-radius:4px;margin:6px 0;font-weight:600;font-size:13px">
+            <span style="color:var(--red)">Total Pasivo Corriente</span>
+            <span style="color:var(--red)" id="tot-pc">$ 0</span>
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.1em;padding:8px 0 4px;margin-top:8px">Pasivo No Corriente</div>
+          <div id="bal-pasivo-nocorriente"></div>
+          <div class="bal-subtotal" style="display:flex;justify-content:space-between;padding:6px 8px;background:rgba(239,68,68,0.08);border-radius:4px;margin:6px 0;font-weight:600;font-size:13px">
+            <span style="color:var(--red)">Total Pasivo No Corriente</span>
+            <span style="color:var(--red)" id="tot-pnc">$ 0</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(239,68,68,0.1);border-radius:4px;margin:4px 0;font-weight:700;font-size:13px">
+            <span style="color:var(--red)">TOTAL PASIVO</span>
+            <span style="color:var(--red)" id="tot-pasivo">$ 0</span>
+          </div>
+
+          <div style="font-family:var(--display);font-size:15px;font-weight:800;color:#fbbf24;text-transform:uppercase;letter-spacing:0.05em;padding:10px 0;border-bottom:2px solid #fbbf24;margin:12px 0 8px">PATRIMONIO NETO</div>
+          <div id="bal-patrimonio"></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(251,191,36,0.1);border-radius:4px;margin:4px 0;font-weight:700;font-size:13px">
+            <span style="color:#fbbf24">TOTAL PATRIMONIO NETO</span>
+            <span style="color:#fbbf24" id="tot-pn">$ 0</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;padding:10px 12px;background:rgba(251,191,36,0.15);border:2px solid #fbbf24;border-radius:var(--r);margin-top:8px;font-family:var(--display);font-size:16px;font-weight:800">
+            <span style="color:#fbbf24">TOTAL PASIVO + PN</span>
+            <span style="color:#fbbf24" id="tot-pasivo-pn">$ 0</span>
+          </div>
+
+          <!-- Verificación -->
+          <div id="bal-verificacion" style="margin-top:8px;padding:8px 12px;border-radius:4px;font-size:12px;font-weight:600;text-align:center"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: ESTADO DE RESULTADOS -->
+    <div class="btab-content" id="btab-resultados" style="display:none">
+      <div style="max-width:700px">
+        <div style="font-family:var(--display);font-size:16px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:0.05em;padding:10px 0;border-bottom:2px solid var(--green);margin-bottom:8px">ESTADO DE RESULTADOS</div>
+        <div id="bal-resultados-body"></div>
+        <div style="display:flex;justify-content:space-between;padding:12px 16px;border:2px solid var(--green);border-radius:var(--r);margin-top:12px;font-family:var(--display);font-size:18px;font-weight:800">
+          <span id="res-label" style="color:var(--green)">RESULTADO DEL EJERCICIO</span>
+          <span id="tot-resultado" style="color:var(--green)">$ 0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: NOTAS -->
+    <div class="btab-content" id="btab-notas" style="display:none">
+      <div class="card">
+        <div class="card-title">Notas a los Estados Contables</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Las notas son parte integrante de los estados contables. Conforme RT N° 8, 9, 17 y 41 FACPCE.</div>
+        <div style="display:flex;flex-direction:column;gap:10px" id="notas-lista">
+          <div class="nota-item" data-nota="1"><label style="font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase">Nota 1 — Criterios de valuación y exposición</label><textarea class="nota-texto" placeholder="Descripción de los criterios contables aplicados..." rows="3" style="width:100%;margin-top:4px"></textarea></div>
+          <div class="nota-item" data-nota="2"><label style="font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase">Nota 2 — Bienes de uso y depreciaciones</label><textarea class="nota-texto" placeholder="Método de depreciación, tasas anuales aplicadas..." rows="3" style="width:100%;margin-top:4px"></textarea></div>
+          <div class="nota-item" data-nota="3"><label style="font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase">Nota 3 — Composición del capital social</label><textarea class="nota-texto" placeholder="Cuotas partes, valor nominal, socios..." rows="3" style="width:100%;margin-top:4px"></textarea></div>
+          <div class="nota-item" data-nota="4"><label style="font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase">Nota 4 — Contingencias y compromisos</label><textarea class="nota-texto" placeholder="Juicios, garantías, pasivos contingentes..." rows="3" style="width:100%;margin-top:4px"></textarea></div>
+          <div class="nota-item" data-nota="5"><label style="font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase">Nota 5 — Hechos posteriores al cierre</label><textarea class="nota-texto" placeholder="Eventos relevantes ocurridos después del cierre del ejercicio..." rows="3" style="width:100%;margin-top:4px"></textarea></div>
+        </div>
+        <button class="btn btn-cyan btn-sm" style="margin-top:12px" id="btn-add-nota">+ Agregar nota</button>
+        <button class="btn btn-sm" style="margin-top:8px;margin-left:6px" id="btn-save-notas">💾 Guardar notas</button>
+      </div>
+    </div>
+
+  </div>
+  <!-- FIN BALANCE -->
 
 </div>
 
@@ -5660,6 +5816,459 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
 document.querySelector('.tab-btn[data-ftab="cobros"]').addEventListener('click', () => {
   renderClientes();
   renderClientStats();
+});
+
+// ══════════════════════════════════════════════════
+// BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
+// Plan de Cuentas PCGAr — RT FACPCE
+// ══════════════════════════════════════════════════
+const BAL_KEY = 'rhinos_balance';
+
+const PLAN = {
+  // ── ACTIVO CORRIENTE ──
+  ac: [
+    { k:'caja', n:'Caja' },
+    { k:'banco_cc', n:'Banco c/c' },
+    { k:'banco_ca', n:'Banco caja de ahorro' },
+    { k:'fondo_fijo', n:'Fondo fijo' },
+    { k:'inv_temp', n:'Inversiones temporarias (Plazos fijos, FCI)' },
+    { k:'cred_ventas', n:'Créditos por ventas' },
+    { k:'doc_cobrar', n:'Documentos a cobrar' },
+    { k:'otros_creditos_c', n:'Otros créditos corrientes' },
+    { k:'iva_cf', n:'IVA — Crédito fiscal' },
+    { k:'ret_percepciones', n:'Retenciones y percepciones a favor' },
+    { k:'anticipo_iigg', n:'Anticipo Impuesto a las Ganancias' },
+    { k:'bienes_cambio_merc', n:'Bienes de cambio — Mercaderías' },
+    { k:'bienes_cambio_pt', n:'Bienes de cambio — Productos terminados' },
+    { k:'bienes_cambio_mp', n:'Bienes de cambio — Materias primas' },
+    { k:'gastos_adelantados', n:'Gastos pagados por adelantado' },
+  ],
+  // ── ACTIVO NO CORRIENTE ──
+  anc: [
+    { k:'creditos_lp', n:'Créditos a largo plazo' },
+    { k:'inv_permanentes', n:'Inversiones permanentes (participaciones)' },
+    { k:'rodados', n:'Rodados (valor origen)', grupo:'uso' },
+    { k:'rodados_am', n:'(-) Amortiz. acumul. rodados', neg:true },
+    { k:'muebles', n:'Muebles y útiles (valor origen)', grupo:'uso' },
+    { k:'muebles_am', n:'(-) Amortiz. acumul. muebles y útiles', neg:true },
+    { k:'instalaciones', n:'Instalaciones (valor origen)', grupo:'uso' },
+    { k:'instalaciones_am', n:'(-) Amortiz. acumul. instalaciones', neg:true },
+    { k:'inmuebles', n:'Inmuebles (valor origen)', grupo:'uso' },
+    { k:'inmuebles_am', n:'(-) Amortiz. acumul. inmuebles', neg:true },
+    { k:'maquinarias', n:'Maquinarias y equipos (valor origen)', grupo:'uso' },
+    { k:'maquinarias_am', n:'(-) Amortiz. acumul. maquinarias', neg:true },
+    { k:'equipos_computo', n:'Equipos de computación (valor origen)', grupo:'uso' },
+    { k:'equipos_computo_am', n:'(-) Amortiz. acumul. equipos computación', neg:true },
+    { k:'intangibles', n:'Activos intangibles (llaves, marcas, software)' },
+    { k:'intangibles_am', n:'(-) Amortiz. acumul. intangibles', neg:true },
+    { k:'otros_anc', n:'Otros activos no corrientes' },
+  ],
+  // ── PASIVO CORRIENTE ──
+  pc: [
+    { k:'proveedores', n:'Proveedores' },
+    { k:'doc_pagar', n:'Documentos a pagar' },
+    { k:'prestamos_bc_cp', n:'Préstamos bancarios c/p' },
+    { k:'iva_pagar', n:'IVA — Débito fiscal a pagar' },
+    { k:'iigg_pagar', n:'Impuesto a las Ganancias a pagar' },
+    { k:'iibb_pagar', n:'Ingresos Brutos a pagar' },
+    { k:'cargas_sociales', n:'Cargas sociales a pagar (SIPA, Obra Social)' },
+    { k:'remuneraciones', n:'Remuneraciones a pagar' },
+    { k:'sueldo_anual_comp', n:'SAC (Sueldo Anual Complementario) a pagar' },
+    { k:'vac_pagar', n:'Vacaciones a pagar' },
+    { k:'anticipo_clientes', n:'Anticipos de clientes' },
+    { k:'dividendos_pagar', n:'Dividendos a pagar' },
+    { k:'otras_deudas_c', n:'Otras deudas corrientes' },
+    { k:'previsiones_c', n:'Previsiones corrientes' },
+  ],
+  // ── PASIVO NO CORRIENTE ──
+  pnc: [
+    { k:'prestamos_bc_lp', n:'Préstamos bancarios a largo plazo' },
+    { k:'otras_deudas_lp', n:'Otras deudas no corrientes' },
+    { k:'previsiones_nc', n:'Previsiones no corrientes (indemnizaciones)' },
+  ],
+  // ── PATRIMONIO NETO ──
+  pn: [
+    { k:'capital_suscripto', n:'Capital suscripto e integrado' },
+    { k:'ajuste_capital', n:'Ajuste integral de capital (inflación)' },
+    { k:'aportes_irrev', n:'Aportes irrevocables a capitalizar' },
+    { k:'reserva_legal', n:'Reserva legal (5% — Art. 70 Ley 19.550)' },
+    { k:'reserva_facultativa', n:'Reserva facultativa' },
+    { k:'res_no_asignados', n:'Resultados no asignados (ejercicios anteriores)' },
+  ],
+  // ── ESTADO DE RESULTADOS ──
+  res: [
+    { k:'ventas', n:'Ventas / Ingresos por servicios', tipo:'ingreso' },
+    { k:'dev_descuentos', n:'(-) Devoluciones y descuentos sobre ventas', tipo:'descuento' },
+    { k:'costo_ventas', n:'(-) Costo de ventas / Costo del servicio', tipo:'costo' },
+    { k:'gasto_sueldos', n:'Sueldos y cargas sociales', tipo:'gasto_adm' },
+    { k:'gasto_honorarios', n:'Honorarios profesionales', tipo:'gasto_adm' },
+    { k:'gasto_alquiler', n:'Alquileres', tipo:'gasto_adm' },
+    { k:'gasto_servicios', n:'Servicios públicos (luz, gas, internet)', tipo:'gasto_adm' },
+    { k:'gasto_software', n:'Suscripciones y software', tipo:'gasto_adm' },
+    { k:'gasto_depreciacion', n:'Depreciaciones y amortizaciones', tipo:'gasto_adm' },
+    { k:'gasto_papeleria', n:'Papelería y útiles de oficina', tipo:'gasto_adm' },
+    { k:'gasto_seguros', n:'Seguros', tipo:'gasto_adm' },
+    { k:'gasto_cbtes', n:'Gastos de representación', tipo:'gasto_adm' },
+    { k:'gasto_otros_adm', n:'Otros gastos de administración', tipo:'gasto_adm' },
+    { k:'gasto_publicidad', n:'Publicidad y marketing', tipo:'gasto_com' },
+    { k:'gasto_ventas', n:'Gastos de ventas y comisiones', tipo:'gasto_com' },
+    { k:'gasto_otros_com', n:'Otros gastos de comercialización', tipo:'gasto_com' },
+    { k:'res_fin_positivos', n:'Resultados financieros positivos (intereses ganados)', tipo:'fin_pos' },
+    { k:'res_fin_negativos', n:'(-) Resultados financieros negativos (intereses pagados)', tipo:'fin_neg' },
+    { k:'dif_cambio_pos', n:'Diferencia de cambio positiva', tipo:'fin_pos' },
+    { k:'dif_cambio_neg', n:'(-) Diferencia de cambio negativa', tipo:'fin_neg' },
+    { k:'otros_ing', n:'Otros ingresos (no operativos)', tipo:'otro_pos' },
+    { k:'otros_eg', n:'(-) Otros egresos (no operativos)', tipo:'otro_neg' },
+    { k:'iigg', n:'(-) Impuesto a las Ganancias del ejercicio', tipo:'impuesto' },
+  ]
+};
+
+function getBalData() { try { return JSON.parse(localStorage.getItem(BAL_KEY)||'{}'); } catch(e){ return {}; } }
+function saveBalData(d) { localStorage.setItem(BAL_KEY, JSON.stringify(d)); }
+function fmtBal(n) {
+  const abs = Math.abs(n||0);
+  const s = abs.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 ? '-' : '') + '$ ' + s;
+}
+
+function renderBalCuentas(planArr, containerId) {
+  const data = getBalData();
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = planArr.map(c => `
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+      <label style="flex:1;font-size:12px;color:${c.neg?'var(--red)':'var(--text2)'}">${c.n}</label>
+      <input type="number" step="0.01" class="bal-input" data-key="${c.k}" value="${data[c.k]||''}" placeholder="0.00"
+        style="width:130px;font-size:12px;padding:4px 8px;text-align:right;${c.neg?'color:var(--red)':''}"/>
+    </div>`).join('');
+  el.querySelectorAll('.bal-input').forEach(inp => {
+    inp.addEventListener('input', () => { const d=getBalData(); d[inp.dataset.key]=+inp.value||0; saveBalData(d); recalcBalance(); });
+  });
+}
+
+function renderResultados() {
+  const data = getBalData();
+  const el = document.getElementById('bal-resultados-body');
+  if (!el) return;
+  const grupos = [
+    { label: 'Ingresos por ventas / servicios', tipos: ['ingreso','descuento'], color:'var(--green)' },
+    { label: 'Costo de ventas', tipos: ['costo'], color:'var(--red)' },
+    { label: 'Gastos de administración', tipos: ['gasto_adm'], color:'var(--amber)' },
+    { label: 'Gastos de comercialización', tipos: ['gasto_com'], color:'var(--amber)' },
+    { label: 'Resultados financieros', tipos: ['fin_pos','fin_neg'], color:'#818cf8' },
+    { label: 'Otros resultados', tipos: ['otro_pos','otro_neg'], color:'var(--text2)' },
+    { label: 'Impuesto a las Ganancias', tipos: ['impuesto'], color:'var(--red)' },
+  ];
+  el.innerHTML = grupos.map(g => {
+    const cuentas = PLAN.res.filter(c => g.tipos.includes(c.tipo));
+    return `<div style="margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;color:${g.color};text-transform:uppercase;letter-spacing:0.08em;padding:6px 0 2px;border-bottom:1px solid ${g.color}44">${g.label}</div>
+      ${cuentas.map(c => `
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+          <label style="flex:1;font-size:12px;color:var(--text2);padding-left:8px">${c.n}</label>
+          <input type="number" step="0.01" class="res-input" data-key="${c.k}" value="${data[c.k]||''}" placeholder="0.00"
+            style="width:130px;font-size:12px;padding:4px 8px;text-align:right;"/>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.res-input').forEach(inp => {
+    inp.addEventListener('input', () => { const d=getBalData(); d[inp.dataset.key]=+inp.value||0; saveBalData(d); recalcBalance(); });
+  });
+}
+
+function recalcBalance() {
+  const d = getBalData();
+  const sum = keys => keys.reduce((a,k) => a + (+d[k]||0), 0);
+  const neg = keys => keys.filter(k=>k.endsWith('_am')||d[k]<0).reduce((a,k)=>a+(+d[k]||0),0);
+
+  const acKeys = PLAN.ac.map(c=>c.k);
+  const ancKeys = PLAN.anc.map(c=>c.k);
+  const pcKeys = PLAN.pc.map(c=>c.k);
+  const pncKeys = PLAN.pnc.map(c=>c.k);
+  const pnKeys = PLAN.pn.map(c=>c.k);
+
+  const totAC = sum(acKeys);
+  const totANC = PLAN.anc.reduce((a,c) => a + (c.neg ? -(+d[c.k]||0) : (+d[c.k]||0)), 0);
+  const totActivo = totAC + totANC;
+  const totPC = sum(pcKeys);
+  const totPNC = sum(pncKeys);
+  const totPasivo = totPC + totPNC;
+
+  // Resultado del ejercicio
+  const ventas = (+d.ventas||0) - (+d.dev_descuentos||0);
+  const costo = +d.costo_ventas||0;
+  const utilBruta = ventas - costo;
+  const gastosAdm = PLAN.res.filter(c=>c.tipo==='gasto_adm').reduce((a,c)=>a+(+d[c.k]||0),0);
+  const gastosCom = PLAN.res.filter(c=>c.tipo==='gasto_com').reduce((a,c)=>a+(+d[c.k]||0),0);
+  const resFin = PLAN.res.filter(c=>c.tipo==='fin_pos').reduce((a,c)=>a+(+d[c.k]||0),0)
+              - PLAN.res.filter(c=>c.tipo==='fin_neg').reduce((a,c)=>a+(+d[c.k]||0),0);
+  const otrosRes = PLAN.res.filter(c=>c.tipo==='otro_pos').reduce((a,c)=>a+(+d[c.k]||0),0)
+                - PLAN.res.filter(c=>c.tipo==='otro_neg').reduce((a,c)=>a+(+d[c.k]||0),0);
+  const iigg = +d.iigg||0;
+  const resultadoEjercicio = utilBruta - gastosAdm - gastosCom + resFin + otrosRes - iigg;
+
+  const totPN = sum(pnKeys) + resultadoEjercicio;
+  const totPasivoPN = totPasivo + totPN;
+
+  const fmt = fmtBal;
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.textContent=fmt(val); };
+  set('tot-ac', totAC);
+  set('tot-anc', totANC);
+  set('tot-activo', totActivo);
+  set('tot-pc', totPC);
+  set('tot-pnc', totPNC);
+  set('tot-pasivo', totPasivo);
+  set('tot-pn', totPN);
+  set('tot-pasivo-pn', totPasivoPN);
+  set('tot-resultado', resultadoEjercicio);
+
+  const resLabel = document.getElementById('res-label');
+  if (resLabel) { resLabel.textContent = resultadoEjercicio >= 0 ? 'RESULTADO DEL EJERCICIO (Ganancia)' : 'RESULTADO DEL EJERCICIO (Pérdida)'; resLabel.style.color = resultadoEjercicio >= 0 ? 'var(--green)' : 'var(--red)'; }
+  const resEl = document.getElementById('tot-resultado');
+  if (resEl) resEl.style.color = resultadoEjercicio >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // Verificación
+  const verEl = document.getElementById('bal-verificacion');
+  if (verEl) {
+    const diff = Math.abs(totActivo - totPasivoPN);
+    if (totActivo === 0 && totPasivoPN === 0) { verEl.style.display='none'; }
+    else if (diff < 0.01) {
+      verEl.style.display='block'; verEl.style.background='rgba(34,197,94,0.1)'; verEl.style.color='var(--green)';
+      verEl.innerHTML = '✓ Balance cuadra: Activo = Pasivo + PN';
+    } else {
+      verEl.style.display='block'; verEl.style.background='rgba(239,68,68,0.1)'; verEl.style.color='var(--red)';
+      verEl.innerHTML = `⚠ Diferencia: ${fmt(totActivo - totPasivoPN)} — revisá los importes`;
+    }
+  }
+}
+
+function loadBalanceDatos() {
+  const d = getBalData();
+  ['razon','cuit','actividad','domicilio','capital-inscripto','nsocios','ejercicio','inicio','cierre','moneda','contador','matricula','consejo'].forEach(id => {
+    const el = document.getElementById('bal-'+id);
+    if (el && d['emp_'+id]) el.value = d['emp_'+id];
+  });
+}
+
+// Tabs Balance
+document.querySelectorAll('.tab-btn[data-btab]').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn[data-btab]').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    document.querySelectorAll('.btab-content').forEach(c => c.style.display='none');
+    const tab = this.dataset.btab;
+    document.getElementById('btab-'+tab).style.display = 'block';
+    if (tab === 'situacion') { renderBalCuentas(PLAN.ac,'bal-activo-corriente'); renderBalCuentas(PLAN.anc,'bal-activo-nocorriente'); renderBalCuentas(PLAN.pc,'bal-pasivo-corriente'); renderBalCuentas(PLAN.pnc,'bal-pasivo-nocorriente'); renderBalCuentas(PLAN.pn,'bal-patrimonio'); recalcBalance(); }
+    if (tab === 'resultados') { renderResultados(); recalcBalance(); }
+    if (tab === 'notas') loadNotasBalance();
+    if (tab === 'empresa') loadBalanceDatos();
+  });
+});
+
+// Guardar datos empresa
+document.getElementById('btn-guardar-empresa').addEventListener('click', () => {
+  const d = getBalData();
+  ['razon','cuit','actividad','domicilio','capital-inscripto','nsocios','ejercicio','inicio','cierre','moneda','contador','matricula','consejo'].forEach(id => {
+    const el = document.getElementById('bal-'+id);
+    if (el) d['emp_'+id] = el.value;
+  });
+  saveBalData(d);
+  showToast('Datos guardados 🦏');
+});
+
+// Notas
+function loadNotasBalance() {
+  const d = getBalData();
+  document.querySelectorAll('.nota-texto').forEach(ta => {
+    const nota = ta.closest('.nota-item')?.dataset.nota;
+    if (nota && d['nota_'+nota]) ta.value = d['nota_'+nota];
+  });
+}
+document.getElementById('btn-save-notas').addEventListener('click', () => {
+  const d = getBalData();
+  document.querySelectorAll('.nota-item').forEach(item => {
+    const nota = item.dataset.nota;
+    const ta = item.querySelector('.nota-texto');
+    if (nota && ta) d['nota_'+nota] = ta.value;
+  });
+  saveBalData(d); showToast('Notas guardadas 🦏');
+});
+let notaCount = 5;
+document.getElementById('btn-add-nota').addEventListener('click', () => {
+  notaCount++;
+  const div = document.createElement('div');
+  div.className = 'nota-item'; div.dataset.nota = notaCount;
+  div.innerHTML = `<label style="font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase">Nota ${notaCount} — <input placeholder="Título de la nota" style="font-size:11px;background:transparent;border:none;border-bottom:1px solid var(--border2);color:var(--cyan);width:200px"/></label><textarea class="nota-texto" rows="3" style="width:100%;margin-top:4px" placeholder="Contenido..."></textarea>`;
+  document.getElementById('notas-lista').appendChild(div);
+});
+
+// Nav balance
+document.querySelector('.nav-btn[data-sec="balance"]')?.addEventListener('click', () => {
+  loadBalanceDatos();
+});
+
+// ── EXPORT EXCEL ─────────────────────────────────
+document.getElementById('btn-balance-excel').addEventListener('click', () => {
+  const d = getBalData();
+  const emp = k => d['emp_'+k]||'';
+  const val = k => +d[k]||0;
+  const fmtXL = n => n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  const rows = [];
+  const add = (cols, bold=false, bg='') => rows.push({cols, bold, bg});
+
+  add([`ESTADO DE SITUACIÓN PATRIMONIAL`, '', ''], true, '#1e3a5f');
+  add([`${emp('razon')} — CUIT: ${emp('cuit')}`, '', ''], true);
+  add([`Ejercicio N° ${emp('ejercicio')} | Cierre: ${emp('cierre')}`, '', ''], false);
+  add(['', '', '']);
+  add(['ACTIVO', '', 'PASIVO Y PATRIMONIO NETO'], true, '#0d2137');
+
+  // Build side-by-side rows
+  const acRows = PLAN.ac.map(c=>({n:c.n, v:val(c.k)}));
+  const ancRows = PLAN.anc.map(c=>({n:c.n, v:c.neg?-val(c.k):val(c.k)}));
+  const pcRows = PLAN.pc.map(c=>({n:c.n, v:val(c.k)}));
+  const pncRows = PLAN.pnc.map(c=>({n:c.n, v:val(c.k)}));
+  const pnRows = PLAN.pn.map(c=>({n:c.n, v:val(c.k)}));
+
+  add(['Activo Corriente','','Pasivo Corriente'], true);
+  const maxLen = Math.max(acRows.length+ancRows.length+2, pcRows.length+pncRows.length+pnRows.length+3);
+  const left = [...acRows.map(r=>[r.n, fmtXL(r.v)]), ['TOTAL AC', fmtXL(acRows.reduce((a,r)=>a+r.v,0))], ...ancRows.map(r=>[r.n, fmtXL(r.v)]), ['TOTAL ANC', fmtXL(ancRows.reduce((a,r)=>a+r.v,0))]];
+  const right = [...pcRows.map(r=>[r.n, fmtXL(r.v)]), ['TOTAL PC', fmtXL(pcRows.reduce((a,r)=>a+r.v,0))], ...pncRows.map(r=>[r.n, fmtXL(r.v)]), ['TOTAL PNC', fmtXL(pncRows.reduce((a,r)=>a+r.v,0))], ...pnRows.map(r=>[r.n, fmtXL(r.v)])];
+  for (let i=0; i<Math.max(left.length, right.length); i++) {
+    const l = left[i]||['',''];
+    const r = right[i]||['',''];
+    add([l[0], l[1], r[0], r[1]]);
+  }
+
+  // CSV generation
+  const csv = rows.map(r => r.cols.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+
+  // Results sheet
+  let csvRes = '"ESTADO DE RESULTADOS"\n';
+  csvRes += `"${emp('razon')} — Ejercicio cerrado: ${emp('cierre')}"\n\n`;
+  csvRes += '"Cuenta","Importe"\n';
+  PLAN.res.forEach(c => { csvRes += `"${c.n}","${fmtXL(val(c.k))}"\n`; });
+
+  const fullCsv = '"=== ESTADO DE SITUACIÓN PATRIMONIAL ==="\n\n' + csv + '\n\n"=== ESTADO DE RESULTADOS ==="\n\n' + csvRes;
+
+  const blob = new Blob(['﻿'+fullCsv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `Balance_${emp('razon')||'SRL'}_${emp('cierre')||'2026'}.csv`;
+  a.click();
+  showToast('Excel descargado 🦏');
+});
+
+// ── VISTA PREVIA PDF ──────────────────────────────
+document.getElementById('btn-balance-print').addEventListener('click', () => {
+  const d = getBalData();
+  const emp = k => d['emp_'+k]||'';
+  const val = k => +d[k]||0;
+  const fmt = n => '$ '+Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const negStyle = 'color:#dc2626';
+
+  // Recalculate totals
+  const totAC = PLAN.ac.reduce((a,c)=>a+val(c.k),0);
+  const totANC = PLAN.anc.reduce((a,c)=>a+(c.neg?-val(c.k):val(c.k)),0);
+  const totActivo = totAC + totANC;
+  const totPC = PLAN.pc.reduce((a,c)=>a+val(c.k),0);
+  const totPNC = PLAN.pnc.reduce((a,c)=>a+val(c.k),0);
+  const totPasivo = totPC+totPNC;
+  const ventas = val('ventas')-val('dev_descuentos');
+  const costo = val('costo_ventas');
+  const gastosAdm = PLAN.res.filter(c=>c.tipo==='gasto_adm').reduce((a,c)=>a+val(c.k),0);
+  const gastosCom = PLAN.res.filter(c=>c.tipo==='gasto_com').reduce((a,c)=>a+val(c.k),0);
+  const resFin = PLAN.res.filter(c=>c.tipo==='fin_pos').reduce((a,c)=>a+val(c.k),0)-PLAN.res.filter(c=>c.tipo==='fin_neg').reduce((a,c)=>a+val(c.k),0);
+  const otrosRes = PLAN.res.filter(c=>c.tipo==='otro_pos').reduce((a,c)=>a+val(c.k),0)-PLAN.res.filter(c=>c.tipo==='otro_neg').reduce((a,c)=>a+val(c.k),0);
+  const reEjercicio = ventas-costo-gastosAdm-gastosCom+resFin+otrosRes-val('iigg');
+  const totPN = PLAN.pn.reduce((a,c)=>a+val(c.k),0)+reEjercicio;
+
+  const rowR = (label, val, bold=false, color='#111') => `<tr><td style="padding:3px 8px;font-size:11px;${bold?'font-weight:700':''}">${label}</td><td style="padding:3px 8px;text-align:right;font-size:11px;${bold?'font-weight:700':''}color:${color}">${fmt(val)}</td></tr>`;
+
+  const win = window.open('','_blank','width=900,height:700');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Balance — ${emp('razon')}</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:11px;color:#111;margin:0;padding:20px;background:white}
+    .header{text-align:center;border-bottom:2px solid #1e3a5f;padding-bottom:12px;margin-bottom:16px}
+    .titulo{font-size:18px;font-weight:900;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px}
+    .sub{font-size:12px;color:#444;margin-top:3px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#1e3a5f;color:white;padding:6px 8px;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:0.5px}
+    tr:nth-child(even){background:#f8f9fa}
+    .seccion{background:#e8f0fe;font-weight:700;font-size:11px;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px}
+    .total-row{background:#1e3a5f;color:white;font-weight:700}
+    .firma{border-top:1px solid #aaa;width:200px;text-align:center;padding-top:4px;margin-top:40px;font-size:10px}
+    @media print{body{margin:0}@page{margin:15mm;size:A4}}
+  </style></head><body>
+  <div class="header">
+    <div class="titulo">${emp('razon') || 'RAZÓN SOCIAL S.R.L.'}</div>
+    <div class="sub">CUIT: ${emp('cuit')} | Actividad: ${emp('actividad')}</div>
+    <div class="sub">${emp('domicilio')}</div>
+    <div class="sub" style="font-weight:700;margin-top:4px">ESTADO DE SITUACIÓN PATRIMONIAL — EJERCICIO N° ${emp('ejercicio')}</div>
+    <div class="sub">Inicio: ${emp('inicio')} | Cierre: ${emp('cierre')}</div>
+  </div>
+
+  <table style="margin-bottom:20px">
+  <tr><th style="width:50%">ACTIVO</th><th style="width:50%;background:#7f1d1d">PASIVO Y PATRIMONIO NETO</th></tr>
+  <tr><td colspan="2" style="padding:0">
+    <table style="width:100%">
+      <tr>
+        <td style="width:50%;vertical-align:top;padding:0">
+          <table style="width:100%">
+            <tr><td colspan="2" class="seccion">Activo Corriente</td></tr>
+            ${PLAN.ac.map(c=>rowR(c.n,val(c.k))).join('')}
+            <tr class="total-row"><td style="padding:5px 8px">TOTAL ACTIVO CORRIENTE</td><td style="padding:5px 8px;text-align:right">${fmt(totAC)}</td></tr>
+            <tr><td colspan="2" class="seccion" style="margin-top:8px">Activo No Corriente</td></tr>
+            ${PLAN.anc.map(c=>rowR(c.n,c.neg?-val(c.k):val(c.k),false,c.neg?'#dc2626':'#111')).join('')}
+            <tr class="total-row"><td style="padding:5px 8px">TOTAL ACTIVO NO CORRIENTE</td><td style="padding:5px 8px;text-align:right">${fmt(totANC)}</td></tr>
+            <tr style="background:#1e3a5f;color:white;font-weight:900;font-size:13px"><td style="padding:8px">TOTAL ACTIVO</td><td style="padding:8px;text-align:right">${fmt(totActivo)}</td></tr>
+          </table>
+        </td>
+        <td style="width:50%;vertical-align:top;padding:0;border-left:2px solid #1e3a5f">
+          <table style="width:100%">
+            <tr><td colspan="2" class="seccion" style="background:#fde8e8">Pasivo Corriente</td></tr>
+            ${PLAN.pc.map(c=>rowR(c.n,val(c.k))).join('')}
+            <tr style="background:#7f1d1d;color:white;font-weight:700"><td style="padding:5px 8px">TOTAL PASIVO CORRIENTE</td><td style="padding:5px 8px;text-align:right">${fmt(totPC)}</td></tr>
+            <tr><td colspan="2" class="seccion" style="background:#fde8e8">Pasivo No Corriente</td></tr>
+            ${PLAN.pnc.map(c=>rowR(c.n,val(c.k))).join('')}
+            <tr style="background:#7f1d1d;color:white;font-weight:700"><td style="padding:5px 8px">TOTAL PASIVO</td><td style="padding:5px 8px;text-align:right">${fmt(totPasivo)}</td></tr>
+            <tr><td colspan="2" class="seccion" style="background:#fef9c3">Patrimonio Neto</td></tr>
+            ${PLAN.pn.map(c=>rowR(c.n,val(c.k))).join('')}
+            ${rowR('Resultado del ejercicio',reEjercicio,false,reEjercicio>=0?'#16a34a':'#dc2626')}
+            <tr style="background:#854d0e;color:white;font-weight:700"><td style="padding:5px 8px">TOTAL PATRIMONIO NETO</td><td style="padding:5px 8px;text-align:right">${fmt(totPN)}</td></tr>
+            <tr style="background:#78350f;color:white;font-weight:900;font-size:13px"><td style="padding:8px">TOTAL PASIVO + PN</td><td style="padding:8px;text-align:right">${fmt(totPasivo+totPN)}</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </td></tr></table>
+
+  <div style="margin-top:24px;border-top:2px solid #1e3a5f;padding-top:12px">
+    <table style="width:60%">
+      <tr><th colspan="2">ESTADO DE RESULTADOS — ${emp('cierre')?.slice(0,4)||'202X'}</th></tr>
+      ${rowR('(+) Ventas / Ingresos netos',ventas,false,'#16a34a')}
+      ${rowR('(-) Costo de ventas',-costo,false,'#dc2626')}
+      <tr style="background:#e8f5e9;font-weight:700"><td style="padding:4px 8px">UTILIDAD BRUTA</td><td style="padding:4px 8px;text-align:right;color:${ventas-costo>=0?'#16a34a':'#dc2626'}">${fmt(ventas-costo)}</td></tr>
+      ${rowR('(-) Gastos de administración',-gastosAdm,false,'#dc2626')}
+      ${rowR('(-) Gastos de comercialización',-gastosCom,false,'#dc2626')}
+      ${rowR('Resultados financieros netos',resFin,false,resFin>=0?'#16a34a':'#dc2626')}
+      ${rowR('Otros resultados netos',otrosRes,false,otrosRes>=0?'#16a34a':'#dc2626')}
+      ${rowR('(-) Impuesto a las Ganancias',-val('iigg'),false,'#dc2626')}
+      <tr style="background:#1e3a5f;color:white;font-weight:900;font-size:13px"><td style="padding:8px">${reEjercicio>=0?'GANANCIA':'PÉRDIDA'} DEL EJERCICIO</td><td style="padding:8px;text-align:right">${fmt(reEjercicio)}</td></tr>
+    </table>
+  </div>
+
+  <div style="margin-top:40px;font-size:10px;color:#666;border-top:1px solid #ddd;padding-top:8px">
+    Conforme RT N° 8, 9, 16, 17, 26 y 41 FACPCE. Los presentes estados contables son expresión fiel de los registros contables de la sociedad.
+  </div>
+  <div style="display:flex;gap:80px;margin-top:40px">
+    <div><div class="firma">&nbsp;</div><div style="font-size:10px">Firma del representante legal<br>${emp('razon')}</div></div>
+    <div><div class="firma">&nbsp;</div><div style="font-size:10px">${emp('contador')||'Contador Público Nacional'}<br>${emp('matricula')||'Matrícula'}<br>${emp('consejo')||'Consejo Profesional'}</div></div>
+  </div>
+
+  <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>
+  </body></html>`);
+  win.document.close();
 });
 
 // ── GUIDE / TOUR ─────────────────────────────────────
