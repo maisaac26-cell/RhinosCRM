@@ -5219,11 +5219,16 @@ function renderClientes() {
         <td style="padding:8px;text-align:right;font-weight:600;color:var(--green)">$${(+c.precio||0).toFixed(2)} USD</td>
         <td style="padding:8px;text-align:center"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.estado==='activo'?'rgba(34,197,94,0.12)':c.estado==='pausado'?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)'};color:${c.estado==='activo'?'var(--green)':c.estado==='pausado'?'var(--amber)':'var(--red)'}">${c.estado}</span></td>
         <td style="padding:8px;display:flex;gap:4px">
+          <button class="btn btn-sm" data-cuenta-cli="${c.id}" style="color:var(--green);padding:3px 10px;border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.08)">📋 Cuenta</button>
           <button class="btn btn-sm" data-edit-cli="${c.id}" style="color:var(--cyan);padding:3px 8px;border-color:rgba(0,229,204,0.2)">✏</button>
           <button class="btn btn-sm" data-del-cli="${c.id}" style="color:var(--red);padding:3px 8px">✕</button>
         </td>
       </tr>`).join('')}
     </tbody></table>`;
+  list.querySelectorAll('[data-cuenta-cli]').forEach(btn => {
+    btn.addEventListener('click', function() { openCuentaCorriente(this.dataset.cuentaCli); });
+  });
+
   list.querySelectorAll('[data-edit-cli]').forEach(btn => {
     btn.addEventListener('click', function() {
       const c = getClients().find(x => x.id === this.dataset.editCli);
@@ -5248,6 +5253,148 @@ function renderClientes() {
     });
   });
   renderClientStats();
+}
+
+function openCuentaCorriente(clientId) {
+  const client = getClients().find(c => c.id === clientId);
+  if (!client) return;
+  const allCobros = getCobros().filter(c => c.clientId === clientId).sort((a,b) => b.periodo.localeCompare(a.periodo));
+
+  const totalPagado = allCobros.filter(c => c.status === 'pagado').reduce((a,c) => a + (+c.monto||0), 0);
+  const totalPendiente = allCobros.filter(c => c.status === 'pendiente' || c.status === 'vencido').reduce((a,c) => a + (+c.monto||0), 0);
+  const totalReembolso = allCobros.filter(c => c.status === 'reembolso').reduce((a,c) => a + (+c.monto||0), 0);
+  const balance = totalPagado - totalReembolso;
+
+  const statusStyle = {
+    pagado: { bg:'rgba(34,197,94,0.12)', color:'var(--green)', label:'✓ Pagado' },
+    pendiente: { bg:'rgba(245,158,11,0.12)', color:'var(--amber)', label:'⏳ Pendiente' },
+    vencido: { bg:'rgba(239,68,68,0.12)', color:'var(--red)', label:'⚠ Vencido' },
+    reembolso: { bg:'rgba(99,102,241,0.12)', color:'#818cf8', label:'↩ Reembolso' },
+    sin_generar: { bg:'rgba(75,85,99,0.2)', color:'var(--text3)', label:'— Sin datos' }
+  };
+
+  const existing = document.getElementById('modal-cuenta');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-cuenta';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid rgba(34,197,94,0.3);border-radius:16px;padding:24px;width:100%;max-width:700px;max-height:85vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+        <div>
+          <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--text)">${client.nombre}</div>
+          <div style="font-size:13px;color:var(--text3)">${client.empresa||'—'} · ${client.email}</div>
+        </div>
+        <button onclick="document.getElementById('modal-cuenta').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:4px">✕</button>
+      </div>
+
+      <!-- Métricas resumen -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+        <div style="background:var(--surface2);border-radius:var(--r);padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Precio/mes</div>
+          <div style="font-size:18px;font-weight:700;color:var(--cyan)">$${(+client.precio||0).toFixed(0)} USD</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:var(--r);padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Total cobrado</div>
+          <div style="font-size:18px;font-weight:700;color:var(--green)">$${totalPagado.toFixed(2)}</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:var(--r);padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Pendiente</div>
+          <div style="font-size:18px;font-weight:700;color:var(--amber)">$${totalPendiente.toFixed(2)}</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:var(--r);padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Balance neto</div>
+          <div style="font-size:18px;font-weight:700;color:${balance >= 0 ? 'var(--green)' : 'var(--red)'}">$${balance.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <!-- Agregar movimiento manual -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;font-weight:600">+ Agregar movimiento manual</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="field" style="margin:0;flex:1;min-width:120px"><label style="font-size:10px">Tipo</label>
+            <select id="cc-tipo" style="font-size:12px;padding:6px 8px">
+              <option value="pagado">✓ Pago recibido</option>
+              <option value="reembolso">↩ Reembolso</option>
+              <option value="pendiente">⏳ Cargo pendiente</option>
+              <option value="vencido">⚠ Cargo vencido</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;flex:1;min-width:100px"><label style="font-size:10px">Período</label>
+            <input id="cc-periodo" type="month" value="${cobCurrentPeriod}" style="font-size:12px;padding:6px 8px"/></div>
+          <div class="field" style="margin:0;flex:1;min-width:100px"><label style="font-size:10px">Monto (USD)</label>
+            <input id="cc-monto" type="number" value="${client.precio||0}" step="0.01" style="font-size:12px;padding:6px 8px"/></div>
+          <div class="field" style="margin:0;flex:2;min-width:140px"><label style="font-size:10px">Descripción</label>
+            <input id="cc-desc" placeholder="Ej: Pago adelantado, ajuste..." style="font-size:12px;padding:6px 8px"/></div>
+          <button class="btn btn-green btn-sm" id="btn-add-movimiento" style="margin-bottom:2px">+ Agregar</button>
+        </div>
+      </div>
+
+      <!-- Historial -->
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;font-weight:600">Historial de movimientos</div>
+      <div id="cc-historial">
+        ${allCobros.length === 0 ? '<div class="empty">Sin movimientos registrados aún. Generá los cobros del mes desde la sección de Cobros.</div>' :
+          `<table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:6px 8px;color:var(--text2);font-size:11px">Período</th>
+              <th style="text-align:left;padding:6px 8px;color:var(--text2);font-size:11px">Estado</th>
+              <th style="text-align:right;padding:6px 8px;color:var(--text2);font-size:11px">Monto</th>
+              <th style="text-align:left;padding:6px 8px;color:var(--text2);font-size:11px">Fecha pago</th>
+              <th style="padding:6px 8px"></th>
+            </tr></thead>
+            <tbody>${allCobros.map(co => {
+              const s = statusStyle[co.status] || statusStyle.sin_generar;
+              return `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px;font-weight:500;color:var(--text)">${cobPeriodLabel(co.periodo)}</td>
+                <td style="padding:8px"><span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${s.bg};color:${s.color}">${s.label}</span></td>
+                <td style="padding:8px;text-align:right;font-weight:600;color:${co.status === 'pagado' ? 'var(--green)' : co.status === 'reembolso' ? '#818cf8' : 'var(--amber)'}">
+                  ${co.status === 'reembolso' ? '-' : '+'}$${(+co.monto||0).toFixed(2)}</td>
+                <td style="padding:8px;color:var(--text3);font-size:12px">${co.fechaPago||'—'}</td>
+                <td style="padding:8px"><button class="btn btn-sm" data-del-cobro="${co.clientId}-${co.periodo}" style="color:var(--red);padding:2px 7px;font-size:10px">✕</button></td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>`
+        }
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+  // Agregar movimiento
+  document.getElementById('btn-add-movimiento').addEventListener('click', async function() {
+    const tipo = document.getElementById('cc-tipo').value;
+    const periodo = document.getElementById('cc-periodo').value;
+    const monto = +document.getElementById('cc-monto').value || 0;
+    if (!periodo || !monto) { showToast('Completá período y monto'); return; }
+    const cobros = getCobros();
+    const today = new Date().toISOString().slice(0,10);
+    const idx = cobros.findIndex(c => c.clientId === clientId && c.periodo === periodo);
+    const newCobro = { clientId, periodo, status: tipo, monto, fechaPago: tipo === 'pagado' ? today : null };
+    if (idx >= 0) cobros[idx] = newCobro; else cobros.push(newCobro);
+    saveCobros(cobros);
+    // Si es pago, registrar en Finanzas
+    if (tipo === 'pagado') {
+      try { await sbFetch('rhinos_transactions','POST',{ type:'ingreso', amount:monto, date:today, description:`Suscripción — ${client.nombre} (${cobPeriodLabel(periodo)})`, category:'Ventas', partner:'empresa', notes:'Cobro mensual', currency:'USD'}); } catch(e){}
+    }
+    showToast('Movimiento registrado 🦏');
+    modal.remove();
+    openCuentaCorriente(clientId);
+    renderClientStats();
+  });
+
+  // Eliminar movimiento
+  modal.querySelectorAll('[data-del-cobro]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (!confirm('¿Eliminar este movimiento?')) return;
+      const [cid, periodo] = this.dataset.delCobro.split('-').reduce((acc, part, i) => i === 0 ? [part, ''] : [acc[0], acc[1] + (acc[1]?'-':'') + part], ['','']);
+      saveCobros(getCobros().filter(c => !(c.clientId === cid && c.periodo === periodo)));
+      modal.remove();
+      openCuentaCorriente(clientId);
+      renderClientStats();
+    });
+  });
 }
 
 function renderCobrosPeriodo() {
