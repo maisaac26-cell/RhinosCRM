@@ -122,6 +122,22 @@ module.exports = async function handler(req, res) {
       result = { imageBase64: imgBuffer.toString('base64'), mime: 'image/png' };
     }
 
+    else if (action === 'get_tipo_cambio') {
+      try {
+        const data = await httpGet('https://api.bluelytics.com.ar/v2/latest');
+        result = {
+          oficial_compra: data.oficial?.value_buy || null,
+          oficial_venta: data.oficial?.value_sell || null,
+          blue_compra: data.blue?.value_buy || null,
+          blue_venta: data.blue?.value_sell || null,
+          fecha: data.last_update || new Date().toISOString(),
+          fuente: 'Banco Nación Argentina'
+        };
+      } catch(e) {
+        result = { error: 'No se pudo obtener cotización: ' + e.message };
+      }
+    }
+
     else if (action === 'supabase_proxy') {
       const { endpoint, method: m = 'GET', body: b } = body;
       const SB_URL_P = 'https://konbqkvrcnxzpltxjdyj.supabase.co';

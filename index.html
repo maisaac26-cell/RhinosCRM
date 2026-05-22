@@ -884,9 +884,35 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- FINANZAS -->
   <div class="section" id="s-finanzas">
-    <div class="section-header">
-      <div class="page-title">FIN<span>ANZAS</span></div>
-      <div class="page-sub">Contabilidad, socios y proyecciones de RhinosApp.</div>
+    <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">FIN<span>ANZAS</span></div>
+        <div class="page-sub">Contabilidad, socios y proyecciones de RhinosApp.</div>
+      </div>
+      <!-- TIPO DE CAMBIO CARD -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 14px;min-width:260px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.08em">🇦🇷 Tipo de Cambio</span>
+          <button class="btn btn-sm" id="btn-fetch-tc" style="font-size:10px;padding:2px 8px">⟳ Banco Nación</button>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div>
+            <div style="font-size:9px;color:var(--text3);margin-bottom:2px">USD → ARS (Oficial)</div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span style="font-size:11px;color:var(--text3)">$</span>
+              <input id="tc-oficial" type="number" step="0.01" placeholder="0.00" style="width:80px;font-size:14px;font-weight:700;color:var(--cyan);background:transparent;border:none;border-bottom:1px solid var(--border2);padding:2px 0;outline:none"/>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--text3);margin-bottom:2px">Blue</div>
+            <div style="font-size:13px;font-weight:600;color:var(--amber)" id="tc-blue-display">—</div>
+          </div>
+          <div style="margin-left:auto">
+            <div style="font-size:9px;color:var(--text3)" id="tc-fecha">Sin datos</div>
+            <button class="btn btn-sm btn-green" id="btn-save-tc" style="margin-top:3px;font-size:10px;padding:2px 8px">Guardar</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- SUB TABS -->
@@ -1136,7 +1162,15 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <div class="field" style="margin:0"><label>Nombre</label><input id="cli-nombre" placeholder="Juan García"/></div>
               <div class="field" style="margin:0"><label>Empresa</label><input id="cli-empresa" placeholder="Distribuidora El Sol SRL"/></div>
               <div class="field" style="margin:0"><label>Email</label><input id="cli-email" type="email" placeholder="juan@empresa.com"/></div>
-              <div class="field" style="margin:0"><label>Precio mensual (USD)</label><input id="cli-precio" type="number" placeholder="0" step="0.01"/></div>
+              <div class="field" style="margin:0"><label>Precio mensual</label>
+                <div style="display:flex;gap:4px">
+                  <input id="cli-precio" type="number" placeholder="0" step="0.01" style="flex:1"/>
+                  <select id="cli-moneda" style="width:70px;font-size:12px;padding:6px 4px">
+                    <option value="USD">USD</option>
+                    <option value="ARS">ARS</option>
+                  </select>
+                </div>
+              </div>
               <div class="field" style="margin:0"><label>Fecha inicio</label><input id="cli-inicio" type="date"/></div>
               <div class="field" style="margin:0"><label>Estado</label>
                 <select id="cli-estado">
@@ -5337,6 +5371,72 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
 }
+// ── TIPO DE CAMBIO ───────────────────────────────────
+const TC_KEY = 'rhinos_tipo_cambio';
+
+function getTc() {
+  try { return JSON.parse(localStorage.getItem(TC_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveTc(obj) { localStorage.setItem(TC_KEY, JSON.stringify(obj)); }
+function getTcOficial() { return +getTc().oficial || 1; }
+
+// Convertir monto a ARS según moneda
+function toARS(monto, moneda) {
+  if (!moneda || moneda === 'ARS') return +monto || 0;
+  return (+monto || 0) * getTcOficial();
+}
+function fmtMoneda(monto, moneda) {
+  const m = moneda || 'USD';
+  const s = (+monto||0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${m === 'USD' ? 'USD ' : '$ '}${s}`;
+}
+function fmtARS(monto) {
+  return '$ ' + (+monto||0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function loadTcUI() {
+  const tc = getTc();
+  const inp = document.getElementById('tc-oficial');
+  const blue = document.getElementById('tc-blue-display');
+  const fecha = document.getElementById('tc-fecha');
+  if (inp && tc.oficial) inp.value = tc.oficial;
+  if (blue) blue.textContent = tc.blue ? `$ ${(+tc.blue).toLocaleString('es-AR', {minimumFractionDigits:2})}` : '—';
+  if (fecha && tc.fecha) fecha.textContent = 'Actualizado: ' + new Date(tc.fecha).toLocaleDateString('es-AR');
+}
+
+document.getElementById('btn-fetch-tc')?.addEventListener('click', async function() {
+  this.disabled = true; this.textContent = '⏳';
+  try {
+    const r = await callAPI('get_tipo_cambio', {});
+    if (r.error) throw new Error(r.error);
+    const tc = getTc();
+    tc.oficial = r.oficial_venta || r.oficial_compra;
+    tc.blue = r.blue_venta || r.blue_compra;
+    tc.fecha = r.fecha;
+    tc.fuente = r.fuente;
+    saveTc(tc);
+    loadTcUI();
+    showToast(`✅ TC Banco Nación: $ ${tc.oficial} 🦏`);
+  } catch(e) { showToast('Error: ' + e.message); }
+  this.disabled = false; this.textContent = '⟳ Banco Nación';
+});
+
+document.getElementById('btn-save-tc')?.addEventListener('click', () => {
+  const val = +document.getElementById('tc-oficial').value;
+  if (!val) { showToast('Ingresá el tipo de cambio'); return; }
+  const tc = getTc();
+  tc.oficial = val;
+  tc.fecha = new Date().toISOString();
+  tc.fuente = 'Manual';
+  saveTc(tc);
+  loadTcUI();
+  showToast(`TC guardado: $ ${val} ARS/USD 🦏`);
+});
+
+// Cargar TC al abrir Finanzas
+document.querySelector('.nav-btn[data-sec="finanzas"]')?.addEventListener('click', loadTcUI);
+loadTcUI();
+
 // ── CLIENTES & COBROS ────────────────────────────────
 const CLIENTS_KEY = 'rhinos_clients';
 const COBROS_KEY  = 'rhinos_cobros';
@@ -5379,13 +5479,20 @@ function cobPeriodLabel(p) {
 function renderClientStats() {
   const clients = getClients().filter(c => c.estado === 'activo');
   const cobros = getCobros().filter(c => c.periodo === cobCurrentPeriod);
-  const mrr = clients.reduce((a,c) => a + (+c.precio||0), 0);
-  const cobrado = cobros.filter(c => c.status === 'pagado').reduce((a,c) => a + (+c.monto||0), 0);
-  const pendiente = cobros.filter(c => c.status !== 'pagado' && c.status !== 'cancelado').reduce((a,c) => a + (+c.monto||0), 0);
+  // MRR en ARS (conversión automática)
+  const mrrARS = clients.reduce((a,c) => a + toARS(c.precio, c.moneda||'USD'), 0);
+  const cobradoARS = cobros.filter(c => c.status === 'pagado').reduce((a,c) => {
+    const cli = clients.find(x => x.id === c.clientId);
+    return a + toARS(c.monto, cli?.moneda||'USD');
+  }, 0);
+  const pendienteARS = cobros.filter(c => c.status !== 'pagado' && c.status !== 'cancelado').reduce((a,c) => {
+    const cli = clients.find(x => x.id === c.clientId);
+    return a + toARS(c.monto, cli?.moneda||'USD');
+  }, 0);
   document.getElementById('cob-total-clientes').textContent = clients.length;
-  document.getElementById('cob-mrr').textContent = '$'+mrr.toFixed(2);
-  document.getElementById('cob-cobrado').textContent = '$'+cobrado.toFixed(2);
-  document.getElementById('cob-pendiente').textContent = '$'+pendiente.toFixed(2);
+  document.getElementById('cob-mrr').textContent = fmtARS(mrrARS);
+  document.getElementById('cob-cobrado').textContent = fmtARS(cobradoARS);
+  document.getElementById('cob-pendiente').textContent = fmtARS(pendienteARS);
 }
 
 function renderClientes() {
@@ -5404,7 +5511,10 @@ function renderClientes() {
       <tr style="border-bottom:1px solid var(--border)">
         <td style="padding:8px"><div style="font-weight:500;color:var(--text)">${c.nombre}</div><div style="font-size:11px;color:var(--text3)">${c.empresa||'—'}</div></td>
         <td style="padding:8px;color:var(--text2)">${c.email}</td>
-        <td style="padding:8px;text-align:right;font-weight:600;color:var(--green)">$${(+c.precio||0).toFixed(2)} USD</td>
+        <td style="padding:8px;text-align:right;font-weight:600;color:var(--green)">
+          ${fmtMoneda(c.precio, c.moneda||'USD')}
+          ${(c.moneda||'USD')==='USD'?`<div style="font-size:10px;color:var(--text3)">${fmtARS(toARS(c.precio,'USD'))}</div>`:''}
+        </td>
         <td style="padding:8px;text-align:center"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.estado==='activo'?'rgba(34,197,94,0.12)':c.estado==='pausado'?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)'};color:${c.estado==='activo'?'var(--green)':c.estado==='pausado'?'var(--amber)':'var(--red)'}">${c.estado}</span></td>
         <td style="padding:8px;display:flex;gap:4px">
           <button class="btn btn-sm" data-cuenta-cli="${c.id}" style="color:var(--green);padding:3px 10px;border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.08)">📋 Cuenta</button>
@@ -5428,6 +5538,7 @@ function renderClientes() {
       document.getElementById('cli-precio').value = c.precio;
       document.getElementById('cli-inicio').value = c.inicio||'';
       document.getElementById('cli-estado').value = c.estado;
+      document.getElementById('cli-moneda').value = c.moneda||'USD';
       document.getElementById('cli-notas').value = c.notas||'';
       document.getElementById('form-cliente-titulo').textContent = 'Editar cliente';
       document.getElementById('form-cliente').style.display = 'block';
@@ -5623,7 +5734,10 @@ function renderCobrosPeriodo() {
       const clientId = this.dataset.pagar;
       const monto = +this.dataset.monto;
       const client = getClients().find(c => c.id === clientId);
-      if (!confirm(`¿Marcar pago de ${client?.nombre} por $${monto} USD como recibido?`)) return;
+      const monedaCli = client?.moneda || 'USD';
+      const montoARS = toARS(monto, monedaCli);
+      const montoLabel = fmtMoneda(monto, monedaCli) + (monedaCli==='USD' ? ` = ${fmtARS(montoARS)}` : '');
+      if (!confirm(`¿Marcar pago de ${client?.nombre} por ${montoLabel} como recibido?`)) return;
       this.disabled = true;
       // Actualizar cobro
       const cobros = getCobros();
@@ -5634,10 +5748,12 @@ function renderCobrosPeriodo() {
       saveCobros(cobros);
       // Registrar como ingreso en Finanzas (Supabase)
       try {
+        const monedaCli2 = client?.moneda || 'USD';
+        const montoARS2 = toARS(monto, monedaCli2);
         const [tx] = await sbFetch('rhinos_transactions', 'POST', {
-          type: 'ingreso', amount: monto, date: today,
-          description: `Suscripción RhinosApp — ${client?.nombre||clientId} (${cobPeriodLabel(cobCurrentPeriod)})`,
-          category: 'Ventas', partner: 'empresa', notes: `Cobro mensual cliente`, currency: 'USD'
+          type: 'ingreso', amount: montoARS2, date: today,
+          description: `Suscripción RhinosApp — ${client?.nombre||clientId} (${cobPeriodLabel(cobCurrentPeriod)})${monedaCli2==='USD'?` | USD ${monto} × TC $${getTcOficial()}`:''}`,
+          category: 'Ventas', partner: 'empresa', notes: `Cobro mensual cliente | Moneda original: ${monedaCli2} ${monto}`, currency: 'ARS'
         });
         notifyFinanzas('Ingreso cobro', { ...tx, type:'ingreso' });
         notifyWhatsApp('Ingreso cobro', { ...tx, type:'ingreso' });
@@ -5750,7 +5866,8 @@ document.getElementById('btn-guardar-cliente').addEventListener('click', () => {
   const precio = document.getElementById('cli-precio').value;
   if (!nombre || !email) { showToast('Nombre y email son obligatorios'); return; }
   const clients = getClients();
-  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, precio: +precio||0, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
+  const moneda = document.getElementById('cli-moneda').value || 'USD';
+  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, precio: +precio||0, moneda, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
   if (clientEditId) {
     const idx = clients.findIndex(c => c.id === clientEditId);
     if (idx >= 0) clients[idx] = {...clients[idx], ...data};
