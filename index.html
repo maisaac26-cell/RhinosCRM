@@ -1042,6 +1042,46 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
     <!-- COBROS TAB -->
     <div class="ftab-content" id="ftab-cobros" style="display:none">
+
+      <!-- GUÍA RÁPIDA -->
+      <details style="margin-bottom:1.25rem">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(0,229,204,0.06);border:1px solid rgba(0,229,204,0.2);border-radius:var(--rl);font-size:13px;font-weight:600;color:var(--cyan)">
+          <span style="font-size:16px">📖</span> ¿Cómo usar Clientes &amp; Cobros? — Guía rápida
+          <span style="margin-left:auto;font-size:11px;color:var(--text3);font-weight:400">Click para expandir</span>
+        </summary>
+        <div style="padding:16px;background:var(--surface2);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--r) var(--r)">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+            <div style="background:var(--surface3);border-radius:var(--r);padding:14px">
+              <div style="font-family:var(--display);font-size:14px;font-weight:800;color:var(--cyan);margin-bottom:8px">① CLIENTES</div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.7">
+                Agregá cada cliente con su <strong style="color:var(--text)">nombre, empresa, email y precio mensual</strong>.<br><br>
+                Click en <strong style="color:var(--cyan)">+ Nuevo cliente</strong> para cargarlos uno a uno.<br><br>
+                El estado puede ser: <strong>Activo</strong> (cobra), <strong>Pausado</strong> o <strong>Inactivo</strong>.
+              </div>
+            </div>
+            <div style="background:var(--surface3);border-radius:var(--r);padding:14px">
+              <div style="font-family:var(--display);font-size:14px;font-weight:800;color:var(--amber);margin-bottom:8px">② COBROS DEL MES</div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.7">
+                Cada mes, click en <strong style="color:var(--cyan)">↺ Generar cobros</strong> para crear los cobros pendientes de cada cliente activo.<br><br>
+                Cuando el cliente paga → click en <strong style="color:var(--green)">✓ Pagado</strong>. Se registra automáticamente como ingreso en Finanzas y manda WhatsApp.<br><br>
+                Podés marcarlos como <strong style="color:var(--red)">Vencido</strong> para luego enviar recordatorio.
+              </div>
+            </div>
+            <div style="background:var(--surface3);border-radius:var(--r);padding:14px">
+              <div style="font-family:var(--display);font-size:14px;font-weight:800;color:#818cf8;margin-bottom:8px">③ EMAILS</div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.7">
+                4 plantillas listas: <strong style="color:var(--text)">solicitud de pago, recordatorio, confirmación, reembolso</strong>.<br><br>
+                Elegís el tipo → <strong style="color:var(--cyan)">🦏 Generar con IA</strong> → revisás el preview → <strong style="color:var(--green)">Enviar</strong>.<br><br>
+                Variables automáticas: <code style="font-size:11px">[nombre]</code> <code style="font-size:11px">[empresa]</code> <code style="font-size:11px">[monto]</code> <code style="font-size:11px">[periodo]</code>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding:10px 14px;background:rgba(245,158,11,0.08);border-radius:var(--r);font-size:12px;color:var(--amber);border:1px solid rgba(245,158,11,0.15)">
+            💡 <strong>Flujo mensual recomendado:</strong> Generás cobros → enviás email de solicitud a todos → a medida que pagan los tildás → al final del mes enviás recordatorio a los que no pagaron.
+          </div>
+        </div>
+      </details>
+
       <!-- ── CLIENTES ── -->
       <div id="ctab-clientes">
         <div class="metrics-row" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:1rem">
@@ -5541,6 +5581,11 @@ const GUIDE_STEPS = [
     title: '📄 Presupuestos',
     desc: 'Generá presupuestos profesionales en segundos. Editá el texto directo en la vista previa, descargá el PDF y envialo por Gmail con el cuerpo generado por IA.',
     target: '[data-sec="presupuestos"]'
+  },
+  {
+    title: '💳 Clientes & Cobros',
+    desc: 'Nuevo módulo en Finanzas para gestionar tus clientes de suscripción. Agregás clientes con su precio mensual, generás los cobros de cada mes, marcás quién pagó (se registra automáticamente como ingreso) y enviás emails de solicitud o recordatorio con IA. Expandí la guía "📖 ¿Cómo usar?" dentro del módulo para ver el paso a paso.',
+    target: '[data-ftab="cobros"]'
   },
   {
     title: '¡Listo! Ya sabés todo 🦏',
