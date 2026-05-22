@@ -226,10 +226,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   </div>
   <div class="nav">
     <button class="nav-btn active" data-sec="dashboard">Dashboard</button>
-    <button class="nav-btn" data-sec="instagram" style="background:rgba(131,58,180,0.1);color:#c084fc;border:1px solid rgba(131,58,180,0.25)">📱 Instagram</button>
+    <button class="nav-btn nav-grupo" data-grupo="instagram" style="background:rgba(131,58,180,0.1);color:#c084fc;border:1px solid rgba(131,58,180,0.25)">📱 Instagram</button>
     <button class="nav-btn" data-sec="gmail">Gmail</button>
     <button class="nav-btn" data-sec="calendario">Calendario</button>
-    <button class="nav-btn" data-sec="comercial" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.2)">💼 Comercial</button>
+    <button class="nav-btn nav-grupo" data-grupo="comercial" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.2)">💼 Comercial</button>
     <button class="nav-btn" data-sec="finanzas" style="background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.2)">💰 Finanzas</button>
     <button class="nav-btn" data-sec="tareas" style="background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.2)">📋 Tareas</button>
     <button class="nav-btn" data-sec="agente">Agente IA</button>
@@ -6586,11 +6586,10 @@ function showGrupoSec(grupo, sec) {
   if (sec==='posts') loadPostsSide?.();
 }
 
-// Override nav-btn clicks for instagram/comercial
-document.querySelectorAll('.nav-btn[data-sec="instagram"], .nav-btn[data-sec="comercial"]').forEach(btn => {
-  btn.addEventListener('click', function(e) {
-    e.stopImmediatePropagation();
-    const grupo = this.dataset.sec;
+// Botones de grupos (instagram / comercial) — usan data-grupo, no data-sec
+document.querySelectorAll('.nav-grupo').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const grupo = this.dataset.grupo;
     const firstSec = NAV_GRUPOS[grupo].secs[0];
     showGrupoSec(grupo, firstSec);
   });
