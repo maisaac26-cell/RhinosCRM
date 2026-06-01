@@ -4307,7 +4307,18 @@ document.getElementById('btn-add-tx').addEventListener('click', async function()
       resetTxForm();
     } else {
       // MODO NUEVO — POST
-      const [newTx] = await sbFetch('rhinos_transactions', 'POST', { type, amount, date, description, category, partner, notes, currency: 'USD' });
+      const txCurrency = document.getElementById('tx-type')?.closest('form')?.querySelector('[name=currency]')?.value || 'USD';
+      const tcHoy = getTcOficial();
+      const amountARS = txCurrency === 'USD' ? amount * tcHoy : amount;
+      const notesConTc = txCurrency === 'USD' && tcHoy > 1
+        ? `${notes || ''} | TC: $${tcHoy} ARS/USD`.trim()
+        : notes;
+      const [newTx] = await sbFetch('rhinos_transactions', 'POST', {
+        type, amount: amountARS, date, description, category, partner,
+        notes: notesConTc, currency: 'ARS',
+        tc_original: txCurrency === 'USD' ? tcHoy : null,
+        amount_original: txCurrency === 'USD' ? amount : null
+      });
       finTx.unshift(newTx);
       notifyFinanzas('Nueva transacción', newTx);
       notifyWhatsApp('Nueva transacción', newTx);
@@ -5464,7 +5475,28 @@ const DEFAULT_TEMPLATES = {
 };
 
 function getClients() { try { return JSON.parse(localStorage.getItem(CLIENTS_KEY)||'[]'); } catch(e){ return []; } }
-function saveClients(arr) { localStorage.setItem(CLIENTS_KEY, JSON.stringify(arr)); }
+function saveClients(arr) {
+  localStorage.setItem(CLIENTS_KEY, JSON.stringify(arr));
+  // Sync a Supabase en background
+  if (arr.length) {
+    callAPI('supabase_upsert_clients', { clients: arr }).catch(e => console.warn('Sync clientes:', e.message));
+  }
+}
+
+async function loadClientsFromSupabase() {
+  try {
+    const data = await sbFetch('rhinos_clients?order=nombre.asc');
+    if (Array.isArray(data) && data.length > 0) {
+      const local = getClients();
+      // Merge: prioriza Supabase si tiene más datos
+      if (data.length >= local.length) {
+        localStorage.setItem(CLIENTS_KEY, JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch(e) { console.warn('Load clientes Supabase:', e.message); }
+  return getClients();
+}
 function getCobros() { try { return JSON.parse(localStorage.getItem(COBROS_KEY)||'[]'); } catch(e){ return []; } }
 function saveCobros(arr) { localStorage.setItem(COBROS_KEY, JSON.stringify(arr)); }
 function getTemplates() { try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY)||'null') || DEFAULT_TEMPLATES; } catch(e){ return DEFAULT_TEMPLATES; } }

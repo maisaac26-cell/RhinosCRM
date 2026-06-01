@@ -138,6 +138,32 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    else if (action === 'supabase_upsert_clients') {
+      // Guarda/actualiza clientes en Supabase (tabla rhinos_clients)
+      const { clients } = body;
+      if (!clients || !clients.length) { result = { ok: true, count: 0 }; return res.status(200).json(result); }
+      const SB_URL_C = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
+      const SB_KEY_C = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
+      const payload = JSON.stringify(clients);
+      const resp = await new Promise((resolve, reject) => {
+        const req2 = https.request({
+          hostname: new URL(SB_URL_C).hostname,
+          path: '/rest/v1/rhinos_clients',
+          method: 'POST',
+          headers: {
+            'apikey': SB_KEY_C, 'Authorization': 'Bearer ' + SB_KEY_C,
+            'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
+            'Prefer': 'resolution=merge-duplicates,return=minimal'
+          }
+        }, (r) => {
+          let raw = ''; r.on('data', c => raw += c);
+          r.on('end', () => resolve({ status: r.statusCode, body: raw }));
+        });
+        req2.on('error', reject); req2.write(payload); req2.end();
+      });
+      result = { ok: resp.status < 300, status: resp.status, count: clients.length };
+    }
+
     else if (action === 'supabase_proxy') {
       const { endpoint, method: m = 'GET', body: b } = body;
       const SB_URL_P = 'https://konbqkvrcnxzpltxjdyj.supabase.co';

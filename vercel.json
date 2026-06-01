@@ -1,12 +1,17 @@
 {
   "functions": {
     "api/api.js": { "maxDuration": 30 },
-    "api/weekly-report.js": { "maxDuration": 30 }
+    "api/weekly-report.js": { "maxDuration": 30 },
+    "api/keepalive.js": { "maxDuration": 10 }
   },
   "crons": [
     {
       "path": "/api/weekly-report",
       "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/keepalive",
+      "schedule": "0 12 * * 3"
     }
   ],
   "rewrites": [
