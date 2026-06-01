@@ -5465,11 +5465,11 @@ let clientEditId = null;
 const DEFAULT_TEMPLATES = {
   pago: {
     asunto: 'Suscripción RhinosApp — [periodo]',
-    cuerpo: `Hola [nombre],\n\nTe escribimos desde el equipo de RhinosApp para recordarte que tu suscripción del mes de [periodo] por un valor de [monto] tiene fecha de vencimiento el [fecha_vencimiento].\n\nPodés realizar el pago vía transferencia o por nuestros medios habituales. Ante cualquier consulta estamos disponibles.\n\nMuchas gracias!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`
+    cuerpo: `Hola [nombre],\n\nTe escribimos desde el equipo de RhinosApp para recordarte que tu suscripción del mes de [periodo] por un valor de [monto] tiene fecha de vencimiento el [fecha_vencimiento].\n\nPodés realizar el pago vía transferencia o por nuestros medios habituales.\n\nUna vez realizado el pago, por favor envianos el comprobante respondiendo este email o a comercial@rhinosapp.com para acreditar tu pago.\n\nAnte cualquier consulta estamos disponibles.\n\nMuchas gracias!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`
   },
   recordatorio: {
     asunto: '⚠️ Pago vencido — RhinosApp [periodo]',
-    cuerpo: `Hola [nombre],\n\nTe recordamos que tu pago de [monto] correspondiente a [periodo] se encuentra vencido.\n\nTe pedimos que regularices la situación a la brevedad para continuar usando el servicio sin interrupciones.\n\nAnte cualquier inconveniente no dudes en contactarnos.\n\nEquipo RhinosApp 🦏`
+    cuerpo: `Hola [nombre],\n\nTe recordamos que tu pago de [monto] correspondiente a [periodo] se encuentra vencido desde el [fecha_vencimiento].\n\nTe pedimos que regularices la situación a la brevedad para continuar usando el servicio sin interrupciones.\n\nUna vez realizado el pago, por favor envianos el comprobante respondiendo este email o a comercial@rhinosapp.com.\n\nAnte cualquier inconveniente no dudes en contactarnos.\n\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`
   },
   confirmacion: {
     asunto: '✅ Pago recibido — RhinosApp',
