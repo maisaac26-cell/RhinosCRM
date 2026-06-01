@@ -5750,7 +5750,7 @@ function renderCobrosPeriodo() {
           <div style="font-size:14px;font-weight:500;color:var(--text)">${c.nombre} ${c.empresa?'<span style="font-size:11px;color:var(--text3)">· '+c.empresa+'</span>':''}</div>
           <div style="font-size:11px;color:var(--text3);margin-top:2px">${c.email}</div>
         </div>
-        <div style="font-size:13px;font-weight:600;color:var(--green)">$${(+cobro.monto||+c.precio||0).toFixed(2)} USD</div>
+        <div style="font-size:13px;font-weight:600;color:var(--green)">${fmtMoneda(cobro.monto||c.precio, c.moneda||'USD')}</div>
         <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${s.bg};color:${s.color}">${s.label}</span>
         <div style="display:flex;gap:5px">
           ${cobro.status !== 'pagado' ? `<button class="btn btn-sm" data-pagar="${c.id}" data-monto="${cobro.monto||c.precio}" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);font-size:11px">✓ Pagado</button>` : ''}
