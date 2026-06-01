@@ -3999,11 +3999,9 @@ function renderResumen() {
   const balEl = document.getElementById('fin-balance');
   balEl.textContent = fmtDisplay(toDisp(balance));
   balEl.style.color = balance >= 0 ? 'var(--green)' : 'var(--red)';
-  const subEl1 = document.getElementById('fin-ingresos-sub');
-  const subEl2 = document.getElementById('fin-gastos-sub');
   const lbl = displayCurrency === 'USD' ? `USD (TC $${tcActual})` : `ARS acumulado (TC $${tcActual})`;
-  if (subEl1) subEl1.textContent = lbl;
-  if (subEl2) subEl2.textContent = lbl;
+  const s1 = document.getElementById('fin-ingresos-sub'); if (s1) s1.textContent = lbl;
+  const s2 = document.getElementById('fin-gastos-sub'); if (s2) s2.textContent = lbl;
 
   // Gastos por categoría
   const cats = {};
