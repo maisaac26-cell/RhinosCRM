@@ -5458,19 +5458,19 @@ let clientEditId = null;
 const DEFAULT_TEMPLATES = {
   pago: {
     asunto: 'Suscripción RhinosApp — [periodo]',
-    cuerpo: `Hola [nombre],\n\nTe escribimos desde el equipo de RhinosApp para recordarte que tu suscripción del mes de [periodo] por un valor de $[monto] USD está pendiente de pago.\n\nPodés realizar el pago vía transferencia o por nuestros medios habituales. Ante cualquier consulta estamos disponibles.\n\nMuchas gracias!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`
+    cuerpo: `Hola [nombre],\n\nTe escribimos desde el equipo de RhinosApp para recordarte que tu suscripción del mes de [periodo] por un valor de [monto] está pendiente de pago.\n\nPodés realizar el pago vía transferencia o por nuestros medios habituales. Ante cualquier consulta estamos disponibles.\n\nMuchas gracias!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`
   },
   recordatorio: {
     asunto: '⚠️ Pago vencido — RhinosApp [periodo]',
-    cuerpo: `Hola [nombre],\n\nTe recordamos que tu pago de $[monto] USD correspondiente a [periodo] se encuentra vencido.\n\nTe pedimos que regularices la situación a la brevedad para continuar usando el servicio sin interrupciones.\n\nAnte cualquier inconveniente no dudes en contactarnos.\n\nEquipo RhinosApp 🦏`
+    cuerpo: `Hola [nombre],\n\nTe recordamos que tu pago de [monto] correspondiente a [periodo] se encuentra vencido.\n\nTe pedimos que regularices la situación a la brevedad para continuar usando el servicio sin interrupciones.\n\nAnte cualquier inconveniente no dudes en contactarnos.\n\nEquipo RhinosApp 🦏`
   },
   confirmacion: {
     asunto: '✅ Pago recibido — RhinosApp',
-    cuerpo: `Hola [nombre],\n\nConfirmamos la recepción de tu pago de $[monto] USD correspondiente a [periodo]. ¡Muchas gracias!\n\nTu acceso a RhinosApp sigue activo. Ante cualquier consulta estamos disponibles.\n\nEquipo RhinosApp 🦏`
+    cuerpo: `Hola [nombre],\n\nConfirmamos la recepción de tu pago de [monto] correspondiente a [periodo]. ¡Muchas gracias!\n\nTu acceso a RhinosApp sigue activo. Ante cualquier consulta estamos disponibles.\n\nEquipo RhinosApp 🦏`
   },
   reembolso: {
     asunto: '↩ Reembolso procesado — RhinosApp',
-    cuerpo: `Hola [nombre],\n\nTe informamos que procesamos un reembolso / crédito de $[monto] USD a tu cuenta.\n\nEste ajuste se verá reflejado en los próximos días según el medio de pago utilizado.\n\nEquipo RhinosApp 🦏`
+    cuerpo: `Hola [nombre],\n\nTe informamos que procesamos un reembolso / crédito de [monto] a tu cuenta.\n\nEste ajuste se verá reflejado en los próximos días según el medio de pago utilizado.\n\nEquipo RhinosApp 🦏`
   }
 };
 
@@ -6012,8 +6012,9 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
   for (const c of targets) {
     const co = cobros.find(x => x.clientId === c.id);
     const monto = (co?.monto || c.precio || 0).toFixed(2);
-    const body = cuerpo.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||'').replace(/\[monto\]/g, monto+' USD').replace(/\[periodo\]/g, periodo).replace(/\[fecha_vencimiento\]/g, cobCurrentPeriod+'-05');
-    const subject = asunto.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||c.nombre).replace(/\[periodo\]/g, periodo).replace(/\[monto\]/g, monto+' USD');
+    const montoFormateado = fmtMoneda(monto, c.moneda||'USD');
+    const body = cuerpo.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||'').replace(/\[monto\]/g, montoFormateado).replace(/\[periodo\]/g, periodo).replace(/\[fecha_vencimiento\]/g, cobCurrentPeriod+'-05');
+    const subject = asunto.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||c.nombre).replace(/\[periodo\]/g, periodo).replace(/\[monto\]/g, montoFormateado);
     try { await callAPI('gmail_send', { access_token: tokens.access_token, to: c.email, subject, body }); sent++; } catch(e){}
     this.textContent = `Enviando (${sent}/${targets.length})...`;
     if (targets.length > 1) await new Promise(r => setTimeout(r, 500));
