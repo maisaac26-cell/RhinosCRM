@@ -6000,11 +6000,36 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
   this.disabled = false; this.textContent = 'Enviar';
 });
 
-// Inicializar al entrar a tab Cobros
-document.querySelector('.tab-btn[data-ftab="cobros"]').addEventListener('click', () => {
+// Inicializar al entrar a tab Cobros — carga desde Supabase primero
+document.querySelector('.tab-btn[data-ftab="cobros"]').addEventListener('click', async () => {
+  // Intentar cargar desde Supabase (tiene prioridad sobre localStorage)
+  await syncClientsSupabase();
   renderClientes();
   renderClientStats();
 });
+
+async function syncClientsSupabase() {
+  try {
+    const remote = await sbFetch('rhinos_clients?order=nombre.asc');
+    const local = getClients();
+    if (Array.isArray(remote)) {
+      if (remote.length > 0) {
+        // Merge: combinar locales y remotos, Supabase tiene prioridad
+        const remoteIds = new Set(remote.map(c => c.id));
+        const soloLocales = local.filter(c => !remoteIds.has(c.id));
+        const merged = [...remote, ...soloLocales];
+        localStorage.setItem(CLIENTS_KEY, JSON.stringify(merged));
+        // Subir los que solo están locales a Supabase
+        if (soloLocales.length) {
+          callAPI('supabase_upsert_clients', { clients: soloLocales }).catch(() => {});
+        }
+      } else if (local.length > 0) {
+        // Supabase vacío pero tenemos locales → subirlos
+        callAPI('supabase_upsert_clients', { clients: local }).catch(() => {});
+      }
+    }
+  } catch(e) { console.warn('Sync clientes:', e.message); }
+}
 
 // ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
