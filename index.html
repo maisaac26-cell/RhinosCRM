@@ -1180,6 +1180,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                 </select>
               </div>
             </div>
+            <div class="field" style="margin-bottom:8px"><label>Emails adicionales <span style="font-weight:400;color:var(--text3)">(CC — separados por coma)</span></label><input id="cli-emails-cc" placeholder="contabilidad@empresa.com, gerencia@empresa.com" style="font-size:12px"/></div>
             <div class="field" style="margin-bottom:10px"><label>Notas (opcional)</label><input id="cli-notas" placeholder="Condiciones especiales, descuentos..."/></div>
             <div style="display:flex;gap:8px">
               <button class="btn btn-green" id="btn-guardar-cliente">Guardar cliente</button>
@@ -5571,6 +5572,7 @@ function renderClientes() {
       document.getElementById('cli-inicio').value = c.inicio||'';
       document.getElementById('cli-estado').value = c.estado;
       document.getElementById('cli-moneda').value = c.moneda||'USD';
+      document.getElementById('cli-emails-cc').value = c.emails_cc||'';
       document.getElementById('cli-notas').value = c.notas||'';
       document.getElementById('form-cliente-titulo').textContent = 'Editar cliente';
       document.getElementById('form-cliente').style.display = 'block';
@@ -5898,7 +5900,7 @@ document.querySelectorAll('.ctab-btn').forEach(btn => {
 // Formulario cliente
 document.getElementById('btn-nuevo-cliente').addEventListener('click', () => {
   clientEditId = null;
-  ['cli-nombre','cli-empresa','cli-email','cli-precio','cli-inicio','cli-notas'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['cli-nombre','cli-empresa','cli-email','cli-emails-cc','cli-precio','cli-inicio','cli-notas'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   document.getElementById('cli-estado').value = 'activo';
   document.getElementById('cli-inicio').value = new Date().toISOString().slice(0,10);
   document.getElementById('form-cliente-titulo').textContent = 'Nuevo cliente';
@@ -5912,7 +5914,8 @@ document.getElementById('btn-guardar-cliente').addEventListener('click', () => {
   if (!nombre || !email) { showToast('Nombre y email son obligatorios'); return; }
   const clients = getClients();
   const moneda = document.getElementById('cli-moneda').value || 'USD';
-  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, precio: +precio||0, moneda, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
+  const emailsCC = document.getElementById('cli-emails-cc').value.trim();
+  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, emails_cc: emailsCC, precio: +precio||0, moneda, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
   if (clientEditId) {
     const idx = clients.findIndex(c => c.id === clientEditId);
     if (idx >= 0) clients[idx] = {...clients[idx], ...data};
@@ -6015,7 +6018,18 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
     const montoFormateado = fmtMoneda(monto, c.moneda||'USD');
     const body = cuerpo.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||'').replace(/\[monto\]/g, montoFormateado).replace(/\[periodo\]/g, periodo).replace(/\[fecha_vencimiento\]/g, cobCurrentPeriod+'-05');
     const subject = asunto.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||c.nombre).replace(/\[periodo\]/g, periodo).replace(/\[monto\]/g, montoFormateado);
-    try { await callAPI('gmail_send', { access_token: tokens.access_token, to: c.email, subject, body }); sent++; } catch(e){}
+    // Enviar al email principal
+    const emailsDestino = [c.email];
+    // Agregar emails CC si existen
+    if (c.emails_cc) {
+      c.emails_cc.split(',').map(e => e.trim()).filter(Boolean).forEach(e => emailsDestino.push(e));
+    }
+    try {
+      for (const emailDest of emailsDestino) {
+        await callAPI('gmail_send', { access_token: tokens.access_token, to: emailDest, subject, body });
+      }
+      sent++;
+    } catch(e){}
     this.textContent = `Enviando (${sent}/${targets.length})...`;
     if (targets.length > 1) await new Promise(r => setTimeout(r, 500));
   }
