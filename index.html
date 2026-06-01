@@ -982,8 +982,16 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <option value="pendiente">⏳ Gasto pendiente</option>
             </select>
           </div>
-          <div class="field" style="margin:0"><label>Monto (USD)</label>
-            <input type="number" id="tx-amount" placeholder="0.00" step="0.01"/>
+          <div class="field" style="margin:0">
+            <label id="tx-amount-label">Monto</label>
+            <div style="display:flex;gap:4px">
+              <select id="tx-currency" style="width:72px;font-size:12px;padding:6px 4px;flex-shrink:0">
+                <option value="ARS">$ ARS</option>
+                <option value="USD">USD</option>
+              </select>
+              <input type="number" id="tx-amount" placeholder="0.00" step="0.01" style="flex:1"/>
+            </div>
+            <div id="tx-amount-ars" style="display:none;font-size:10px;color:var(--text3);margin-top:3px"></div>
           </div>
           <div class="field" style="margin:0"><label>Fecha</label>
             <input type="date" id="tx-date"/>
@@ -3904,14 +3912,16 @@ function fmtUSD(n) {
   return (n < 0 ? '-' : '') + '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Convierte monto de transacción a ARS según su moneda guardada
+// Convierte monto de transacción a ARS — usa TC histórico si está guardado
 function txToARS(t) {
   const amt = Math.abs(+t.amount || 0);
-  // Si currency es ARS o no está definida pero el monto parece ARS (>100), usar directo
+  // Si ya está en ARS (nuevo sistema), usar directo
   if (t.currency === 'ARS') return amt;
-  // Si currency es USD, convertir con TC actual
+  // Si tiene TC histórico guardado, úsalo
+  if (t.tc_dia && +t.tc_dia > 1) return Math.abs(+t.amount_original || amt) * +t.tc_dia;
+  // Si currency es USD sin TC guardado, usar TC actual
   if (t.currency === 'USD') return toARS(amt, 'USD');
-  // Sin currency definida: asumir USD si el monto es pequeño (< 5000)
+  // Sin currency: asumir USD si el monto es pequeño (viejo sistema)
   return amt < 5000 ? toARS(amt, 'USD') : amt;
 }
 
@@ -4078,7 +4088,7 @@ function renderTransacciones() {
         <td style="padding:8px;color:var(--text2)">${t.date}</td>
         <td style="padding:8px;text-align:right;font-weight:500;color:${s.color}">
           <div>${t.type==='ingreso'?'+':'−'}${fmtARS2(txToARS(t))}</div>
-          ${t.currency==='USD'?`<div style="font-size:10px;color:var(--text3)">USD ${(+t.amount).toFixed(2)}</div>`:''}
+          ${t.currency_original==='USD'||t.currency==='USD'?`<div style="font-size:10px;color:var(--text3)">USD ${(+t.amount_original||+t.amount).toFixed(2)}${t.tc_dia?' · TC $'+t.tc_dia:''}</div>`:''}
         </td>
         <td style="padding:8px;display:flex;gap:4px">
           <button class="btn btn-sm" style="color:var(--cyan);padding:3px 8px;border-color:rgba(0,229,204,0.2)" data-edit-tx="${t.id}">✏</button>
@@ -4319,9 +4329,30 @@ RhinosApp · Sistema de notificaciones automáticas`;
   } catch(e) { console.warn('Notificación de finanzas no enviada:', e.message); }
 }
 
+// Mostrar equivalente ARS cuando se escribe en USD
+document.getElementById('tx-currency')?.addEventListener('change', function() {
+  const arsDiv = document.getElementById('tx-amount-ars');
+  if (this.value === 'USD') {
+    const amt = +document.getElementById('tx-amount').value || 0;
+    const tc = getTcOficial();
+    arsDiv.style.display = 'block';
+    arsDiv.textContent = tc > 1 ? `≈ ${fmtARS2(amt * tc)} (TC $${tc})` : '';
+  } else { arsDiv.style.display = 'none'; }
+});
+document.getElementById('tx-amount')?.addEventListener('input', function() {
+  const curr = document.getElementById('tx-currency')?.value;
+  const arsDiv = document.getElementById('tx-amount-ars');
+  if (curr === 'USD') {
+    const tc = getTcOficial();
+    arsDiv.style.display = 'block';
+    arsDiv.textContent = tc > 1 ? `≈ ${fmtARS2((+this.value||0) * tc)} (TC $${tc})` : '';
+  }
+});
+
 document.getElementById('btn-add-tx').addEventListener('click', async function() {
   const type = document.getElementById('tx-type').value;
-  const amount = +document.getElementById('tx-amount').value;
+  const amountRaw = +document.getElementById('tx-amount').value;
+  const txCurrency = document.getElementById('tx-currency')?.value || 'ARS';
   const date = document.getElementById('tx-date').value;
   const description = document.getElementById('tx-desc').value.trim();
   const category = document.getElementById('tx-cat').value;
@@ -4329,13 +4360,16 @@ document.getElementById('btn-add-tx').addEventListener('click', async function()
   const notes = document.getElementById('tx-notes').value.trim();
   const isRecurring = document.getElementById('tx-recurring').checked;
   const recurringDay = document.getElementById('tx-recurring-day').value;
-  if (!amount || !description || !date) { showToast('Completá monto, descripción y fecha'); return; }
+  if (!amountRaw || !description || !date) { showToast('Completá monto, descripción y fecha'); return; }
+  // Calcular monto en ARS con TC del día
+  const tcHoy = getTcOficial();
+  const amount = txCurrency === 'USD' ? amountRaw * (tcHoy || 1) : amountRaw;
   this.disabled = true;
   try {
     if (txEditId) {
       // MODO EDICIÓN — PATCH
-      await sbFetch(`rhinos_transactions?id=eq.${txEditId}`, 'PATCH', { type, amount, date, description, category, partner, notes });
-      const updated = {...finTx.find(t => t.id === txEditId), type, amount, date, description, category, partner, notes};
+      await sbFetch(`rhinos_transactions?id=eq.${txEditId}`, 'PATCH', { type, amount, date, description, category, partner, notes, currency: 'ARS', currency_original: txCurrency, amount_original: amountRaw, tc_dia: tcHoy || null });
+      const updated = {...finTx.find(t => t.id === txEditId), type, amount, date, description, category, partner, notes, currency:'ARS', currency_original: txCurrency, amount_original: amountRaw, tc_dia: tcHoy};
       finTx = finTx.map(t => t.id === txEditId ? updated : t);
       notifyFinanzas('Editada', updated);
       notifyWhatsApp('Editada', updated);
@@ -4343,17 +4377,12 @@ document.getElementById('btn-add-tx').addEventListener('click', async function()
       resetTxForm();
     } else {
       // MODO NUEVO — POST
-      const txCurrency = document.getElementById('tx-type')?.closest('form')?.querySelector('[name=currency]')?.value || 'USD';
-      const tcHoy = getTcOficial();
-      const amountARS = txCurrency === 'USD' ? amount * tcHoy : amount;
-      const notesConTc = txCurrency === 'USD' && tcHoy > 1
-        ? `${notes || ''} | TC: $${tcHoy} ARS/USD`.trim()
-        : notes;
       const [newTx] = await sbFetch('rhinos_transactions', 'POST', {
-        type, amount: amountARS, date, description, category, partner,
-        notes: notesConTc, currency: 'ARS',
-        tc_original: txCurrency === 'USD' ? tcHoy : null,
-        amount_original: txCurrency === 'USD' ? amount : null
+        type, amount, date, description, category, partner,
+        notes, currency: 'ARS',
+        currency_original: txCurrency,
+        amount_original: amountRaw,
+        tc_dia: tcHoy || null
       });
       finTx.unshift(newTx);
       notifyFinanzas('Nueva transacción', newTx);
