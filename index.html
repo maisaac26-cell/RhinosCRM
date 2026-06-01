@@ -911,6 +911,11 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <div style="font-size:9px;color:var(--text3)" id="tc-fecha">Sin datos</div>
             <button class="btn btn-sm btn-green" id="btn-save-tc" style="margin-top:3px;font-size:10px;padding:2px 8px">Guardar</button>
           </div>
+          <div style="margin-top:8px;display:flex;gap:4px;border-top:1px solid var(--border);padding-top:8px">
+            <span style="font-size:10px;color:var(--text3);align-self:center">Ver en:</span>
+            <button id="btn-display-ars" onclick="setDisplayCurrency('ARS')" style="padding:3px 10px;border-radius:20px;border:1px solid rgba(0,229,204,0.4);background:rgba(0,229,204,0.15);color:var(--cyan);font-size:11px;font-family:var(--font);cursor:pointer;font-weight:600">$ ARS</button>
+            <button id="btn-display-usd" onclick="setDisplayCurrency('USD')" style="padding:3px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:11px;font-family:var(--font);cursor:pointer">USD</button>
+          </div>
         </div>
       </div>
     </div>
@@ -3986,12 +3991,19 @@ function renderResumen() {
     pendCard.style.display = 'none';
   }
 
-  document.getElementById('fin-ingresos').textContent = fmtARS2(ingresos);
-  document.getElementById('fin-gastos').textContent = fmtARS2(gastos);
-  document.getElementById('fin-inversiones').textContent = fmtARS2(inversiones);
+  const tcActual = getTcOficial();
+  const toDisp = n => displayCurrency === 'USD' && tcActual > 0 ? n / tcActual : n;
+  document.getElementById('fin-ingresos').textContent = fmtDisplay(toDisp(ingresos));
+  document.getElementById('fin-gastos').textContent = fmtDisplay(toDisp(gastos));
+  document.getElementById('fin-inversiones').textContent = fmtDisplay(toDisp(inversiones));
   const balEl = document.getElementById('fin-balance');
-  balEl.textContent = fmtARS2(balance);
+  balEl.textContent = fmtDisplay(toDisp(balance));
   balEl.style.color = balance >= 0 ? 'var(--green)' : 'var(--red)';
+  const subEl1 = document.getElementById('fin-ingresos-sub');
+  const subEl2 = document.getElementById('fin-gastos-sub');
+  const lbl = displayCurrency === 'USD' ? `USD (TC $${tcActual})` : `ARS acumulado (TC $${tcActual})`;
+  if (subEl1) subEl1.textContent = lbl;
+  if (subEl2) subEl2.textContent = lbl;
 
   // Gastos por categoría
   const cats = {};
@@ -4417,17 +4429,21 @@ document.getElementById('btn-export-tx').addEventListener('click', () => {
 });
 
 function renderSocios() {
-  const inversiones = finTx.filter(t => t.type === 'inversion').reduce((a, t) => a + +t.amount, 0);
-  const ingresos = finTx.filter(t => t.type === 'ingreso').reduce((a, t) => a + +t.amount, 0);
-  const gastos = finTx.filter(t => t.type === 'gasto').reduce((a, t) => a + +t.amount, 0);
-  const saldo = inversiones + ingresos - gastos;
-  const beneficios = ingresos - gastos;
+  // Usar txToARS para convertir todo a ARS primero
+  const inversionesARS = finTx.filter(t => t.type === 'inversion').reduce((a,t) => a + txToARS(t), 0);
+  const ingresosARS    = finTx.filter(t => t.type === 'ingreso').reduce((a,t) => a + txToARS(t), 0);
+  const gastosARS      = finTx.filter(t => t.type === 'gasto').reduce((a,t) => a + txToARS(t), 0);
+  const saldoARS       = inversionesARS + ingresosARS - gastosARS;
+  const beneficiosARS  = ingresosARS - gastosARS;
 
-  document.getElementById('soc-capital').textContent = fmtUSD(inversiones);
-  document.getElementById('soc-saldo').textContent = fmtUSD(saldo);
+  const tc = getTcOficial() || 1;
+  const toD = n => displayCurrency === 'USD' ? n / tc : n;
+
+  document.getElementById('soc-capital').textContent = fmtDisplay(toD(inversionesARS));
+  document.getElementById('soc-saldo').textContent = fmtDisplay(toD(saldoARS));
   const benEl = document.getElementById('soc-beneficios');
-  benEl.textContent = fmtUSD(beneficios);
-  benEl.style.color = beneficios >= 0 ? 'var(--green)' : 'var(--red)';
+  benEl.textContent = fmtDisplay(toD(beneficiosARS));
+  benEl.style.color = beneficiosARS >= 0 ? 'var(--green)' : 'var(--red)';
 
   const grid = document.getElementById('socios-grid');
   const partners = finPartners.length ? finPartners : [
@@ -4437,30 +4453,31 @@ function renderSocios() {
     {name:'Rami',percentage:25,color:'#ef4444'}
   ];
 
+  const curLabel = displayCurrency === 'USD' ? `· TC $${tc}` : '';
   grid.innerHTML = partners.map(p => {
-    const pInversion = finTx.filter(t => t.type==='inversion' && t.partner===p.name.toLowerCase()).reduce((a,t)=>a+(+t.amount),0);
-    const pGastos = finTx.filter(t => t.type==='gasto' && t.partner===p.name.toLowerCase()).reduce((a,t)=>a+(+t.amount),0);
-    const pBeneficio = beneficios * (p.percentage / 100);
+    const pInvARS  = finTx.filter(t => t.type==='inversion' && t.partner===p.name.toLowerCase()).reduce((a,t)=>a+txToARS(t),0);
+    const pGastARS = finTx.filter(t => t.type==='gasto' && t.partner===p.name.toLowerCase()).reduce((a,t)=>a+txToARS(t),0);
+    const pBenARS  = beneficiosARS * (p.percentage / 100);
     return `<div class="card" style="border-color:${p.color}22">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
         <div style="width:36px;height:36px;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:16px;font-weight:800;color:#000">${p.name[0]}</div>
         <div>
           <div style="font-size:15px;font-weight:500">${p.name}</div>
-          <div style="font-size:12px;color:var(--text2)">${p.percentage}% participación</div>
+          <div style="font-size:12px;color:var(--text2)">${p.percentage}% participación ${curLabel}</div>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border)">
           <span style="color:var(--text2)">Capital aportado</span>
-          <span style="color:var(--cyan);font-weight:500">${fmtUSD(pInversion)}</span>
+          <span style="color:var(--cyan);font-weight:500">${fmtDisplay(toD(pInvARS))}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border)">
           <span style="color:var(--text2)">Gastos pagados</span>
-          <span style="color:var(--red);font-weight:500">${fmtUSD(pGastos)}</span>
+          <span style="color:var(--red);font-weight:500">${fmtDisplay(toD(pGastARS))}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0">
           <span style="color:var(--text2)">Beneficio correspondiente</span>
-          <span style="color:${pBeneficio>=0?'var(--green)':'var(--red)'};font-weight:500">${fmtUSD(pBeneficio)}</span>
+          <span style="color:${pBenARS>=0?'var(--green)':'var(--red)'};font-weight:500">${fmtDisplay(toD(pBenARS))}</span>
         </div>
       </div>
     </div>`;
@@ -5447,6 +5464,35 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
 }
+// ── MONEDA DE VISUALIZACIÓN GLOBAL ───────────────────
+let displayCurrency = 'ARS'; // 'ARS' o 'USD'
+
+function setDisplayCurrency(cur) {
+  displayCurrency = cur;
+  const arsBtn = document.getElementById('btn-display-ars');
+  const usdBtn = document.getElementById('btn-display-usd');
+  if (arsBtn) { arsBtn.style.background = cur==='ARS'?'rgba(0,229,204,0.15)':'transparent'; arsBtn.style.color = cur==='ARS'?'var(--cyan)':'var(--text2)'; arsBtn.style.borderColor = cur==='ARS'?'rgba(0,229,204,0.4)':'var(--border2)'; arsBtn.style.fontWeight = cur==='ARS'?'600':'400'; }
+  if (usdBtn) { usdBtn.style.background = cur==='USD'?'rgba(245,158,11,0.15)':'transparent'; usdBtn.style.color = cur==='USD'?'var(--amber)':'var(--text2)'; usdBtn.style.borderColor = cur==='USD'?'rgba(245,158,11,0.4)':'var(--border2)'; usdBtn.style.fontWeight = cur==='USD'?'600':'400'; }
+  // Re-renderizar secciones financieras
+  renderResumen();
+  renderSocios();
+  if (document.getElementById('ftab-transacciones')?.style.display !== 'none') renderTransacciones();
+}
+
+// Convierte un monto a la moneda de visualización actual
+function toDisplayAmt(arsAmount, txData) {
+  if (displayCurrency === 'ARS') return arsAmount;
+  // Para USD: dividir por TC histórico de la transacción o TC actual
+  const tc = (txData?.tc_dia && +txData.tc_dia > 1) ? +txData.tc_dia : getTcOficial();
+  return tc > 0 ? arsAmount / tc : arsAmount;
+}
+
+function fmtDisplay(n) {
+  const abs = Math.abs(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const signo = n < 0 ? '-' : '';
+  return displayCurrency === 'USD' ? `${signo}USD ${abs}` : `${signo}$ ${abs}`;
+}
+
 // ── TIPO DE CAMBIO ───────────────────────────────────
 const TC_KEY = 'rhinos_tipo_cambio';
 
@@ -5506,6 +5552,9 @@ document.getElementById('btn-save-tc')?.addEventListener('click', () => {
   tc.fuente = 'Manual';
   saveTc(tc);
   loadTcUI();
+  // Guardar en historial Supabase
+  const today = new Date().toISOString().slice(0,10);
+  sbFetch('rhinos_tc_historico', 'POST', { fecha: today, oficial_venta: val, fuente: 'Manual' }).catch(()=>{});
   showToast(`TC guardado: $ ${val} ARS/USD 🦏`);
 });
 
