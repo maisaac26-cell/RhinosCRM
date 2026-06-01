@@ -5756,6 +5756,7 @@ function renderCobrosPeriodo() {
           ${cobro.status !== 'pagado' ? `<button class="btn btn-sm" data-pagar="${c.id}" data-monto="${cobro.monto||c.precio}" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);font-size:11px">✓ Pagado</button>` : ''}
           ${cobro.status === 'pendiente' ? `<button class="btn btn-sm" data-vencer="${c.id}" style="background:rgba(239,68,68,0.1);color:var(--red);border-color:rgba(239,68,68,0.2);font-size:11px">Vencido</button>` : ''}
           <button class="btn btn-sm" data-email-cli="${c.id}" style="font-size:11px">📧</button>
+          ${cobro.status !== 'sin_generar' ? `<button class="btn btn-sm" data-del-cobro-periodo="${c.id}" style="color:var(--text3);border-color:var(--border2);font-size:11px" title="Eliminar cobro">✕</button>` : ''}
         </div>
       </div>`;
     }).join('')}
@@ -5809,11 +5810,23 @@ function renderCobrosPeriodo() {
     btn.addEventListener('click', function() {
       const c = getClients().find(x => x.id === this.dataset.emailCli);
       if (!c) return;
-      // Cambiar a tab emails con ese cliente preseleccionado
       document.querySelector('.ctab-btn[data-ctab="emails"]').click();
       document.getElementById('email-destinatario').value = 'uno';
-      document.getElementById('email-cliente-especifico').style.display = 'block';
+      document.getElementById('email-destinatario').dispatchEvent(new Event('change'));
       document.getElementById('email-cli-sel').value = c.id;
+    });
+  });
+
+  list.querySelectorAll('[data-del-cobro-periodo]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const clientId = this.dataset.delCobroPeriodo;
+      const client = getClients().find(c => c.id === clientId);
+      if (!confirm(`¿Eliminar el cobro de ${client?.nombre||clientId} del período ${cobPeriodLabel(cobCurrentPeriod)}?`)) return;
+      const cobros = getCobros().filter(c => !(c.clientId === clientId && c.periodo === cobCurrentPeriod));
+      saveCobros(cobros);
+      renderCobrosPeriodo();
+      renderClientStats();
+      showToast('Cobro eliminado. Podés regenerarlo con "↺ Generar cobros del mes" 🦏');
     });
   });
 }
