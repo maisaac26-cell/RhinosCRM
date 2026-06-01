@@ -927,8 +927,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <!-- RESUMEN -->
     <div class="ftab-content active" id="ftab-resumen">
       <div class="metrics-row" id="fin-metrics">
-        <div class="metric-card"><div class="m-label">Ingresos totales</div><div class="m-val green" id="fin-ingresos">$0</div><div class="m-sub">USD acumulado</div></div>
-        <div class="metric-card"><div class="m-label">Gastos totales</div><div class="m-val" id="fin-gastos" style="color:var(--red)">$0</div><div class="m-sub">USD acumulado</div></div>
+        <div class="metric-card"><div class="m-label">Ingresos totales</div><div class="m-val green" id="fin-ingresos">$0</div><div class="m-sub" id="fin-ingresos-sub">ARS acumulado</div></div>
+        <div class="metric-card"><div class="m-label">Gastos totales</div><div class="m-val" id="fin-gastos" style="color:var(--red)">$0</div><div class="m-sub" id="fin-gastos-sub">ARS acumulado</div></div>
         <div class="metric-card"><div class="m-label">Inversiones</div><div class="m-val" id="fin-inversiones" style="color:var(--blue)">$0</div><div class="m-sub">Capital social</div></div>
         <div class="metric-card"><div class="m-label">Balance</div><div class="m-val" id="fin-balance">$0</div><div class="m-sub">Ingresos - Gastos</div></div>
       </div>
@@ -3904,12 +3904,35 @@ function fmtUSD(n) {
   return (n < 0 ? '-' : '') + '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Convierte monto de transacción a ARS según su moneda guardada
+function txToARS(t) {
+  const amt = Math.abs(+t.amount || 0);
+  // Si currency es ARS o no está definida pero el monto parece ARS (>100), usar directo
+  if (t.currency === 'ARS') return amt;
+  // Si currency es USD, convertir con TC actual
+  if (t.currency === 'USD') return toARS(amt, 'USD');
+  // Sin currency definida: asumir USD si el monto es pequeño (< 5000)
+  return amt < 5000 ? toARS(amt, 'USD') : amt;
+}
+
+function fmtARS2(n) {
+  const abs = Math.abs(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 ? '-' : '') + '$ ' + abs;
+}
+
 function renderResumen() {
-  const ingresos = finTx.filter(t => t.type === 'ingreso').reduce((a, t) => a + +t.amount, 0);
-  const gastos = finTx.filter(t => t.type === 'gasto').reduce((a, t) => a + +t.amount, 0);
-  const inversiones = finTx.filter(t => t.type === 'inversion').reduce((a, t) => a + +t.amount, 0);
+  const ingresos = finTx.filter(t => t.type === 'ingreso').reduce((a, t) => a + txToARS(t), 0);
+  const gastos   = finTx.filter(t => t.type === 'gasto').reduce((a, t) => a + txToARS(t), 0);
+  const inversiones = finTx.filter(t => t.type === 'inversion').reduce((a, t) => a + txToARS(t), 0);
   const pendientes = finTx.filter(t => t.type === 'pendiente');
   const balance = ingresos - gastos;
+
+  // Subtítulos con TC info
+  const tcInfo = getTcOficial() > 1 ? ` (TC $${getTcOficial()})` : '';
+  const subEl1 = document.getElementById('fin-ingresos-sub');
+  const subEl2 = document.getElementById('fin-gastos-sub');
+  if (subEl1) subEl1.textContent = 'ARS acumulado' + tcInfo;
+  if (subEl2) subEl2.textContent = 'ARS acumulado' + tcInfo;
 
   // Pendientes
   const pendCard = document.getElementById('pendientes-card');
@@ -3953,11 +3976,11 @@ function renderResumen() {
     pendCard.style.display = 'none';
   }
 
-  document.getElementById('fin-ingresos').textContent = fmtUSD(ingresos);
-  document.getElementById('fin-gastos').textContent = fmtUSD(gastos);
-  document.getElementById('fin-inversiones').textContent = fmtUSD(inversiones);
+  document.getElementById('fin-ingresos').textContent = fmtARS2(ingresos);
+  document.getElementById('fin-gastos').textContent = fmtARS2(gastos);
+  document.getElementById('fin-inversiones').textContent = fmtARS2(inversiones);
   const balEl = document.getElementById('fin-balance');
-  balEl.textContent = fmtUSD(balance);
+  balEl.textContent = fmtARS2(balance);
   balEl.style.color = balance >= 0 ? 'var(--green)' : 'var(--red)';
 
   // Gastos por categoría
@@ -3984,7 +4007,10 @@ function renderResumen() {
           <div style="font-size:12px;color:var(--text)">${t.description}${isMonthly(t) ? MONTHLY_BADGE : ''}</div>
           <div style="font-size:11px;color:var(--text3)">${t.date} · ${t.category}</div>
         </div>
-        <span style="font-size:13px;font-weight:500;color:${t.type==='ingreso'?'var(--green)':'var(--red)'}">${t.type==='ingreso'?'+':'−'}${fmtUSD(+t.amount)}</span>
+        <div style="text-align:right">
+          <div style="font-size:13px;font-weight:500;color:${t.type==='ingreso'?'var(--green)':'var(--red)'}">${t.type==='ingreso'?'+':'−'}${fmtARS2(txToARS(t))}</div>
+          ${t.currency==='USD'?`<div style="font-size:10px;color:var(--text3)">USD ${(+t.amount).toFixed(2)}</div>`:''}
+        </div>
       </div>`).join('');
   }
 
@@ -4050,7 +4076,10 @@ function renderTransacciones() {
         <td style="padding:8px;color:var(--text2)">${t.category}</td>
         <td style="padding:8px;color:var(--text2)">${t.partner||'empresa'}</td>
         <td style="padding:8px;color:var(--text2)">${t.date}</td>
-        <td style="padding:8px;text-align:right;font-weight:500;color:${s.color}">${t.type==='ingreso'?'+':'−'}${fmtUSD(+t.amount)}</td>
+        <td style="padding:8px;text-align:right;font-weight:500;color:${s.color}">
+          <div>${t.type==='ingreso'?'+':'−'}${fmtARS2(txToARS(t))}</div>
+          ${t.currency==='USD'?`<div style="font-size:10px;color:var(--text3)">USD ${(+t.amount).toFixed(2)}</div>`:''}
+        </td>
         <td style="padding:8px;display:flex;gap:4px">
           <button class="btn btn-sm" style="color:var(--cyan);padding:3px 8px;border-color:rgba(0,229,204,0.2)" data-edit-tx="${t.id}">✏</button>
           <button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-del-tx="${t.id}">✕</button>
