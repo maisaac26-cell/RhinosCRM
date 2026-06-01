@@ -4263,7 +4263,7 @@ async function applyRecurring() {
       const [newTx] = await sbFetch('rhinos_transactions', 'POST', {
         type: r.type, amount: r.amount, date: txDate,
         description: r.description + ' (fijo)', category: r.category,
-        partner: r.partner, notes: 'Gasto fijo automático', currency: 'USD'
+        partner: r.partner, notes: 'Gasto fijo automático', currency: 'ARS'
       });
       finTx.unshift(newTx);
       r.last_applied = currentMonth;
@@ -4295,9 +4295,18 @@ async function notifyWhatsApp(accion, tx) {
   const icons = { ingreso: '💰', gasto: '💸', inversion: '📈', pendiente: '⏳' };
   const icon = icons[tx.type] || '💳';
   const monthly = isMonthly(tx) ? ' ↻ mensual' : '';
-  const signo = tx.type === 'ingreso' ? '+' : '-';
-  const monto = parseFloat(tx.amount) || 0;
-  const montoFmt = `${signo}${monto.toFixed(2)} USD`;
+  const signo = tx.type === 'ingreso' ? '+' : '−';
+  const currOrig = tx.currency_original || tx.currency || 'ARS';
+  let montoFmt;
+  if (currOrig === 'USD' && +tx.amount_original > 0) {
+    const usdStr = (+tx.amount_original).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const arsStr = Math.abs(+tx.amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const tcStr = tx.tc_dia ? ` · TC $${(+tx.tc_dia).toLocaleString('es-AR')}` : '';
+    montoFmt = `${signo}USD ${usdStr}\n≈ ${signo}$ ${arsStr} ARS${tcStr}`;
+  } else {
+    const arsStr = Math.abs(+tx.amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    montoFmt = `${signo}$ ${arsStr} ARS`;
+  }
   const text = `${icon} *RhinosApp Finanzas*\n\n*${accion}*\n\n📋 ${tx.description}${monthly}\n💵 ${montoFmt}\n🏷 ${tx.category || '—'} · ${tx.partner || 'empresa'}\n📅 ${tx.date}`;
   const encoded = encodeURIComponent(text);
   for (const r of WA_RECIPIENTS) {
@@ -4314,9 +4323,21 @@ async function notifyFinanzas(accion, tx) {
     if (!tokens?.access_token) return;
     const icons = { ingreso: '💰', gasto: '💸', inversion: '📈', pendiente: '⏳' };
     const icon = icons[tx.type] || '💳';
-    const monthly = (tx.notes || '').toLowerCase().includes('fijo') ? ' (↻ mensual)' : '';
+    const monthly = isMonthly(tx) ? ' (↻ mensual)' : '';
     const session = getCRMSession();
     const quien = session?.user?.name || session?.user?.email || 'alguien del equipo';
+    const signo = tx.type === 'ingreso' ? '+' : '−';
+    const currOrig = tx.currency_original || tx.currency || 'ARS';
+    let montoEmail;
+    if (currOrig === 'USD' && +tx.amount_original > 0) {
+      const usdStr = (+tx.amount_original).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const arsStr = Math.abs(+tx.amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const tcStr = tx.tc_dia ? ` (TC $${(+tx.tc_dia).toLocaleString('es-AR')})` : '';
+      montoEmail = `${signo}USD ${usdStr}  (≈ ${signo}$ ${arsStr} ARS${tcStr})`;
+    } else {
+      const arsStr = Math.abs(+tx.amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      montoEmail = `${signo}$ ${arsStr} ARS`;
+    }
     const subject = `${icon} RhinosApp Finanzas — ${accion}: ${tx.description}`;
     const body = `Hola equipo 🦏,
 
@@ -4325,7 +4346,7 @@ Se registró un movimiento en Finanzas de RhinosApp:
 Acción: ${accion.toUpperCase()}
 Tipo: ${tx.type}${monthly}
 Descripción: ${tx.description}
-Monto: ${tx.type === 'ingreso' ? '+' : '−'}$${Number(tx.amount).toFixed(2)} USD
+Monto: ${montoEmail}
 Categoría: ${tx.category || '—'}
 Socio: ${tx.partner || 'empresa'}
 Fecha: ${tx.date}${tx.notes ? '\nNotas: ' + tx.notes : ''}
