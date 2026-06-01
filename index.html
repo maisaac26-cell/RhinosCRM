@@ -1172,6 +1172,12 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                 </div>
               </div>
               <div class="field" style="margin:0"><label>Fecha inicio</label><input id="cli-inicio" type="date"/></div>
+              <div class="field" style="margin:0"><label>Plazo de pago</label>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <input id="cli-dias-plazo" type="number" min="1" max="90" value="10" style="padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface2);color:var(--text);width:70px;font-size:13px"/>
+                  <span style="font-size:11px;color:var(--text3)">días desde el 1° del mes</span>
+                </div>
+              </div>
               <div class="field" style="margin:0"><label>Estado</label>
                 <select id="cli-estado">
                   <option value="activo">Activo</option>
@@ -5459,7 +5465,7 @@ let clientEditId = null;
 const DEFAULT_TEMPLATES = {
   pago: {
     asunto: 'Suscripción RhinosApp — [periodo]',
-    cuerpo: `Hola [nombre],\n\nTe escribimos desde el equipo de RhinosApp para recordarte que tu suscripción del mes de [periodo] por un valor de [monto] está pendiente de pago.\n\nPodés realizar el pago vía transferencia o por nuestros medios habituales. Ante cualquier consulta estamos disponibles.\n\nMuchas gracias!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`
+    cuerpo: `Hola [nombre],\n\nTe escribimos desde el equipo de RhinosApp para recordarte que tu suscripción del mes de [periodo] por un valor de [monto] tiene fecha de vencimiento el [fecha_vencimiento].\n\nPodés realizar el pago vía transferencia o por nuestros medios habituales. Ante cualquier consulta estamos disponibles.\n\nMuchas gracias!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`
   },
   recordatorio: {
     asunto: '⚠️ Pago vencido — RhinosApp [periodo]',
@@ -5502,6 +5508,22 @@ function getCobros() { try { return JSON.parse(localStorage.getItem(COBROS_KEY)|
 function saveCobros(arr) { localStorage.setItem(COBROS_KEY, JSON.stringify(arr)); }
 function getTemplates() { try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY)||'null') || DEFAULT_TEMPLATES; } catch(e){ return DEFAULT_TEMPLATES; } }
 function saveTemplates(t) { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t)); }
+
+function calcFechaVencimiento(periodo, diasPlazo) {
+  // periodo = "2026-06", diasPlazo = 10 → "2026-06-10"
+  const dias = Math.max(1, Math.min(+diasPlazo||10, 31));
+  const [y, m] = periodo.split('-').map(Number);
+  // Verificar que el día no supere el último día del mes
+  const ultimoDia = new Date(y, m, 0).getDate();
+  const diaReal = Math.min(dias, ultimoDia);
+  return `${periodo}-${String(diaReal).padStart(2,'0')}`;
+}
+
+function fmtFecha(isoDate) {
+  if (!isoDate) return '—';
+  const [y, m, d] = isoDate.split('-');
+  return `${d}/${m}/${y}`;
+}
 
 function cobPeriodLabel(p) {
   const [y,m] = p.split('-');
@@ -5573,6 +5595,7 @@ function renderClientes() {
       document.getElementById('cli-estado').value = c.estado;
       document.getElementById('cli-moneda').value = c.moneda||'USD';
       document.getElementById('cli-emails-cc').value = c.emails_cc||'';
+      document.getElementById('cli-dias-plazo').value = c.dias_plazo||10;
       document.getElementById('cli-notas').value = c.notas||'';
       document.getElementById('form-cliente-titulo').textContent = 'Editar cliente';
       document.getElementById('form-cliente').style.display = 'block';
@@ -5747,10 +5770,11 @@ function renderCobrosPeriodo() {
         sin_generar: { bg:'rgba(75,85,99,0.2)', color:'var(--text3)', label:'— Sin generar' }
       };
       const s = statusStyles[cobro.status] || statusStyles.sin_generar;
+      const fVenc = calcFechaVencimiento(cobCurrentPeriod, c.dias_plazo||10);
       return `<div class="card" style="padding:12px;margin-bottom:0;display:flex;align-items:center;gap:12px">
         <div style="flex:1">
           <div style="font-size:14px;font-weight:500;color:var(--text)">${c.nombre} ${c.empresa?'<span style="font-size:11px;color:var(--text3)">· '+c.empresa+'</span>':''}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">${c.email}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${c.email} · <span style="color:var(--amber)">Vence: ${fmtFecha(fVenc)}</span> (${c.dias_plazo||10} días)</div>
         </div>
         <div style="font-size:13px;font-weight:600;color:var(--green)">${fmtMoneda(cobro.monto||c.precio, c.moneda||'USD')}</div>
         <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${s.bg};color:${s.color}">${s.label}</span>
@@ -5901,6 +5925,7 @@ document.querySelectorAll('.ctab-btn').forEach(btn => {
 document.getElementById('btn-nuevo-cliente').addEventListener('click', () => {
   clientEditId = null;
   ['cli-nombre','cli-empresa','cli-email','cli-emails-cc','cli-precio','cli-inicio','cli-notas'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  const dpEl = document.getElementById('cli-dias-plazo'); if(dpEl) dpEl.value = '10';
   document.getElementById('cli-estado').value = 'activo';
   document.getElementById('cli-inicio').value = new Date().toISOString().slice(0,10);
   document.getElementById('form-cliente-titulo').textContent = 'Nuevo cliente';
@@ -5915,7 +5940,8 @@ document.getElementById('btn-guardar-cliente').addEventListener('click', () => {
   const clients = getClients();
   const moneda = document.getElementById('cli-moneda').value || 'USD';
   const emailsCC = document.getElementById('cli-emails-cc').value.trim();
-  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, emails_cc: emailsCC, precio: +precio||0, moneda, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
+  const diasPlazo = +document.getElementById('cli-dias-plazo').value || 10;
+  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, emails_cc: emailsCC, precio: +precio||0, moneda, dias_plazo: diasPlazo, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
   if (clientEditId) {
     const idx = clients.findIndex(c => c.id === clientEditId);
     if (idx >= 0) clients[idx] = {...clients[idx], ...data};
@@ -6016,7 +6042,14 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
     const co = cobros.find(x => x.clientId === c.id);
     const monto = (co?.monto || c.precio || 0).toFixed(2);
     const montoFormateado = fmtMoneda(monto, c.moneda||'USD');
-    const body = cuerpo.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||'').replace(/\[monto\]/g, montoFormateado).replace(/\[periodo\]/g, periodo).replace(/\[fecha_vencimiento\]/g, cobCurrentPeriod+'-05');
+    const fechaVenc = fmtFecha(calcFechaVencimiento(cobCurrentPeriod, c.dias_plazo||10));
+    const body = cuerpo
+      .replace(/\[nombre\]/g, c.nombre)
+      .replace(/\[empresa\]/g, c.empresa||'')
+      .replace(/\[monto\]/g, montoFormateado)
+      .replace(/\[periodo\]/g, periodo)
+      .replace(/\[fecha_vencimiento\]/g, fechaVenc)
+      .replace(/\[dias_plazo\]/g, String(c.dias_plazo||10));
     const subject = asunto.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||c.nombre).replace(/\[periodo\]/g, periodo).replace(/\[monto\]/g, montoFormateado);
     // Enviar al email principal
     const emailsDestino = [c.email];
