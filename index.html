@@ -5943,7 +5943,16 @@ document.querySelectorAll('.email-tipo-btn').forEach(btn => {
 });
 
 document.getElementById('email-destinatario').addEventListener('change', function() {
-  document.getElementById('email-cliente-especifico').style.display = this.value === 'uno' ? 'block' : 'none';
+  const show = this.value === 'uno';
+  document.getElementById('email-cliente-especifico').style.display = show ? 'block' : 'none';
+  if (show) {
+    // Recargar lista de clientes cada vez que se abre el selector
+    const clients = getClients();
+    const sel = document.getElementById('email-cli-sel');
+    if (sel && clients.length) {
+      sel.innerHTML = clients.map(c => `<option value="${c.id}">${c.nombre}${c.empresa?' — '+c.empresa:''} (${c.email})</option>`).join('');
+    }
+  }
 });
 
 document.getElementById('btn-guardar-template').addEventListener('click', () => {
