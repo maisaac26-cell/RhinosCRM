@@ -3261,32 +3261,20 @@ function showApp(session) {
   setTimeout(initialDataSync, 800);
 }
 
-// Sincronización inicial completa al loguearse
+// Carga inicial desde Supabase al loguearse (pura lectura, sin localStorage)
 async function initialDataSync() {
-  try {
-    await Promise.allSettled([
-      loadTcFromSupabase(),
-      syncClientsSupabase(),
-      syncCobrosFromSupabase(),
-      loadTemplatesFromSupabase(),
-      syncRecurringTxsFromSupabase(),
-      loadProspectEmailsFromSupabase(),
-      (async () => {
-        // Subir datos locales que Supabase no tiene aún
-        const tiers = JSON.parse(localStorage.getItem('rhinos_pres_tiers') || 'null');
-        if (tiers?.length) sbUpsert('rhinos_pres_tiers', [{ id: 'default', data: tiers }]);
-        const balData = getBalData();
-        if (Object.keys(balData).length) sbUpsert('rhinos_balance', [{ id: 'default', data: balData }]);
-        const recurring = getRecurring();
-        if (recurring.length) sbUpsert('rhinos_recurring_txs', recurring);
-        const tplLocal = JSON.parse(localStorage.getItem(TEMPLATES_KEY || 'rhinos_email_templates') || 'null');
-        if (tplLocal) { const rows = Object.entries(tplLocal).map(([type, v]) => ({ type, asunto: v.asunto, cuerpo: v.cuerpo })); if (rows.length) sbUpsert('rhinos_email_templates', rows); }
-        const presHistory = getPresHistory();
-        if (presHistory.length) sbUpsert('rhinos_pres_history', presHistory.map(p => ({ id: String(p.id), fecha: p.fecha||'', cliente: p.cliente||'', empresa: p.empresa||'', validez: p.validez||'', tc: p.tc||0, nota: p.nota||'', tiers: p.tiers||[] })));
-      })()
-    ]);
-    console.log('[sync] Sincronización inicial completa');
-  } catch(e) { console.warn('[sync] Error en sync inicial:', e.message); }
+  await Promise.allSettled([
+    loadTcFromSupabase(),
+    syncClientsSupabase(),
+    syncCobrosFromSupabase(),
+    loadTemplatesFromSupabase(),
+    syncRecurringTxsFromSupabase(),
+    loadProspectEmailsFromSupabase(),
+    loadTiersFromSupabase(),
+    loadBalDataFromSupabase(),
+    syncPresHistoryFromSupabase()
+  ]);
+  console.log('[sync] Carga inicial desde Supabase completa');
 }
 
 async function initCRMAuth() {
@@ -4432,28 +4420,16 @@ function syncRecurringFromSupabase() {
   if (added > 0) saveRecurring(existing);
 }
 
-// ── GASTOS FIJOS (RECURRENTES) ───────────────────────
-const RECURRING_KEY = 'rhinos_recurring_txs';
-
-function getRecurring() {
-  try { return JSON.parse(localStorage.getItem(RECURRING_KEY) || '[]'); } catch(e) { return []; }
-}
+// ── GASTOS FIJOS — en memoria, fuente: Supabase ──────
+let _recurring = [];
+function getRecurring() { return _recurring; }
 function saveRecurring(list) {
-  localStorage.setItem(RECURRING_KEY, JSON.stringify(list));
+  _recurring = list;
   if (list.length) sbUpsert('rhinos_recurring_txs', list);
 }
-
 async function syncRecurringTxsFromSupabase() {
-  try {
-    const remote = await sbFetch('rhinos_recurring_txs?order=description.asc');
-    if (!Array.isArray(remote) || !remote.length) return;
-    const local = getRecurring();
-    const remoteIds = new Set(remote.map(r => r.id));
-    const soloLocales = local.filter(r => !remoteIds.has(r.id));
-    const merged = [...remote, ...soloLocales];
-    localStorage.setItem(RECURRING_KEY, JSON.stringify(merged));
-    if (soloLocales.length) sbUpsert('rhinos_recurring_txs', soloLocales);
-  } catch(e) { console.warn('[sync] recurring:', e.message); }
+  try { _recurring = (await sbFetch('rhinos_recurring_txs?order=description.asc')) || []; }
+  catch(e) { console.warn('[sync] recurring:', e.message); }
 }
 
 function renderRecurring() {
@@ -4482,8 +4458,7 @@ function renderRecurring() {
       if (!confirm('¿Eliminar este gasto fijo? No borra las transacciones ya generadas.')) return;
       const rid = this.dataset.delRecurring;
       sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(rid)}`, 'DELETE').catch(() => {});
-      const updated = getRecurring().filter(r => r.id !== rid);
-      localStorage.setItem(RECURRING_KEY, JSON.stringify(updated)); // sin re-upsert para no pisar el DELETE
+      _recurring = _recurring.filter(r => r.id !== rid);
       renderRecurring();
       showToast('Gasto fijo eliminado');
     });
@@ -5003,21 +4978,17 @@ function appendProspects(newPlaces, startIdx) {
 }
 
 // Emails persistidos por place_id
-const PROSPECT_EMAILS_KEY = 'rhinos_prospect_emails';
-function getProspectEmails() { try { return JSON.parse(localStorage.getItem(PROSPECT_EMAILS_KEY) || '{}'); } catch(e) { return {}; } }
+// ── PROSPECT EMAILS — en memoria, fuente: Supabase ───
+let _prospectEmails = {};
+function getProspectEmails() { return _prospectEmails; }
 function saveProspectEmail(id, email) {
-  const e = getProspectEmails(); e[id] = email;
-  localStorage.setItem(PROSPECT_EMAILS_KEY, JSON.stringify(e));
+  _prospectEmails[id] = email;
   sbUpsert('rhinos_prospect_emails', [{ place_id: id, email }]);
 }
-
 async function loadProspectEmailsFromSupabase() {
   try {
     const rows = await sbFetch('rhinos_prospect_emails');
-    if (!Array.isArray(rows) || !rows.length) return;
-    const local = getProspectEmails();
-    rows.forEach(r => { if (r.place_id && r.email) local[r.place_id] = r.email; });
-    localStorage.setItem(PROSPECT_EMAILS_KEY, JSON.stringify(local));
+    if (Array.isArray(rows)) rows.forEach(r => { if (r.place_id && r.email) _prospectEmails[r.place_id] = r.email; });
   } catch(e) { console.warn('[sync] prospect_emails:', e.message); }
 }
 
@@ -5320,19 +5291,17 @@ const DEFAULT_TIERS = [
   { desc: 'Venta Directa (Taylor made)', price: 35000, note: '+ $35.000 / usuario / mes' },
 ];
 
-let presupuestoTiers = JSON.parse(localStorage.getItem('rhinos_pres_tiers') || 'null') || DEFAULT_TIERS.map(t => ({...t}));
+// ── PRESUPUESTO TIERS — en memoria, fuente: Supabase ─
+let presupuestoTiers = DEFAULT_TIERS.map(t => ({...t}));
 
 function saveTiers() {
-  localStorage.setItem('rhinos_pres_tiers', JSON.stringify(presupuestoTiers));
   sbUpsert('rhinos_pres_tiers', [{ id: 'default', data: presupuestoTiers }]);
 }
-
 async function loadTiersFromSupabase() {
   try {
     const rows = await sbFetch('rhinos_pres_tiers?id=eq.default');
     if (Array.isArray(rows) && rows.length && Array.isArray(rows[0].data) && rows[0].data.length) {
       presupuestoTiers = rows[0].data;
-      localStorage.setItem('rhinos_pres_tiers', JSON.stringify(presupuestoTiers));
       renderTiersTable();
     }
   } catch(e) { console.warn('[sync] pres_tiers:', e.message); }
@@ -5662,28 +5631,20 @@ document.querySelectorAll('.tab-btn[data-ptab]').forEach(btn => {
 // ── HISTORIAL DE PRESUPUESTOS ─────────────────────────
 const PRES_HISTORY_KEY = 'rhinos_pres_history';
 
-function getPresHistory() {
-  try { return JSON.parse(localStorage.getItem(PRES_HISTORY_KEY) || '[]'); } catch(e) { return []; }
-}
+// ── PRESUPUESTO HISTORIAL — en memoria, fuente: Supabase
+let _presHistory = [];
+function getPresHistory() { return _presHistory; }
 
 function savePresToHistory(data) {
   const entry = { ...data, id: String(Date.now()), fecha: new Date().toLocaleDateString('es-AR') };
-  const history = getPresHistory();
-  history.unshift(entry);
-  localStorage.setItem(PRES_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
+  _presHistory.unshift(entry);
+  if (_presHistory.length > 50) _presHistory = _presHistory.slice(0, 50);
   sbUpsert('rhinos_pres_history', [{ id: entry.id, fecha: entry.fecha, cliente: entry.cliente, empresa: entry.empresa||'', validez: entry.validez||'', tc: entry.tc||0, nota: entry.nota||'', tiers: entry.tiers||[] }]);
 }
-
 async function syncPresHistoryFromSupabase() {
   try {
     const remote = await sbFetch('rhinos_pres_history?order=created_at.desc&limit=50');
-    if (!Array.isArray(remote) || !remote.length) return;
-    const local = getPresHistory();
-    const remoteIds = new Set(remote.map(p => String(p.id)));
-    const soloLocales = local.filter(p => !remoteIds.has(String(p.id)));
-    const merged = [...remote.map(p => ({...p, id: String(p.id)})), ...soloLocales];
-    localStorage.setItem(PRES_HISTORY_KEY, JSON.stringify(merged.slice(0,50)));
-    if (soloLocales.length) sbUpsert('rhinos_pres_history', soloLocales.map(p => ({ id: String(p.id), fecha: p.fecha||'', cliente: p.cliente||'', empresa: p.empresa||'', validez: p.validez||'', tc: p.tc||0, nota: p.nota||'', tiers: p.tiers||[] })));
+    _presHistory = (Array.isArray(remote) ? remote : []).map(p => ({...p, id: String(p.id)}));
   } catch(e) { console.warn('[sync] pres_history:', e.message); }
 }
 
@@ -5748,8 +5709,7 @@ function renderPresHistory() {
       if (!confirm('¿Eliminar este presupuesto del historial?')) return;
       const id = String(this.dataset.delPres);
       sbFetch(`rhinos_pres_history?id=eq.${encodeURIComponent(id)}`, 'DELETE').catch(() => {});
-      const updated = getPresHistory().filter(p => String(p.id) !== id);
-      localStorage.setItem(PRES_HISTORY_KEY, JSON.stringify(updated));
+      _presHistory = _presHistory.filter(p => String(p.id) !== id);
       renderPresHistory();
     });
   });
@@ -5757,8 +5717,8 @@ function renderPresHistory() {
 
 document.getElementById('btn-clear-pres-history').addEventListener('click', () => {
   if (!confirm('¿Limpiar todo el historial de presupuestos?')) return;
-  sbFetch('rhinos_pres_history', 'DELETE').catch(() => {}); // borra todos
-  localStorage.removeItem(PRES_HISTORY_KEY);
+  sbFetch('rhinos_pres_history', 'DELETE').catch(() => {});
+  _presHistory = [];
   renderPresHistory();
 });
 
@@ -5801,34 +5761,26 @@ function fmtDisplay(n) {
   return displayCurrency === 'USD' ? `${signo}USD ${abs}` : `${signo}$ ${abs}`;
 }
 
-// ── TIPO DE CAMBIO ───────────────────────────────────
-const TC_KEY = 'rhinos_tipo_cambio';
-
-function getTc() {
-  try { return JSON.parse(localStorage.getItem(TC_KEY) || '{}'); } catch(e) { return {}; }
-}
-function saveTc(obj) {
-  localStorage.setItem(TC_KEY, JSON.stringify(obj));
-  // Sync a rhinos_tc_historico
+// ── TIPO DE CAMBIO — en memoria, fuente: Supabase ────
+let _tc = {};
+function getTc() { return _tc; }
+async function saveTc(obj) {
+  _tc = obj;
   const today = (obj.fecha || new Date().toISOString()).slice(0,10);
   sbFetch('rhinos_tc_historico', 'POST', {
     fecha: today, oficial_venta: obj.oficial || null,
     blue_venta: obj.blue || null, fuente: obj.fuente || 'Auto'
   }).catch(() => {});
 }
-function getTcOficial() { return +getTc().oficial || 1; }
+function getTcOficial() { return +(_tc.oficial) || 1; }
 
-// Cargar TC desde Supabase (historial) si no hay en local o está desactualizado
 async function loadTcFromSupabase() {
-  const local = getTc();
-  const hoy = new Date().toISOString().slice(0,10);
-  if (local.oficial && local.fecha && local.fecha.slice(0,10) === hoy) return; // ya tenemos de hoy
   try {
     const rows = await sbFetch('rhinos_tc_historico?order=fecha.desc&limit=1');
     if (Array.isArray(rows) && rows.length) {
       const r = rows[0];
       const tc = { oficial: r.oficial_venta || r.oficial_compra, blue: r.blue_venta || r.blue_compra, fecha: r.fecha, fuente: r.fuente || 'Supabase' };
-      if (tc.oficial) { localStorage.setItem(TC_KEY, JSON.stringify(tc)); loadTcUI(); }
+      if (tc.oficial) { _tc = tc; loadTcUI(); }
     }
   } catch(e) {}
 }
@@ -5920,87 +5872,51 @@ const DEFAULT_TEMPLATES = {
   }
 };
 
-function getClients() { try { return JSON.parse(localStorage.getItem(CLIENTS_KEY)||'[]'); } catch(e){ return []; } }
+// ── CLIENTES — en memoria, fuente: Supabase ──────────
+let _clients = [];
+function getClients() { return _clients; }
 function saveClients(arr) {
-  localStorage.setItem(CLIENTS_KEY, JSON.stringify(arr));
-  // Sync a Supabase en background
-  if (arr.length) {
-    callAPI('supabase_upsert_clients', { clients: arr }).catch(e => console.warn('Sync clientes:', e.message));
-  }
+  _clients = arr;
+  if (arr.length) callAPI('supabase_upsert_clients', { clients: arr }).catch(e => console.warn('Sync clientes:', e.message));
 }
-
-async function loadClientsFromSupabase() {
-  try {
-    const data = await sbFetch('rhinos_clients?order=nombre.asc');
-    if (Array.isArray(data) && data.length > 0) {
-      const local = getClients();
-      // Merge: prioriza Supabase si tiene más datos
-      if (data.length >= local.length) {
-        localStorage.setItem(CLIENTS_KEY, JSON.stringify(data));
-        return data;
-      }
-    }
-  } catch(e) { console.warn('Load clientes Supabase:', e.message); }
-  return getClients();
+async function syncClientsSupabase() {
+  try { _clients = (await sbFetch('rhinos_clients?order=nombre.asc')) || []; } catch(e) { console.warn('Load clientes:', e.message); }
 }
-function getCobros() { try { return JSON.parse(localStorage.getItem(COBROS_KEY)||'[]'); } catch(e){ return []; } }
+// Alias para compatibilidad con código existente
+const loadClientsFromSupabase = syncClientsSupabase;
 
+// ── COBROS — en memoria, fuente: Supabase ─────────────
+let _cobros = [];
+function getCobros() { return _cobros; }
 function saveCobros(arr) {
-  localStorage.setItem(COBROS_KEY, JSON.stringify(arr));
-  // Sync a Supabase en background
+  _cobros = arr;
   if (arr.length) {
-    const payload = arr.map(c => ({
-      id: c.clientId + '_' + c.periodo,
-      clientId: c.clientId,
-      periodo: c.periodo,
-      status: c.status || 'pendiente',
-      monto: +c.monto || 0,
-      fechaPago: c.fechaPago || null
-    }));
-    callAPI('supabase_upsert_cobros', { cobros: payload })
-      .catch(e => console.warn('Sync cobros:', e.message));
+    const payload = arr.map(c => ({ id: c.clientId + '_' + c.periodo, clientId: c.clientId, periodo: c.periodo, status: c.status || 'pendiente', monto: +c.monto || 0, fechaPago: c.fechaPago || null }));
+    callAPI('supabase_upsert_cobros', { cobros: payload }).catch(e => console.warn('Sync cobros:', e.message));
   }
 }
-
 async function syncCobrosFromSupabase() {
   try {
     const remote = await sbFetch('rhinos_cobros?order=periodo.desc');
-    if (!Array.isArray(remote) || !remote.length) return;
-    const local = getCobros();
-    const remoteMap = new Map(remote.map(c => [c.clientId + '_' + c.periodo, {
-      clientId: c.clientId, periodo: c.periodo, status: c.status,
-      monto: +c.monto || 0, ...(c.fechaPago ? { fechaPago: c.fechaPago } : {})
-    }]));
-    // Local-only cobros que Supabase no tiene → subirlos
-    const soloLocales = local.filter(c => !remoteMap.has(c.clientId + '_' + c.periodo));
-    const merged = [...remoteMap.values(), ...soloLocales];
-    localStorage.setItem(COBROS_KEY, JSON.stringify(merged));
-    if (soloLocales.length) {
-      callAPI('supabase_upsert_cobros', { cobros: soloLocales.map(c => ({
-        id: c.clientId + '_' + c.periodo,
-        clientId: c.clientId, periodo: c.periodo,
-        status: c.status || 'pendiente', monto: +c.monto || 0,
-        fechaPago: c.fechaPago || null
-      }))}).catch(() => {});
-    }
-  } catch(e) { console.warn('Load cobros Supabase:', e.message); }
+    _cobros = (Array.isArray(remote) ? remote : []).map(c => ({ clientId: c.clientId, periodo: c.periodo, status: c.status, monto: +c.monto || 0, ...(c.fechaPago ? { fechaPago: c.fechaPago } : {}) }));
+  } catch(e) { console.warn('Load cobros:', e.message); }
 }
 
-function getTemplates() { try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY)||'null') || DEFAULT_TEMPLATES; } catch(e){ return DEFAULT_TEMPLATES; } }
+// ── TEMPLATES — en memoria, fuente: Supabase ──────────
+let _templates = null;
+function getTemplates() { return _templates || DEFAULT_TEMPLATES; }
 function saveTemplates(t) {
-  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
-  // Sync: una fila por tipo
+  _templates = t;
   const rows = Object.entries(t).map(([type, v]) => ({ type, asunto: v.asunto, cuerpo: v.cuerpo }));
   sbUpsert('rhinos_email_templates', rows);
 }
-
 async function loadTemplatesFromSupabase() {
   try {
     const rows = await sbFetch('rhinos_email_templates');
-    if (!Array.isArray(rows) || !rows.length) return;
-    const tpl = getTemplates();
-    rows.forEach(r => { if (r.type) tpl[r.type] = { asunto: r.asunto, cuerpo: r.cuerpo }; });
-    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(tpl));
+    if (Array.isArray(rows) && rows.length) {
+      _templates = { ...DEFAULT_TEMPLATES };
+      rows.forEach(r => { if (r.type) _templates[r.type] = { asunto: r.asunto, cuerpo: r.cuerpo }; });
+    }
   } catch(e) { console.warn('[sync] email_templates:', e.message); }
 }
 
@@ -6346,9 +6262,8 @@ function renderCobrosPeriodo() {
       // Eliminar de Supabase
       const cobroId = encodeURIComponent(clientId + '_' + cobCurrentPeriod);
       sbFetch(`rhinos_cobros?id=eq.${cobroId}`, 'DELETE').catch(() => {});
-      // Eliminar local (sin re-sync para evitar pisar el DELETE)
-      const cobros = getCobros().filter(c => !(c.clientId === clientId && c.periodo === cobCurrentPeriod));
-      localStorage.setItem(COBROS_KEY, JSON.stringify(cobros));
+      // Actualizar memoria sin re-upsert (evita pisar el DELETE)
+      _cobros = _cobros.filter(c => !(c.clientId === clientId && c.periodo === cobCurrentPeriod));
       renderCobrosPeriodo();
       renderClientStats();
       showToast('Cobro eliminado. Podés regenerarlo con "↺ Generar cobros del mes" 🦏');
@@ -6595,28 +6510,7 @@ document.querySelector('.tab-btn[data-ftab="cobros"]').addEventListener('click',
   renderEmailTab();
 });
 
-async function syncClientsSupabase() {
-  try {
-    const remote = await sbFetch('rhinos_clients?order=nombre.asc');
-    const local = getClients();
-    if (Array.isArray(remote)) {
-      if (remote.length > 0) {
-        // Merge: combinar locales y remotos, Supabase tiene prioridad
-        const remoteIds = new Set(remote.map(c => c.id));
-        const soloLocales = local.filter(c => !remoteIds.has(c.id));
-        const merged = [...remote, ...soloLocales];
-        localStorage.setItem(CLIENTS_KEY, JSON.stringify(merged));
-        // Subir los que solo están locales a Supabase
-        if (soloLocales.length) {
-          callAPI('supabase_upsert_clients', { clients: soloLocales }).catch(() => {});
-        }
-      } else if (local.length > 0) {
-        // Supabase vacío pero tenemos locales → subirlos
-        callAPI('supabase_upsert_clients', { clients: local }).catch(() => {});
-      }
-    }
-  } catch(e) { console.warn('Sync clientes:', e.message); }
-}
+// syncClientsSupabase definida más arriba como: async () => { _clients = await sbFetch(...) }
 
 // ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
@@ -6723,26 +6617,26 @@ const PLAN = {
   ]
 };
 
-function getBalData() { try { return JSON.parse(localStorage.getItem(BAL_KEY)||'{}'); } catch(e){ return {}; } }
+// ── BALANCE GENERAL — en memoria, fuente: Supabase ───
+let _balData = {};
+function getBalData() { return _balData; }
 
-const _saveBalSupabase = debounce((d) => {
-  sbUpsert('rhinos_balance', [{ id: 'default', data: d }]);
-}, 1500); // espera 1.5s sin cambios antes de escribir
+const _saveBalSupabase = debounce(() => {
+  sbUpsert('rhinos_balance', [{ id: 'default', data: _balData }]);
+}, 1500);
 
 function saveBalData(d) {
-  localStorage.setItem(BAL_KEY, JSON.stringify(d));
-  _saveBalSupabase(d);
+  _balData = d;
+  _saveBalSupabase();
 }
-
 async function loadBalDataFromSupabase() {
   try {
     const rows = await sbFetch('rhinos_balance?id=eq.default');
     if (Array.isArray(rows) && rows.length && rows[0].data && Object.keys(rows[0].data).length) {
-      localStorage.setItem(BAL_KEY, JSON.stringify(rows[0].data));
-      return rows[0].data;
+      _balData = rows[0].data;
     }
   } catch(e) { console.warn('[sync] balance:', e.message); }
-  return getBalData();
+  return _balData;
 }
 function fmtBal(n) {
   const abs = Math.abs(n||0);
