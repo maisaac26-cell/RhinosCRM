@@ -169,7 +169,7 @@ module.exports = async function handler(req, res) {
       const { table, rows } = body;
       const ALLOWED = ['rhinos_recurring_txs','rhinos_pres_tiers','rhinos_pres_history',
         'rhinos_prospect_emails','rhinos_email_templates','rhinos_balance',
-        'rhinos_clients','rhinos_cobros','rhinos_tc_historico'];
+        'rhinos_clients','rhinos_cobros','rhinos_tc_historico','rhinos_partners'];
       if (!table || !ALLOWED.includes(table)) { return res.status(400).json({ error: 'Tabla no permitida: ' + table }); }
       if (!rows?.length) { result = { ok: true, count: 0 }; return res.status(200).json(result); }
       const SB_URL_G = 'https://konbqkvrcnxzpltxjdyj.supabase.co';

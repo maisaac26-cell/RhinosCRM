@@ -3257,11 +3257,87 @@ function showApp(session) {
       showLoginScreen();
     });
   }
-  // Sync inicial en background: sube datos locales a Supabase y descarga remotos
-  setTimeout(initialDataSync, 800);
+  // 1. Primero migrar cualquier dato que quede en localStorage (corre UNA sola vez por browser)
+  // 2. Luego cargar todo desde Supabase
+  setTimeout(async () => {
+    await migrateLocalStorageToSupabase();
+    await initialDataSync();
+  }, 500);
 }
 
-// Carga inicial desde Supabase al loguearse (pura lectura, sin localStorage)
+// ── MIGRACIÓN ÚNICA: localStorage → Supabase ─────────
+// Corre una sola vez por browser. Sube datos residuales de versiones anteriores.
+async function migrateLocalStorageToSupabase() {
+  if (localStorage.getItem('rhinos_ls_migrated_v2')) return; // ya migrado
+
+  const ops = [];
+  const pick = key => { try { return JSON.parse(localStorage.getItem(key)); } catch(e) { return null; } };
+
+  // Clientes
+  const clients = pick('rhinos_clients');
+  if (Array.isArray(clients) && clients.length)
+    ops.push(callAPI('supabase_upsert_clients', { clients }).catch(() => {}));
+
+  // Cobros
+  const cobros = pick('rhinos_cobros');
+  if (Array.isArray(cobros) && cobros.length) {
+    const payload = cobros.map(c => ({ id: c.clientId+'_'+c.periodo, clientId: c.clientId, periodo: c.periodo, status: c.status||'pendiente', monto: +c.monto||0, fechaPago: c.fechaPago||null }));
+    ops.push(sbUpsert('rhinos_cobros', payload));
+  }
+
+  // Gastos recurrentes
+  const recurring = pick('rhinos_recurring_txs');
+  if (Array.isArray(recurring) && recurring.length)
+    ops.push(sbUpsert('rhinos_recurring_txs', recurring));
+
+  // Tiers de presupuesto
+  const tiers = pick('rhinos_pres_tiers');
+  if (Array.isArray(tiers) && tiers.length)
+    ops.push(sbUpsert('rhinos_pres_tiers', [{ id: 'default', data: tiers }]));
+
+  // Historial de presupuestos
+  const presHistory = pick('rhinos_pres_history');
+  if (Array.isArray(presHistory) && presHistory.length)
+    ops.push(sbUpsert('rhinos_pres_history', presHistory.map(p => ({ id: String(p.id), fecha: p.fecha||'', cliente: p.cliente||'', empresa: p.empresa||'', validez: p.validez||'', tc: p.tc||0, nota: p.nota||'', tiers: p.tiers||[] }))));
+
+  // Templates de email
+  const tpl = pick('rhinos_email_templates');
+  if (tpl && typeof tpl === 'object')
+    ops.push(sbUpsert('rhinos_email_templates', Object.entries(tpl).map(([type, v]) => ({ type, asunto: v.asunto, cuerpo: v.cuerpo }))));
+
+  // Balance
+  const bal = pick('rhinos_balance');
+  if (bal && typeof bal === 'object' && Object.keys(bal).length)
+    ops.push(sbUpsert('rhinos_balance', [{ id: 'default', data: bal }]));
+
+  // Tipo de cambio
+  const tc = pick('rhinos_tipo_cambio');
+  if (tc?.oficial) {
+    const today = (tc.fecha||new Date().toISOString()).slice(0,10);
+    ops.push(sbUpsert('rhinos_tc_historico', [{ fecha: today, oficial_venta: tc.oficial, blue_venta: tc.blue||null, fuente: tc.fuente||'Migración' }]));
+  }
+
+  // Emails de prospectos
+  const emails = pick('rhinos_prospect_emails');
+  if (emails && typeof emails === 'object') {
+    const rows = Object.entries(emails).map(([place_id, email]) => ({ place_id, email }));
+    if (rows.length) ops.push(sbUpsert('rhinos_prospect_emails', rows));
+  }
+
+  if (ops.length) {
+    await Promise.allSettled(ops);
+    console.log(`[migración] ${ops.length} tablas subidas a Supabase desde localStorage`);
+  }
+
+  // Marcar como migrado y limpiar localStorage de negocio
+  localStorage.setItem('rhinos_ls_migrated_v2', '1');
+  ['rhinos_clients','rhinos_cobros','rhinos_recurring_txs','rhinos_pres_tiers',
+   'rhinos_pres_history','rhinos_email_templates','rhinos_balance',
+   'rhinos_tipo_cambio','rhinos_prospect_emails'].forEach(k => localStorage.removeItem(k));
+  console.log('[migración] localStorage de negocio limpiado');
+}
+
+// Carga inicial desde Supabase al loguearse (fuente de verdad)
 async function initialDataSync() {
   await Promise.allSettled([
     loadTcFromSupabase(),
@@ -5767,10 +5843,7 @@ function getTc() { return _tc; }
 async function saveTc(obj) {
   _tc = obj;
   const today = (obj.fecha || new Date().toISOString()).slice(0,10);
-  sbFetch('rhinos_tc_historico', 'POST', {
-    fecha: today, oficial_venta: obj.oficial || null,
-    blue_venta: obj.blue || null, fuente: obj.fuente || 'Auto'
-  }).catch(() => {});
+  sbUpsert('rhinos_tc_historico', [{ fecha: today, oficial_venta: obj.oficial || null, blue_venta: obj.blue || null, fuente: obj.fuente || 'Auto' }]);
 }
 function getTcOficial() { return +(_tc.oficial) || 1; }
 
