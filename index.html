@@ -1216,6 +1216,87 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div id="recurring-list"><div class="empty" style="font-size:12px">No hay gastos fijos configurados aún.</div></div>
       </div>
 
+      <!-- Modal edición gasto fijo -->
+      <div id="recurring-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+        <div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--rl);padding:1.5rem;width:min(500px,92vw);max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.5)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+            <div style="font-family:var(--display);font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--cyan)">✏ Editar gasto fijo</div>
+            <button onclick="closeRecurringEdit()" style="border:none;background:var(--surface2);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--text2);font-size:14px">✕</button>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div class="field" style="margin:0"><label>Tipo</label>
+              <select id="rec-edit-type">
+                <option value="gasto">Gasto</option>
+                <option value="ingreso">Ingreso</option>
+                <option value="inversion">Inversión</option>
+                <option value="pendiente">⏳ Pendiente</option>
+              </select>
+            </div>
+            <div class="field" style="margin:0"><label>Día del mes</label>
+              <select id="rec-edit-day">
+                <option value="1">Día 1</option>
+                <option value="5">Día 5</option>
+                <option value="10">Día 10</option>
+                <option value="15">Día 15</option>
+                <option value="16">Día 16</option>
+                <option value="20">Día 20</option>
+                <option value="25">Día 25</option>
+                <option value="28">Día 28</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field"><label>Descripción</label>
+            <input id="rec-edit-desc" placeholder="Ej: Vercel PRO mensual"/>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div class="field" style="margin:0"><label>Monto</label>
+              <input type="number" id="rec-edit-amount" placeholder="0.00" step="0.01"/>
+            </div>
+            <div class="field" style="margin:0"><label>Moneda</label>
+              <select id="rec-edit-currency">
+                <option value="ARS">$ ARS</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div class="field" style="margin:0"><label>Categoría</label>
+              <select id="rec-edit-cat">
+                <option>Tecnología</option>
+                <option>Marketing</option>
+                <option>Honorarios</option>
+                <option>Legal</option>
+                <option>Infraestructura</option>
+                <option>Ventas</option>
+                <option>Otros Gastos</option>
+              </select>
+            </div>
+            <div class="field" style="margin:0"><label>Pagado por</label>
+              <select id="rec-edit-partner">
+                <option value="empresa">Saldo Empresa</option>
+                <option value="manu">Manu</option>
+                <option value="guille">Guille</option>
+                <option value="poli">Poli</option>
+                <option value="rami">Rami</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field"><label>Notas (opcional)</label>
+            <input id="rec-edit-notes" placeholder="Notas adicionales..."/>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:1.25rem">
+            <button id="btn-save-recurring-edit" class="btn btn-cyan" style="flex:1;justify-content:center;font-weight:700">💾 Guardar cambios</button>
+            <button onclick="closeRecurringEdit()" class="btn" style="color:var(--text2)">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
           Historial
@@ -4481,20 +4562,36 @@ function renderRecurring() {
   const badge = document.getElementById('recurring-badge');
   badge.textContent = list.length + ' activo' + (list.length !== 1 ? 's' : '');
   if (!list.length) { el.innerHTML = '<div class="empty" style="font-size:12px">No hay gastos fijos configurados aún.</div>'; return; }
-  el.innerHTML = list.map(r => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,0.12);color:var(--red)">↻ fijo</span>
-        <div>
-          <div style="font-size:13px;color:var(--text)">${r.description}</div>
+
+  el.innerHTML = list.map(r => {
+    const moneda = r.currency || 'ARS';
+    const montoFmt = moneda === 'USD'
+      ? `USD ${(+r.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`
+      : `$ ${(+r.amount).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})} ARS`;
+    const colorTipo = r.type === 'ingreso' ? 'var(--green)' : 'var(--red)';
+    const signo = r.type === 'ingreso' ? '+' : '−';
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2);flex-shrink:0">↻ fijo</span>
+        <div style="min-width:0">
+          <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.description}</div>
           <div style="font-size:11px;color:var(--text3)">${r.category} · ${r.partner} · día ${r.day} de cada mes</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <span style="font-size:13px;font-weight:500;color:var(--red)">−${fmtUSD(+r.amount)}</span>
-        <button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-del-recurring="${r.id}">✕</button>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:12px">
+        <span style="font-size:13px;font-weight:600;color:${colorTipo}">${signo}${montoFmt}</span>
+        <button class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.25);padding:3px 8px" data-edit-recurring="${r.id}" title="Editar">✏</button>
+        <button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-del-recurring="${r.id}" title="Eliminar">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('[data-edit-recurring]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      openRecurringEdit(this.dataset.editRecurring);
+    });
+  });
 
   el.querySelectorAll('[data-del-recurring]').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -4503,10 +4600,80 @@ function renderRecurring() {
       sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(rid)}`, 'DELETE').catch(() => {});
       _recurring = _recurring.filter(r => r.id !== rid);
       renderRecurring();
-      showToast('Gasto fijo eliminado');
+      showToast('Gasto fijo eliminado 🦏');
     });
   });
 }
+
+// ── EDICIÓN DE GASTOS FIJOS ──────────────────────────
+let _recurringEditId = null;
+
+function openRecurringEdit(id) {
+  const r = _recurring.find(x => x.id === id);
+  if (!r) return;
+  _recurringEditId = id;
+
+  document.getElementById('rec-edit-type').value    = r.type || 'gasto';
+  document.getElementById('rec-edit-day').value     = String(r.day || '1');
+  document.getElementById('rec-edit-desc').value    = r.description || '';
+  document.getElementById('rec-edit-amount').value  = r.amount || '';
+  document.getElementById('rec-edit-currency').value = r.currency || 'ARS';
+  document.getElementById('rec-edit-cat').value     = r.category || 'Tecnología';
+  document.getElementById('rec-edit-partner').value = r.partner || 'empresa';
+  document.getElementById('rec-edit-notes').value   = r.notes || '';
+
+  const modal = document.getElementById('recurring-edit-modal');
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('rec-edit-desc').focus(), 50);
+}
+
+function closeRecurringEdit() {
+  document.getElementById('recurring-edit-modal').style.display = 'none';
+  _recurringEditId = null;
+}
+
+document.getElementById('btn-save-recurring-edit').addEventListener('click', async function() {
+  if (!_recurringEditId) return;
+  this.disabled = true; this.textContent = 'Guardando...';
+  try {
+    const description = document.getElementById('rec-edit-desc').value.trim();
+    if (!description) { showToast('La descripción es obligatoria'); this.disabled = false; this.textContent = '💾 Guardar cambios'; return; }
+
+    const updated = {
+      type:        document.getElementById('rec-edit-type').value,
+      day:         document.getElementById('rec-edit-day').value,
+      description,
+      amount:      +document.getElementById('rec-edit-amount').value || 0,
+      currency:    document.getElementById('rec-edit-currency').value,
+      category:    document.getElementById('rec-edit-cat').value,
+      partner:     document.getElementById('rec-edit-partner').value,
+      notes:       document.getElementById('rec-edit-notes').value.trim(),
+    };
+
+    // Actualizar en Supabase
+    await sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(_recurringEditId)}`, 'PATCH', updated);
+
+    // Actualizar en memoria
+    _recurring = _recurring.map(r => r.id === _recurringEditId ? { ...r, ...updated } : r);
+
+    closeRecurringEdit();
+    renderRecurring();
+    showToast('Gasto fijo actualizado 🦏');
+  } catch(e) {
+    showToast('Error al guardar: ' + e.message);
+  }
+  this.disabled = false; this.textContent = '💾 Guardar cambios';
+});
+
+// Cerrar modal con Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && _recurringEditId) closeRecurringEdit();
+});
+
+// Cerrar modal al hacer click fuera
+document.getElementById('recurring-edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeRecurringEdit();
+});
 
 async function applyRecurring() {
   const list = getRecurring();
