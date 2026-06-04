@@ -5631,7 +5631,48 @@ async function loadClientsFromSupabase() {
   return getClients();
 }
 function getCobros() { try { return JSON.parse(localStorage.getItem(COBROS_KEY)||'[]'); } catch(e){ return []; } }
-function saveCobros(arr) { localStorage.setItem(COBROS_KEY, JSON.stringify(arr)); }
+
+function saveCobros(arr) {
+  localStorage.setItem(COBROS_KEY, JSON.stringify(arr));
+  // Sync a Supabase en background
+  if (arr.length) {
+    const payload = arr.map(c => ({
+      id: c.clientId + '_' + c.periodo,
+      clientId: c.clientId,
+      periodo: c.periodo,
+      status: c.status || 'pendiente',
+      monto: +c.monto || 0,
+      fechaPago: c.fechaPago || null
+    }));
+    callAPI('supabase_upsert_cobros', { cobros: payload })
+      .catch(e => console.warn('Sync cobros:', e.message));
+  }
+}
+
+async function syncCobrosFromSupabase() {
+  try {
+    const remote = await sbFetch('rhinos_cobros?order=periodo.desc');
+    if (!Array.isArray(remote) || !remote.length) return;
+    const local = getCobros();
+    const remoteMap = new Map(remote.map(c => [c.clientId + '_' + c.periodo, {
+      clientId: c.clientId, periodo: c.periodo, status: c.status,
+      monto: +c.monto || 0, ...(c.fechaPago ? { fechaPago: c.fechaPago } : {})
+    }]));
+    // Local-only cobros que Supabase no tiene → subirlos
+    const soloLocales = local.filter(c => !remoteMap.has(c.clientId + '_' + c.periodo));
+    const merged = [...remoteMap.values(), ...soloLocales];
+    localStorage.setItem(COBROS_KEY, JSON.stringify(merged));
+    if (soloLocales.length) {
+      callAPI('supabase_upsert_cobros', { cobros: soloLocales.map(c => ({
+        id: c.clientId + '_' + c.periodo,
+        clientId: c.clientId, periodo: c.periodo,
+        status: c.status || 'pendiente', monto: +c.monto || 0,
+        fechaPago: c.fechaPago || null
+      }))}).catch(() => {});
+    }
+  } catch(e) { console.warn('Load cobros Supabase:', e.message); }
+}
+
 function getTemplates() { try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY)||'null') || DEFAULT_TEMPLATES; } catch(e){ return DEFAULT_TEMPLATES; } }
 function saveTemplates(t) { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t)); }
 
@@ -5974,8 +6015,12 @@ function renderCobrosPeriodo() {
       const clientId = this.dataset.delCobroPeriodo;
       const client = getClients().find(c => c.id === clientId);
       if (!confirm(`¿Eliminar el cobro de ${client?.nombre||clientId} del período ${cobPeriodLabel(cobCurrentPeriod)}?`)) return;
+      // Eliminar de Supabase
+      const cobroId = encodeURIComponent(clientId + '_' + cobCurrentPeriod);
+      sbFetch(`rhinos_cobros?id=eq.${cobroId}`, 'DELETE').catch(() => {});
+      // Eliminar local (sin re-sync para evitar pisar el DELETE)
       const cobros = getCobros().filter(c => !(c.clientId === clientId && c.periodo === cobCurrentPeriod));
-      saveCobros(cobros);
+      localStorage.setItem(COBROS_KEY, JSON.stringify(cobros));
       renderCobrosPeriodo();
       renderClientStats();
       showToast('Cobro eliminado. Podés regenerarlo con "↺ Generar cobros del mes" 🦏');
@@ -6016,11 +6061,24 @@ document.getElementById('btn-marcar-todos-pagados').addEventListener('click', as
   const clients = getClients().filter(c => c.estado === 'activo');
   const cobros = getCobros();
   const today = new Date().toISOString().slice(0,10);
+  const tcHoy = getTcOficial();
   for (const c of clients) {
     const idx = cobros.findIndex(x => x.clientId === c.id && x.periodo === cobCurrentPeriod);
     if (idx >= 0 && cobros[idx].status !== 'pagado') {
       cobros[idx] = {...cobros[idx], status:'pagado', fechaPago: today};
-      try { await sbFetch('rhinos_transactions','POST',{ type:'ingreso', amount:cobros[idx].monto, date:today, description:`Suscripción — ${c.nombre} (${cobPeriodLabel(cobCurrentPeriod)})`, category:'Ventas', partner:'empresa', notes:'Cobro mensual', currency:'USD'}); } catch(e){}
+      const monedaCli = c.moneda || 'ARS';
+      const montoOrig = cobros[idx].monto;
+      const montoARS = toARS(montoOrig, monedaCli);
+      try {
+        const [tx] = await sbFetch('rhinos_transactions', 'POST', {
+          type: 'ingreso', amount: montoARS, date: today,
+          description: `Suscripción RhinosApp — ${c.nombre} (${cobPeriodLabel(cobCurrentPeriod)})`,
+          category: 'Ventas', partner: 'empresa', notes: 'Cobro mensual',
+          currency: 'ARS', currency_original: monedaCli, amount_original: montoOrig,
+          tc_dia: monedaCli === 'USD' ? tcHoy : null
+        });
+        notifyWhatsApp('Ingreso cobro', { ...tx, type:'ingreso' });
+      } catch(e){}
     }
   }
   saveCobros(cobros);
@@ -6196,12 +6254,15 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
   this.disabled = false; this.textContent = 'Enviar';
 });
 
-// Inicializar al entrar a tab Cobros — carga desde Supabase primero
+// Inicializar al entrar a tab Cobros — carga clientes Y cobros desde Supabase primero
 document.querySelector('.tab-btn[data-ftab="cobros"]').addEventListener('click', async () => {
-  // Intentar cargar desde Supabase (tiene prioridad sobre localStorage)
-  await syncClientsSupabase();
+  await Promise.all([
+    syncClientsSupabase(),
+    syncCobrosFromSupabase()
+  ]);
   renderClientes();
   renderClientStats();
+  renderCobrosPeriodo();
 });
 
 async function syncClientsSupabase() {
