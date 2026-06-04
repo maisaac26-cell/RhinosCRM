@@ -164,6 +164,36 @@ module.exports = async function handler(req, res) {
       result = { ok: resp.status < 300, status: resp.status, count: clients.length };
     }
 
+    else if (action === 'supabase_upsert') {
+      // Upsert genérico — acepta cualquier tabla del proyecto
+      const { table, rows } = body;
+      const ALLOWED = ['rhinos_recurring_txs','rhinos_pres_tiers','rhinos_pres_history',
+        'rhinos_prospect_emails','rhinos_email_templates','rhinos_balance',
+        'rhinos_clients','rhinos_cobros','rhinos_tc_historico'];
+      if (!table || !ALLOWED.includes(table)) { return res.status(400).json({ error: 'Tabla no permitida: ' + table }); }
+      if (!rows?.length) { result = { ok: true, count: 0 }; return res.status(200).json(result); }
+      const SB_URL_G = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
+      const SB_KEY_G = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
+      const payload = JSON.stringify(rows);
+      const resp = await new Promise((resolve, reject) => {
+        const req2 = https.request({
+          hostname: new URL(SB_URL_G).hostname,
+          path: `/rest/v1/${table}`,
+          method: 'POST',
+          headers: {
+            'apikey': SB_KEY_G, 'Authorization': 'Bearer ' + SB_KEY_G,
+            'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
+            'Prefer': 'resolution=merge-duplicates,return=minimal'
+          }
+        }, (r) => {
+          let raw = ''; r.on('data', c => raw += c);
+          r.on('end', () => resolve({ status: r.statusCode, body: raw }));
+        });
+        req2.on('error', reject); req2.write(payload); req2.end();
+      });
+      result = { ok: resp.status < 300, status: resp.status };
+    }
+
     else if (action === 'supabase_upsert_cobros') {
       // Guarda/actualiza cobros en Supabase (tabla rhinos_cobros)
       const { cobros } = body;

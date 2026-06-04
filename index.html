@@ -3257,6 +3257,36 @@ function showApp(session) {
       showLoginScreen();
     });
   }
+  // Sync inicial en background: sube datos locales a Supabase y descarga remotos
+  setTimeout(initialDataSync, 800);
+}
+
+// Sincronización inicial completa al loguearse
+async function initialDataSync() {
+  try {
+    await Promise.allSettled([
+      loadTcFromSupabase(),
+      syncClientsSupabase(),
+      syncCobrosFromSupabase(),
+      loadTemplatesFromSupabase(),
+      syncRecurringTxsFromSupabase(),
+      loadProspectEmailsFromSupabase(),
+      (async () => {
+        // Subir datos locales que Supabase no tiene aún
+        const tiers = JSON.parse(localStorage.getItem('rhinos_pres_tiers') || 'null');
+        if (tiers?.length) sbUpsert('rhinos_pres_tiers', [{ id: 'default', data: tiers }]);
+        const balData = getBalData();
+        if (Object.keys(balData).length) sbUpsert('rhinos_balance', [{ id: 'default', data: balData }]);
+        const recurring = getRecurring();
+        if (recurring.length) sbUpsert('rhinos_recurring_txs', recurring);
+        const tplLocal = JSON.parse(localStorage.getItem(TEMPLATES_KEY || 'rhinos_email_templates') || 'null');
+        if (tplLocal) { const rows = Object.entries(tplLocal).map(([type, v]) => ({ type, asunto: v.asunto, cuerpo: v.cuerpo })); if (rows.length) sbUpsert('rhinos_email_templates', rows); }
+        const presHistory = getPresHistory();
+        if (presHistory.length) sbUpsert('rhinos_pres_history', presHistory.map(p => ({ id: String(p.id), fecha: p.fecha||'', cliente: p.cliente||'', empresa: p.empresa||'', validez: p.validez||'', tc: p.tc||0, nota: p.nota||'', tiers: p.tiers||[] })));
+      })()
+    ]);
+    console.log('[sync] Sincronización inicial completa');
+  } catch(e) { console.warn('[sync] Error en sync inicial:', e.message); }
 }
 
 async function initCRMAuth() {
@@ -3894,6 +3924,7 @@ document.querySelectorAll('[data-filter-status]').forEach(card => {
   });
 });
 document.querySelector('.nav-btn[data-sec="leads"]').addEventListener('click', loadLeads);
+document.querySelector('.nav-btn[data-sec="prospectos"]')?.addEventListener('click', loadProspectEmailsFromSupabase);
 
 // ── TAREAS ────────────────────────────────────────────
 let tasksData = [];
@@ -4073,9 +4104,21 @@ document.querySelector('.nav-btn[data-sec="tareas"]').addEventListener('click', 
 async function sbFetch(endpoint, method, body) {
   const result = await callAPI('supabase_proxy', { endpoint, method: method || 'GET', body });
   if (!result) return (!method || method === 'GET') ? [] : null;
-  // Si Supabase devuelve un error en lugar de datos
   if (!Array.isArray(result) && result.code && result.message) throw new Error('DB: ' + result.message);
   return result;
+}
+
+// Upsert genérico con merge-duplicates — sincroniza cualquier tabla
+function sbUpsert(table, rows) {
+  const arr = Array.isArray(rows) ? rows : [rows];
+  if (!arr.length) return Promise.resolve();
+  return callAPI('supabase_upsert', { table, rows: arr })
+    .catch(e => console.warn(`[sync] ${table}:`, e.message));
+}
+
+// Debounce helper para evitar writes excesivos en inputs
+function debounce(fn, ms) {
+  let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
 
 let finTx = [], finPartners = [];
@@ -4084,7 +4127,8 @@ async function loadFinanzas() {
   try {
     [finTx, finPartners] = await Promise.all([
       sbFetch('rhinos_transactions?order=date.desc'),
-      sbFetch('rhinos_partners?order=name.asc')
+      sbFetch('rhinos_partners?order=name.asc'),
+      syncRecurringTxsFromSupabase()
     ]);
     syncRecurringFromSupabase();
     await applyRecurring();
@@ -4396,6 +4440,20 @@ function getRecurring() {
 }
 function saveRecurring(list) {
   localStorage.setItem(RECURRING_KEY, JSON.stringify(list));
+  if (list.length) sbUpsert('rhinos_recurring_txs', list);
+}
+
+async function syncRecurringTxsFromSupabase() {
+  try {
+    const remote = await sbFetch('rhinos_recurring_txs?order=description.asc');
+    if (!Array.isArray(remote) || !remote.length) return;
+    const local = getRecurring();
+    const remoteIds = new Set(remote.map(r => r.id));
+    const soloLocales = local.filter(r => !remoteIds.has(r.id));
+    const merged = [...remote, ...soloLocales];
+    localStorage.setItem(RECURRING_KEY, JSON.stringify(merged));
+    if (soloLocales.length) sbUpsert('rhinos_recurring_txs', soloLocales);
+  } catch(e) { console.warn('[sync] recurring:', e.message); }
 }
 
 function renderRecurring() {
@@ -4422,8 +4480,10 @@ function renderRecurring() {
   el.querySelectorAll('[data-del-recurring]').forEach(btn => {
     btn.addEventListener('click', function() {
       if (!confirm('¿Eliminar este gasto fijo? No borra las transacciones ya generadas.')) return;
-      const updated = getRecurring().filter(r => r.id !== this.dataset.delRecurring);
-      saveRecurring(updated);
+      const rid = this.dataset.delRecurring;
+      sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(rid)}`, 'DELETE').catch(() => {});
+      const updated = getRecurring().filter(r => r.id !== rid);
+      localStorage.setItem(RECURRING_KEY, JSON.stringify(updated)); // sin re-upsert para no pisar el DELETE
       renderRecurring();
       showToast('Gasto fijo eliminado');
     });
@@ -4945,7 +5005,21 @@ function appendProspects(newPlaces, startIdx) {
 // Emails persistidos por place_id
 const PROSPECT_EMAILS_KEY = 'rhinos_prospect_emails';
 function getProspectEmails() { try { return JSON.parse(localStorage.getItem(PROSPECT_EMAILS_KEY) || '{}'); } catch(e) { return {}; } }
-function saveProspectEmail(id, email) { const e = getProspectEmails(); e[id] = email; localStorage.setItem(PROSPECT_EMAILS_KEY, JSON.stringify(e)); }
+function saveProspectEmail(id, email) {
+  const e = getProspectEmails(); e[id] = email;
+  localStorage.setItem(PROSPECT_EMAILS_KEY, JSON.stringify(e));
+  sbUpsert('rhinos_prospect_emails', [{ place_id: id, email }]);
+}
+
+async function loadProspectEmailsFromSupabase() {
+  try {
+    const rows = await sbFetch('rhinos_prospect_emails');
+    if (!Array.isArray(rows) || !rows.length) return;
+    const local = getProspectEmails();
+    rows.forEach(r => { if (r.place_id && r.email) local[r.place_id] = r.email; });
+    localStorage.setItem(PROSPECT_EMAILS_KEY, JSON.stringify(local));
+  } catch(e) { console.warn('[sync] prospect_emails:', e.message); }
+}
 
 let selectedProspects = new Set();
 
@@ -5250,6 +5324,18 @@ let presupuestoTiers = JSON.parse(localStorage.getItem('rhinos_pres_tiers') || '
 
 function saveTiers() {
   localStorage.setItem('rhinos_pres_tiers', JSON.stringify(presupuestoTiers));
+  sbUpsert('rhinos_pres_tiers', [{ id: 'default', data: presupuestoTiers }]);
+}
+
+async function loadTiersFromSupabase() {
+  try {
+    const rows = await sbFetch('rhinos_pres_tiers?id=eq.default');
+    if (Array.isArray(rows) && rows.length && Array.isArray(rows[0].data) && rows[0].data.length) {
+      presupuestoTiers = rows[0].data;
+      localStorage.setItem('rhinos_pres_tiers', JSON.stringify(presupuestoTiers));
+      renderTiersTable();
+    }
+  } catch(e) { console.warn('[sync] pres_tiers:', e.message); }
 }
 
 function renderTiersTable() {
@@ -5551,12 +5637,15 @@ document.getElementById('btn-pres-send-gmail').addEventListener('click', async f
   this.disabled = false; this.textContent = 'Enviar email';
 });
 
-document.querySelector('.nav-btn[data-sec="presupuestos"]').addEventListener('click', () => {
+document.querySelector('.nav-btn[data-sec="presupuestos"]').addEventListener('click', async () => {
+  await Promise.all([loadTiersFromSupabase(), syncPresHistoryFromSupabase()]);
   renderTiersTable();
+  renderPresHistory();
 });
 
 // Init tiers on load
 renderTiersTable();
+loadTiersFromSupabase(); // background
 
 // ── TABS PRESUPUESTOS ─────────────────────────────────
 document.querySelectorAll('.tab-btn[data-ptab]').forEach(btn => {
@@ -5578,9 +5667,24 @@ function getPresHistory() {
 }
 
 function savePresToHistory(data) {
+  const entry = { ...data, id: String(Date.now()), fecha: new Date().toLocaleDateString('es-AR') };
   const history = getPresHistory();
-  history.unshift({ ...data, id: Date.now(), fecha: new Date().toLocaleDateString('es-AR') });
+  history.unshift(entry);
   localStorage.setItem(PRES_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
+  sbUpsert('rhinos_pres_history', [{ id: entry.id, fecha: entry.fecha, cliente: entry.cliente, empresa: entry.empresa||'', validez: entry.validez||'', tc: entry.tc||0, nota: entry.nota||'', tiers: entry.tiers||[] }]);
+}
+
+async function syncPresHistoryFromSupabase() {
+  try {
+    const remote = await sbFetch('rhinos_pres_history?order=created_at.desc&limit=50');
+    if (!Array.isArray(remote) || !remote.length) return;
+    const local = getPresHistory();
+    const remoteIds = new Set(remote.map(p => String(p.id)));
+    const soloLocales = local.filter(p => !remoteIds.has(String(p.id)));
+    const merged = [...remote.map(p => ({...p, id: String(p.id)})), ...soloLocales];
+    localStorage.setItem(PRES_HISTORY_KEY, JSON.stringify(merged.slice(0,50)));
+    if (soloLocales.length) sbUpsert('rhinos_pres_history', soloLocales.map(p => ({ id: String(p.id), fecha: p.fecha||'', cliente: p.cliente||'', empresa: p.empresa||'', validez: p.validez||'', tc: p.tc||0, nota: p.nota||'', tiers: p.tiers||[] })));
+  } catch(e) { console.warn('[sync] pres_history:', e.message); }
 }
 
 function fmtARS(n) {
@@ -5642,8 +5746,9 @@ function renderPresHistory() {
   list.querySelectorAll('[data-del-pres]').forEach(btn => {
     btn.addEventListener('click', function() {
       if (!confirm('¿Eliminar este presupuesto del historial?')) return;
-      const id = +this.dataset.delPres;
-      const updated = getPresHistory().filter(p => p.id !== id);
+      const id = String(this.dataset.delPres);
+      sbFetch(`rhinos_pres_history?id=eq.${encodeURIComponent(id)}`, 'DELETE').catch(() => {});
+      const updated = getPresHistory().filter(p => String(p.id) !== id);
       localStorage.setItem(PRES_HISTORY_KEY, JSON.stringify(updated));
       renderPresHistory();
     });
@@ -5652,6 +5757,7 @@ function renderPresHistory() {
 
 document.getElementById('btn-clear-pres-history').addEventListener('click', () => {
   if (!confirm('¿Limpiar todo el historial de presupuestos?')) return;
+  sbFetch('rhinos_pres_history', 'DELETE').catch(() => {}); // borra todos
   localStorage.removeItem(PRES_HISTORY_KEY);
   renderPresHistory();
 });
@@ -5701,8 +5807,31 @@ const TC_KEY = 'rhinos_tipo_cambio';
 function getTc() {
   try { return JSON.parse(localStorage.getItem(TC_KEY) || '{}'); } catch(e) { return {}; }
 }
-function saveTc(obj) { localStorage.setItem(TC_KEY, JSON.stringify(obj)); }
+function saveTc(obj) {
+  localStorage.setItem(TC_KEY, JSON.stringify(obj));
+  // Sync a rhinos_tc_historico
+  const today = (obj.fecha || new Date().toISOString()).slice(0,10);
+  sbFetch('rhinos_tc_historico', 'POST', {
+    fecha: today, oficial_venta: obj.oficial || null,
+    blue_venta: obj.blue || null, fuente: obj.fuente || 'Auto'
+  }).catch(() => {});
+}
 function getTcOficial() { return +getTc().oficial || 1; }
+
+// Cargar TC desde Supabase (historial) si no hay en local o está desactualizado
+async function loadTcFromSupabase() {
+  const local = getTc();
+  const hoy = new Date().toISOString().slice(0,10);
+  if (local.oficial && local.fecha && local.fecha.slice(0,10) === hoy) return; // ya tenemos de hoy
+  try {
+    const rows = await sbFetch('rhinos_tc_historico?order=fecha.desc&limit=1');
+    if (Array.isArray(rows) && rows.length) {
+      const r = rows[0];
+      const tc = { oficial: r.oficial_venta || r.oficial_compra, blue: r.blue_venta || r.blue_compra, fecha: r.fecha, fuente: r.fuente || 'Supabase' };
+      if (tc.oficial) { localStorage.setItem(TC_KEY, JSON.stringify(tc)); loadTcUI(); }
+    }
+  } catch(e) {}
+}
 
 // Convertir monto a ARS según moneda
 function toARS(monto, moneda) {
@@ -5760,9 +5889,10 @@ document.getElementById('btn-save-tc')?.addEventListener('click', () => {
   showToast(`TC guardado: $ ${val} ARS/USD 🦏`);
 });
 
-// Cargar TC al abrir Finanzas
-document.querySelector('.nav-btn[data-sec="finanzas"]')?.addEventListener('click', loadTcUI);
+// Cargar TC al abrir Finanzas (local primero, luego Supabase en bg)
+document.querySelector('.nav-btn[data-sec="finanzas"]')?.addEventListener('click', () => { loadTcUI(); loadTcFromSupabase(); });
 loadTcUI();
+loadTcFromSupabase(); // en background al inicio
 
 // ── CLIENTES & COBROS ────────────────────────────────
 const CLIENTS_KEY = 'rhinos_clients';
@@ -5857,7 +5987,22 @@ async function syncCobrosFromSupabase() {
 }
 
 function getTemplates() { try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY)||'null') || DEFAULT_TEMPLATES; } catch(e){ return DEFAULT_TEMPLATES; } }
-function saveTemplates(t) { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t)); }
+function saveTemplates(t) {
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
+  // Sync: una fila por tipo
+  const rows = Object.entries(t).map(([type, v]) => ({ type, asunto: v.asunto, cuerpo: v.cuerpo }));
+  sbUpsert('rhinos_email_templates', rows);
+}
+
+async function loadTemplatesFromSupabase() {
+  try {
+    const rows = await sbFetch('rhinos_email_templates');
+    if (!Array.isArray(rows) || !rows.length) return;
+    const tpl = getTemplates();
+    rows.forEach(r => { if (r.type) tpl[r.type] = { asunto: r.asunto, cuerpo: r.cuerpo }; });
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(tpl));
+  } catch(e) { console.warn('[sync] email_templates:', e.message); }
+}
 
 function calcFechaVencimiento(periodo, diasPlazo) {
   // periodo = "2026-06", diasPlazo = 10 → "2026-06-10"
@@ -6437,15 +6582,17 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
   this.disabled = false; this.textContent = 'Enviar';
 });
 
-// Inicializar al entrar a tab Cobros — carga clientes Y cobros desde Supabase primero
+// Inicializar al entrar a tab Cobros — carga clientes, cobros y templates desde Supabase
 document.querySelector('.tab-btn[data-ftab="cobros"]').addEventListener('click', async () => {
   await Promise.all([
     syncClientsSupabase(),
-    syncCobrosFromSupabase()
+    syncCobrosFromSupabase(),
+    loadTemplatesFromSupabase()
   ]);
   renderClientes();
   renderClientStats();
   renderCobrosPeriodo();
+  renderEmailTab();
 });
 
 async function syncClientsSupabase() {
@@ -6577,7 +6724,26 @@ const PLAN = {
 };
 
 function getBalData() { try { return JSON.parse(localStorage.getItem(BAL_KEY)||'{}'); } catch(e){ return {}; } }
-function saveBalData(d) { localStorage.setItem(BAL_KEY, JSON.stringify(d)); }
+
+const _saveBalSupabase = debounce((d) => {
+  sbUpsert('rhinos_balance', [{ id: 'default', data: d }]);
+}, 1500); // espera 1.5s sin cambios antes de escribir
+
+function saveBalData(d) {
+  localStorage.setItem(BAL_KEY, JSON.stringify(d));
+  _saveBalSupabase(d);
+}
+
+async function loadBalDataFromSupabase() {
+  try {
+    const rows = await sbFetch('rhinos_balance?id=eq.default');
+    if (Array.isArray(rows) && rows.length && rows[0].data && Object.keys(rows[0].data).length) {
+      localStorage.setItem(BAL_KEY, JSON.stringify(rows[0].data));
+      return rows[0].data;
+    }
+  } catch(e) { console.warn('[sync] balance:', e.message); }
+  return getBalData();
+}
 function fmtBal(n) {
   const abs = Math.abs(n||0);
   const s = abs.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -6800,9 +6966,10 @@ document.getElementById('btn-add-nota').addEventListener('click', () => {
 });
 
 // Nav balance
-document.querySelector('.nav-btn[data-sec="balance"]')?.addEventListener('click', () => {
+document.querySelector('.nav-btn[data-sec="balance"]')?.addEventListener('click', async () => {
+  // Cargar desde Supabase primero, luego renderizar
+  await loadBalDataFromSupabase();
   loadBalanceDatos();
-  // Auto-sync silencioso desde Finanzas al abrir
   setTimeout(() => autoSyncBalance(), 300);
 });
 
