@@ -4459,42 +4459,9 @@ function resetTxForm() {
   document.querySelector('#ftab-transacciones .card-title').textContent = 'Nueva transacción';
 }
 
-function syncRecurringFromSupabase() {
-  const existing = getRecurring();
-  const existingDescs = new Set(existing.map(r => r.description.trim().toLowerCase()));
-  const recurringTxs = finTx.filter(t => isMonthly(t) && t.type !== 'pendiente');
-
-  // Agrupar por descripción para detectar plantillas únicas
-  const groups = {};
-  recurringTxs.forEach(t => {
-    const key = t.description.trim().toLowerCase();
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(t);
-  });
-
-  let added = 0;
-  Object.entries(groups).forEach(([key, txs]) => {
-    if (existingDescs.has(key)) return;
-    // Usar la transacción más reciente como plantilla
-    const latest = txs.sort((a, b) => b.date.localeCompare(a.date))[0];
-    const day = String(+latest.date.slice(8, 10)); // "01" → "1"
-    const lastApplied = latest.date.slice(0, 7);
-    existing.push({
-      id: Date.now().toString() + Math.random().toString(36).slice(2),
-      type: latest.type,
-      amount: latest.amount,
-      description: latest.description,
-      category: latest.category || 'Tecnología',
-      partner: latest.partner || 'empresa',
-      notes: latest.notes || '',
-      day,
-      last_applied: lastApplied
-    });
-    added++;
-  });
-
-  if (added > 0) saveRecurring(existing);
-}
+// syncRecurringFromSupabase() eliminada — recreaba duplicados desde transacciones.
+// Los gastos fijos son ahora entidades propias en Supabase (rhinos_recurring_txs).
+function syncRecurringFromSupabase() { /* deshabilitada */ }
 
 // ── GASTOS FIJOS — en memoria, fuente: Supabase ──────
 let _recurring = [];
@@ -4551,22 +4518,29 @@ async function applyRecurring() {
 
   for (const r of list) {
     if (r.last_applied === currentMonth) continue;
-    if (today < +r.day) continue; // esperar al día configurado
+    if (today < +r.day) continue;
     const txDate = `${currentMonth}-${String(r.day).padStart(2, '0')}`;
     try {
+      const tcHoy = getTcOficial();
+      const monedaR = r.currency || 'ARS';
+      const amountARS = monedaR === 'USD' ? (+r.amount) * (tcHoy || 1) : +r.amount;
       const [newTx] = await sbFetch('rhinos_transactions', 'POST', {
-        type: r.type, amount: r.amount, date: txDate,
-        description: r.description + ' (fijo)', category: r.category,
-        partner: r.partner, notes: 'Gasto fijo automático', currency: 'ARS'
+        type: r.type, amount: amountARS, date: txDate,
+        description: r.description, category: r.category,
+        partner: r.partner, notes: 'Gasto fijo automático',
+        currency: 'ARS', currency_original: monedaR,
+        amount_original: +r.amount, tc_dia: monedaR === 'USD' ? tcHoy : null
       });
       finTx.unshift(newTx);
       r.last_applied = currentMonth;
       applied++;
+      // Actualizar last_applied en Supabase directamente (sin re-upsert completo)
+      sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(r.id)}`, 'PATCH', { last_applied: currentMonth }).catch(() => {});
     } catch(e) { console.error('Error aplicando recurrente:', e); }
   }
 
   if (applied > 0) {
-    saveRecurring(list);
+    _recurring = list; // actualizar memoria sin sbUpsert (ya hicimos PATCH por id)
     showToast(`↻ ${applied} gasto${applied > 1 ? 's' : ''} fijo${applied > 1 ? 's' : ''} aplicado${applied > 1 ? 's' : ''} automáticamente`);
     renderResumen(); renderTransacciones(); renderSocios();
   }
