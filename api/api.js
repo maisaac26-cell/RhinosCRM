@@ -1,5 +1,35 @@
 const https = require('https');
 
+// ── Config de Instagram desde Supabase (con caché por cold start) ──
+const SB_URL_CONF = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
+const SB_KEY_CONF = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
+let _igConfigCache = null;
+
+async function getIgConfig() {
+  if (_igConfigCache) return _igConfigCache;
+  try {
+    const data = await new Promise((resolve) => {
+      const req = https.request({
+        hostname: new URL(SB_URL_CONF).hostname,
+        path: '/rest/v1/rhinos_config?key=in.(ig_access_token,ig_account_id)',
+        method: 'GET',
+        headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF }
+      }, (r) => {
+        let raw = ''; r.on('data', c => raw += c);
+        r.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { resolve([]); } });
+      });
+      req.on('error', () => resolve([])); req.end();
+    });
+    if (Array.isArray(data) && data.length) {
+      const cfg = {};
+      data.forEach(r => { cfg[r.key] = r.value; });
+      if (cfg.ig_access_token) { _igConfigCache = cfg; return cfg; }
+    }
+  } catch(e) {}
+  // Fallback a env vars
+  return { ig_access_token: process.env.IG_ACCESS_TOKEN, ig_account_id: process.env.IG_ACCOUNT_ID };
+}
+
 function httpGet(url) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -15,10 +45,11 @@ function httpGet(url) {
   });
 }
 
-function igFetch(path, method, body) {
-  const IG_TOKEN = process.env.IG_ACCESS_TOKEN;
+async function igFetch(path, method, body) {
+  const cfg = await getIgConfig();
+  const IG_TOKEN = cfg.ig_access_token;
   const baseUrl = `https://graph.facebook.com/v25.0/${path}${path.includes('?') ? '&' : '?'}access_token=${IG_TOKEN}`;
-  
+
   return new Promise((resolve, reject) => {
     const url = new URL(baseUrl);
     const options = {
@@ -27,7 +58,6 @@ function igFetch(path, method, body) {
       method: method || 'GET',
       headers: { 'Content-Type': 'application/json' }
     };
-    
     const req = https.request(options, (res) => {
       let raw = '';
       res.on('data', chunk => raw += chunk);
@@ -88,7 +118,8 @@ module.exports = async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { return res.status(400).json({ error: 'Invalid JSON' }); } }
 
-  const IG_ID = process.env.IG_ACCOUNT_ID;
+  const igCfg = await getIgConfig();
+  const IG_ID = igCfg.ig_account_id || process.env.IG_ACCOUNT_ID;
   const { action } = body;
 
   try {
@@ -120,6 +151,88 @@ module.exports = async function handler(req, res) {
 
       // Devolver como base64 para que el frontend lo dibuje en canvas
       result = { imageBase64: imgBuffer.toString('base64'), mime: 'image/png' };
+    }
+
+    else if (action === 'save_ig_config') {
+      const { token } = body;
+      if (!token) { return res.status(400).json({ error: 'Token requerido' }); }
+
+      // 1. Validar token contra Meta API
+      let accountId, username, followers;
+      try {
+        const pages = await httpGet(`https://graph.facebook.com/v25.0/me/accounts?fields=name,instagram_business_account&access_token=${encodeURIComponent(token)}`);
+        if (pages.error) throw new Error(pages.error.message);
+        accountId = pages.data?.[0]?.instagram_business_account?.id;
+        if (!accountId) throw new Error('No hay cuenta de Instagram Business asociada a este token');
+
+        const profile = await httpGet(`https://graph.facebook.com/v25.0/${accountId}?fields=username,followers_count&access_token=${encodeURIComponent(token)}`);
+        if (profile.error) throw new Error(profile.error.message);
+        username = profile.username;
+        followers = profile.followers_count;
+      } catch(e) {
+        return res.status(200).json({ error: 'Token inválido: ' + e.message });
+      }
+
+      // 2. Guardar en Supabase con fecha
+      const now = new Date().toISOString();
+      const configs = [
+        { key: 'ig_access_token', value: token, updated_at: now },
+        { key: 'ig_account_id', value: accountId, updated_at: now }
+      ];
+      const payload = JSON.stringify(configs);
+      await new Promise((resolve, reject) => {
+        const req2 = https.request({
+          hostname: new URL(SB_URL_CONF).hostname,
+          path: '/rest/v1/rhinos_config',
+          method: 'POST',
+          headers: {
+            'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF,
+            'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
+            'Prefer': 'resolution=merge-duplicates,return=minimal'
+          }
+        }, (r) => { let raw = ''; r.on('data', c => raw += c); r.on('end', () => resolve()); });
+        req2.on('error', reject); req2.write(payload); req2.end();
+      });
+
+      // 3. Invalidar caché para que el próximo request use el nuevo token
+      _igConfigCache = null;
+
+      result = { ok: true, account_id: accountId, username, followers, updated_at: now };
+    }
+
+    else if (action === 'get_ig_config_status') {
+      // Devuelve el estado actual del token (sin exponer el token completo)
+      try {
+        const data = await new Promise((resolve) => {
+          const req2 = https.request({
+            hostname: new URL(SB_URL_CONF).hostname,
+            path: '/rest/v1/rhinos_config?key=in.(ig_access_token,ig_account_id)',
+            method: 'GET',
+            headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF }
+          }, (r) => {
+            let raw = ''; r.on('data', c => raw += c);
+            r.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { resolve([]); } });
+          });
+          req2.on('error', () => resolve([])); req2.end();
+        });
+        const cfg = {};
+        (data || []).forEach(r => { cfg[r.key] = r; });
+        const tokenRow = cfg.ig_access_token;
+        if (!tokenRow) { result = { connected: false }; }
+        else {
+          const updatedAt = new Date(tokenRow.updated_at);
+          const expiresAt = new Date(updatedAt.getTime() + 60 * 24 * 60 * 60 * 1000); // 60 días
+          const daysLeft = Math.ceil((expiresAt - new Date()) / (24 * 60 * 60 * 1000));
+          result = {
+            connected: true,
+            account_id: cfg.ig_account_id?.value,
+            token_preview: tokenRow.value.slice(0, 20) + '...',
+            updated_at: tokenRow.updated_at,
+            expires_at: expiresAt.toISOString(),
+            days_left: daysLeft
+          };
+        }
+      } catch(e) { result = { connected: false, error: e.message }; }
     }
 
     else if (action === 'get_tipo_cambio') {

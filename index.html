@@ -479,6 +479,31 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div class="card-title">Comentarios del post <button class="btn btn-sm" id="btn-close-comments" style="margin-left:auto">✕ Cerrar</button></div>
       <div id="comments-list"><div class="empty">Seleccioná un post</div></div>
     </div>
+
+    <!-- Card conexión Instagram -->
+    <div class="card" id="ig-config-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        📡 Conexión Instagram
+        <span id="ig-status-badge" style="font-size:10px;padding:2px 10px;border-radius:10px;background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.25)">Verificando...</span>
+      </div>
+      <div id="ig-config-info" style="font-size:13px;color:var(--text2);margin-bottom:1rem">Cargando estado del token...</div>
+
+      <div id="ig-token-form" style="display:none">
+        <div class="field" style="margin-bottom:8px">
+          <label>Nuevo token de acceso de Instagram</label>
+          <input id="ig-new-token" type="password" placeholder="Pegá el nuevo token de Meta aquí..." style="font-size:12px"/>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="btn-save-ig-token" class="btn btn-cyan" style="flex:1;justify-content:center">✅ Validar y guardar token</button>
+          <button onclick="document.getElementById('ig-token-form').style.display='none'" class="btn" style="color:var(--text2)">Cancelar</button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+          💡 Conseguí el token en: <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--cyan)">Meta Graph API Explorer</a> → seleccioná la app → generá token con permisos <code>instagram_basic, instagram_content_publish, pages_read_engagement</code>
+        </div>
+      </div>
+
+      <button id="btn-show-ig-form" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">🔄 Actualizar token</button>
+    </div>
   </div>
 
   <!-- POSTS -->
@@ -2115,6 +2140,77 @@ document.getElementById('btn-close-comments').addEventListener('click', () => {
   document.querySelectorAll('.media-card').forEach(c => c.classList.remove('selected'));
 });
 document.getElementById('btn-refresh').addEventListener('click', loadDashboard);
+
+// ── INSTAGRAM CONFIG CARD ─────────────────────────────
+async function loadIgConfigStatus() {
+  const badge = document.getElementById('ig-status-badge');
+  const info  = document.getElementById('ig-config-info');
+  try {
+    const r = await callAPI('get_ig_config_status', {});
+    if (!r.connected) {
+      badge.textContent = '⚠ Sin conectar';
+      badge.style.background = 'rgba(239,68,68,0.12)';
+      badge.style.color = 'var(--red)';
+      badge.style.borderColor = 'rgba(239,68,68,0.25)';
+      info.innerHTML = 'Token no configurado. Agregá uno abajo.';
+      return;
+    }
+    const updDate = new Date(r.updated_at).toLocaleDateString('es-AR');
+    const expDate = new Date(r.expires_at).toLocaleDateString('es-AR');
+    const daysLeft = r.days_left;
+    const urgencia = daysLeft <= 7 ? 'color:var(--red);font-weight:700' : daysLeft <= 20 ? 'color:var(--amber);font-weight:600' : 'color:var(--green)';
+
+    badge.textContent = daysLeft > 0 ? `✅ Conectado · ${daysLeft}d restantes` : '⚠ Expirado';
+    badge.style.background = daysLeft > 20 ? 'rgba(34,197,94,0.12)' : daysLeft > 7 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
+    badge.style.color = daysLeft > 20 ? 'var(--green)' : daysLeft > 7 ? 'var(--amber)' : 'var(--red)';
+    badge.style.borderColor = daysLeft > 20 ? 'rgba(34,197,94,0.25)' : daysLeft > 7 ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.25)';
+
+    info.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px">
+          <div style="color:var(--text3);margin-bottom:2px">Cuenta</div>
+          <div style="color:var(--cyan);font-weight:600">@rhinosapp</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px">
+          <div style="color:var(--text3);margin-bottom:2px">Actualizado</div>
+          <div style="color:var(--text)">${updDate}</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px">
+          <div style="color:var(--text3);margin-bottom:2px">Vence</div>
+          <div style="${urgencia}">${expDate} (${daysLeft}d)</div>
+        </div>
+      </div>`;
+  } catch(e) {
+    badge.textContent = '⚠ Error';
+    info.textContent = 'No se pudo verificar el estado: ' + e.message;
+  }
+}
+
+document.getElementById('btn-show-ig-form').addEventListener('click', () => {
+  const form = document.getElementById('ig-token-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  if (form.style.display === 'block') document.getElementById('ig-new-token').focus();
+});
+
+document.getElementById('btn-save-ig-token').addEventListener('click', async function() {
+  const token = document.getElementById('ig-new-token').value.trim();
+  if (!token) { showToast('Pegá el token primero'); return; }
+  this.disabled = true; this.textContent = '⏳ Validando...';
+  try {
+    const r = await callAPI('save_ig_config', { token });
+    if (r.error) { showToast('Error: ' + r.error); return; }
+    document.getElementById('ig-new-token').value = '';
+    document.getElementById('ig-token-form').style.display = 'none';
+    showToast(`✅ Token guardado — @${r.username} (${r.followers} seguidores) 🦏`);
+    await loadIgConfigStatus();
+    // Recargar dashboard con el nuevo token
+    setTimeout(loadDashboard, 500);
+  } catch(e) { showToast('Error: ' + e.message); }
+  this.disabled = false; this.textContent = '✅ Validar y guardar token';
+});
+
+// Cargar estado al arranque
+loadIgConfigStatus();
 
 // ── POSTS SIDE ────────────────────────────────────────
 let mediaCache = null;
