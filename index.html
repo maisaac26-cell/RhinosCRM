@@ -332,6 +332,13 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   .sidebar-footer #crm-user{font-size:10px}
 }
 
+/* ── Gmail responsive ── */
+  #gmail-layout { grid-template-columns: 1fr !important; }
+  #gmail-reader-panel { display: none; }
+  #gmail-reader-panel.open { display: block; }
+  #gmail-list-panel.hidden { display: none; }
+  #btn-gmail-back { display: block !important; }
+
 /* Safe area para iPhone con notch/barra de inicio */
 @supports(padding-bottom: env(safe-area-inset-bottom)){
   @media(max-width:768px){
@@ -796,46 +803,59 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
 
     <div id="gmail-main" style="display:none">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-        <button id="btn-gmail-reconnect" class="btn btn-sm" style="font-size:11px;color:var(--text3);border-color:var(--border)">🔄 Reconectar cuenta Google</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-cyan btn-sm" id="btn-gmail-inbox">📥 Bandeja</button>
+          <button class="btn btn-sm" id="btn-gmail-sent">📤 Enviados</button>
+          <button class="btn btn-sm" id="btn-compose">✏️ Nuevo</button>
+        </div>
+        <button id="btn-gmail-reconnect" class="btn btn-sm" style="font-size:11px;color:var(--text3);border-color:var(--border)">🔄 Reconectar</button>
       </div>
-      <div class="grid3">
-        <div>
+
+      <!-- Layout 2 columnas: lista + lector -->
+      <div id="gmail-layout" style="display:grid;grid-template-columns:320px 1fr;gap:12px;align-items:start">
+
+        <!-- Panel lista -->
+        <div id="gmail-list-panel">
           <div class="card" style="padding:0.75rem">
             <div style="display:flex;gap:6px;margin-bottom:10px">
-              <button class="btn btn-cyan btn-sm" id="btn-gmail-inbox" style="flex:1;justify-content:center">Bandeja</button>
-              <button class="btn btn-sm" id="btn-gmail-sent" style="flex:1;justify-content:center">Enviados</button>
-            </div>
-            <div style="display:flex;gap:6px;margin-bottom:10px">
-              <input id="gmail-search" placeholder="Buscar..." style="font-size:12px;padding:6px 10px"/>
+              <input id="gmail-search" placeholder="Buscar..." style="font-size:12px;padding:6px 10px;flex:1"/>
               <button class="btn btn-sm" id="btn-gmail-search">🔍</button>
             </div>
-            <div id="gmail-list" style="display:flex;flex-direction:column;gap:4px;max-height:600px;overflow-y:auto">
+            <div id="gmail-list" style="display:flex;flex-direction:column;gap:3px;max-height:70vh;overflow-y:auto">
               <div class="empty"><div class="loader"></div></div>
             </div>
             <button class="btn btn-full btn-sm" id="btn-gmail-more" style="display:none;margin-top:8px">Cargar más</button>
           </div>
-          <button class="btn btn-full" id="btn-compose" style="margin-top:-4px">✏️ Nuevo email</button>
         </div>
 
-        <div>
+        <!-- Panel lector -->
+        <div id="gmail-reader-panel">
+          <!-- Botón volver (solo mobile) -->
+          <div id="btn-gmail-back" style="display:none;margin-bottom:8px">
+            <button class="btn btn-sm" onclick="closeGmailReader()">← Volver a la lista</button>
+          </div>
           <div id="gmail-view">
-            <div class="empty" style="padding:3rem">Seleccioná un email para leerlo</div>
+            <div class="card" style="text-align:center;padding:3rem;color:var(--text3)">
+              <div style="font-size:32px;margin-bottom:8px">✉️</div>
+              <div style="font-size:13px">Seleccioná un email para leerlo</div>
+            </div>
+          </div>
+          <!-- Compose -->
+          <div id="compose-modal" style="display:none">
+            <div class="card" style="border-color:var(--border2)">
+              <div class="card-title">✏️ Nuevo email</div>
+              <div class="field"><label>Para</label><input id="compose-to" placeholder="destinatario@empresa.com"/></div>
+              <div class="field"><label>Asunto</label><input id="compose-subject" placeholder="Asunto del email..."/></div>
+              <div class="field"><label>Mensaje</label><textarea id="compose-body" rows="8" placeholder="Escribí tu mensaje..."></textarea></div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-green" id="btn-send-compose">Enviar</button>
+                <button class="btn" id="btn-cancel-compose">Cancelar</button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div id="compose-modal" style="display:none">
-        <div class="card" style="border-color:var(--border2)">
-          <div class="card-title">✏️ Nuevo email</div>
-          <div class="field"><label>Para</label><input id="compose-to" placeholder="destinatario@empresa.com"/></div>
-          <div class="field"><label>Asunto</label><input id="compose-subject" placeholder="Asunto del email..."/></div>
-          <div class="field"><label>Mensaje</label><textarea id="compose-body" rows="8" placeholder="Escribí tu mensaje..."></textarea></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-green" id="btn-send-compose">Enviar email</button>
-            <button class="btn" id="btn-cancel-compose">Cancelar</button>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -3801,23 +3821,43 @@ async function loadGmailInbox(query, pageToken) {
   } catch(e) { list.innerHTML = `<div class="empty" style="color:var(--red)">Error: ${e.message}</div>`; }
 }
 
+function closeGmailReader() {
+  document.getElementById('gmail-reader-panel').classList.remove('open');
+  document.getElementById('gmail-list-panel').classList.remove('hidden');
+}
+
 async function openGmailMsg(m) {
   const view = document.getElementById('gmail-view');
   view.innerHTML = '<div class="empty"><div class="loader"></div></div>';
   gmailCurrentMsg = m;
   document.getElementById('compose-modal').style.display = 'none';
+
+  // Mobile: ocultar lista, mostrar lector
+  if (window.innerWidth <= 768) {
+    document.getElementById('gmail-list-panel').classList.add('hidden');
+    document.getElementById('gmail-reader-panel').classList.add('open');
+    document.getElementById('gmail-reader-panel').scrollIntoView({ behavior: 'smooth' });
+  }
+
   const token = await getAccessToken();
   try {
     const full = await callAPI('gmail_get', { access_token: token, message_id: m.id });
+    // Formatear el cuerpo del email (convertir saltos de línea en HTML)
+    const bodyHtml = (full.body || '(sin contenido)')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\n/g,'<br>');
+
     view.innerHTML = `
-      <div class="card">
+      <div class="card" style="padding:1.25rem">
         <div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
-          <div style="font-size:16px;font-weight:500;margin-bottom:6px">${full.subject}</div>
-          <div style="font-size:12px;color:var(--text2)">De: ${full.from}</div>
-          <div style="font-size:12px;color:var(--text2)">Para: ${full.to}</div>
-          <div style="font-size:12px;color:var(--text3)">${full.date}</div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:8px;color:var(--text);line-height:1.4">${full.subject || '(sin asunto)'}</div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div style="font-size:12px;color:var(--text2)"><span style="color:var(--text3)">De:</span> ${full.from}</div>
+            <div style="font-size:12px;color:var(--text2)"><span style="color:var(--text3)">Para:</span> ${full.to}</div>
+            <div style="font-size:11px;color:var(--text3)">${full.date}</div>
+          </div>
         </div>
-        <div style="font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;max-height:300px;overflow-y:auto;margin-bottom:1rem">${full.body}</div>
+        <div style="font-size:13px;line-height:1.8;color:var(--text);word-break:break-word;margin-bottom:1.25rem;max-height:60vh;overflow-y:auto;padding-right:4px">${bodyHtml}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-cyan btn-sm" id="btn-ai-reply-gmail">🦏 Respuesta IA</button>
           <button class="btn btn-sm" id="btn-manual-reply-gmail">Responder manualmente</button>
@@ -3897,7 +3937,12 @@ document.getElementById('btn-gmail-more').addEventListener('click', () => {
 });
 document.getElementById('btn-compose').addEventListener('click', () => {
   document.getElementById('compose-modal').style.display = 'block';
-  document.getElementById('gmail-view').innerHTML = '<div class="empty">Seleccioná un email</div>';
+  document.getElementById('gmail-view').innerHTML = '';
+  // En mobile: mostrar el panel del lector (con el compose)
+  if (window.innerWidth <= 768) {
+    document.getElementById('gmail-list-panel').classList.add('hidden');
+    document.getElementById('gmail-reader-panel').classList.add('open');
+  }
 });
 document.getElementById('btn-cancel-compose').addEventListener('click', () => {
   document.getElementById('compose-modal').style.display = 'none';
