@@ -157,47 +157,61 @@ module.exports = async function handler(req, res) {
       const { token } = body;
       if (!token) { return res.status(400).json({ error: 'Token requerido' }); }
 
-      // 1. Validar token contra Meta API
-      let accountId, username, followers;
+      // 1. Intentar convertir a long-lived token usando credenciales guardadas
+      let finalToken = token;
+      let isLongLived = false;
       try {
-        const pages = await httpGet(`https://graph.facebook.com/v25.0/me/accounts?fields=name,instagram_business_account&access_token=${encodeURIComponent(token)}`);
+        const cfg = await getIgConfig();
+        const appId     = cfg.ig_app_id     || process.env.IG_APP_ID;
+        const appSecret = cfg.ig_app_secret  || process.env.IG_APP_SECRET;
+        if (appId && appSecret) {
+          const exchangeUrl = `https://graph.facebook.com/v25.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${encodeURIComponent(token)}`;
+          const exchanged = await httpGet(exchangeUrl);
+          if (exchanged.access_token && !exchanged.error) {
+            finalToken = exchanged.access_token;
+            isLongLived = true;
+          }
+        }
+      } catch(e) { /* Si falla el exchange, seguimos con el token original */ }
+
+      // 2. Validar token final contra Meta API
+      let accountId, username, followers, expiresIn;
+      try {
+        const pages = await httpGet(`https://graph.facebook.com/v25.0/me/accounts?fields=name,instagram_business_account&access_token=${encodeURIComponent(finalToken)}`);
         if (pages.error) throw new Error(pages.error.message);
         accountId = pages.data?.[0]?.instagram_business_account?.id;
-        if (!accountId) throw new Error('No hay cuenta de Instagram Business asociada a este token');
+        if (!accountId) throw new Error('No hay cuenta de Instagram Business asociada');
 
-        const profile = await httpGet(`https://graph.facebook.com/v25.0/${accountId}?fields=username,followers_count&access_token=${encodeURIComponent(token)}`);
+        const profile = await httpGet(`https://graph.facebook.com/v25.0/${accountId}?fields=username,followers_count&access_token=${encodeURIComponent(finalToken)}`);
         if (profile.error) throw new Error(profile.error.message);
         username = profile.username;
         followers = profile.followers_count;
+
+        // Verificar cuánto dura
+        const debug = await httpGet(`https://graph.facebook.com/v25.0/debug_token?input_token=${encodeURIComponent(finalToken)}&access_token=${encodeURIComponent(finalToken)}`);
+        expiresIn = debug.data?.expires_at ? Math.ceil((debug.data.expires_at - Date.now()/1000) / 86400) : null;
       } catch(e) {
         return res.status(200).json({ error: 'Token inválido: ' + e.message });
       }
 
-      // 2. Guardar en Supabase con fecha
+      // 3. Guardar token final en Supabase
       const now = new Date().toISOString();
       const configs = [
-        { key: 'ig_access_token', value: token, updated_at: now },
-        { key: 'ig_account_id', value: accountId, updated_at: now }
+        { key: 'ig_access_token', value: finalToken, updated_at: now },
+        { key: 'ig_account_id',   value: accountId,  updated_at: now }
       ];
-      const payload = JSON.stringify(configs);
+      const sbPayload = JSON.stringify(configs);
       await new Promise((resolve, reject) => {
         const req2 = https.request({
-          hostname: new URL(SB_URL_CONF).hostname,
-          path: '/rest/v1/rhinos_config',
-          method: 'POST',
-          headers: {
-            'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF,
-            'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
-            'Prefer': 'resolution=merge-duplicates,return=minimal'
-          }
+          hostname: new URL(SB_URL_CONF).hostname, path: '/rest/v1/rhinos_config', method: 'POST',
+          headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(sbPayload), 'Prefer': 'resolution=merge-duplicates,return=minimal' }
         }, (r) => { let raw = ''; r.on('data', c => raw += c); r.on('end', () => resolve()); });
-        req2.on('error', reject); req2.write(payload); req2.end();
+        req2.on('error', reject); req2.write(sbPayload); req2.end();
       });
 
-      // 3. Invalidar caché para que el próximo request use el nuevo token
-      _igConfigCache = null;
+      _igConfigCache = null; // invalidar caché
 
-      result = { ok: true, account_id: accountId, username, followers, updated_at: now };
+      result = { ok: true, account_id: accountId, username, followers, updated_at: now, long_lived: isLongLived, days_valid: expiresIn };
     }
 
     else if (action === 'get_ig_config_status') {

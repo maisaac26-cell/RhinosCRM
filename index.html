@@ -2201,7 +2201,11 @@ document.getElementById('btn-save-ig-token').addEventListener('click', async fun
     if (r.error) { showToast('Error: ' + r.error); return; }
     document.getElementById('ig-new-token').value = '';
     document.getElementById('ig-token-form').style.display = 'none';
-    showToast(`✅ Token guardado — @${r.username} (${r.followers} seguidores) 🦏`);
+    const duracion = r.long_lived ? `${r.days_valid || 60}d` : 'corto';
+    const msg = r.long_lived
+      ? `✅ Token de ${duracion} guardado — @${r.username} 🦏`
+      : `⚠ Token corto guardado (válido ~1h). Configurá App Secret para auto-convertir.`;
+    showToast(msg);
     await loadIgConfigStatus();
     // Recargar dashboard con el nuevo token
     setTimeout(loadDashboard, 500);
