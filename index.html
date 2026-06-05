@@ -330,14 +330,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   /* ── Ocultar sidebar-footer texto en mobile ── */
   .sidebar-footer #crm-user{font-size:10px}
-}
 
-/* ── Gmail responsive ── */
+  /* ── Gmail responsive ── */
   #gmail-layout { grid-template-columns: 1fr !important; }
   #gmail-reader-panel { display: none; }
-  #gmail-reader-panel.open { display: block; }
-  #gmail-list-panel.hidden { display: none; }
+  #gmail-reader-panel.open { display: block !important; }
+  #gmail-list-panel.hidden { display: none !important; }
   #btn-gmail-back { display: block !important; }
+}
 
 /* Safe area para iPhone con notch/barra de inicio */
 @supports(padding-bottom: env(safe-area-inset-bottom)){
