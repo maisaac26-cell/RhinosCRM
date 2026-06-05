@@ -1,4 +1,5 @@
-const https = require('https');
+const https  = require('https');
+const crypto = require('crypto');
 
 // ── Config de Instagram desde Supabase (con caché por cold start) ──
 const SB_URL_CONF = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
@@ -105,6 +106,57 @@ function anthropicFetch(messages, system) {
     req.on('error', reject);
     req.write(payload);
     req.end();
+  });
+}
+
+// ── Google Analytics 4 — Service Account JWT Auth ────
+let _gaTokenCache = null; // { token, exp }
+
+async function getGAAccessToken() {
+  if (_gaTokenCache && _gaTokenCache.exp > Date.now() / 1000 + 60) return _gaTokenCache.token;
+
+  const clientEmail = process.env.GA_CLIENT_EMAIL;
+  const privateKey  = (process.env.GA_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+  if (!clientEmail || !privateKey) throw new Error('GA credentials no configuradas');
+
+  const now = Math.floor(Date.now() / 1000);
+  const claim = { iss: clientEmail, scope: 'https://www.googleapis.com/auth/analytics.readonly', aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now };
+
+  const header  = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify(claim)).toString('base64url');
+  const sign    = crypto.createSign('RSA-SHA256');
+  sign.update(`${header}.${payload}`);
+  const sig = sign.sign(privateKey, 'base64url');
+  const jwt = `${header}.${payload}.${sig}`;
+
+  const tokenData = await new Promise((resolve, reject) => {
+    const body = `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`;
+    const req = https.request({ hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) } }, (r) => {
+      let raw = ''; r.on('data', c => raw += c);
+      r.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw)); } });
+    });
+    req.on('error', reject); req.write(body); req.end();
+  });
+
+  if (!tokenData.access_token) throw new Error('GA Auth failed: ' + JSON.stringify(tokenData));
+  _gaTokenCache = { token: tokenData.access_token, exp: now + (tokenData.expires_in || 3600) };
+  return _gaTokenCache.token;
+}
+
+async function gaReport(propertyId, body) {
+  const token = await getGAAccessToken();
+  const payload = JSON.stringify(body);
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'analyticsdata.googleapis.com',
+      path: `/v1beta/properties/${propertyId}:runReport`,
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+    }, (r) => {
+      let raw = ''; r.on('data', c => raw += c);
+      r.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0,300))); } });
+    });
+    req.on('error', reject); req.write(payload); req.end();
   });
 }
 
@@ -247,6 +299,99 @@ module.exports = async function handler(req, res) {
           };
         }
       } catch(e) { result = { connected: false, error: e.message }; }
+    }
+
+    else if (action === 'ga_report') {
+      const propertyId = process.env.GA_PROPERTY_ID;
+      if (!propertyId) { result = { error: 'GA_PROPERTY_ID no configurado' }; return res.status(200).json(result); }
+
+      const { range = '30daysAgo' } = body;
+      const dateRange = [{ startDate: range, endDate: 'today' }];
+
+      try {
+        const [overview, pages, sources, devices, countries] = await Promise.all([
+
+          // 1. Métricas generales
+          gaReport(propertyId, {
+            dateRanges: [
+              { startDate: 'today',     endDate: 'today' },
+              { startDate: '7daysAgo',  endDate: 'today' },
+              { startDate: '30daysAgo', endDate: 'today' }
+            ],
+            metrics: [
+              { name: 'activeUsers' }, { name: 'sessions' },
+              { name: 'screenPageViews' }, { name: 'bounceRate' },
+              { name: 'averageSessionDuration' }, { name: 'newUsers' }
+            ]
+          }),
+
+          // 2. Top páginas
+          gaReport(propertyId, {
+            dateRanges: dateRange,
+            dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
+            metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }, { name: 'averageSessionDuration' }],
+            orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+            limit: 8
+          }),
+
+          // 3. Fuentes de tráfico
+          gaReport(propertyId, {
+            dateRanges: dateRange,
+            dimensions: [{ name: 'sessionDefaultChannelGroup' }],
+            metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
+            orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+            limit: 8
+          }),
+
+          // 4. Dispositivos
+          gaReport(propertyId, {
+            dateRanges: dateRange,
+            dimensions: [{ name: 'deviceCategory' }],
+            metrics: [{ name: 'sessions' }, { name: 'activeUsers' }]
+          }),
+
+          // 5. Países
+          gaReport(propertyId, {
+            dateRanges: dateRange,
+            dimensions: [{ name: 'country' }],
+            metrics: [{ name: 'activeUsers' }],
+            orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }],
+            limit: 5
+          })
+        ]);
+
+        // Procesar overview por dateRange
+        const parseMetrics = (row) => {
+          const m = {};
+          overview.metricHeaders.forEach((h, i) => { m[h.name] = +row.metricValues[i].value; });
+          return m;
+        };
+        const ovRows = overview.rows || [];
+        const metrics = {
+          today:   ovRows[0] ? parseMetrics(ovRows[0]) : {},
+          week7:   ovRows[1] ? parseMetrics(ovRows[1]) : {},
+          month30: ovRows[2] ? parseMetrics(ovRows[2]) : {}
+        };
+
+        // Parsear tabla genérica
+        const parseTable = (report) => (report.rows || []).map(row => {
+          const obj = {};
+          (report.dimensionHeaders || []).forEach((h, i) => { obj[h.name] = row.dimensionValues[i].value; });
+          (report.metricHeaders || []).forEach((h, i) => { obj[h.name] = +row.metricValues[i].value; });
+          return obj;
+        });
+
+        result = {
+          metrics,
+          pages:     parseTable(pages),
+          sources:   parseTable(sources),
+          devices:   parseTable(devices),
+          countries: parseTable(countries),
+          range
+        };
+      } catch(e) {
+        result = { error: 'GA API error: ' + e.message };
+      }
     }
 
     else if (action === 'get_tipo_cambio') {
