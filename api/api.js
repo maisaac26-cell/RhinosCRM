@@ -807,6 +807,166 @@ Respondé SOLO con un JSON válido con esta estructura exacta (sin markdown, sin
       result = { ...parsed, raw };
     }
 
+    else if (action === 'prospect_bulk_search') {
+      // Búsqueda masiva: múltiples keywords en paralelo + deduplicación
+      const { baseQuery, location, provincia, maxResults = 200 } = body;
+      const PLACES_KEY = process.env.GOOGLE_PLACES_KEY;
+      const loc = location || provincia || 'Argentina';
+
+      // Generar variantes de búsqueda automáticamente
+      const baseKeywords = [baseQuery];
+      const extras = {
+        'distribuidora de alimentos': ['mayorista de alimentos','empresa distribuidora alimentos','proveedor de alimentos'],
+        'distribuidora de bebidas':   ['mayorista de bebidas','empresa distribuidora bebidas','distribuidor de gaseosas'],
+        'distribuidora de lácteos':   ['distribuidor de lacteos','mayorista lacteos','distribuidora quesos y lacteos'],
+        'distribuidora de quesos y fiambres': ['distribuidor quesos','mayorista fiambres','distribuidora quesos fiambres'],
+        'distribuidora de carnes y embutidos': ['distribuidor carnes','frigorífico','mayorista carnes'],
+        'mayorista de alimentos': ['supermercado mayorista','cash and carry alimentos','distribuidor mayorista'],
+      };
+      const keywords = [...new Set([...baseKeywords, ...(extras[baseQuery] || ['empresa distribuidora','mayorista'])])];
+
+      // Para cada keyword, buscar hasta 3 páginas (60 resultados)
+      async function searchKeyword(kw, pageToken) {
+        const q = encodeURIComponent(`${kw} ${loc}`);
+        const url = pageToken
+          ? `https://maps.googleapis.com/maps/api/place/textsearch/json?pagetoken=${pageToken}&key=${PLACES_KEY}`
+          : `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${q}&type=establishment&language=es&region=ar&key=${PLACES_KEY}`;
+        return httpGet(url);
+      }
+
+      // Recopilar todos los place_ids únicos
+      const seenIds = new Set();
+      const allPlaces = [];
+
+      await Promise.allSettled(keywords.map(async (kw) => {
+        try {
+          let token = null;
+          for (let page = 0; page < 3; page++) {
+            if (page > 0 && token) await new Promise(r => setTimeout(r, 2000)); // esperar 2s entre páginas (req de Google)
+            const data = await searchKeyword(kw, token);
+            if (data.status !== 'OK') break;
+            for (const p of (data.results || [])) {
+              if (!seenIds.has(p.place_id)) {
+                seenIds.add(p.place_id);
+                allPlaces.push(p);
+              }
+            }
+            token = data.next_page_token;
+            if (!token) break;
+          }
+        } catch(e) {}
+      }));
+
+      // Obtener detalles de los primeros maxResults
+      const toDetail = allPlaces.slice(0, maxResults);
+      const detailed = await Promise.all(toDetail.map(async (place) => {
+        try {
+          const det = await httpGet(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_phone_number,international_phone_number,website,formatted_address,rating,user_ratings_total,business_status&language=es&key=${PLACES_KEY}`);
+          const d = det.result || {};
+          const phone = d.formatted_phone_number || d.international_phone_number || null;
+          return {
+            id: place.place_id, name: place.name,
+            address: d.formatted_address || place.formatted_address,
+            phone, website: d.website || null,
+            rating: place.rating || null, reviews: place.user_ratings_total || 0,
+            has_phone: !!phone, has_website: !!d.website,
+            instagram: null, ig_username: null
+          };
+        } catch(e) {
+          return { id: place.place_id, name: place.name, address: place.formatted_address, phone: null, website: null, rating: place.rating, reviews: place.user_ratings_total || 0, has_phone: false, has_website: false, instagram: null, ig_username: null };
+        }
+      }));
+      result = { places: detailed, total: detailed.length, keywords_used: keywords.length, status: 'OK' };
+    }
+
+    else if (action === 'find_prospect_instagram') {
+      // Busca el Instagram de un prospecto en su website y por nombre
+      const { website, name } = body;
+      let igHandle = null;
+      let igData = null;
+
+      // 1. Buscar en el website
+      if (website) {
+        try {
+          const fetchPage = (url) => new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(''), 5000);
+            try {
+              const u = new URL(url.startsWith('http') ? url : 'https://' + url);
+              const lib = u.protocol === 'https:' ? https : require('http');
+              const req = lib.request({ hostname: u.hostname, path: u.pathname || '/', method: 'GET', headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html' }, timeout: 4500 }, (res) => {
+                if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
+                  clearTimeout(timeout);
+                  const loc = res.headers.location.startsWith('http') ? res.headers.location : `${u.origin}${res.headers.location}`;
+                  fetchPage(loc).then(resolve);
+                  return;
+                }
+                let html = ''; res.on('data', c => { html += c; if (html.length > 200000) res.destroy(); });
+                res.on('end', () => { clearTimeout(timeout); resolve(html); });
+                res.on('error', () => { clearTimeout(timeout); resolve(''); });
+              });
+              req.on('error', () => { clearTimeout(timeout); resolve(''); });
+              req.on('timeout', () => { req.destroy(); clearTimeout(timeout); resolve(''); });
+              req.end();
+            } catch(e) { clearTimeout(timeout); resolve(''); }
+          });
+
+          const html = await fetchPage(website);
+          if (html) {
+            // Buscar links de Instagram
+            const igMatch = html.match(/instagram\.com\/([a-zA-Z0-9_.]{2,30})\/?["'\s]/);
+            if (igMatch && igMatch[1] && !['p','reel','explore','stories','accounts'].includes(igMatch[1])) {
+              igHandle = igMatch[1].replace(/\/$/, '');
+            }
+          }
+        } catch(e) {}
+      }
+
+      // 2. Si encontramos handle, obtener datos básicos del perfil
+      if (igHandle) {
+        try {
+          const cfg = await getIgConfig();
+          const igToken = cfg.ig_access_token;
+          if (igToken) {
+            const searchData = await httpGet(`https://graph.facebook.com/v25.0/ig_hashtag_search?q=${encodeURIComponent(igHandle)}&user_id=${cfg.ig_account_id}&fields=id&access_token=${igToken}`);
+            // Intentar buscar usuario por username via API
+            const userData = await httpGet(`https://graph.facebook.com/v25.0/?fields=business_discovery.fields(instagram_business_account{id,username,followers_count,biography})&id=&access_token=${igToken}`).catch(() => null);
+          }
+        } catch(e) {}
+        igData = { username: igHandle, profile_url: `https://instagram.com/${igHandle}`, found: true };
+      }
+
+      result = { instagram: igData, ig_username: igHandle };
+    }
+
+    else if (action === 'ig_find_user_id') {
+      // Busca el user_id de un username de Instagram para poder mandarle DM
+      const { username } = body;
+      if (!username) { result = { error: 'username requerido' }; return res.status(200).json(result); }
+      try {
+        const cfg = await getIgConfig();
+        const IG_ACCOUNT = cfg.ig_account_id;
+        const token = cfg.ig_access_token;
+        // Buscar business user por username
+        const data = await httpGet(`https://graph.facebook.com/v25.0/${IG_ACCOUNT}?fields=business_discovery.fields(id,username,name,followers_count)&access_token=${token}`).catch(() => null);
+        result = { found: false, note: 'Para DMs necesitás que el usuario haya interactuado con @rhinosapp primero.' };
+      } catch(e) { result = { error: e.message }; }
+    }
+
+    else if (action === 'ig_send_prospect_dm') {
+      // Enviar DM de Instagram a un prospecto (requiere que haya conversación previa o sea seguidor)
+      const { recipient_id, message } = body;
+      if (!recipient_id || !message) { result = { error: 'recipient_id y message requeridos' }; return res.status(200).json(result); }
+      try {
+        const cfg = await getIgConfig();
+        const IG_ACCOUNT = cfg.ig_account_id;
+        const sent = await igFetch(`${IG_ACCOUNT}/messages`, 'POST', {
+          recipient: { id: recipient_id },
+          message: { text: message }
+        });
+        result = sent.error ? { error: sent.error.message } : { ok: true, message_id: sent.message_id };
+      } catch(e) { result = { error: e.message }; }
+    }
+
     else if (action === 'prospect_search') {
       const { query, location, provincia, next_page_token } = body;
       const PLACES_KEY = process.env.GOOGLE_PLACES_KEY;

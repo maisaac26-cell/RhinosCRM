@@ -1090,11 +1090,42 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           </div>
         </div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-green" id="btn-search-prospects">Buscar prospectos 🔍</button>
-        <button class="btn btn-cyan" id="btn-export-prospects" style="display:none">Exportar CSV</button>
-        <span id="p-count" style="font-size:12px;color:var(--text2)"></span>
+      <!-- Filtros de calidad de contacto -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Filtrar resultados por</div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="f-phone" checked style="width:auto;padding:0;accent-color:var(--green)"/> 📞 Con teléfono
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="f-instagram" style="width:auto;padding:0;accent-color:var(--cyan)"/> 📸 Con Instagram encontrado
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="f-website" style="width:auto;padding:0;accent-color:var(--amber)"/> 🌐 Con website
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="f-rating" style="width:auto;padding:0;accent-color:var(--red)"/> ⭐ Con reseñas
+          </label>
+        </div>
       </div>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-green" id="btn-search-prospects" style="gap:6px">🔍 Buscar prospectos</button>
+        <button class="btn btn-cyan" id="btn-bulk-search-prospects" style="gap:6px">🚀 Búsqueda masiva <span style="font-size:10px;opacity:0.7">(multi-keyword)</span></button>
+        <button class="btn btn-sm" id="btn-export-prospects" style="display:none">📥 Exportar CSV</button>
+        <button class="btn btn-sm" id="btn-find-all-ig" style="display:none;background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);color:white;border:none">📸 Buscar IG en todos</button>
+        <span id="p-count" style="font-size:12px;color:var(--text2)"></span>
+        <span id="p-ig-count" style="font-size:12px;color:var(--cyan);display:none"></span>
+      </div>
+    </div>
+
+    <!-- Barra de campaña de DM -->
+    <div id="ig-campaign-bar" style="display:none;position:sticky;top:62px;z-index:90;background:var(--surface);border:1px solid rgba(131,58,180,0.4);border-radius:var(--rl);padding:12px 16px;margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 4px 20px rgba(131,58,180,0.2)">
+      <div style="font-size:13px;font-weight:600;color:#a78bfa">📸 Campaña DM Instagram</div>
+      <span id="ig-campaign-count" style="font-size:12px;color:var(--text2)">0 seleccionados con Instagram</span>
+      <input id="ig-campaign-msg" placeholder="Hola [nombre]! Vi que tenés una [tipo_negocio]..." style="flex:1;min-width:200px;font-size:12px;padding:6px 10px;border:1px solid rgba(131,58,180,0.3);background:var(--surface2)"/>
+      <button class="btn btn-sm" id="btn-ig-generate-msg" style="background:rgba(131,58,180,0.15);color:#a78bfa;border-color:rgba(131,58,180,0.3)">🦏 Generar con IA</button>
+      <button class="btn btn-sm" id="btn-ig-send-campaign" style="background:linear-gradient(135deg,#833ab4,#fd1d1d);color:white;border:none">📤 Enviar DMs</button>
     </div>
 
     <div id="prospects-results"></div>
@@ -4313,6 +4344,80 @@ document.querySelectorAll('[data-filter-status]').forEach(card => {
 document.querySelector('.nav-btn[data-sec="leads"]').addEventListener('click', loadLeads);
 document.querySelector('.nav-btn[data-sec="prospectos"]')?.addEventListener('click', loadProspectEmailsFromSupabase);
 
+// Filtro Instagram desde el panel principal
+document.getElementById('f-instagram')?.addEventListener('change', () => renderProspects());
+
+// ── CAMPAÑA DM INSTAGRAM ─────────────────────────────
+document.getElementById('btn-ig-generate-msg')?.addEventListener('click', async function() {
+  this.disabled = true; this.textContent = '⏳ Generando...';
+  const tipo = document.getElementById('p-tipo')?.value || 'distribuidora de alimentos';
+  try {
+    const r = await callAPI('ai_agent', {
+      system: `Sos el equipo comercial de RhinosApp — CRM para distribuidoras y pymes en Argentina. Redactás mensajes directos de Instagram para prospectar clientes fríos. Tono: cercano, directo, no corporativo. Máximo 3 líneas. Español rioplatense.`,
+      messages: [{ role: 'user', content: `Generá un mensaje de DM de Instagram para contactar a una ${tipo} de Argentina y ofrecerles RhinosApp. El mensaje debe:
+- Comenzar con "Hola [nombre]!"
+- Mencionar que viste su perfil de Instagram
+- Mencionar el dolor que resolvemos (stock en Excel, pedidos desordenados, cobranzas sin control)
+- Terminar con una pregunta o CTA simple
+- Variables disponibles: [nombre], [empresa]
+- Máximo 250 caracteres (importante para DM de Instagram)
+Solo respondé el mensaje, sin explicaciones.` }]
+    });
+    document.getElementById('ig-campaign-msg').value = r.reply?.trim() || '';
+    showToast('Mensaje generado con IA 🦏');
+  } catch(e) { showToast('Error: ' + e.message); }
+  this.disabled = false; this.textContent = '🦏 Generar con IA';
+});
+
+document.getElementById('btn-ig-send-campaign')?.addEventListener('click', async function() {
+  const msg = document.getElementById('ig-campaign-msg').value.trim();
+  if (!msg) { showToast('Escribí un mensaje primero'); return; }
+
+  // Obtener prospectos seleccionados con Instagram
+  const targets = [...selectedProspects]
+    .map(i => prospectsData[i])
+    .filter(p => p?.ig_username);
+
+  if (!targets.length) { showToast('No hay prospectos seleccionados con Instagram'); return; }
+  if (!confirm(`¿Enviar DM de @rhinosapp a ${targets.length} prospectos de Instagram?\n\nMensaje:\n${msg.slice(0,200)}...`)) return;
+
+  this.disabled = true;
+  let sent = 0; let errors = 0;
+  const resultLines = [];
+
+  for (const p of targets) {
+    const personalMsg = msg
+      .replace(/\[nombre\]/gi, p.name.split(' ')[0] || p.name)
+      .replace(/\[empresa\]/gi, p.name);
+
+    // Abrir Instagram DM en nueva pestaña (método garantizado sin restricciones de API)
+    const igUrl = `https://www.instagram.com/${p.ig_username}/`;
+    resultLines.push(`✅ @${p.ig_username} — ${p.name}`);
+    sent++;
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  // Mostrar resultado con links a los perfiles
+  const bar = document.getElementById('ig-campaign-bar');
+  if (bar) {
+    bar.innerHTML = `
+      <div style="width:100%">
+        <div style="font-size:13px;font-weight:600;color:#a78bfa;margin-bottom:8px">📸 Campaña lista — ${sent} perfiles</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
+          Copiá el mensaje y abrí cada perfil para enviar el DM manualmente desde Instagram:
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px;font-size:12px;color:var(--text);white-space:pre-wrap;margin-bottom:10px;cursor:pointer" onclick="navigator.clipboard.writeText(this.dataset.msg);showToast('Mensaje copiado 🦏')" data-msg="${msg.replace(/"/g,'&quot;')}" title="Clic para copiar">${msg}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${targets.map(p => `<a href="https://www.instagram.com/${p.ig_username}/" target="_blank" style="font-size:11px;padding:4px 10px;border-radius:var(--r);background:linear-gradient(135deg,rgba(131,58,180,0.2),rgba(253,29,29,0.1));color:#a78bfa;border:1px solid rgba(131,58,180,0.3);text-decoration:none">@${p.ig_username}</a>`).join('')}
+        </div>
+        <button onclick="document.getElementById('ig-campaign-bar').style.display='none'" class="btn btn-sm" style="margin-top:10px;color:var(--text3)">✕ Cerrar</button>
+      </div>`;
+    bar.style.display = 'flex';
+  }
+  showToast(`${sent} perfiles listos para DM 🦏`);
+  this.disabled = false;
+});
+
 // ── TAREAS ────────────────────────────────────────────
 let tasksData = [];
 let taskFilterStatus = '';
@@ -5261,8 +5366,80 @@ function formatWhatsApp(phone) {
 // ── PROSPECTOS ───────────────────────────────────────
 let prospectsData = [];
 let nextPageToken = null;
+let selectedProspectsIG = new Set(); // IDs de prospectos con IG seleccionados para DM
 
 document.getElementById('btn-search-prospects').addEventListener('click', () => searchProspects(false));
+
+// ── BÚSQUEDA MASIVA ───────────────────────────────────
+document.getElementById('btn-bulk-search-prospects').addEventListener('click', async () => {
+  const tipo = document.getElementById('p-tipo').value;
+  const provincia = document.getElementById('p-provincia').value;
+  const ciudad = document.getElementById('p-ciudad').value;
+  const zona = document.getElementById('p-zona').value.trim();
+  const location = zona || ciudad || provincia;
+  const out = document.getElementById('prospects-results');
+  const btn = document.getElementById('btn-bulk-search-prospects');
+
+  prospectsData = [];
+  nextPageToken = null;
+  btn.disabled = true; btn.textContent = '⏳ Buscando (puede tardar 30s)...';
+  out.innerHTML = `<div class="card" style="text-align:center;padding:2rem">
+    <div class="loader" style="margin:0 auto 1rem"></div>
+    <div style="font-size:14px;font-weight:500;color:var(--text)">Búsqueda masiva en curso</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:6px">Consultando múltiples variantes en paralelo...<br>Esto puede tardar hasta 30 segundos.</div>
+  </div>`;
+
+  try {
+    const r = await callAPI('prospect_bulk_search', { baseQuery: tipo, location, provincia, maxResults: 200 });
+    if (r.error) throw new Error(r.error);
+
+    let places = r.places || [];
+    const filterPhone = document.getElementById('f-phone').checked;
+    const filterWebsite = document.getElementById('f-website').checked;
+    const filterRating = document.getElementById('f-rating').checked;
+    if (filterPhone) places = places.filter(p => p.has_phone);
+    if (filterWebsite) places = places.filter(p => p.has_website);
+    if (filterRating) places = places.filter(p => p.rating);
+
+    prospectsData = places;
+    document.getElementById('p-count').textContent = `${prospectsData.length} prospectos (${r.keywords_used} keywords buscadas)`;
+    document.getElementById('btn-export-prospects').style.display = prospectsData.length ? 'inline-flex' : 'none';
+    document.getElementById('btn-find-all-ig').style.display = prospectsData.filter(p => p.has_website).length ? 'inline-flex' : 'none';
+    renderProspects();
+  } catch(e) {
+    out.innerHTML = `<div class="empty" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+  btn.disabled = false; btn.innerHTML = '🚀 Búsqueda masiva <span style="font-size:10px;opacity:0.7">(multi-keyword)</span>';
+});
+
+// ── BUSCAR INSTAGRAM EN TODOS ─────────────────────────
+document.getElementById('btn-find-all-ig').addEventListener('click', async function() {
+  this.disabled = true; this.textContent = '⏳ Buscando Instagram...';
+  let found = 0;
+  const withWebsite = prospectsData.filter((p, i) => p.has_website && !p.ig_username).slice(0, 50);
+
+  for (let i = 0; i < withWebsite.length; i++) {
+    const p = withWebsite[i];
+    try {
+      const r = await callAPI('find_prospect_instagram', { website: p.website, name: p.name });
+      if (r.ig_username) {
+        const idx = prospectsData.findIndex(x => x.id === p.id);
+        if (idx >= 0) { prospectsData[idx].ig_username = r.ig_username; prospectsData[idx].instagram = r.instagram; found++; }
+        // Actualizar card en el DOM
+        const igEl = document.getElementById(`ig-${p.id}`);
+        if (igEl) igEl.innerHTML = renderIGBadge(r.ig_username);
+      }
+    } catch(e) {}
+    this.textContent = `⏳ Buscando IG... (${i+1}/${withWebsite.length})`;
+    await new Promise(r => setTimeout(r, 300));
+  }
+  document.getElementById('p-ig-count').style.display = found ? 'inline' : 'none';
+  document.getElementById('p-ig-count').textContent = `📸 ${found} con Instagram`;
+  showToast(`Instagram encontrado en ${found} prospectos 🦏`);
+  this.disabled = false; this.textContent = '📸 IG encontrado: ' + found;
+  // Actualizar filtro
+  applyProspectFilters();
+});
 
 async function searchProspects(loadMore) {
   const tipo = document.getElementById('p-tipo').value;
@@ -5473,9 +5650,27 @@ function updateCampaignBar() {
     const p = prospectsData[i];
     return getProspectEmails()[p?.id];
   }).length;
+  const withIG = [...selectedProspects].filter(i => prospectsData[i]?.ig_username).length;
   if (count === 0) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
-  document.getElementById('campaign-count').textContent = `${count} seleccionado${count > 1 ? 's' : ''}${withEmail > 0 ? ` · ${withEmail} con email` : ' · ninguno con email'}`;
+  document.getElementById('campaign-count').textContent = `${count} seleccionado${count>1?'s':''}${withEmail>0?` · ${withEmail} con email`:''} ${withIG>0?`· 📸 ${withIG} con IG`:''}`;
+  const igBtn = document.getElementById('btn-ig-campaign-open');
+  if (igBtn) igBtn.style.display = withIG > 0 ? 'inline-flex' : 'none';
+}
+
+function renderIGBadge(username) {
+  if (!username) return `<button class="btn btn-sm prospect-find-ig" style="font-size:11px;padding:3px 8px;opacity:0.6">📸 Buscar IG</button>`;
+  return `<a href="https://instagram.com/${username}" target="_blank" style="font-size:11px;padding:3px 8px;border-radius:var(--r);background:linear-gradient(135deg,rgba(131,58,180,0.15),rgba(253,29,29,0.08));color:#a78bfa;border:1px solid rgba(131,58,180,0.3);text-decoration:none;white-space:nowrap">📸 @${username}</a>`;
+}
+
+function applyProspectFilters() {
+  const filterIG = document.getElementById('f-instagram')?.checked;
+  if (!filterIG) { renderProspects(); return; }
+  const orig = prospectsData;
+  const filtered = orig.filter(p => p.ig_username);
+  prospectsData = filtered;
+  renderProspects();
+  prospectsData = orig;
 }
 
 function renderProspects() {
@@ -5483,25 +5678,38 @@ function renderProspects() {
   if (!prospectsData.length) { out.innerHTML = '<div class="empty">Sin resultados. Probá con otra búsqueda.</div>'; return; }
   const savedEmails = getProspectEmails();
   selectedProspects.clear();
+  selectedProspectsIG.clear();
+
+  // Aplicar filtro de Instagram si está activo
+  const filterIG = document.getElementById('f-instagram')?.checked;
+  const displayData = filterIG ? prospectsData.filter(p => p.ig_username) : prospectsData;
 
   out.innerHTML = `
-    <!-- Barra de campaña -->
+    <!-- Barra de campaña email -->
     <div id="campaign-bar" style="display:none;position:sticky;top:60px;z-index:50;background:rgba(13,17,23,0.95);border:1px solid rgba(0,229,204,0.3);border-radius:var(--r);padding:10px 16px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:12px;backdrop-filter:blur(8px)">
       <span id="campaign-count" style="font-size:13px;color:var(--cyan);font-weight:500"></span>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" id="btn-deselect-all">Deseleccionar todo</button>
-        <button class="btn btn-sm" id="btn-campaign-send" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">📧 Enviar campaña</button>
+        <button class="btn btn-sm" id="btn-campaign-send" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">📧 Enviar campaña email</button>
+        <button class="btn btn-sm" id="btn-ig-campaign-open" style="background:linear-gradient(135deg,rgba(131,58,180,0.15),rgba(253,29,29,0.08));color:#a78bfa;border-color:rgba(131,58,180,0.3);font-weight:600;display:none">📸 Campaña IG DM</button>
       </div>
     </div>
 
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;color:var(--text3)">
+      <span>Mostrando ${displayData.length} de ${prospectsData.length} prospectos</span>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12px">
+        <input type="checkbox" id="f-instagram-inline" ${filterIG?'checked':''} style="width:auto;padding:0;accent-color:var(--cyan)"/> Solo con Instagram
+      </label>
+    </div>
+
     <div style="display:flex;flex-direction:column;gap:8px">
-      ${prospectsData.map((p, i) => {
+      ${displayData.map((p, i) => {
         const savedEmail = savedEmails[p.id] || '';
         return `
         <div class="card" style="padding:1rem;margin-bottom:0" id="prospect-${i}">
           <div style="display:flex;align-items:flex-start;gap:12px">
             <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0">
-              <input type="checkbox" class="prospect-check" data-idx="${i}" style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer"/>
+              <input type="checkbox" class="prospect-check" data-idx="${i}" data-pid="${p.id}" style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer"/>
               <div style="width:36px;height:36px;border-radius:8px;background:rgba(0,229,204,0.1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px">🏭</div>
             </div>
             <div style="flex:1;min-width:0">
@@ -5511,16 +5719,18 @@ function renderProspects() {
                 ${p.phone ? `<span style="color:var(--green)">📞 ${p.phone}</span>` : '<span style="color:var(--text3)">Sin teléfono</span>'}
                 ${p.website ? `<a href="${p.website}" target="_blank" style="color:var(--cyan)">🌐 Website</a>` : ''}
                 ${p.rating ? `<span style="color:var(--amber)">⭐ ${p.rating} (${p.reviews} reseñas)</span>` : ''}
+                <span id="ig-${p.id}">${renderIGBadge(p.ig_username)}</span>
               </div>
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <input type="email" class="prospect-email-input" data-pid="${p.id}" placeholder="📧 Email del contacto" value="${savedEmail}" style="flex:1;font-size:12px;padding:5px 10px;min-width:180px"/>
-                ${p.website ? `<button class="btn btn-sm prospect-find-email" data-idx="${i}" data-website="${p.website}" data-pid="${p.id}" title="Buscar email en la web del negocio" style="white-space:nowrap;padding:5px 10px">🔍 Auto</button>` : ''}
+                ${p.website ? `<button class="btn btn-sm prospect-find-email" data-idx="${i}" data-website="${p.website}" data-pid="${p.id}" style="white-space:nowrap;padding:5px 10px">🔍 Email auto</button>` : ''}
                 <button class="btn btn-sm" data-email-idx="${i}" style="background:rgba(99,102,241,0.12);color:#818cf8;border-color:rgba(99,102,241,0.3);white-space:nowrap;${!savedEmail?'opacity:0.5':''}">📧 Enviar</button>
               </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-              ${p.phone ? `<a href="https://wa.me/${formatWhatsApp(p.phone)}" target="_blank" class="btn btn-green btn-sm">💬 WhatsApp</a>` : ''}
-              <button class="btn btn-cyan btn-sm" data-enrich-idx="${i}">🦏 Analizar</button>
+              ${p.phone ? `<a href="https://wa.me/${formatWhatsApp(p.phone)}" target="_blank" class="btn btn-green btn-sm" style="text-align:center">💬 WA</a>` : ''}
+              ${p.website ? `<button class="btn btn-sm prospect-find-ig-single" data-pid="${p.id}" data-website="${p.website}" data-name="${p.name.replace(/"/g,'')}" style="font-size:11px;padding:4px 8px;${p.ig_username?'opacity:0.5':''}">📸 IG</button>` : ''}
+              <button class="btn btn-cyan btn-sm" data-enrich-idx="${i}" style="font-size:11px">🦏</button>
             </div>
           </div>
           <div id="enrich-${i}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>
@@ -5600,6 +5810,45 @@ function renderProspects() {
       this.disabled = false;
       if (this.textContent === '⏳') this.textContent = '🔍 Auto';
     });
+  });
+
+  // Buscar Instagram individual
+  out.querySelectorAll('.prospect-find-ig-single').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const pid = this.dataset.pid; const website = this.dataset.website; const name = this.dataset.name;
+      this.disabled = true; this.textContent = '⏳';
+      try {
+        const r = await callAPI('find_prospect_instagram', { website, name });
+        const igEl = document.getElementById(`ig-${pid}`);
+        if (r.ig_username) {
+          if (igEl) igEl.innerHTML = renderIGBadge(r.ig_username);
+          const idx = prospectsData.findIndex(p => p.id === pid);
+          if (idx >= 0) { prospectsData[idx].ig_username = r.ig_username; prospectsData[idx].instagram = r.instagram; }
+          this.textContent = '✅ IG'; this.style.opacity = '0.5';
+          showToast(`Instagram encontrado: @${r.ig_username} 🦏`);
+        } else {
+          showToast('No se encontró Instagram en el sitio web');
+          this.textContent = '📸 IG'; this.disabled = false;
+        }
+      } catch(e) { showToast('Error buscando IG'); this.disabled = false; this.textContent = '📸 IG'; }
+    });
+  });
+
+  // Filtro inline de Instagram
+  const igFilterInline = document.getElementById('f-instagram-inline');
+  if (igFilterInline) igFilterInline.addEventListener('change', function() {
+    const mainFilter = document.getElementById('f-instagram');
+    if (mainFilter) mainFilter.checked = this.checked;
+    renderProspects();
+  });
+
+  // Botón campaña IG
+  const igCampBtn = document.getElementById('btn-ig-campaign-open');
+  if (igCampBtn) igCampBtn.addEventListener('click', () => {
+    const bar = document.getElementById('ig-campaign-bar');
+    bar.style.display = 'flex';
+    const withIG = [...selectedProspects].filter(i => prospectsData[i]?.ig_username).length;
+    document.getElementById('ig-campaign-count').textContent = `${withIG} seleccionados con Instagram`;
   });
 
   // Botón enviar email individual
