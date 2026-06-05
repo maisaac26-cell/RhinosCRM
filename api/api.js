@@ -394,10 +394,15 @@ module.exports = async function handler(req, res) {
           })
         ]);
 
+        // Detectar errores silenciosos de la API
+        if (overview.error) throw new Error('GA API: ' + (overview.error.message || overview.error.status));
+        if (pages.error)    console.warn('GA pages error:', pages.error.message);
+        if (sources.error)  console.warn('GA sources error:', sources.error.message);
+
         // Procesar overview por dateRange
         const parseMetrics = (row) => {
           const m = {};
-          overview.metricHeaders.forEach((h, i) => { m[h.name] = +row.metricValues[i].value; });
+          (overview.metricHeaders || []).forEach((h, i) => { m[h.name] = +row.metricValues[i].value; });
           return m;
         };
         const ovRows = overview.rows || [];
