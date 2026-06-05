@@ -301,6 +301,43 @@ module.exports = async function handler(req, res) {
       } catch(e) { result = { connected: false, error: e.message }; }
     }
 
+    else if (action === 'ga_get_auth_url') {
+      const clientId = process.env.GA_CLIENT_ID;
+      const redirect = 'https://rhinos-crm.vercel.app/auth/callback';
+      const scope = 'https://www.googleapis.com/auth/analytics.readonly';
+      result = { url: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=analytics_auth` };
+    }
+
+    else if (action === 'ga_exchange_code') {
+      const { code } = body;
+      const clientId     = process.env.GA_CLIENT_ID;
+      const clientSecret = process.env.GA_CLIENT_SECRET;
+      const redirect     = 'https://rhinos-crm.vercel.app/auth/callback';
+      const payload = new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirect, grant_type: 'authorization_code' }).toString();
+      const tokenData = await new Promise((resolve, reject) => {
+        const req = https.request({ hostname:'oauth2.googleapis.com', path:'/token', method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','Content-Length':Buffer.byteLength(payload)} }, (r) => {
+          let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>{ try{resolve(JSON.parse(raw));}catch(e){reject(new Error(raw));} });
+        });
+        req.on('error',reject); req.write(payload); req.end();
+      });
+      if (!tokenData.access_token) return res.status(200).json({ error: 'Token exchange failed: ' + JSON.stringify(tokenData) });
+
+      // Guardar en Supabase
+      const now = new Date().toISOString();
+      const expiry = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
+      const configs = [
+        { key: 'ga_access_token',  value: tokenData.access_token,  updated_at: now },
+        { key: 'ga_refresh_token', value: tokenData.refresh_token || '', updated_at: now },
+        { key: 'ga_token_expiry',  value: expiry, updated_at: now }
+      ].filter(c => c.value);
+      const sbPay = JSON.stringify(configs);
+      await new Promise((resolve, reject) => {
+        const req = https.request({ hostname: new URL(SB_URL_CONF).hostname, path: '/rest/v1/rhinos_config', method: 'POST', headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(sbPay), 'Prefer': 'resolution=merge-duplicates,return=minimal' } }, (r) => { let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>resolve()); });
+        req.on('error', reject); req.write(sbPay); req.end();
+      });
+      result = { ok: true };
+    }
+
     else if (action === 'ga_report') {
       // Leer Property ID desde Supabase (fallback a env var)
       let propertyId = process.env.GA_PROPERTY_ID;
@@ -323,24 +360,55 @@ module.exports = async function handler(req, res) {
       const { range = '30daysAgo', access_token: oauthToken } = body;
       const dateRange = [{ startDate: range, endDate: 'today' }];
 
-      // Si viene un token OAuth del usuario, úsalo directamente (evita service account)
-      const gaReportWithToken = oauthToken
-        ? async (propId, body) => {
-            const payload = JSON.stringify(body);
-            return new Promise((resolve, reject) => {
-              const req = https.request({
-                hostname: 'analyticsdata.googleapis.com',
-                path: `/v1beta/properties/${propId}:runReport`,
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + oauthToken, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
-              }, (r) => {
-                let raw = ''; r.on('data', c => raw += c);
-                r.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0,300))); } });
-              });
-              req.on('error', reject); req.write(payload); req.end();
+      // Obtener token de Analytics desde Supabase (tiene prioridad sobre el token de Gmail)
+      let analyticsToken = null;
+      try {
+        const cfgRows = await new Promise((resolve) => {
+          const req2 = https.request({ hostname: new URL(SB_URL_CONF).hostname, path: '/rest/v1/rhinos_config?key=in.(ga_access_token,ga_refresh_token,ga_token_expiry)', method: 'GET', headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF } }, (r) => { let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>{ try{resolve(JSON.parse(raw));}catch(e){resolve([]);} }); });
+          req2.on('error',()=>resolve([])); req2.end();
+        });
+        const cfg = {};
+        (cfgRows||[]).forEach(r => { cfg[r.key] = r.value; });
+        if (cfg.ga_access_token) {
+          const expired = cfg.ga_token_expiry && new Date(cfg.ga_token_expiry) < new Date(Date.now() + 60000);
+          if (expired && cfg.ga_refresh_token) {
+            // Refrescar token
+            const clientId = process.env.GA_CLIENT_ID; const clientSecret = process.env.GA_CLIENT_SECRET;
+            const rPayload = new URLSearchParams({ refresh_token: cfg.ga_refresh_token, client_id: clientId, client_secret: clientSecret, grant_type: 'refresh_token' }).toString();
+            const refreshed = await new Promise((resolve) => {
+              const req3 = https.request({ hostname:'oauth2.googleapis.com', path:'/token', method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','Content-Length':Buffer.byteLength(rPayload)} }, (r) => { let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>{ try{resolve(JSON.parse(raw));}catch(e){resolve({});} }); });
+              req3.on('error',()=>resolve({})); req3.write(rPayload); req3.end();
             });
-          }
-        : gaReport; // fallback al service account
+            if (refreshed.access_token) {
+              analyticsToken = refreshed.access_token;
+              const newExpiry = new Date(Date.now() + (refreshed.expires_in||3600)*1000).toISOString();
+              const upd = JSON.stringify([{key:'ga_access_token',value:analyticsToken,updated_at:new Date().toISOString()},{key:'ga_token_expiry',value:newExpiry,updated_at:new Date().toISOString()}]);
+              https.request({ hostname:new URL(SB_URL_CONF).hostname, path:'/rest/v1/rhinos_config', method:'POST', headers:{'apikey':SB_KEY_CONF,'Authorization':'Bearer '+SB_KEY_CONF,'Content-Type':'application/json','Content-Length':Buffer.byteLength(upd),'Prefer':'resolution=merge-duplicates,return=minimal'} }, ()=>{}).end(upd);
+            }
+          } else { analyticsToken = cfg.ga_access_token; }
+        }
+      } catch(e) {}
+
+      const finalToken = analyticsToken || oauthToken; // Analytics token tiene prioridad
+
+      // Si viene un token OAuth del usuario, úsalo directamente (evita service account)
+      if (!finalToken) { result = { error: 'Analytics no conectado. Conectá Google Analytics en el CRM.' }; return res.status(200).json(result); }
+
+      const gaReportWithToken = async (propId, reqBody) => {
+        const payload = JSON.stringify(reqBody);
+        return new Promise((resolve, reject) => {
+          const req = https.request({
+            hostname: 'analyticsdata.googleapis.com',
+            path: `/v1beta/properties/${propId}:runReport`,
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + finalToken, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+          }, (r) => {
+            let raw = ''; r.on('data', c => raw += c);
+            r.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0,300))); } });
+          });
+          req.on('error', reject); req.write(payload); req.end();
+        });
+      };
 
       try {
         const [overview, pages, sources, devices, countries] = await Promise.all([

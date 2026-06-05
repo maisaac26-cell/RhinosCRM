@@ -483,6 +483,17 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="comments-list"><div class="empty">Seleccioná un post</div></div>
     </div>
 
+    <!-- Card conexión Analytics -->
+    <div class="card" id="ga-connect-card" style="display:none">
+      <div class="card-title">📊 Conectar Google Analytics</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:1rem">
+        Conectá tu cuenta de Google Analytics para ver los datos de <strong>rhinosapp.vercel.app</strong> directamente en el CRM.
+      </div>
+      <button id="btn-connect-ga" class="btn btn-cyan" style="justify-content:center">
+        🔗 Conectar con Google Analytics
+      </button>
+    </div>
+
     <!-- Card conexión Instagram -->
     <div class="card" id="ig-config-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -7389,15 +7400,9 @@ async function loadAnalytics() {
     const el = document.getElementById(id); if (el) el.textContent = '…';
   });
 
-  // Obtener access token de Gmail OAuth (ya tiene scope analytics.readonly)
+  // Obtener token de Gmail como fallback (puede no tener analytics scope)
   let accessToken;
   try { accessToken = await getAccessToken(); } catch(e) {}
-
-  if (!accessToken) {
-    errEl.style.display = 'block';
-    errMsg.innerHTML = '⚠ Necesitás conectar Gmail primero para acceder a Analytics.<br><small style="color:var(--text3)">Andá a la sección Gmail → conectar cuenta Google.</small>';
-    return;
-  }
 
   try {
     const data = await callAPI('ga_report', { range, access_token: accessToken });
@@ -7416,6 +7421,41 @@ async function loadAnalytics() {
 document.querySelector('.nav-btn[data-sec="analytics"]')?.addEventListener('click', loadAnalytics);
 document.getElementById('btn-ga-refresh')?.addEventListener('click', loadAnalytics);
 document.getElementById('ga-range')?.addEventListener('change', loadAnalytics);
+
+// Conectar Analytics con OAuth propio
+document.getElementById('btn-connect-ga')?.addEventListener('click', async () => {
+  const r = await callAPI('ga_get_auth_url', {});
+  if (r.url) window.location.href = r.url;
+});
+
+// Verificar si hay token de Analytics en Supabase — mostrar/ocultar botón conectar
+async function checkGAConnection() {
+  try {
+    const data = await sbFetch('rhinos_config?key=eq.ga_access_token');
+    const hasToken = Array.isArray(data) && data.length && data[0].value;
+    const card = document.getElementById('ga-connect-card');
+    if (card) card.style.display = hasToken ? 'none' : 'block';
+  } catch(e) {}
+}
+checkGAConnection();
+
+// Manejar callback de Analytics OAuth (state=analytics_auth)
+(async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code  = urlParams.get('code');
+  const state = urlParams.get('state');
+  if (code && state === 'analytics_auth') {
+    window.history.replaceState({}, '', window.location.pathname);
+    try {
+      const r = await callAPI('ga_exchange_code', { code });
+      if (r.ok) {
+        showToast('✅ Google Analytics conectado 🦏');
+        checkGAConnection();
+        loadAnalytics();
+      } else { showToast('Error conectando Analytics: ' + (r.error || 'desconocido')); }
+    } catch(e) { showToast('Error: ' + e.message); }
+  }
+})();
 
 async function autoSyncBalance() {
   try {
