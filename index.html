@@ -3547,10 +3547,18 @@ async function migrateLocalStorageToSupabase() {
     ops.push(sbUpsert('rhinos_cobros', payload));
   }
 
-  // Gastos recurrentes
+  // Gastos recurrentes — deduplicar por descripción antes de migrar
   const recurring = pick('rhinos_recurring_txs');
-  if (Array.isArray(recurring) && recurring.length)
-    ops.push(sbUpsert('rhinos_recurring_txs', recurring));
+  if (Array.isArray(recurring) && recurring.length) {
+    ops.push((async () => {
+      try {
+        const remote = await sbFetch('rhinos_recurring_txs?select=description');
+        const remoteDescs = new Set((remote||[]).map(r => r.description?.trim().toLowerCase()));
+        const nuevos = recurring.filter(r => r.description && !remoteDescs.has(r.description.trim().toLowerCase()));
+        if (nuevos.length) await sbUpsert('rhinos_recurring_txs', nuevos);
+      } catch(e) {}
+    })());
+  }
 
   // Tiers de presupuesto
   const tiers = pick('rhinos_pres_tiers');
@@ -4741,8 +4749,20 @@ function saveRecurring(list) {
   if (list.length) sbUpsert('rhinos_recurring_txs', list);
 }
 async function syncRecurringTxsFromSupabase() {
-  try { _recurring = (await sbFetch('rhinos_recurring_txs?order=description.asc')) || []; }
-  catch(e) { console.warn('[sync] recurring:', e.message); }
+  try {
+    const rows = (await sbFetch('rhinos_recurring_txs?order=description.asc')) || [];
+    // Deduplicar por descripción en memoria (por si quedaron duplicados en DB)
+    const seen = new Set();
+    _recurring = rows.filter(r => {
+      const key = r.description?.trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    // Si había duplicados en DB, borrarlos
+    const toDelete = rows.filter(r => !_recurring.find(k => k.id === r.id));
+    toDelete.forEach(r => sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(r.id)}`, 'DELETE').catch(() => {}));
+  } catch(e) { console.warn('[sync] recurring:', e.message); }
 }
 
 function renderRecurring() {
