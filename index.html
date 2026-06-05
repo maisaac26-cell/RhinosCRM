@@ -3664,7 +3664,7 @@ document.getElementById('btn-crm-login').addEventListener('click', async () => {
 
 // ── GMAIL ─────────────────────────────────────────────
 const GMAIL_REDIRECT = window.location.origin + '/auth/callback';
-const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/calendar';
+const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/analytics.readonly';
 let GMAIL_CLIENT_ID = '';
 
 let gmailTokens = null;
@@ -7366,7 +7366,10 @@ function renderGAMetrics(data) {
 
 async function loadAnalytics() {
   const range = document.getElementById('ga-range')?.value || '30daysAgo';
-  document.getElementById('ga-error').style.display = 'none';
+  const errEl = document.getElementById('ga-error');
+  const errMsg = document.getElementById('ga-error-msg');
+  errEl.style.display = 'none';
+
   ['ga-pages','ga-sources','ga-devices','ga-countries'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
@@ -7374,17 +7377,28 @@ async function loadAnalytics() {
   ['ga-users-30','ga-sessions','ga-pageviews','ga-new-users','ga-bounce','ga-duration'].forEach(id => {
     const el = document.getElementById(id); if (el) el.textContent = '…';
   });
+
+  // Obtener access token de Gmail OAuth (ya tiene scope analytics.readonly)
+  let accessToken;
+  try { accessToken = await getAccessToken(); } catch(e) {}
+
+  if (!accessToken) {
+    errEl.style.display = 'block';
+    errMsg.innerHTML = '⚠ Necesitás conectar Gmail primero para acceder a Analytics.<br><small style="color:var(--text3)">Andá a la sección Gmail → conectar cuenta Google.</small>';
+    return;
+  }
+
   try {
-    const data = await callAPI('ga_report', { range });
+    const data = await callAPI('ga_report', { range, access_token: accessToken });
     if (data.error) {
-      document.getElementById('ga-error').style.display = 'block';
-      document.getElementById('ga-error-msg').textContent = '⚠ ' + data.error;
+      errEl.style.display = 'block';
+      errMsg.textContent = '⚠ ' + data.error;
       return;
     }
     renderGAMetrics(data);
   } catch(e) {
-    document.getElementById('ga-error').style.display = 'block';
-    document.getElementById('ga-error-msg').textContent = '⚠ Error: ' + e.message;
+    errEl.style.display = 'block';
+    errMsg.textContent = '⚠ Error: ' + e.message;
   }
 }
 

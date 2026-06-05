@@ -305,14 +305,33 @@ module.exports = async function handler(req, res) {
       const propertyId = process.env.GA_PROPERTY_ID;
       if (!propertyId) { result = { error: 'GA_PROPERTY_ID no configurado' }; return res.status(200).json(result); }
 
-      const { range = '30daysAgo' } = body;
+      const { range = '30daysAgo', access_token: oauthToken } = body;
       const dateRange = [{ startDate: range, endDate: 'today' }];
+
+      // Si viene un token OAuth del usuario, úsalo directamente (evita service account)
+      const gaReportWithToken = oauthToken
+        ? async (propId, body) => {
+            const payload = JSON.stringify(body);
+            return new Promise((resolve, reject) => {
+              const req = https.request({
+                hostname: 'analyticsdata.googleapis.com',
+                path: `/v1beta/properties/${propId}:runReport`,
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + oauthToken, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+              }, (r) => {
+                let raw = ''; r.on('data', c => raw += c);
+                r.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error(raw.slice(0,300))); } });
+              });
+              req.on('error', reject); req.write(payload); req.end();
+            });
+          }
+        : gaReport; // fallback al service account
 
       try {
         const [overview, pages, sources, devices, countries] = await Promise.all([
 
           // 1. Métricas generales
-          gaReport(propertyId, {
+          gaReportWithToken(propertyId, {
             dateRanges: [
               { startDate: 'today',     endDate: 'today' },
               { startDate: '7daysAgo',  endDate: 'today' },
@@ -326,7 +345,7 @@ module.exports = async function handler(req, res) {
           }),
 
           // 2. Top páginas
-          gaReport(propertyId, {
+          gaReportWithToken(propertyId, {
             dateRanges: dateRange,
             dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
             metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }, { name: 'averageSessionDuration' }],
@@ -335,7 +354,7 @@ module.exports = async function handler(req, res) {
           }),
 
           // 3. Fuentes de tráfico
-          gaReport(propertyId, {
+          gaReportWithToken(propertyId, {
             dateRanges: dateRange,
             dimensions: [{ name: 'sessionDefaultChannelGroup' }],
             metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
@@ -344,14 +363,14 @@ module.exports = async function handler(req, res) {
           }),
 
           // 4. Dispositivos
-          gaReport(propertyId, {
+          gaReportWithToken(propertyId, {
             dateRanges: dateRange,
             dimensions: [{ name: 'deviceCategory' }],
             metrics: [{ name: 'sessions' }, { name: 'activeUsers' }]
           }),
 
           // 5. Países
-          gaReport(propertyId, {
+          gaReportWithToken(propertyId, {
             dateRanges: dateRange,
             dimensions: [{ name: 'country' }],
             metrics: [{ name: 'activeUsers' }],
