@@ -302,7 +302,22 @@ module.exports = async function handler(req, res) {
     }
 
     else if (action === 'ga_report') {
-      const propertyId = process.env.GA_PROPERTY_ID;
+      // Leer Property ID desde Supabase (fallback a env var)
+      let propertyId = process.env.GA_PROPERTY_ID;
+      if (!propertyId) {
+        try {
+          const cfgRows = await new Promise((resolve) => {
+            const req2 = https.request({
+              hostname: new URL(SB_URL_CONF).hostname,
+              path: '/rest/v1/rhinos_config?key=eq.ga_property_id',
+              method: 'GET',
+              headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF }
+            }, (r) => { let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>{ try{resolve(JSON.parse(raw));}catch(e){resolve([]);} }); });
+            req2.on('error',()=>resolve([])); req2.end();
+          });
+          propertyId = cfgRows?.[0]?.value;
+        } catch(e) {}
+      }
       if (!propertyId) { result = { error: 'GA_PROPERTY_ID no configurado' }; return res.status(200).json(result); }
 
       const { range = '30daysAgo', access_token: oauthToken } = body;
