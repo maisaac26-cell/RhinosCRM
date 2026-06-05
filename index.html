@@ -785,6 +785,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
 
     <div id="gmail-main" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+        <button id="btn-gmail-reconnect" class="btn btn-sm" style="font-size:11px;color:var(--text3);border-color:var(--border)">🔄 Reconectar cuenta Google</button>
+      </div>
       <div class="grid3">
         <div>
           <div class="card" style="padding:0.75rem">
@@ -3729,13 +3732,21 @@ async function initGmail() {
   }
 }
 
-document.getElementById('btn-gmail-auth').addEventListener('click', async () => {
+async function startGmailAuth() {
   if (!GMAIL_CLIENT_ID) {
     const r = await callAPI('gmail_get_client_id', {});
     GMAIL_CLIENT_ID = r.client_id;
   }
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GMAIL_CLIENT_ID}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT)}&response_type=code&scope=${encodeURIComponent(GMAIL_SCOPES)}&access_type=offline&prompt=consent&state=gmail_auth`;
   window.location.href = authUrl;
+}
+
+document.getElementById('btn-gmail-auth').addEventListener('click', startGmailAuth);
+
+document.getElementById('btn-gmail-reconnect').addEventListener('click', () => {
+  if (!confirm('¿Reconectar cuenta de Google? Esto actualizará los permisos (Gmail + Analytics). Gmail seguirá funcionando igual.')) return;
+  localStorage.removeItem('rhinos_gmail_tokens');
+  startGmailAuth();
 });
 
 async function loadGmailInbox(query, pageToken) {
