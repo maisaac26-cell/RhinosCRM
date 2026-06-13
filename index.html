@@ -732,8 +732,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
     <div class="tab-row">
       <button class="tab-btn active" data-wctab="articulos">📝 Artículos</button>
-      <button class="tab-btn" data-wctab="precios">💲 Precios y plan</button>
-      <button class="tab-btn" data-wctab="textos">🏠 Textos</button>
+      <button class="tab-btn" data-wctab="contenido">🧩 Contenido de la página</button>
     </div>
 
     <!-- ARTICULOS -->
@@ -768,68 +767,24 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="wc-posts-list"><div class="empty">Cargando...</div></div>
     </div>
 
-    <!-- PRECIOS Y PLAN -->
-    <div class="tab-content" id="wctab-precios">
-      <div class="card">
-        <div class="card-title">Sección de precios</div>
-        <div class="field">
-          <label>Título de la sección</label>
-          <input id="wc-pricing-title">
-        </div>
-        <div class="field">
-          <label>Subtítulo</label>
-          <input id="wc-pricing-subtitle">
+    <!-- CONTENIDO DE LA PAGINA -->
+    <div class="tab-content" id="wctab-contenido">
+      <div class="card" style="border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.05)">
+        <div style="font-size:12px;color:var(--text2);line-height:1.6">
+          Esto es lo que está <b>publicado ahora</b> en rhinosapp.vercel.app, organizado por sección. Editá los textos que quieras y tocá <b>"Ver cambios"</b>: te muestra exactamente qué va a cambiar (antes → después) antes de publicar nada.
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">Plan</div>
-        <div class="field">
-          <label>Nombre del plan</label>
-          <input id="wc-plan-name">
-        </div>
-        <div class="field">
-          <label>Descripción</label>
-          <input id="wc-plan-description">
-        </div>
-        <div class="field">
-          <label>Funcionalidades incluidas (una por línea)</label>
-          <textarea id="wc-plan-features" rows="9"></textarea>
+      <div id="wc-content-tree"><div class="empty">Cargando...</div></div>
+      <button class="btn btn-full" id="btn-wc-preview-changes" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">🔍 Ver cambios</button>
+      <div class="card" id="wc-changes-card" style="display:none;margin-top:1rem;border-color:rgba(245,158,11,0.4)">
+        <div class="card-title">Cambios a publicar</div>
+        <div id="wc-changes-list"></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-full" id="btn-wc-confirm-publish" style="background:rgba(34,197,94,0.12);color:var(--green);border-color:rgba(34,197,94,0.3);font-weight:600">✓ Confirmar y publicar</button>
+          <button class="btn" id="btn-wc-cancel-changes">Cancelar</button>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">Bonos por tiempo limitado</div>
-        <div class="field">
-          <label>Un bono por línea, con el formato: Título :: Descripción</label>
-          <textarea id="wc-bonuses" rows="4"></textarea>
-        </div>
-      </div>
-      <button class="btn btn-full" id="btn-wc-save-pricing" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">Guardar cambios</button>
-      <div id="wc-pricing-status" style="margin-top:8px;font-size:12px"></div>
-    </div>
-
-    <!-- TEXTOS -->
-    <div class="tab-content" id="wctab-textos">
-      <div class="card">
-        <div class="card-title">Encabezado principal (Hero)</div>
-        <div class="field">
-          <label>Texto pequeño superior</label>
-          <input id="wc-hero-preheadline">
-        </div>
-        <div class="field">
-          <label>Título principal</label>
-          <textarea id="wc-hero-title" rows="2"></textarea>
-        </div>
-        <div class="field">
-          <label>Subtítulo</label>
-          <textarea id="wc-hero-subtitle" rows="3"></textarea>
-        </div>
-        <div class="field">
-          <label>Texto del banner de IA</label>
-          <input id="wc-hero-aitext">
-        </div>
-      </div>
-      <button class="btn btn-full" id="btn-wc-save-textos" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">Guardar cambios</button>
-      <div id="wc-textos-status" style="margin-top:8px;font-size:12px"></div>
+      <div id="wc-content-status" style="margin-top:8px;font-size:12px"></div>
     </div>
   </div>
 
@@ -8495,8 +8450,7 @@ async function loadWebContent() {
     wcSiteContent = contentRes.siteContent;
 
     renderWcPosts();
-    fillWcPricingForm();
-    fillWcTextosForm();
+    wcRenderContentTree();
   } catch (e) {
     document.getElementById('wc-posts-list').innerHTML = `<div class="empty" style="color:var(--red)">Error: ${e.message}</div>`;
   }
@@ -8591,62 +8545,176 @@ async function wcDeletePost(slug) {
   }
 }
 
-function fillWcPricingForm() {
-  const c = wcSiteContent;
-  document.getElementById('wc-pricing-title').value = c.pricing.title;
-  document.getElementById('wc-pricing-subtitle').value = c.pricing.subtitle;
-  document.getElementById('wc-plan-name').value = c.pricing.plan.name;
-  document.getElementById('wc-plan-description').value = c.pricing.plan.description;
-  document.getElementById('wc-plan-features').value = c.pricing.plan.features.join('\n');
-  document.getElementById('wc-bonuses').value = c.pricing.bonuses.map(b => `${b.title} :: ${b.description}`).join('\n');
+// ── Editor genérico de contenido (refleja 1:1 lo publicado) ──
+function wcGetPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 
-document.getElementById('btn-wc-save-pricing').addEventListener('click', async () => {
-  const status = document.getElementById('wc-pricing-status');
+function wcSetPath(obj, path, value) {
+  const keys = path.split('.');
+  let cur = obj;
+  for (let i = 0; i < keys.length - 1; i++) cur = cur[keys[i]];
+  cur[keys[keys.length - 1]] = value;
+}
+
+function wcEscapeHtml(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function wcBuildSections(c) {
+  return [
+    { title: '🧭 Encabezado / menú', fields: [
+      { path: 'header.navLinks', label: `Enlaces del menú (uno por línea — son ${c.header.navLinks.length}, no agregues ni quites líneas)`, type: 'list' },
+      { path: 'header.loginLabel', label: 'Texto del botón "Log in"', type: 'text' },
+    ]},
+    { title: '🚀 Portada principal (Hero)', fields: [
+      { path: 'hero.preheadline', label: 'Texto pequeño arriba del título', type: 'text' },
+      { path: 'hero.title', label: 'Título principal (H1)', type: 'textarea' },
+      { path: 'hero.subtitle', label: 'Subtítulo', type: 'textarea' },
+      { path: 'hero.ctaLabel', label: 'Texto del botón principal ("Agendar demo")', type: 'text' },
+      { path: 'hero.aiText', label: 'Texto del cartel de IA', type: 'text' },
+    ]},
+    { title: '⚙️ Funcionalidades del CRM', fields: [
+      { path: 'features.title', label: 'Título de la tarjeta destacada', type: 'textarea' },
+      { path: 'features.description', label: 'Descripción de la tarjeta destacada', type: 'textarea' },
+      ...c.features.items.flatMap((_, i) => [
+        { path: `features.items.${i}.title`, label: `Funcionalidad ${i + 1} — título`, type: 'text' },
+        { path: `features.items.${i}.description`, label: `Funcionalidad ${i + 1} — descripción`, type: 'textarea' },
+      ]),
+    ]},
+    { title: '📊 Comparación: tu método vs Rhinosapp', fields: [
+      { path: 'comparison.title', label: 'Título de la sección', type: 'text' },
+      { path: 'comparison.subtitle', label: 'Subtítulo de la sección', type: 'textarea' },
+      { path: 'comparison.current.title', label: 'Columna izquierda — título', type: 'text' },
+      { path: 'comparison.current.subtitle', label: 'Columna izquierda — subtítulo', type: 'text' },
+      { path: 'comparison.current.items', label: `Columna izquierda — ítems (uno por línea, ${c.comparison.current.items.length} en total)`, type: 'list' },
+      { path: 'comparison.rhinos.title', label: 'Columna derecha — título', type: 'text' },
+      { path: 'comparison.rhinos.subtitle', label: 'Columna derecha — subtítulo', type: 'text' },
+      { path: 'comparison.rhinos.items', label: `Columna derecha — ítems (uno por línea, ${c.comparison.rhinos.items.length} en total)`, type: 'list' },
+    ]},
+    { title: '💲 Precios y plan', fields: [
+      { path: 'pricing.title', label: 'Título de la sección', type: 'text' },
+      { path: 'pricing.subtitle', label: 'Subtítulo de la sección', type: 'text' },
+      { path: 'pricing.plan.name', label: 'Nombre del plan', type: 'text' },
+      { path: 'pricing.plan.description', label: 'Descripción del plan', type: 'text' },
+      { path: 'pricing.plan.features', label: 'Funcionalidades incluidas (una por línea)', type: 'list' },
+      ...c.pricing.bonuses.flatMap((_, i) => [
+        { path: `pricing.bonuses.${i}.title`, label: `Bono ${i + 1} — título`, type: 'text' },
+        { path: `pricing.bonuses.${i}.description`, label: `Bono ${i + 1} — descripción`, type: 'textarea' },
+      ]),
+    ]},
+    { title: '📬 Contacto', fields: [
+      { path: 'contact.title', label: 'Título de la sección', type: 'textarea' },
+      { path: 'contact.subtitle', label: 'Subtítulo', type: 'text' },
+      { path: 'contact.whatsappQuestion', label: '"¿Preferís hablar por WhatsApp?"', type: 'text' },
+      { path: 'contact.whatsappButtonLabel', label: 'Texto del botón de WhatsApp', type: 'text' },
+      { path: 'contact.calendlyButtonLabel', label: 'Texto del botón de Calendly', type: 'text' },
+    ]},
+    { title: '📰 Blog (vista previa en la home)', fields: [
+      { path: 'blog.badge', label: 'Etiqueta ("Blog")', type: 'text' },
+      { path: 'blog.title', label: 'Título', type: 'text' },
+      { path: 'blog.subtitle', label: 'Subtítulo', type: 'textarea' },
+      { path: 'blog.ctaLabel', label: 'Texto del botón "Ver el blog"', type: 'text' },
+    ]},
+    { title: '👣 Pie de página', fields: [
+      { path: 'footer.tagline', label: 'Texto debajo del nombre', type: 'textarea' },
+      { path: 'footer.copyright', label: 'Texto de copyright (después del año)', type: 'text' },
+    ]},
+  ];
+}
+
+function wcRenderContentTree() {
+  const sections = wcBuildSections(wcSiteContent);
+  const container = document.getElementById('wc-content-tree');
+  container.innerHTML = sections.map(sec => `
+    <div class="card">
+      <div class="card-title">${sec.title}</div>
+      ${sec.fields.map(f => {
+        const val = wcGetPath(wcSiteContent, f.path);
+        if (f.type === 'list') {
+          const text = (val || []).join('\n');
+          return `<div class="field"><label>${f.label}</label><textarea data-wc-path="${f.path}" data-wc-type="list" rows="${Math.min(10, Math.max(3, (val || []).length + 1))}">${wcEscapeHtml(text)}</textarea></div>`;
+        }
+        if (f.type === 'textarea') {
+          return `<div class="field"><label>${f.label}</label><textarea data-wc-path="${f.path}" data-wc-type="text" rows="3">${wcEscapeHtml(val)}</textarea></div>`;
+        }
+        return `<div class="field"><label>${f.label}</label><input data-wc-path="${f.path}" data-wc-type="text" value="${wcEscapeHtml(val)}"></div>`;
+      }).join('')}
+    </div>
+  `).join('');
+  document.getElementById('wc-changes-card').style.display = 'none';
+  document.getElementById('wc-content-status').textContent = '';
+}
+
+function wcCollectUpdated() {
   const updated = JSON.parse(JSON.stringify(wcSiteContent));
-  updated.pricing.title = document.getElementById('wc-pricing-title').value.trim();
-  updated.pricing.subtitle = document.getElementById('wc-pricing-subtitle').value.trim();
-  updated.pricing.plan.name = document.getElementById('wc-plan-name').value.trim();
-  updated.pricing.plan.description = document.getElementById('wc-plan-description').value.trim();
-  updated.pricing.plan.features = document.getElementById('wc-plan-features').value.split('\n').map(s => s.trim()).filter(Boolean);
-  updated.pricing.bonuses = document.getElementById('wc-bonuses').value.split('\n').map(s => s.trim()).filter(Boolean).map(line => {
-    const [bTitle, bDesc] = line.split('::').map(s => s.trim());
-    return { title: bTitle || '', description: bDesc || '' };
+  document.querySelectorAll('#wc-content-tree [data-wc-path]').forEach(el => {
+    const path = el.dataset.wcPath;
+    if (el.dataset.wcType === 'list') {
+      wcSetPath(updated, path, el.value.split('\n').map(s => s.trim()).filter(Boolean));
+    } else {
+      wcSetPath(updated, path, el.value.trim());
+    }
+  });
+  return updated;
+}
+
+let wcPendingUpdate = null;
+
+document.getElementById('btn-wc-preview-changes').addEventListener('click', () => {
+  const updated = wcCollectUpdated();
+  const sections = wcBuildSections(wcSiteContent);
+  const changes = [];
+  sections.forEach(sec => {
+    sec.fields.forEach(f => {
+      const oldVal = wcGetPath(wcSiteContent, f.path);
+      const newVal = wcGetPath(updated, f.path);
+      const oldStr = Array.isArray(oldVal) ? oldVal.join('\n') : String(oldVal ?? '');
+      const newStr = Array.isArray(newVal) ? newVal.join('\n') : String(newVal ?? '');
+      if (oldStr !== newStr) changes.push({ section: sec.title, label: f.label, oldStr, newStr });
+    });
   });
 
-  status.textContent = 'Guardando...';
-  try {
-    const r = await callWcAPI('wc_save_site_content', { siteContent: updated });
-    if (r.error) throw new Error(r.error);
-    wcSiteContent = updated;
-    status.innerHTML = '<span style="color:var(--green)">✓ Guardado. Va a estar en vivo en 1-2 minutos.</span>';
-  } catch (e) {
-    status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  const card = document.getElementById('wc-changes-card');
+  const list = document.getElementById('wc-changes-list');
+  const confirmBtn = document.getElementById('btn-wc-confirm-publish');
+
+  if (!changes.length) {
+    list.innerHTML = '<div class="empty">No hay cambios para publicar.</div>';
+    confirmBtn.style.display = 'none';
+    wcPendingUpdate = null;
+  } else {
+    list.innerHTML = changes.map(ch => `
+      <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">${ch.section} — ${ch.label}</div>
+        <div style="font-size:12px;color:var(--red);text-decoration:line-through;opacity:0.75;white-space:pre-wrap;margin-bottom:2px">${wcEscapeHtml(ch.oldStr) || '(vacío)'}</div>
+        <div style="font-size:12px;color:var(--green);white-space:pre-wrap">${wcEscapeHtml(ch.newStr) || '(vacío)'}</div>
+      </div>
+    `).join('');
+    confirmBtn.style.display = 'inline-flex';
+    wcPendingUpdate = updated;
   }
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
 
-function fillWcTextosForm() {
-  const c = wcSiteContent;
-  document.getElementById('wc-hero-preheadline').value = c.hero.preheadline;
-  document.getElementById('wc-hero-title').value = c.hero.title;
-  document.getElementById('wc-hero-subtitle').value = c.hero.subtitle;
-  document.getElementById('wc-hero-aitext').value = c.hero.aiText;
-}
+document.getElementById('btn-wc-cancel-changes').addEventListener('click', () => {
+  wcPendingUpdate = null;
+  document.getElementById('wc-changes-card').style.display = 'none';
+});
 
-document.getElementById('btn-wc-save-textos').addEventListener('click', async () => {
-  const status = document.getElementById('wc-textos-status');
-  const updated = JSON.parse(JSON.stringify(wcSiteContent));
-  updated.hero.preheadline = document.getElementById('wc-hero-preheadline').value.trim();
-  updated.hero.title = document.getElementById('wc-hero-title').value.trim();
-  updated.hero.subtitle = document.getElementById('wc-hero-subtitle').value.trim();
-  updated.hero.aiText = document.getElementById('wc-hero-aitext').value.trim();
-
-  status.textContent = 'Guardando...';
+document.getElementById('btn-wc-confirm-publish').addEventListener('click', async () => {
+  if (!wcPendingUpdate) return;
+  const status = document.getElementById('wc-content-status');
+  status.textContent = 'Publicando...';
   try {
-    const r = await callWcAPI('wc_save_site_content', { siteContent: updated });
+    const r = await callWcAPI('wc_save_site_content', { siteContent: wcPendingUpdate });
     if (r.error) throw new Error(r.error);
-    wcSiteContent = updated;
-    status.innerHTML = '<span style="color:var(--green)">✓ Guardado. Va a estar en vivo en 1-2 minutos.</span>';
+    wcSiteContent = wcPendingUpdate;
+    wcPendingUpdate = null;
+    document.getElementById('wc-changes-card').style.display = 'none';
+    wcRenderContentTree();
+    status.innerHTML = '<span style="color:var(--green)">✓ Publicado. Va a estar en vivo en 1-2 minutos.</span>';
   } catch (e) {
     status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
   }
