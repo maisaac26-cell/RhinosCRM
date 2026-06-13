@@ -424,6 +424,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <button class="nav-btn" data-sec="dms"><span class="nav-icon">💬</span>DMs</button>
     <button class="nav-btn" data-sec="contenido"><span class="nav-icon">🎨</span>Contenido</button>
 
+    <div class="nav-group-label">Web</div>
+    <button class="nav-btn" data-sec="webcontent"><span class="nav-icon">🌐</span>Blog y Web</button>
+
   </div>
 
   <!-- Footer del sidebar -->
@@ -717,6 +720,116 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- BLOG Y WEB -->
+  <div class="section" id="s-webcontent">
+    <div class="section-header">
+      <div class="page-title">BLOG <span>Y WEB</span></div>
+      <div class="page-sub">Editá los artículos del blog, los precios/plan y los textos principales de rhinosapp.vercel.app. Los cambios se publican solos en 1-2 minutos.</div>
+    </div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" data-wctab="articulos">📝 Artículos</button>
+      <button class="tab-btn" data-wctab="precios">💲 Precios y plan</button>
+      <button class="tab-btn" data-wctab="textos">🏠 Textos</button>
+    </div>
+
+    <!-- ARTICULOS -->
+    <div class="tab-content active" id="wctab-articulos">
+      <div class="card" style="border-color:rgba(0,229,204,0.25)">
+        <div class="card-title"><span class="ct-accent">+</span> Nuevo / editar artículo</div>
+        <input type="hidden" id="wc-post-slug-original" value="">
+        <div class="field">
+          <label>Título</label>
+          <input id="wc-post-title" placeholder="Ej: 5 errores al gestionar el stock de tu distribuidora">
+        </div>
+        <div class="field">
+          <label>Resumen (se muestra en la lista del blog)</label>
+          <textarea id="wc-post-excerpt" rows="2" placeholder="Resumen corto del artículo..."></textarea>
+        </div>
+        <div class="field">
+          <label>Fecha</label>
+          <input type="date" id="wc-post-date">
+        </div>
+        <div class="field">
+          <label>Contenido</label>
+          <textarea id="wc-post-content" rows="10" placeholder="Escribí el artículo acá. Separá los párrafos con una línea en blanco.&#10;Para un subtítulo, empezá la línea con ##&#10;Para una lista, escribí cada ítem en una línea empezando con - "></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-full" id="btn-wc-save-post" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">Publicar artículo</button>
+          <button class="btn" id="btn-wc-clear-post" style="display:none">Cancelar edición</button>
+        </div>
+        <div id="wc-post-status" style="margin-top:8px;font-size:12px"></div>
+      </div>
+
+      <div class="card-title" style="margin-top:1.5rem">Artículos publicados</div>
+      <div id="wc-posts-list"><div class="empty">Cargando...</div></div>
+    </div>
+
+    <!-- PRECIOS Y PLAN -->
+    <div class="tab-content" id="wctab-precios">
+      <div class="card">
+        <div class="card-title">Sección de precios</div>
+        <div class="field">
+          <label>Título de la sección</label>
+          <input id="wc-pricing-title">
+        </div>
+        <div class="field">
+          <label>Subtítulo</label>
+          <input id="wc-pricing-subtitle">
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Plan</div>
+        <div class="field">
+          <label>Nombre del plan</label>
+          <input id="wc-plan-name">
+        </div>
+        <div class="field">
+          <label>Descripción</label>
+          <input id="wc-plan-description">
+        </div>
+        <div class="field">
+          <label>Funcionalidades incluidas (una por línea)</label>
+          <textarea id="wc-plan-features" rows="9"></textarea>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Bonos por tiempo limitado</div>
+        <div class="field">
+          <label>Un bono por línea, con el formato: Título :: Descripción</label>
+          <textarea id="wc-bonuses" rows="4"></textarea>
+        </div>
+      </div>
+      <button class="btn btn-full" id="btn-wc-save-pricing" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">Guardar cambios</button>
+      <div id="wc-pricing-status" style="margin-top:8px;font-size:12px"></div>
+    </div>
+
+    <!-- TEXTOS -->
+    <div class="tab-content" id="wctab-textos">
+      <div class="card">
+        <div class="card-title">Encabezado principal (Hero)</div>
+        <div class="field">
+          <label>Texto pequeño superior</label>
+          <input id="wc-hero-preheadline">
+        </div>
+        <div class="field">
+          <label>Título principal</label>
+          <textarea id="wc-hero-title" rows="2"></textarea>
+        </div>
+        <div class="field">
+          <label>Subtítulo</label>
+          <textarea id="wc-hero-subtitle" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label>Texto del banner de IA</label>
+          <input id="wc-hero-aitext">
+        </div>
+      </div>
+      <button class="btn btn-full" id="btn-wc-save-textos" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">Guardar cambios</button>
+      <div id="wc-textos-status" style="margin-top:8px;font-size:12px"></div>
     </div>
   </div>
 
@@ -2116,6 +2229,7 @@ document.querySelectorAll('.nav-btn[data-sec]').forEach(btn => {
     this.classList.add('active');
     if (this.dataset.sec === 'calendario') loadCalendar();
     if (this.dataset.sec === 'posts') loadPostsSide();
+    if (this.dataset.sec === 'webcontent') loadWebContent();
     // Cerrar sidebar en mobile al navegar
     closeMobileSidebar();
   });
@@ -8321,6 +8435,222 @@ function renderGuideStep() {
     nextBtn.onclick = () => guideStep(1);
   }
 }
+
+// ── BLOG Y WEB ────────────────────────────────────────
+const WC_API = '/api/web-content';
+
+async function callWcAPI(action, extra) {
+  const res = await fetch(WC_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...extra })
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch(e) { throw new Error(text.slice(0, 150)); }
+}
+
+document.querySelectorAll('.tab-btn[data-wctab]').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn[data-wctab]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#s-webcontent .tab-content').forEach(c => c.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('wctab-' + this.dataset.wctab).classList.add('active');
+  });
+});
+
+let wcSiteContent = null;
+let wcBlogPosts = null;
+
+function wcContentToText(blocks) {
+  return (blocks || []).map(b => {
+    if (b.type === 'heading') return '## ' + b.text;
+    if (b.type === 'list') return b.items.map(i => '- ' + i).join('\n');
+    return b.text;
+  }).join('\n\n');
+}
+
+function wcTextToContent(text) {
+  return text.split(/\n\s*\n/).map(block => block.trim()).filter(Boolean).map(block => {
+    if (block.startsWith('## ')) return { type: 'heading', text: block.slice(3).trim() };
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length && lines.every(l => l.startsWith('- '))) {
+      return { type: 'list', items: lines.map(l => l.slice(2).trim()) };
+    }
+    return { type: 'paragraph', text: lines.join(' ') };
+  });
+}
+
+async function loadWebContent() {
+  document.getElementById('wc-posts-list').innerHTML = '<div class="empty">Cargando...</div>';
+  try {
+    const [postsRes, contentRes] = await Promise.all([
+      callWcAPI('wc_get_blog_posts'),
+      callWcAPI('wc_get_site_content')
+    ]);
+    if (postsRes.error) throw new Error(postsRes.error);
+    if (contentRes.error) throw new Error(contentRes.error);
+
+    wcBlogPosts = postsRes.posts;
+    wcSiteContent = contentRes.siteContent;
+
+    renderWcPosts();
+    fillWcPricingForm();
+    fillWcTextosForm();
+  } catch (e) {
+    document.getElementById('wc-posts-list').innerHTML = `<div class="empty" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+function renderWcPosts() {
+  const el = document.getElementById('wc-posts-list');
+  if (!wcBlogPosts || !wcBlogPosts.length) {
+    el.innerHTML = '<div class="empty">Todavía no hay artículos publicados.</div>';
+    return;
+  }
+  const sorted = [...wcBlogPosts].sort((a, b) => (a.date < b.date ? 1 : -1));
+  el.innerHTML = sorted.map(p => `
+    <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:600;font-size:13px">${p.title}</div>
+        <div style="font-size:11px;color:var(--text3)">${p.date} · /blog/${p.slug}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" data-wc-edit="${p.slug}">Editar</button>
+        <button class="btn btn-sm" style="color:var(--red);border-color:rgba(239,68,68,0.3)" data-wc-delete="${p.slug}">Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+
+  el.querySelectorAll('[data-wc-edit]').forEach(btn => {
+    btn.addEventListener('click', () => wcEditPost(btn.dataset.wcEdit));
+  });
+  el.querySelectorAll('[data-wc-delete]').forEach(btn => {
+    btn.addEventListener('click', () => wcDeletePost(btn.dataset.wcDelete));
+  });
+}
+
+function wcEditPost(slug) {
+  const post = wcBlogPosts.find(p => p.slug === slug);
+  if (!post) return;
+  document.getElementById('wc-post-slug-original').value = post.slug;
+  document.getElementById('wc-post-title').value = post.title;
+  document.getElementById('wc-post-excerpt').value = post.excerpt;
+  document.getElementById('wc-post-date').value = post.date;
+  document.getElementById('wc-post-content').value = wcContentToText(post.content);
+  document.getElementById('btn-wc-clear-post').style.display = 'inline-flex';
+  document.getElementById('btn-wc-save-post').textContent = 'Guardar cambios del artículo';
+  document.getElementById('wc-post-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+document.getElementById('btn-wc-clear-post').addEventListener('click', () => {
+  document.getElementById('wc-post-slug-original').value = '';
+  document.getElementById('wc-post-title').value = '';
+  document.getElementById('wc-post-excerpt').value = '';
+  document.getElementById('wc-post-date').value = '';
+  document.getElementById('wc-post-content').value = '';
+  document.getElementById('btn-wc-clear-post').style.display = 'none';
+  document.getElementById('btn-wc-save-post').textContent = 'Publicar artículo';
+  document.getElementById('wc-post-status').textContent = '';
+});
+
+document.getElementById('btn-wc-save-post').addEventListener('click', async () => {
+  const status = document.getElementById('wc-post-status');
+  const title = document.getElementById('wc-post-title').value.trim();
+  if (!title) { status.innerHTML = '<span style="color:var(--red)">Falta el título</span>'; return; }
+
+  const originalSlug = document.getElementById('wc-post-slug-original').value;
+  const post = {
+    slug: originalSlug || undefined,
+    title,
+    excerpt: document.getElementById('wc-post-excerpt').value.trim(),
+    date: document.getElementById('wc-post-date').value || undefined,
+    content: wcTextToContent(document.getElementById('wc-post-content').value)
+  };
+
+  status.textContent = 'Publicando...';
+  try {
+    const r = await callWcAPI('wc_save_blog_post', { post });
+    if (r.error) throw new Error(r.error);
+    status.innerHTML = '<span style="color:var(--green)">✓ Publicado. Va a estar en vivo en 1-2 minutos.</span>';
+    document.getElementById('btn-wc-clear-post').click();
+    await loadWebContent();
+  } catch (e) {
+    status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+});
+
+async function wcDeletePost(slug) {
+  if (!confirm('¿Eliminar este artículo de la web?')) return;
+  try {
+    const r = await callWcAPI('wc_delete_blog_post', { slug });
+    if (r.error) throw new Error(r.error);
+    await loadWebContent();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function fillWcPricingForm() {
+  const c = wcSiteContent;
+  document.getElementById('wc-pricing-title').value = c.pricing.title;
+  document.getElementById('wc-pricing-subtitle').value = c.pricing.subtitle;
+  document.getElementById('wc-plan-name').value = c.pricing.plan.name;
+  document.getElementById('wc-plan-description').value = c.pricing.plan.description;
+  document.getElementById('wc-plan-features').value = c.pricing.plan.features.join('\n');
+  document.getElementById('wc-bonuses').value = c.pricing.bonuses.map(b => `${b.title} :: ${b.description}`).join('\n');
+}
+
+document.getElementById('btn-wc-save-pricing').addEventListener('click', async () => {
+  const status = document.getElementById('wc-pricing-status');
+  const updated = JSON.parse(JSON.stringify(wcSiteContent));
+  updated.pricing.title = document.getElementById('wc-pricing-title').value.trim();
+  updated.pricing.subtitle = document.getElementById('wc-pricing-subtitle').value.trim();
+  updated.pricing.plan.name = document.getElementById('wc-plan-name').value.trim();
+  updated.pricing.plan.description = document.getElementById('wc-plan-description').value.trim();
+  updated.pricing.plan.features = document.getElementById('wc-plan-features').value.split('\n').map(s => s.trim()).filter(Boolean);
+  updated.pricing.bonuses = document.getElementById('wc-bonuses').value.split('\n').map(s => s.trim()).filter(Boolean).map(line => {
+    const [bTitle, bDesc] = line.split('::').map(s => s.trim());
+    return { title: bTitle || '', description: bDesc || '' };
+  });
+
+  status.textContent = 'Guardando...';
+  try {
+    const r = await callWcAPI('wc_save_site_content', { siteContent: updated });
+    if (r.error) throw new Error(r.error);
+    wcSiteContent = updated;
+    status.innerHTML = '<span style="color:var(--green)">✓ Guardado. Va a estar en vivo en 1-2 minutos.</span>';
+  } catch (e) {
+    status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+});
+
+function fillWcTextosForm() {
+  const c = wcSiteContent;
+  document.getElementById('wc-hero-preheadline').value = c.hero.preheadline;
+  document.getElementById('wc-hero-title').value = c.hero.title;
+  document.getElementById('wc-hero-subtitle').value = c.hero.subtitle;
+  document.getElementById('wc-hero-aitext').value = c.hero.aiText;
+}
+
+document.getElementById('btn-wc-save-textos').addEventListener('click', async () => {
+  const status = document.getElementById('wc-textos-status');
+  const updated = JSON.parse(JSON.stringify(wcSiteContent));
+  updated.hero.preheadline = document.getElementById('wc-hero-preheadline').value.trim();
+  updated.hero.title = document.getElementById('wc-hero-title').value.trim();
+  updated.hero.subtitle = document.getElementById('wc-hero-subtitle').value.trim();
+  updated.hero.aiText = document.getElementById('wc-hero-aitext').value.trim();
+
+  status.textContent = 'Guardando...';
+  try {
+    const r = await callWcAPI('wc_save_site_content', { siteContent: updated });
+    if (r.error) throw new Error(r.error);
+    wcSiteContent = updated;
+    status.innerHTML = '<span style="color:var(--green)">✓ Guardado. Va a estar en vivo en 1-2 minutos.</span>';
+  } catch (e) {
+    status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+});
 
 // ── INIT ──────────────────────
 initCRMAuth().then(() => {
