@@ -2057,6 +2057,16 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div style="color:var(--red);font-size:13px" id="ga-error-msg"></div>
     </div>
 
+    <div class="card" id="ga-connect-card-analytics" style="display:none">
+      <div class="card-title">📊 Conectar Google Analytics</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:1rem">
+        Conectá tu cuenta de Google para que el CRM pueda leer los datos de <strong>rhinosapp.vercel.app</strong>.
+      </div>
+      <button id="btn-connect-ga-2" class="btn btn-cyan" style="justify-content:center">
+        🔗 Conectar con Google Analytics
+      </button>
+    </div>
+
     <!-- Métricas principales -->
     <div class="metrics-row" id="ga-metrics-row" style="grid-template-columns:repeat(3,1fr)">
       <div class="metric-card"><div class="m-label">Usuarios activos</div><div class="m-val cyan" id="ga-users-30">—</div><div class="m-sub" id="ga-users-sub">últimos 30 días</div></div>
@@ -7792,6 +7802,10 @@ async function loadAnalytics() {
     if (data.error) {
       errEl.style.display = 'block';
       errMsg.textContent = '⚠ ' + data.error;
+      if (/scope|conectado/i.test(data.error)) {
+        const card2 = document.getElementById('ga-connect-card-analytics');
+        if (card2) card2.style.display = 'block';
+      }
       return;
     }
     renderGAMetrics(data);
@@ -7810,6 +7824,10 @@ document.getElementById('btn-connect-ga')?.addEventListener('click', async () =>
   const r = await callAPI('ga_get_auth_url', {});
   if (r.url) window.location.href = r.url;
 });
+document.getElementById('btn-connect-ga-2')?.addEventListener('click', async () => {
+  const r = await callAPI('ga_get_auth_url', {});
+  if (r.url) window.location.href = r.url;
+});
 
 // Verificar si hay token de Analytics en Supabase — mostrar/ocultar botón conectar
 async function checkGAConnection() {
@@ -7818,7 +7836,10 @@ async function checkGAConnection() {
     const hasToken = Array.isArray(data) && data.length && data[0].value;
     const card = document.getElementById('ga-connect-card');
     if (card) card.style.display = hasToken ? 'none' : 'block';
-  } catch(e) {}
+    const card2 = document.getElementById('ga-connect-card-analytics');
+    if (card2) card2.style.display = hasToken ? 'none' : 'block';
+    return hasToken;
+  } catch(e) { return false; }
 }
 checkGAConnection();
 
