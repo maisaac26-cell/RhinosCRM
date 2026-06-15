@@ -420,6 +420,7 @@ module.exports = async function handler(req, res) {
               { startDate: '7daysAgo',  endDate: 'today' },
               { startDate: '30daysAgo', endDate: 'today' }
             ],
+            dimensions: [{ name: 'dateRange' }],
             metrics: [
               { name: 'activeUsers' }, { name: 'sessions' },
               { name: 'screenPageViews' }, { name: 'bounceRate' },
@@ -467,17 +468,21 @@ module.exports = async function handler(req, res) {
         if (pages.error)    console.warn('GA pages error:', pages.error.message);
         if (sources.error)  console.warn('GA sources error:', sources.error.message);
 
-        // Procesar overview por dateRange
+        // Procesar overview por dateRange (la API puede omitir filas sin datos, ej. "hoy")
         const parseMetrics = (row) => {
           const m = {};
           (overview.metricHeaders || []).forEach((h, i) => { m[h.name] = +row.metricValues[i].value; });
           return m;
         };
-        const ovRows = overview.rows || [];
+        const byRange = {};
+        (overview.rows || []).forEach(row => {
+          const key = row.dimensionValues?.[0]?.value;
+          if (key) byRange[key] = parseMetrics(row);
+        });
         const metrics = {
-          today:   ovRows[0] ? parseMetrics(ovRows[0]) : {},
-          week7:   ovRows[1] ? parseMetrics(ovRows[1]) : {},
-          month30: ovRows[2] ? parseMetrics(ovRows[2]) : {}
+          today:   byRange.date_range_0 || {},
+          week7:   byRange.date_range_1 || {},
+          month30: byRange.date_range_2 || {}
         };
 
         // Parsear tabla genérica
