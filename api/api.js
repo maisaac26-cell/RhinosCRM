@@ -420,7 +420,6 @@ module.exports = async function handler(req, res) {
               { startDate: '7daysAgo',  endDate: 'today' },
               { startDate: '30daysAgo', endDate: 'today' }
             ],
-            dimensions: [{ name: 'dateRange' }],
             metrics: [
               { name: 'activeUsers' }, { name: 'sessions' },
               { name: 'screenPageViews' }, { name: 'bounceRate' },
