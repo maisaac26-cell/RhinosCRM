@@ -737,6 +737,19 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
     <!-- ARTICULOS -->
     <div class="tab-content active" id="wctab-articulos">
+      <div class="card" style="border-color:rgba(167,139,250,0.3);background:rgba(167,139,250,0.05)">
+        <div class="card-title">✨ Generar artículo con IA</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
+          La IA escribe el artículo completo (título, resumen y contenido) optimizado para SEO y para que motores de IA recomienden RhinosApp, y lo publica directo.
+        </div>
+        <div class="field">
+          <label>Tema o palabra clave (opcional)</label>
+          <input id="wc-ai-topic" placeholder="Ej: cómo controlar el stock de una distribuidora de quesos — dejá vacío para que la IA elija el tema">
+        </div>
+        <button class="btn btn-full" id="btn-wc-generate-post" style="background:rgba(167,139,250,0.15);color:#a78bfa;border-color:rgba(167,139,250,0.35);font-weight:600">🦏 Generar con IA y publicar</button>
+        <div id="wc-ai-status" style="margin-top:8px;font-size:12px"></div>
+      </div>
+
       <div class="card" style="border-color:rgba(0,229,204,0.25)">
         <div class="card-title"><span class="ct-accent">+</span> Nuevo / editar artículo</div>
         <input type="hidden" id="wc-post-slug-original" value="">
@@ -2074,9 +2087,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div class="metric-card"><div class="m-label">Páginas vistas</div><div class="m-val green" id="ga-pageviews">—</div><div class="m-sub" id="ga-pv-sub">últimos 30 días</div></div>
     </div>
     <div class="metrics-row" id="ga-metrics-row2" style="grid-template-columns:repeat(3,1fr)">
-      <div class="metric-card"><div class="m-label">Usuarios nuevos</div><div class="m-val" id="ga-new-users">—</div><div class="m-sub">últimos 30 días</div></div>
-      <div class="metric-card"><div class="m-label">Tasa de rebote</div><div class="m-val" id="ga-bounce">—</div><div class="m-sub">promedio</div></div>
-      <div class="metric-card"><div class="m-label">Duración sesión</div><div class="m-val" id="ga-duration">—</div><div class="m-sub">promedio</div></div>
+      <div class="metric-card"><div class="m-label">Usuarios nuevos</div><div class="m-val" id="ga-new-users">—</div><div class="m-sub" id="ga-newusers-sub">últimos 30 días</div></div>
+      <div class="metric-card"><div class="m-label">Tasa de rebote</div><div class="m-val" id="ga-bounce">—</div><div class="m-sub" id="ga-bounce-sub">últimos 30 días</div></div>
+      <div class="metric-card"><div class="m-label">Duración sesión</div><div class="m-val" id="ga-duration">—</div><div class="m-sub" id="ga-duration-sub">últimos 30 días</div></div>
     </div>
 
     <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
@@ -7677,24 +7690,41 @@ function gaBar(value, max, color = 'var(--cyan)') {
   return `<div style="flex:1;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:3px"></div></div>`;
 }
 
-function renderGAMetrics(data) {
-  const m30 = data.metrics.month30;
-  const m7  = data.metrics.week7;
+const GA_RANGE_LABELS = { '7daysAgo': 'últimos 7 días', '30daysAgo': 'últimos 30 días', '90daysAgo': 'últimos 90 días' };
 
-  // Métricas con comparación 7d vs 30d
-  const setMetric = (id, val30, sub) => {
+// Badge de tendencia vs período anterior equivalente (▲/▼ + %). invert=true cuando "menos es mejor" (ej. tasa de rebote)
+function gaTrendBadge(cur, prev, invert = false) {
+  if (cur === undefined || prev === undefined) return '';
+  if (prev === 0) return cur === 0 ? '' : `<span style="color:var(--green);font-weight:700">▲ nuevo</span>`;
+  const pct = ((cur - prev) / prev) * 100;
+  if (Math.abs(pct) < 0.05) return `<span style="color:var(--text3);font-weight:700">▬ 0%</span>`;
+  const up = pct > 0;
+  const color = (invert ? !up : up) ? 'var(--green)' : 'var(--red)';
+  return `<span style="color:${color};font-weight:700">${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}%</span>`;
+}
+
+function renderGAMetrics(data) {
+  const cur  = data.metrics.current  || {};
+  const prev = data.metrics.previous || {};
+  const rangeLabel = GA_RANGE_LABELS[data.range] || 'período seleccionado';
+
+  // Valor principal + comparación vs período anterior equivalente
+  const setMetric = (id, subId, curVal, prevVal, fmt, invert = false) => {
     const el = document.getElementById(id);
-    if (el) el.textContent = val30 !== undefined ? fmtK(Math.round(val30)) : '—';
-    const subEl = document.getElementById(id + '-sub');
-    if (subEl && sub) subEl.textContent = sub;
+    if (el) el.textContent = curVal !== undefined ? fmt(curVal) : '—';
+    const subEl = document.getElementById(subId);
+    if (subEl) {
+      const badge = gaTrendBadge(curVal, prevVal, invert);
+      subEl.innerHTML = badge ? `${rangeLabel} · ${badge}` : rangeLabel;
+    }
   };
 
-  setMetric('ga-users-30',  m30.activeUsers);
-  setMetric('ga-sessions',  m30.sessions);
-  setMetric('ga-pageviews', m30.screenPageViews);
-  setMetric('ga-new-users', m30.newUsers);
-  if (document.getElementById('ga-bounce'))   document.getElementById('ga-bounce').textContent   = m30.bounceRate !== undefined ? fmtPct(m30.bounceRate) : '—';
-  if (document.getElementById('ga-duration')) document.getElementById('ga-duration').textContent = m30.averageSessionDuration !== undefined ? fmtSecs(m30.averageSessionDuration) : '—';
+  setMetric('ga-users-30',  'ga-users-sub',    cur.activeUsers,             prev.activeUsers,             v => fmtK(Math.round(v)));
+  setMetric('ga-sessions',  'ga-sessions-sub', cur.sessions,                 prev.sessions,                 v => fmtK(Math.round(v)));
+  setMetric('ga-pageviews', 'ga-pv-sub',       cur.screenPageViews,          prev.screenPageViews,          v => fmtK(Math.round(v)));
+  setMetric('ga-new-users', 'ga-newusers-sub', cur.newUsers,                 prev.newUsers,                 v => fmtK(Math.round(v)));
+  setMetric('ga-bounce',    'ga-bounce-sub',   cur.bounceRate,               prev.bounceRate,               fmtPct, true);
+  setMetric('ga-duration',  'ga-duration-sub', cur.averageSessionDuration,   prev.averageSessionDuration,   fmtSecs);
 
   // Top páginas
   const pagesEl = document.getElementById('ga-pages');
@@ -8529,10 +8559,10 @@ document.getElementById('btn-wc-clear-post').addEventListener('click', () => {
   document.getElementById('wc-post-status').textContent = '';
 });
 
-document.getElementById('btn-wc-save-post').addEventListener('click', async () => {
-  const status = document.getElementById('wc-post-status');
+// Publica el artículo que está cargado en el formulario. Devuelve true si se publicó OK.
+async function wcPublishFormPost(status) {
   const title = document.getElementById('wc-post-title').value.trim();
-  if (!title) { status.innerHTML = '<span style="color:var(--red)">Falta el título</span>'; return; }
+  if (!title) { status.innerHTML = '<span style="color:var(--red)">Falta el título</span>'; return false; }
 
   const originalSlug = document.getElementById('wc-post-slug-original').value;
   const post = {
@@ -8550,8 +8580,49 @@ document.getElementById('btn-wc-save-post').addEventListener('click', async () =
     status.innerHTML = '<span style="color:var(--green)">✓ Publicado. Va a estar en vivo en 1-2 minutos.</span>';
     document.getElementById('btn-wc-clear-post').click();
     await loadWebContent();
+    return true;
   } catch (e) {
     status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+    return false;
+  }
+}
+
+document.getElementById('btn-wc-save-post').addEventListener('click', () => {
+  wcPublishFormPost(document.getElementById('wc-post-status'));
+});
+
+document.getElementById('btn-wc-generate-post').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-wc-generate-post');
+  const status = document.getElementById('wc-ai-status');
+  const topic = document.getElementById('wc-ai-topic').value.trim();
+
+  btn.disabled = true;
+  status.innerHTML = '<span style="color:var(--text2)">🦏 Escribiendo artículo con IA... puede tardar hasta 1 minuto.</span>';
+  try {
+    const r = await callWcAPI('wc_generate_blog_post', { topic });
+    if (r.error) throw new Error(r.error);
+
+    const post = r.post;
+    document.getElementById('wc-post-slug-original').value = '';
+    document.getElementById('wc-post-title').value = post.title || '';
+    document.getElementById('wc-post-excerpt').value = post.excerpt || '';
+    document.getElementById('wc-post-date').value = post.date || '';
+    document.getElementById('wc-post-content').value = wcContentToText(post.content);
+    document.getElementById('btn-wc-clear-post').style.display = 'inline-flex';
+    document.getElementById('btn-wc-save-post').textContent = 'Guardar cambios del artículo';
+
+    status.innerHTML = '<span style="color:var(--text2)">Artículo generado. Publicando...</span>';
+    const ok = await wcPublishFormPost(document.getElementById('wc-post-status'));
+    if (ok) {
+      status.innerHTML = '<span style="color:var(--green)">✓ Artículo generado y publicado con IA.</span>';
+      document.getElementById('wc-ai-topic').value = '';
+    } else {
+      status.innerHTML = '<span style="color:var(--amber)">El artículo se generó pero no se pudo publicar. Revisalo abajo y publicalo manualmente.</span>';
+    }
+  } catch (e) {
+    status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
   }
 });
 

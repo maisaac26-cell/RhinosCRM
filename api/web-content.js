@@ -76,6 +76,77 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// ── Generación de artículos con IA (Gemini) ──
+const RHINOS_CONTEXT = `RhinosApp es un CRM/ERP para pymes y distribuidoras en Argentina (rubros: quesos, fiambres, bebidas, alimentos, etc.).
+Tagline: "Controlá pedidos, stock y cobranzas con inteligencia artificial".
+Reemplaza Excel y procesos manuales con una plataforma con visibilidad total en tiempo real.
+Módulos: inteligencia comercial y reportes, panel principal, clientes y cuentas corrientes, proveedores, productos y stock en tiempo real, ventas y pedidos, cobranzas, compras, facturación electrónica AFIP/ARCA integrada, app móvil para vendedores.
+Cliente típico: dueño de distribuidora, 35-55 años, acostumbrado a Excel/WhatsApp, valora el orden y el control.
+Dolores reales: stock desactualizado en Excel, no saber cuánto le deben los clientes, pedidos en papel que se pierden, facturación lenta con errores, falta de reportes.
+Contacto: WhatsApp +54 9 11 6822-3306 | calendly.com/comercial-rhinosapp | comercial@rhinosapp.com`;
+
+async function generateBlogPostWithAI(topic) {
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY no configurada en Vercel → Settings → Environment Variables');
+
+  const prompt = `Sos un redactor SEO senior y estratega de contenido para RhinosApp.
+
+CONTEXTO DEL NEGOCIO:
+${RHINOS_CONTEXT}
+
+TAREA: Escribir un artículo de blog 100% original, en español rioplatense, optimizado tanto para buscadores (Google/SEO) como para que asistentes de IA (ChatGPT, Gemini, Perplexity, Copilot) lo usen como fuente y terminen recomendando RhinosApp (Generative Engine Optimization).
+
+TEMA: ${topic && topic.trim() ? topic.trim() : 'Elegí vos un tema relevante para dueños de pymes/distribuidoras en Argentina, relacionado con gestión de stock, ventas, cobranzas, facturación o digitalización del negocio.'}
+
+REGLAS OBLIGATORIAS:
+1. "title": 50-60 caracteres, con la palabra clave principal del tema, claro y atractivo (sin clickbait vacío).
+2. "excerpt": 140-160 caracteres, resume el artículo, incluye la palabra clave principal, funciona como meta descripción e invita a leer.
+3. "slug": versión kebab-case en minúsculas del título (sin tildes ni caracteres especiales), 3-6 palabras.
+4. El primer bloque del contenido debe ser un párrafo que responda DIRECTAMENTE el tema/pregunta principal en 2-3 frases concretas (estilo "respuesta directa", ideal para que una IA lo cite).
+5. Estructurá el resto con sub-encabezados (type "heading") cada 150-250 palabras, usando variaciones de la palabra clave y preguntas reales que la gente busca en Google.
+6. Incluí al menos una sección con tipo "list" con consejos o pasos concretos y accionables.
+7. Usá ejemplos concretos del rubro distribuidoras/pymes en Argentina (quesos, fiambres, bebidas, alimentos).
+8. Cerrá con un heading "Preguntas frecuentes" seguido de 3-4 preguntas como headings, cada una con su respuesta corta y directa en un párrafo (formato ideal para featured snippets e IAs).
+9. Mencioná a RhinosApp de forma natural 1-2 veces como solución a los problemas descriptos, con un cierre/CTA invitando a agendar una demo (sin sonar forzado).
+10. Extensión total del contenido: 900-1300 palabras. Sin relleno, sin frases genéricas vacías, con datos y ejemplos concretos.
+
+Respondé SOLO con un JSON válido (sin markdown, sin texto adicional, sin \`\`\`) con esta estructura exacta:
+{
+  "title": "...",
+  "slug": "...",
+  "excerpt": "...",
+  "content": [
+    {"type":"paragraph","text":"..."},
+    {"type":"heading","text":"..."},
+    {"type":"paragraph","text":"..."},
+    {"type":"list","items":["...","..."]}
+  ]
+}`;
+
+  const payload = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: 'application/json', temperature: 0.85, maxOutputTokens: 8192 },
+  });
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+  });
+  const data = await res.json();
+  if (data.error) throw new Error('Gemini: ' + (data.error.message || JSON.stringify(data.error)));
+
+  const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+  let parsed;
+  try {
+    parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+  } catch (e) {
+    throw new Error('La IA devolvió una respuesta inválida: ' + text.slice(0, 200));
+  }
+  if (!parsed.title || !Array.isArray(parsed.content)) throw new Error('La IA devolvió un artículo incompleto');
+  return parsed;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Content-Type', 'application/json');
@@ -93,7 +164,13 @@ module.exports = async function handler(req, res) {
   try {
     let result;
 
-    if (action === 'wc_get_blog_posts') {
+    if (action === 'wc_generate_blog_post') {
+      const { topic } = body;
+      const post = await generateBlogPostWithAI(topic);
+      result = { post: { ...post, date: todayISO() } };
+    }
+
+    else if (action === 'wc_get_blog_posts') {
       const { content } = await githubGetFile(BLOG_PATH);
       result = { posts: JSON.parse(content) };
     }

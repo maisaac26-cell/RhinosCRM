@@ -360,6 +360,11 @@ module.exports = async function handler(req, res) {
       const { range = '30daysAgo', access_token: oauthToken } = body;
       const dateRange = [{ startDate: range, endDate: 'today' }];
 
+      // Período anterior equivalente, para comparativas (ej. 30daysAgo -> los 30 días previos a esos)
+      const rangeDays = parseInt(range) || 30;
+      const prevStart = `${rangeDays * 2}daysAgo`;
+      const prevEnd = `${rangeDays + 1}daysAgo`;
+
       // Obtener token de Analytics desde Supabase (tiene prioridad sobre el token de Gmail)
       let analyticsToken = null;
       try {
@@ -418,7 +423,9 @@ module.exports = async function handler(req, res) {
             dateRanges: [
               { startDate: 'today',     endDate: 'today' },
               { startDate: '7daysAgo',  endDate: 'today' },
-              { startDate: '30daysAgo', endDate: 'today' }
+              { startDate: '30daysAgo', endDate: 'today' },
+              { startDate: range,       endDate: 'today' },
+              { startDate: prevStart,   endDate: prevEnd }
             ],
             metrics: [
               { name: 'activeUsers' }, { name: 'sessions' },
@@ -479,9 +486,11 @@ module.exports = async function handler(req, res) {
           if (key) byRange[key] = parseMetrics(row);
         });
         const metrics = {
-          today:   byRange.date_range_0 || {},
-          week7:   byRange.date_range_1 || {},
-          month30: byRange.date_range_2 || {}
+          today:    byRange.date_range_0 || {},
+          week7:    byRange.date_range_1 || {},
+          month30:  byRange.date_range_2 || {},
+          current:  byRange.date_range_3 || {},
+          previous: byRange.date_range_4 || {}
         };
 
         // Parsear tabla genérica
