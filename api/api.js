@@ -421,11 +421,10 @@ module.exports = async function handler(req, res) {
           // 1. Métricas generales
           gaReportWithToken(propertyId, {
             dateRanges: [
-              { startDate: 'today',     endDate: 'today' },
-              { startDate: '7daysAgo',  endDate: 'today' },
-              { startDate: '30daysAgo', endDate: 'today' },
-              { startDate: range,       endDate: 'today' },
-              { startDate: prevStart,   endDate: prevEnd }
+              { startDate: 'today',    endDate: 'today' },
+              { startDate: '7daysAgo', endDate: 'today' },
+              { startDate: range,      endDate: 'today' },
+              { startDate: prevStart,  endDate: prevEnd }
             ],
             metrics: [
               { name: 'activeUsers' }, { name: 'sessions' },
@@ -489,8 +488,8 @@ module.exports = async function handler(req, res) {
           today:    byRange.date_range_0 || {},
           week7:    byRange.date_range_1 || {},
           month30:  byRange.date_range_2 || {},
-          current:  byRange.date_range_3 || {},
-          previous: byRange.date_range_4 || {}
+          current:  byRange.date_range_2 || {},
+          previous: byRange.date_range_3 || {}
         };
 
         // Parsear tabla genérica
