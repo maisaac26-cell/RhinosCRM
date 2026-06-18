@@ -4827,8 +4827,8 @@ document.querySelectorAll('.tab-btn[data-ttab]').forEach(btn => {
     document.querySelectorAll('.tab-btn[data-ttab]').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
     const tab = this.dataset.ttab;
-    document.getElementById('ttab-tareas').style.display      = tab === 'tareas'      ? '' : 'none';
-    document.getElementById('ttab-auto-emails').style.display = tab === 'auto-emails' ? '' : 'none';
+    document.getElementById('ttab-tareas').style.display      = tab === 'tareas'      ? 'block' : 'none';
+    document.getElementById('ttab-auto-emails').style.display = tab === 'auto-emails' ? 'block' : 'none';
     if (tab === 'auto-emails') loadAutoEmails();
   });
 });
