@@ -1363,6 +1363,19 @@ Respondé SOLO con JSON válido, sin markdown:
         });
         req.on('error', reject); req.write(payload); req.end();
       });
+      // Guardar refresh_token en Supabase para que el cron de emails automáticos pueda usarlo
+      if (tokenData.refresh_token) {
+        const expiry = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
+        const rows = JSON.stringify([
+          { key: 'gmail_refresh_token', value: tokenData.refresh_token, updated_at: new Date().toISOString() },
+          { key: 'gmail_access_token',  value: tokenData.access_token,  updated_at: new Date().toISOString() },
+          { key: 'gmail_token_expiry',  value: expiry,                  updated_at: new Date().toISOString() }
+        ]);
+        https.request({ hostname: new URL(SB_URL_CONF).hostname, path: '/rest/v1/rhinos_config', method: 'POST',
+          headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF, 'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(rows), 'Prefer': 'resolution=merge-duplicates,return=minimal' }
+        }, () => {}).end(rows);
+      }
       result = tokenData;
     }
 

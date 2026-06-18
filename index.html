@@ -949,12 +949,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
 
     <!-- MÉTRICAS RÁPIDAS -->
-    <div class="metrics-row" id="leads-metrics" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+    <div class="metrics-row" id="leads-metrics" style="grid-template-columns:repeat(7,minmax(0,1fr))">
       <div class="metric-card" style="cursor:pointer" data-filter-status=""><div class="m-label">Total</div><div class="m-val" id="lm-total" style="color:var(--text)">0</div></div>
       <div class="metric-card" style="cursor:pointer" data-filter-status="nuevo"><div class="m-label">Nuevos</div><div class="m-val" id="lm-nuevo" style="color:var(--cyan)">0</div></div>
       <div class="metric-card" style="cursor:pointer" data-filter-status="contactado"><div class="m-label">Contactados</div><div class="m-val" id="lm-contactado" style="color:var(--amber)">0</div></div>
       <div class="metric-card" style="cursor:pointer" data-filter-status="demo"><div class="m-label">Demo agendada</div><div class="m-val" id="lm-demo" style="color:var(--green)">0</div></div>
       <div class="metric-card" style="cursor:pointer" data-filter-status="cliente"><div class="m-label">Clientes</div><div class="m-val" id="lm-cliente" style="color:#22c55e">0</div></div>
+      <div class="metric-card" style="cursor:pointer" data-filter-status="perdido"><div class="m-label">Perdidos</div><div class="m-val" id="lm-perdido" style="color:var(--red)">0</div></div>
+      <div class="metric-card" style="cursor:pointer" data-filter-status="imposible"><div class="m-label">Imposibles</div><div class="m-val" id="lm-imposible" style="color:#64748b">0</div></div>
     </div>
 
     <!-- ALERTAS FOLLOW UP -->
@@ -975,6 +977,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <button class="lead-filter-btn" data-status="demo" style="font-size:10px;padding:3px 8px;border:1px solid rgba(34,197,94,0.3);border-radius:10px;background:transparent;cursor:pointer;font-family:var(--font);color:var(--green)">Demo</button>
             <button class="lead-filter-btn" data-status="cliente" style="font-size:10px;padding:3px 8px;border:1px solid rgba(34,197,94,0.5);border-radius:10px;background:transparent;cursor:pointer;font-family:var(--font);color:#22c55e">Cliente</button>
             <button class="lead-filter-btn" data-status="perdido" style="font-size:10px;padding:3px 8px;border:1px solid rgba(239,68,68,0.3);border-radius:10px;background:transparent;cursor:pointer;font-family:var(--font);color:var(--red)">Perdido</button>
+            <button class="lead-filter-btn" data-status="imposible" style="font-size:10px;padding:3px 8px;border:1px solid rgba(100,116,139,0.4);border-radius:10px;background:transparent;cursor:pointer;font-family:var(--font);color:#94a3b8">Imposible</button>
           </div>
           <div id="leads-list" style="display:flex;flex-direction:column;gap:4px;max-height:600px;overflow-y:auto"></div>
         </div>
@@ -1689,6 +1692,60 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div class="page-sub">Agenda del equipo RhinosApp — Manu, Guille, Poli y Rami.</div>
     </div>
 
+    <div class="tab-row">
+      <button class="tab-btn active" data-ttab="tareas">📋 Tareas</button>
+      <button class="tab-btn" data-ttab="auto-emails">📧 Emails automáticos</button>
+    </div>
+
+    <!-- TAB: EMAILS AUTOMÁTICOS -->
+    <div class="tab-content" id="ttab-auto-emails" style="display:none">
+      <div class="card" style="border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.04);margin-bottom:1rem">
+        <div class="card-title" style="color:#818cf8">+ Nueva automatización de email</div>
+        <div class="grid2">
+          <div class="field" style="margin:0;grid-column:1/-1">
+            <label>Nombre interno (referencia)</label>
+            <input id="ae-name" placeholder="Ej: Recordatorio mensual a Juan"/>
+          </div>
+          <div class="field" style="margin:0">
+            <label>Para (destinatario)</label>
+            <input id="ae-to" placeholder="cliente@empresa.com" type="email"/>
+          </div>
+          <div class="field" style="margin:0">
+            <label>Frecuencia</label>
+            <select id="ae-frequency">
+              <option value="once">Una sola vez (fecha específica)</option>
+              <option value="daily">Diario</option>
+              <option value="weekly">Semanal</option>
+              <option value="monthly">Mensual (día del mes)</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0" id="ae-day-field">
+            <label id="ae-day-label">Fecha / Día</label>
+            <input id="ae-day" placeholder=""/>
+          </div>
+          <div class="field" style="margin:0">
+            <label>Vence el (opcional)</label>
+            <input id="ae-expires" type="date"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Asunto del email</label>
+          <input id="ae-subject" placeholder="Ej: Recordatorio de pago — RhinosApp"/>
+        </div>
+        <div class="field">
+          <label>Cuerpo del email</label>
+          <textarea id="ae-body" rows="5" placeholder="Texto del email..."></textarea>
+        </div>
+        <button class="btn btn-full" id="btn-add-auto-email" style="background:rgba(99,102,241,0.15);color:#818cf8;border-color:rgba(99,102,241,0.35);font-weight:600">📧 Guardar automatización</button>
+        <div id="ae-status" style="margin-top:8px;font-size:12px"></div>
+      </div>
+
+      <div class="card-title" style="margin-bottom:8px">Emails programados</div>
+      <div id="ae-list"><div class="empty">Cargando...</div></div>
+    </div>
+
+    <!-- TAB: TAREAS (contenido original) -->
+    <div id="ttab-tareas">
     <!-- RESUMEN RÁPIDO -->
     <div class="metrics-row" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:1.5rem">
       <div class="metric-card" style="cursor:pointer" data-task-filter=""><div class="m-label">Total</div><div class="m-val" id="tm-total" style="color:var(--text)">0</div></div>
@@ -1761,6 +1818,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
     <!-- KANBAN / LISTA -->
     <div id="tasks-board"></div>
+    </div><!-- /ttab-tareas -->
   </div>
 
   <!-- AGENTE -->
@@ -3868,6 +3926,7 @@ async function initGmail() {
     document.getElementById('gmail-auth-card').style.display = 'none';
     document.getElementById('gmail-main').style.display = 'block';
     loadGmailInbox();
+    setTimeout(checkAndSendAutoEmails, 3000); // revisa emails automáticos al iniciar
   }
 
   // Handle OAuth callback
@@ -4092,11 +4151,12 @@ let currentLeadFilter = '';
 let currentLeadId = null;
 
 const STATUS_CONFIG = {
-  nuevo:      { color: 'var(--cyan)',  label: 'Nuevo' },
-  contactado: { color: 'var(--amber)', label: 'Contactado' },
-  demo:       { color: 'var(--green)', label: 'Demo agendada' },
-  cliente:    { color: '#22c55e',      label: 'Cliente 🦏' },
-  perdido:    { color: 'var(--red)',   label: 'Perdido' }
+  nuevo:      { color: 'var(--cyan)',  label: 'Nuevo',            pipeline: 0 },
+  contactado: { color: 'var(--amber)', label: 'Contactado',       pipeline: 1 },
+  demo:       { color: 'var(--green)', label: 'Demo agendada',    pipeline: 2 },
+  cliente:    { color: '#22c55e',      label: 'Cliente 🦏',       pipeline: 3 },
+  perdido:    { color: 'var(--red)',   label: 'Perdido',          pipeline: -1 },
+  imposible:  { color: '#64748b',      label: 'Imposible',        pipeline: -1 }
 };
 
 async function loadLeads() {
@@ -4110,7 +4170,7 @@ async function loadLeads() {
 
 function renderLeadsMetrics() {
   document.getElementById('lm-total').textContent = leadsData.length;
-  ['nuevo','contactado','demo','cliente'].forEach(s => {
+  ['nuevo','contactado','demo','cliente','perdido','imposible'].forEach(s => {
     const el = document.getElementById('lm-' + s);
     if (el) el.textContent = leadsData.filter(l => l.status === s).length;
   });
@@ -4151,16 +4211,29 @@ function renderLeadsList() {
     l.phone?.includes(search)
   );
   if (!filtered.length) { list.innerHTML = '<div class="empty" style="padding:1.5rem">Sin leads</div>'; return; }
+  const now = Date.now();
+  const PIPELINE_STEPS = ['nuevo','contactado','demo','cliente'];
   list.innerHTML = filtered.map(l => {
     const cfg = STATUS_CONFIG[l.status] || STATUS_CONFIG.nuevo;
     const isSelected = l.id === currentLeadId;
-    return `<div class="lead-item" data-lead-id="${l.id}" style="padding:8px 10px;border-radius:var(--r);border:1px solid ${isSelected?'var(--amber)':'var(--border)'};background:${isSelected?'rgba(245,158,11,0.05)':'transparent'};cursor:pointer;margin-bottom:3px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-        <div style="font-size:13px;font-weight:500;color:var(--text)">${l.name}</div>
-        <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${cfg.color}22;color:${cfg.color}">${cfg.label}</span>
+    const daysSince = l.created_at ? Math.floor((now - new Date(l.created_at).getTime()) / 86400000) : null;
+    const isOverdue = l.next_followup && l.next_followup < new Date().toISOString().slice(0,10);
+    const pStep = cfg.pipeline;
+    const pipelineHTML = pStep >= 0 ? `<div style="display:flex;gap:2px;margin-top:5px">${PIPELINE_STEPS.map((s,i)=>`<div style="flex:1;height:3px;border-radius:2px;background:${i<=pStep?STATUS_CONFIG[s].color:'var(--surface3)'}"></div>`).join('')}</div>` : '';
+    return `<div class="lead-item" data-lead-id="${l.id}" style="padding:9px 10px;border-radius:var(--r);border:1px solid ${isSelected?'var(--amber)':'var(--border)'};background:${isSelected?'rgba(245,158,11,0.05)':'var(--surface)'};cursor:pointer;margin-bottom:3px;border-left:3px solid ${cfg.color}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text);line-height:1.3">${l.name}</div>
+          ${l.company?`<div style="font-size:11px;color:var(--text2)">${l.company}</div>`:''}
+        </div>
+        <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${cfg.color}22;color:${cfg.color};white-space:nowrap;margin-left:6px">${cfg.label}</span>
       </div>
-      <div style="font-size:11px;color:var(--text2)">${l.company||''}${l.source?' · '+l.source:''}</div>
-      ${l.next_followup ? `<div style="font-size:10px;color:var(--amber);margin-top:2px">📅 ${l.next_followup}</div>` : ''}
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${l.source?`<span style="font-size:10px;color:var(--text3)">🔗 ${l.source}</span>`:''}
+        ${daysSince!==null?`<span style="font-size:10px;color:var(--text3)">📆 hace ${daysSince}d</span>`:''}
+        ${l.next_followup?`<span style="font-size:10px;color:${isOverdue?'var(--red)':'var(--amber)'};font-weight:${isOverdue?'600':'400'}">📅 ${isOverdue?'⚠ ':''} ${l.next_followup}</span>`:''}
+      </div>
+      ${pipelineHTML}
     </div>`;
   }).join('');
 
@@ -4209,9 +4282,22 @@ async function openLead(lead) {
       <div style="margin-bottom:1rem">
         <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Cambiar estado</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
-          ${Object.entries(STATUS_CONFIG).map(([s,c])=>`<button class="btn btn-sm lead-status-btn" data-status="${s}" style="color:${c.color};border-color:${c.color}33;${lead.status===s?'background:'+c.color+'22':''}">${c.label}</button>`).join('')}
+          ${Object.entries(STATUS_CONFIG).map(([s,c])=>`<button class="btn btn-sm lead-status-btn" data-status="${s}" style="color:${c.color};border-color:${c.color}33;${lead.status===s?'background:'+c.color+'22;font-weight:700':''}">${c.label}</button>`).join('')}
+        </div>
+        <div id="status-change-panel" style="display:none;margin-top:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:12px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Cambiar a: <span id="status-change-label" style="font-weight:600"></span></div>
+          <textarea id="status-change-comment" rows="2" placeholder="Comentario (opcional) — ¿por qué cambió el estado? ¿qué pasó?" style="font-size:12px;min-height:54px;margin-bottom:8px"></textarea>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-green" id="btn-confirm-status-change">✓ Confirmar</button>
+            <button class="btn btn-sm" id="btn-cancel-status-change">Cancelar</button>
+          </div>
         </div>
       </div>
+
+      ${lead.status === 'cliente' ? `
+      <div style="margin-bottom:1rem">
+        <button class="btn btn-sm" id="btn-lead-to-client" style="background:rgba(34,197,94,0.1);color:var(--green);border-color:rgba(34,197,94,0.35);font-weight:600">📋 Registrar como cliente en Finanzas →</button>
+      </div>` : ''}
 
       <div style="margin-bottom:1rem">
         <button class="btn btn-cyan btn-sm" id="btn-ai-lead">🦏 Sugerencia IA</button>
@@ -4249,18 +4335,70 @@ async function openLead(lead) {
       </div>
     </div>`;
 
+  let pendingStatus = null;
   detail.querySelectorAll('.lead-status-btn').forEach(btn => {
-    btn.addEventListener('click', async function() {
+    btn.addEventListener('click', function() {
       const s = this.dataset.status;
-      try {
-        await sbFetch(`rhinos_leads?id=eq.${lead.id}`, 'PATCH', { status: s, updated_at: new Date().toISOString() });
-        lead.status = s;
-        leadsData = leadsData.map(l => l.id === lead.id ? {...l, status: s} : l);
-        renderLeadsMetrics(); renderLeadsAlerts(); renderLeadsList(); openLead(lead);
-        showToast('Estado actualizado 🦏');
-      } catch(e) { showToast('Error: ' + e.message); }
+      if (s === lead.status) return;
+      pendingStatus = s;
+      const cfg = STATUS_CONFIG[s] || STATUS_CONFIG.nuevo;
+      const panel = document.getElementById('status-change-panel');
+      document.getElementById('status-change-label').innerHTML = `<span style="color:${cfg.color}">${cfg.label}</span>`;
+      document.getElementById('status-change-comment').value = '';
+      panel.style.display = 'block';
+      document.getElementById('status-change-comment').focus();
     });
   });
+
+  document.getElementById('btn-cancel-status-change').addEventListener('click', () => {
+    document.getElementById('status-change-panel').style.display = 'none';
+    pendingStatus = null;
+  });
+
+  document.getElementById('btn-confirm-status-change').addEventListener('click', async function() {
+    if (!pendingStatus) return;
+    this.disabled = true;
+    const comment = document.getElementById('status-change-comment').value.trim();
+    const prevStatus = lead.status;
+    try {
+      await sbFetch(`rhinos_leads?id=eq.${lead.id}`, 'PATCH', { status: pendingStatus, updated_at: new Date().toISOString() });
+      if (comment) {
+        const noteText = `[${STATUS_CONFIG[prevStatus]?.label} → ${STATUS_CONFIG[pendingStatus]?.label}] ${comment}`;
+        const ni = await sbFetch('rhinos_lead_interactions', 'POST', { lead_id: lead.id, type: 'cambio_estado', note: noteText });
+        if (Array.isArray(ni) && ni[0]) interactions.unshift(ni[0]);
+      }
+      lead.status = pendingStatus;
+      leadsData = leadsData.map(l => l.id === lead.id ? {...l, status: pendingStatus} : l);
+      pendingStatus = null;
+      renderLeadsMetrics(); renderLeadsAlerts(); renderLeadsList(); openLead(lead);
+      showToast('Estado actualizado 🦏');
+    } catch(e) { showToast('Error: ' + e.message); }
+    this.disabled = false;
+  });
+
+  const btnToClient = document.getElementById('btn-lead-to-client');
+  if (btnToClient) {
+    btnToClient.addEventListener('click', async function() {
+      const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
+      if (existing) { showToast('Ya existe un cliente con ese nombre/email en Finanzas'); return; }
+      const newClient = {
+        id: 'cli_' + Date.now(),
+        nombre: lead.name,
+        empresa: lead.company || lead.name,
+        email: lead.email || '',
+        precio: 0,
+        inicio: new Date().toISOString().slice(0, 10),
+        estado: 'activo',
+        moneda: 'USD',
+        emails_cc: '',
+        dias_plazo: 10,
+        notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
+      };
+      saveClients([...getClients(), newClient]);
+      showToast('✅ Cliente registrado en Finanzas 🦏');
+      document.querySelector('.nav-btn[data-sec="finanzas"]').click();
+    });
+  }
 
   document.getElementById('btn-add-int').addEventListener('click', async function() {
     const type = document.getElementById('int-type').value;
@@ -4681,7 +4819,187 @@ document.querySelectorAll('[data-task-filter]').forEach(el => {
   });
 });
 
-document.querySelector('.nav-btn[data-sec="tareas"]').addEventListener('click', loadTareas);
+document.querySelector('.nav-btn[data-sec="tareas"]').addEventListener('click', () => { loadTareas(); loadAutoEmails(); });
+
+// ── TABS TAREAS ──────────────────────────────────────
+document.querySelectorAll('.tab-btn[data-ttab]').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn[data-ttab]').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const tab = this.dataset.ttab;
+    document.getElementById('ttab-tareas').style.display      = tab === 'tareas'      ? '' : 'none';
+    document.getElementById('ttab-auto-emails').style.display = tab === 'auto-emails' ? '' : 'none';
+    if (tab === 'auto-emails') loadAutoEmails();
+  });
+});
+
+// ── EMAILS AUTOMÁTICOS ───────────────────────────────
+const AE_FREQ_CONFIG = {
+  once:    { label: 'Fecha de envío', placeholder: 'YYYY-MM-DD', type: 'date' },
+  daily:   { label: null, placeholder: null, type: null },
+  weekly:  { label: 'Día de la semana', placeholder: null, type: 'select-dow' },
+  monthly: { label: 'Día del mes (1-31)', placeholder: '1', type: 'number' }
+};
+const DOW_NAMES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+
+function aeUpdateDayField() {
+  const freq = document.getElementById('ae-frequency').value;
+  const cfg  = AE_FREQ_CONFIG[freq];
+  const field = document.getElementById('ae-day-field');
+  const inp   = document.getElementById('ae-day');
+  if (!cfg.label) { field.style.display = 'none'; return; }
+  field.style.display = '';
+  document.getElementById('ae-day-label').textContent = cfg.label;
+  if (cfg.type === 'select-dow') {
+    inp.outerHTML = `<select id="ae-day">${DOW_NAMES.map((d,i)=>`<option value="${i}">${d}</option>`).join('')}</select>`;
+  } else if (cfg.type === 'date') {
+    inp.outerHTML = `<input id="ae-day" type="date"/>`;
+  } else {
+    inp.outerHTML = `<input id="ae-day" type="number" min="1" max="31" placeholder="${cfg.placeholder||''}"/>`;
+  }
+}
+document.getElementById('ae-frequency').addEventListener('change', aeUpdateDayField);
+aeUpdateDayField();
+
+let aeData = [];
+
+async function loadAutoEmails() {
+  const el = document.getElementById('ae-list');
+  if (!el) return;
+  try {
+    aeData = await sbFetch('rhinos_auto_emails?order=created_at.desc') || [];
+    renderAutoEmails();
+  } catch(e) { el.innerHTML = `<div class="empty" style="color:var(--red)">Error: ${e.message}</div>`; }
+}
+
+function renderAutoEmails() {
+  const el = document.getElementById('ae-list');
+  if (!el) return;
+  if (!aeData.length) { el.innerHTML = '<div class="empty">No hay emails programados aún.</div>'; return; }
+  const freqLabel = { once:'Una vez', daily:'Diario', weekly:'Semanal', monthly:'Mensual' };
+  el.innerHTML = aeData.map(em => {
+    const lastSent = em.last_sent_at ? new Date(em.last_sent_at).toLocaleDateString('es-AR') : 'Nunca';
+    const dayInfo = em.frequency === 'weekly' ? ` · ${DOW_NAMES[em.schedule_day]||em.schedule_day}`
+                  : em.frequency === 'monthly' ? ` · día ${em.schedule_day}`
+                  : em.frequency === 'once' ? ` · ${em.schedule_day}` : '';
+    return `<div class="card" style="margin-bottom:8px;border-color:${em.active?'rgba(99,102,241,0.25)':'var(--border)'}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px;margin-bottom:2px">${em.name}</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">📧 ${em.to_email} · <span style="color:#818cf8">${freqLabel[em.frequency]||em.frequency}${dayInfo}</span>${em.expires_at?' · vence '+em.expires_at:''}</div>
+          <div style="font-size:12px;font-weight:500;color:var(--text)">${em.subject}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${em.body?.slice(0,80)}${em.body?.length>80?'…':''}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:4px">Último envío: ${lastSent}</div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+          <button class="btn btn-sm ae-toggle-btn" data-ae-id="${em.id}" data-ae-active="${em.active}" style="color:${em.active?'var(--green)':'var(--text3)'};border-color:${em.active?'rgba(34,197,94,0.3)':'var(--border)'}">${em.active?'✓ Activo':'Pausado'}</button>
+          <button class="btn btn-sm ae-send-now-btn" data-ae-id="${em.id}" style="color:#818cf8;border-color:rgba(99,102,241,0.3)" title="Enviar ahora">▶</button>
+          <button class="btn btn-sm ae-del-btn" data-ae-id="${em.id}" style="color:var(--red)">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.ae-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const id = this.dataset.aeId;
+      const newActive = this.dataset.aeActive !== 'true';
+      try {
+        await sbFetch(`rhinos_auto_emails?id=eq.${id}`, 'PATCH', { active: newActive });
+        aeData = aeData.map(e => e.id === id ? {...e, active: newActive} : e);
+        renderAutoEmails();
+      } catch(e) { showToast('Error: ' + e.message); }
+    });
+  });
+
+  el.querySelectorAll('.ae-del-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      if (!confirm('¿Eliminar esta automatización?')) return;
+      const id = this.dataset.aeId;
+      try {
+        await sbFetch(`rhinos_auto_emails?id=eq.${id}`, 'DELETE');
+        aeData = aeData.filter(e => e.id !== id);
+        renderAutoEmails();
+        showToast('Eliminado');
+      } catch(e) { showToast('Error: ' + e.message); }
+    });
+  });
+
+  el.querySelectorAll('.ae-send-now-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const em = aeData.find(e => e.id === this.dataset.aeId);
+      if (!em) return;
+      this.disabled = true; this.textContent = '…';
+      try {
+        const token = await getAccessToken();
+        if (!token) { showToast('Conectá Gmail primero'); return; }
+        await callAPI('gmail_send', { access_token: token, to: em.to_email, subject: em.subject, body: em.body });
+        await sbFetch(`rhinos_auto_emails?id=eq.${em.id}`, 'PATCH', { last_sent_at: new Date().toISOString() });
+        aeData = aeData.map(e => e.id === em.id ? {...e, last_sent_at: new Date().toISOString()} : e);
+        renderAutoEmails();
+        showToast('✅ Email enviado');
+      } catch(e) { showToast('Error: ' + e.message); }
+      this.disabled = false; this.textContent = '▶';
+    });
+  });
+}
+
+document.getElementById('btn-add-auto-email').addEventListener('click', async function() {
+  const status = document.getElementById('ae-status');
+  const name    = document.getElementById('ae-name').value.trim();
+  const to      = document.getElementById('ae-to').value.trim();
+  const subject = document.getElementById('ae-subject').value.trim();
+  const body    = document.getElementById('ae-body').value.trim();
+  const freq    = document.getElementById('ae-frequency').value;
+  const day     = document.getElementById('ae-day')?.value?.trim() || null;
+  const expires = document.getElementById('ae-expires').value || null;
+
+  if (!name || !to || !subject || !body) { status.innerHTML = '<span style="color:var(--red)">Completá nombre, destinatario, asunto y cuerpo</span>'; return; }
+  if (freq !== 'daily' && !day) { status.innerHTML = '<span style="color:var(--red)">Indicá la fecha / día de envío</span>'; return; }
+
+  this.disabled = true;
+  status.textContent = 'Guardando...';
+  try {
+    const row = { name, to_email: to, subject, body, frequency: freq, schedule_day: day, expires_at: expires, active: true };
+    const [created] = await sbFetch('rhinos_auto_emails', 'POST', row);
+    aeData.unshift(created);
+    renderAutoEmails();
+    // Limpiar formulario
+    ['ae-name','ae-to','ae-subject','ae-body','ae-expires'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('ae-frequency').value = 'once';
+    aeUpdateDayField();
+    status.innerHTML = '<span style="color:var(--green)">✓ Automatización guardada. Empezará a enviar según lo programado.</span>';
+  } catch(e) { status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`; }
+  this.disabled = false;
+});
+
+// Verificar y enviar emails automáticos pendientes al abrir el CRM
+async function checkAndSendAutoEmails() {
+  try {
+    if (!gmailTokens) return;
+    const emails = await sbFetch('rhinos_auto_emails?active=eq.true');
+    if (!Array.isArray(emails) || !emails.length) return;
+    const token = await getAccessToken();
+    if (!token) return;
+    const today    = new Date().toISOString().slice(0, 10);
+    const todayDow = new Date().getDay();
+    const todayDom = new Date().getDate();
+    for (const em of emails) {
+      if (em.expires_at && today > em.expires_at) continue;
+      if (em.last_sent_at && em.last_sent_at.slice(0, 10) === today) continue;
+      let due = false;
+      if (em.frequency === 'once')    due = em.schedule_day === today;
+      if (em.frequency === 'daily')   due = true;
+      if (em.frequency === 'weekly')  due = String(todayDow) === String(em.schedule_day);
+      if (em.frequency === 'monthly') due = String(todayDom) === String(em.schedule_day);
+      if (!due) continue;
+      try {
+        await callAPI('gmail_send', { access_token: token, to: em.to_email, subject: em.subject, body: em.body });
+        await sbFetch(`rhinos_auto_emails?id=eq.${em.id}`, 'PATCH', { last_sent_at: new Date().toISOString() });
+      } catch(e) { console.warn('Auto-email error:', em.name, e.message); }
+    }
+  } catch(e) { console.warn('checkAndSendAutoEmails:', e.message); }
+}
 
 // ── FINANZAS ─────────────────────────────────────────
 // Supabase va por el servidor Vercel para evitar problemas SSL/CORS en el browser
