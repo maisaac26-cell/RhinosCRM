@@ -2156,6 +2156,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <option value="90daysAgo">Últimos 90 días</option>
         </select>
         <button class="btn btn-sm btn-cyan" id="btn-ga-refresh">↻ Actualizar</button>
+        <button class="btn btn-sm" id="btn-ga-reconnect" style="color:var(--text3);border-color:var(--border);font-size:11px">🔄 Reconectar</button>
       </div>
     </div>
 
@@ -8202,14 +8203,16 @@ document.querySelector('.nav-btn[data-sec="analytics"]')?.addEventListener('clic
 document.getElementById('btn-ga-refresh')?.addEventListener('click', loadAnalytics);
 document.getElementById('ga-range')?.addEventListener('change', loadAnalytics);
 
-// Conectar Analytics con OAuth propio
-document.getElementById('btn-connect-ga')?.addEventListener('click', async () => {
+// Conectar / Reconectar Analytics con OAuth propio
+const gaStartAuth = async () => {
   const r = await callAPI('ga_get_auth_url', {});
   if (r.url) window.location.href = r.url;
-});
-document.getElementById('btn-connect-ga-2')?.addEventListener('click', async () => {
-  const r = await callAPI('ga_get_auth_url', {});
-  if (r.url) window.location.href = r.url;
+};
+document.getElementById('btn-connect-ga')?.addEventListener('click', gaStartAuth);
+document.getElementById('btn-connect-ga-2')?.addEventListener('click', gaStartAuth);
+document.getElementById('btn-ga-reconnect')?.addEventListener('click', async () => {
+  if (!confirm('¿Reconectar Google Analytics? Se va a pedir permiso nuevamente.')) return;
+  gaStartAuth();
 });
 
 // Verificar si hay token de Analytics en Supabase — mostrar/ocultar botón conectar
