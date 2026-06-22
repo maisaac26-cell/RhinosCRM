@@ -553,6 +553,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <span id="guide-counter" style="font-size:10px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;font-weight:600"></span>
     <div style="display:flex;gap:4px" id="guide-dots"></div>
   </div>
+  <div id="guide-module" style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px"></div>
   <div id="guide-title" style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--cyan);margin-bottom:8px;letter-spacing:0.02em"></div>
   <div id="guide-desc" style="font-size:13px;color:var(--text2);line-height:1.8;margin-bottom:20px"></div>
   <div style="display:flex;justify-content:space-between;align-items:center">
@@ -573,7 +574,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-title">DASH<span>BOARD</span></div>
         <div class="page-sub"><span class="status-dot"></span>Vista ejecutiva del negocio RhinosApp</div>
       </div>
-      <button class="btn btn-sm" id="btn-db-refresh" style="color:var(--text2);margin-top:8px">↻ Actualizar</button>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+        <button class="btn btn-sm" id="btn-db-refresh" style="color:var(--text2)">↻ Actualizar</button>
+        <button onclick="startModuleGuide('dashboard')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
+      </div>
     </div>
 
     <!-- KPIs Financieros -->
@@ -654,7 +658,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-title">INSTA<span>GRAM</span></div>
         <div class="page-sub">Perfil, posts y comentarios de @rhinosapp.</div>
       </div>
-      <button class="refresh-btn" id="btn-refresh" style="margin-top:12px">↻ Actualizar</button>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:12px">
+        <button class="refresh-btn" id="btn-refresh">↻ Actualizar</button>
+        <button onclick="startModuleGuide('posts')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
+      </div>
     </div>
 
     <!-- Perfil Instagram -->
@@ -728,9 +735,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- DMs -->
   <div class="section" id="s-dms">
-    <div class="section-header">
-      <div class="page-title">DM<span>S</span></div>
-      <div class="page-sub">Mensajes directos de Instagram.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">DM<span>S</span></div>
+      <div class="page-sub">Mensajes directos de Instagram.</div></div>
+      <button onclick="startModuleGuide('dms')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
     <div class="card" style="background:rgba(0,229,204,0.05);border-color:rgba(0,229,204,0.2)">
       <div style="font-size:13px;color:var(--cyan);line-height:1.6">
@@ -783,9 +791,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- CONTENIDO -->
   <div class="section" id="s-contenido">
-    <div class="section-header">
-      <div class="page-title">GENE<span>RADOR</span></div>
-      <div class="page-sub">Captions e ideas con identidad de marca RhinosApp.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">GENE<span>RADOR</span></div>
+      <div class="page-sub">Captions e ideas con identidad de marca RhinosApp.</div></div>
+      <button onclick="startModuleGuide('contenido')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
     <div class="grid2">
       <div class="card">
@@ -899,9 +908,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- BLOG Y WEB -->
   <div class="section" id="s-webcontent">
-    <div class="section-header">
-      <div class="page-title">BLOG <span>Y WEB</span></div>
-      <div class="page-sub">Editá los artículos del blog, los precios/plan y los textos principales de rhinosapp.vercel.app. Los cambios se publican solos en 1-2 minutos.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">BLOG <span>Y WEB</span></div>
+      <div class="page-sub">Editá los artículos del blog, los precios/plan y los textos principales de rhinosapp.vercel.app. Los cambios se publican solos en 1-2 minutos.</div></div>
+      <button onclick="startModuleGuide('webcontent')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
 
     <div class="tab-row">
@@ -977,9 +987,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- CALENDARIO -->
   <div class="section" id="s-calendario">
-    <div class="section-header">
-      <div class="page-title">CALEN<span>DARIO</span></div>
-      <div class="page-sub">Google Calendar integrado en tiempo real.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">CALEN<span>DARIO</span></div>
+      <div class="page-sub">Google Calendar integrado en tiempo real.</div></div>
+      <button onclick="startModuleGuide('calendario')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
 
     <div id="cal-auth-card" class="card" style="text-align:center;padding:2rem;display:none">
@@ -1045,9 +1056,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- GMAIL -->
   <div class="section" id="s-gmail">
-    <div class="section-header">
-      <div class="page-title">G<span>MAIL</span></div>
-      <div class="page-sub">Bandeja de entrada y envío de emails desde el CRM.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">G<span>MAIL</span></div>
+      <div class="page-sub">Bandeja de entrada y envío de emails desde el CRM.</div></div>
+      <button onclick="startModuleGuide('gmail')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
 
     <div id="gmail-auth-card" class="card" style="text-align:center;padding:2rem">
@@ -1117,9 +1129,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- LEADS -->
   <div class="section" id="s-leads">
-    <div class="section-header">
-      <div class="page-title">🎯 <span>LEADS</span></div>
-      <div class="page-sub">Seguimiento y follow-up de prospectos calientes.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">🎯 <span>LEADS</span></div>
+      <div class="page-sub">Seguimiento y follow-up de prospectos calientes.</div></div>
+      <button onclick="startModuleGuide('leads')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
 
     <div class="tab-row">
@@ -1265,9 +1278,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- VENDEDORES -->
   <div class="section" id="s-vendedores">
-    <div class="section-header">
-      <div class="page-title">VENDE<span>DORES</span></div>
-      <div class="page-sub">Gestioná tu equipo de ventas y asignalos a leads y clientes.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">VENDE<span>DORES</span></div>
+      <div class="page-sub">Gestioná tu equipo de ventas y asignalos a leads y clientes.</div></div>
+      <button onclick="startModuleGuide('vendedores')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
     <div class="metrics-row" style="grid-template-columns:repeat(4,1fr)">
       <div class="metric-card"><div class="m-label">Vendedores</div><div class="m-val cyan" id="vm-total">—</div><div class="m-sub">activos</div></div>
@@ -1352,9 +1366,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- PROSPECTOS -->
   <div class="section" id="s-prospectos">
-    <div class="section-header">
-      <div class="page-title">PROS<span>PECTOS</span></div>
-      <div class="page-sub">Buscá distribuidoras de alimentos en Argentina con Google Places.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">PROS<span>PECTOS</span></div>
+      <div class="page-sub">Buscá distribuidoras de alimentos en Argentina con Google Places.</div></div>
+      <button onclick="startModuleGuide('prospectos')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
     <div class="card">
       <div class="card-title">Buscar prospectos</div>
@@ -1572,14 +1587,43 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="btn btn-sm" id="btn-ig-send-campaign" style="background:linear-gradient(135deg,#833ab4,#fd1d1d);color:white;border:none">📤 Enviar DMs</button>
     </div>
 
+    <!-- Barra de plantillas WhatsApp -->
+    <div id="wa-template-bar" style="display:none;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.2);border-radius:var(--r);padding:10px 14px;margin-bottom:8px;display:none;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--green);font-weight:600;white-space:nowrap">💬 Plantilla WA:</span>
+      <select id="wa-template-select" style="font-size:12px;padding:5px 10px;background:var(--surface2);border:1px solid rgba(34,197,94,0.3);border-radius:var(--r);color:var(--text);flex:1;min-width:220px"></select>
+      <button class="btn btn-sm" id="btn-wa-bulk" style="color:var(--green);border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.08);white-space:nowrap;display:none">💬 Campaña WA (<span id="wa-bulk-count">0</span>)</button>
+    </div>
+
     <div id="prospects-results"></div>
+  </div>
+
+  <!-- MODAL CAMPAÑA WA -->
+  <div id="wa-campaign-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:7000;align-items:center;justify-content:center">
+    <div style="background:var(--surface);border:1px solid rgba(34,197,94,0.3);border-radius:16px;padding:24px;width:480px;max-width:92vw;box-shadow:0 16px 48px rgba(0,0,0,0.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:600;color:var(--green)">💬 Campaña WhatsApp</div>
+        <span id="wa-camp-progress" style="font-size:11px;color:var(--text3)"></span>
+      </div>
+      <div id="wa-camp-name" style="font-size:18px;font-weight:600;margin-bottom:4px"></div>
+      <div id="wa-camp-phone" style="font-size:12px;color:var(--text3);margin-bottom:14px"></div>
+      <div id="wa-camp-preview" style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:var(--r);padding:12px;white-space:pre-wrap;margin-bottom:16px;max-height:140px;overflow-y:auto;line-height:1.6"></div>
+      <div style="display:flex;gap:10px">
+        <a id="btn-wa-camp-open" href="#" target="_blank" class="btn btn-green" style="flex:1;justify-content:center;font-size:13px">💬 Abrir WhatsApp</a>
+        <button id="btn-wa-camp-next" class="btn" style="flex:1;font-size:13px">Siguiente →</button>
+        <button id="btn-wa-camp-close" class="btn" style="font-size:12px;color:var(--text3)">✕</button>
+      </div>
+      <div id="wa-camp-done" style="display:none;text-align:center;padding:12px 0">
+        <div style="font-size:32px;margin-bottom:8px">🎉</div>
+        <div style="color:var(--text2);font-size:13px">¡Campaña completada!</div>
+      </div>
+    </div>
   </div>
 
   <!-- FINANZAS -->
   <div class="section" id="s-finanzas">
     <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
       <div>
-        <div class="page-title">FIN<span>ANZAS</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><div class="page-title">FIN<span>ANZAS</span></div><button onclick="startModuleGuide('finanzas')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-bottom:4px" title="Guía de este módulo">ⓘ</button></div>
         <div class="page-sub">Contabilidad, socios y proyecciones de RhinosApp.</div>
       </div>
       <!-- TIPO DE CAMBIO CARD -->
@@ -2047,9 +2091,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- TAREAS -->
   <div class="section" id="s-tareas">
-    <div class="section-header">
-      <div class="page-title">TA<span>REAS</span></div>
-      <div class="page-sub">Agenda del equipo RhinosApp — Manu, Guille, Poli y Rami.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">TA<span>REAS</span></div>
+      <div class="page-sub">Agenda del equipo RhinosApp — Manu, Guille, Poli y Rami.</div></div>
+      <button onclick="startModuleGuide('tareas')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
 
     <div class="tab-row">
@@ -2183,9 +2228,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- AGENTE -->
   <div class="section" id="s-agente">
-    <div class="section-header">
-      <div class="page-title">AGENTE <span>IA</span></div>
-      <div class="page-sub">Mensajes comerciales listos para enviar. Conectado con los precios reales de RhinosApp.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">AGENTE <span>IA</span></div>
+      <div class="page-sub">Mensajes comerciales listos para enviar. Conectado con los precios reales de RhinosApp.</div></div>
+      <button onclick="startModuleGuide('agente')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
     <div class="agente-layout">
       <!-- Contexto -->
@@ -2274,7 +2320,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   <div class="section" id="s-presupuestos">
     <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
       <div>
-        <div class="page-title">PRESU<span>PUESTOS</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><div class="page-title">PRESU<span>PUESTOS</span></div><button onclick="startModuleGuide('presupuestos')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-bottom:4px" title="Guía de este módulo">ⓘ</button></div>
         <div class="page-sub">Generá presupuestos profesionales de RhinosApp en PDF.</div>
       </div>
       <div class="tab-row" style="width:auto;margin:0">
@@ -2379,7 +2425,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-title">BALAN<span>CE</span></div>
         <div class="page-sub">Estados Contables SRL — Plan de Cuentas PCGAr · RT FACPCE</div>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="startModuleGuide('finanzas')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
         <button class="btn btn-sm" id="btn-balance-sync" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">🔄 Importar desde Finanzas</button>
         <button class="btn btn-sm" id="btn-balance-excel" style="background:rgba(34,197,94,0.12);color:var(--green);border-color:rgba(34,197,94,0.3);font-weight:600">📊 Exportar Excel</button>
         <button class="btn btn-sm" id="btn-balance-print" style="background:rgba(251,191,36,0.12);color:#fbbf24;border-color:rgba(251,191,36,0.3);font-weight:600">🖨 Vista previa PDF</button>
@@ -2536,6 +2583,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-sub"><span class="status-dot"></span>rhinosapp.vercel.app — Google Analytics 4</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
+        <button onclick="startModuleGuide('analytics')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
         <select id="ga-range" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text)">
           <option value="7daysAgo">Últimos 7 días</option>
           <option value="30daysAgo" selected>Últimos 30 días</option>
@@ -2608,7 +2656,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-title">🌅 <span id="mi-dia-title">MI DÍA</span></div>
         <div class="page-sub">Tu resumen personalizado de hoy — seguimientos, leads activos y alertas.</div>
       </div>
-      <button class="btn btn-sm btn-cyan" id="btn-mi-dia-refresh">↻ Actualizar</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-sm btn-cyan" id="btn-mi-dia-refresh">↻ Actualizar</button>
+        <button onclick="startModuleGuide('mi-dia')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
+      </div>
     </div>
     <div id="mi-dia-content">
       <div class="empty">Cargando...</div>
@@ -4057,6 +4108,28 @@ document.getElementById('btn-save-event').addEventListener('click', async functi
 
 document.querySelector('.nav-btn[data-sec="calendario"]').addEventListener('click', loadCalendar);
 
+// ── PLANTILLAS WHATSAPP ────────────────────────────────
+const WA_TEMPLATES = [
+  { key: 'primer-contacto', label: '👋 Primer contacto',
+    msg: `Hola {nombre}! 👋 Te escribo de *RhinosApp*, un sistema de gestión para distribuidoras en Argentina.\n\nVi que {empresa} trabaja en distribución y quería consultarles si tienen alguna herramienta para gestionar pedidos, facturación ARCA y stock.\n\n¿Les puedo contar brevemente cómo funciona? Una demo de 20 minutos y ven todo en vivo. ¿Les viene bien esta semana?` },
+  { key: 'enviar-info', label: '📋 Enviar info rápida',
+    msg: `Hola {nombre}! Te paso un resumen de *RhinosApp*:\n\n✅ Facturación ARCA integrada desde el día 1\n📦 Stock con pesos variables (kg, litros, unidades)\n💰 Cobranzas y ventas en un solo sistema\n🤖 IA comercial para armar presupuestos y emails\n📊 CRM + pipeline de ventas\n\n¿Tienen 20 minutos esta semana para una demo en vivo?` },
+  { key: 'follow-up', label: '🔔 Seguimiento',
+    msg: `Hola {nombre}, ¿cómo están? 😊 Te escribo de *RhinosApp*, hablamos hace unos días sobre el sistema de gestión.\n\n¿Tuvieron oportunidad de pensarlo? No hay presión, solo quería saber si tienen alguna pregunta.\n\nCon gusto armamos una demo según sus tiempos.` },
+  { key: 'confirmar-demo', label: '📅 Confirmar demo',
+    msg: `Hola {nombre}! Te confirmo la demo de *RhinosApp* que agendamos. Te mando el link de la reunión unos minutos antes.\n\n¿Alguna consulta previa? 🙌` },
+  { key: 'cierre', label: '🤝 Cerrar venta',
+    msg: `Hola {nombre}! ¿Qué tal quedaron después de la demo de *RhinosApp*? 🦏\n\nSi están listos para arrancar, activamos la cuenta hoy mismo y en las primeras 48hs los tenemos operativos.\n\n¿Qué preguntas les quedan antes de decidir?` },
+  { key: 'reactivar', label: '♻️ Reactivar contacto',
+    msg: `Hola {nombre}! Pasó un tiempo desde que hablamos de *RhinosApp*. 😊\n\nSumamos novedades: integración ARCA mejorada, módulo de cobranzas y IA para armar presupuestos automáticamente.\n\n¿Estarían en condiciones de retomar la conversación?` },
+];
+
+function buildWaMsg(template, nombre, empresa) {
+  return template.msg
+    .replace(/\{nombre\}/g, nombre || 'estimado/a')
+    .replace(/\{empresa\}/g, empresa || 'su empresa');
+}
+
 // ── AGENTE IA VENTAS ─────────────────────────────────
 const AGENTE_TEMPLATES = [
   { key: 'primer-contacto',   icon: '👋', label: 'Primer contacto',     desc: 'Cold outreach al lead nuevo' },
@@ -5276,7 +5349,10 @@ async function openLead(lead) {
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem">
-        ${lead.phone?`<a href="https://wa.me/${formatWhatsApp(lead.phone)}" target="_blank" class="btn btn-green btn-sm">💬 WhatsApp</a>`:''}
+        ${lead.phone?`<div style="position:relative;display:inline-flex">
+          <a href="https://wa.me/${formatWhatsApp(lead.phone)}" target="_blank" class="btn btn-green btn-sm" style="border-radius:var(--r) 0 0 var(--r);border-right:0">💬 WA</a>
+          <button class="btn btn-green btn-sm" id="btn-lead-wa-tpl" data-lid="${lead.id}" style="border-radius:0 var(--r) var(--r) 0;padding:0 7px;font-size:11px" title="Elegir plantilla WA">▼</button>
+        </div>`:''}
         ${lead.email?`<a href="mailto:${lead.email}" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">📧 Email</a>`:''}
         ${lead.instagram?`<a href="https://instagram.com/${lead.instagram.replace('@','')}" target="_blank" class="btn btn-sm" style="color:#e1306c;border-color:rgba(225,48,108,0.3)">📸 IG</a>`:''}
         <button class="btn btn-sm" id="btn-lead-agente" style="background:rgba(0,229,204,0.1);color:var(--cyan);border-color:rgba(0,229,204,0.3)">🤖 Mensaje IA</button>
@@ -5521,6 +5597,33 @@ Dame: 1) QUÉ HACER ahora (acción concreta) 2) MENSAJE para WhatsApp listo para
   document.getElementById('btn-edit-lead').addEventListener('click', () => showLeadForm(lead));
 
   document.getElementById('btn-lead-agente').addEventListener('click', () => openAgenteWithLead(lead));
+
+  // WA plantilla picker
+  document.getElementById('btn-lead-wa-tpl')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    const existing = document.getElementById('wa-tpl-popup');
+    if (existing) { existing.remove(); return; }
+    const popup = document.createElement('div');
+    popup.id = 'wa-tpl-popup';
+    popup.style.cssText = 'position:absolute;top:calc(100% + 4px);left:0;z-index:1000;background:var(--surface);border:1px solid rgba(34,197,94,0.4);border-radius:var(--r);padding:6px;min-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.4);display:flex;flex-direction:column;gap:4px';
+    WA_TEMPLATES.forEach(tpl => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm';
+      btn.style.cssText = 'text-align:left;justify-content:flex-start;font-size:12px;padding:5px 10px';
+      btn.textContent = tpl.label;
+      btn.addEventListener('click', () => {
+        const msg = buildWaMsg(tpl, lead.name, lead.company || lead.name);
+        window.open(`https://wa.me/${formatWhatsApp(lead.phone)}?text=${encodeURIComponent(msg)}`, '_blank');
+        popup.remove();
+      });
+      popup.appendChild(btn);
+    });
+    this.parentElement.style.position = 'relative';
+    this.parentElement.appendChild(popup);
+    setTimeout(() => document.addEventListener('click', function h(ev) {
+      if (!popup.contains(ev.target) && ev.target !== popup) { popup.remove(); document.removeEventListener('click', h); }
+    }), 0);
+  });
 
   document.getElementById('btn-lead-presupuesto').addEventListener('click', () => {
     document.querySelector('.nav-btn[data-sec="presupuestos"]').click();
@@ -7240,16 +7343,16 @@ function updateCampaignBar() {
   const bar = document.getElementById('campaign-bar');
   if (!bar) return;
   const count = selectedProspects.size;
-  const withEmail = [...selectedProspects].filter(i => {
-    const p = prospectsData[i];
-    return getProspectEmails()[p?.id];
-  }).length;
+  const withEmail = [...selectedProspects].filter(i => { const p = prospectsData[i]; return getProspectEmails()[p?.id]; }).length;
   const withIG = [...selectedProspects].filter(i => prospectsData[i]?.ig_username).length;
+  const withPhone = [...selectedProspects].filter(i => prospectsData[i]?.phone).length;
   if (count === 0) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
-  document.getElementById('campaign-count').textContent = `${count} seleccionado${count>1?'s':''}${withEmail>0?` · ${withEmail} con email`:''} ${withIG>0?`· 📸 ${withIG} con IG`:''}`;
+  document.getElementById('campaign-count').textContent = `${count} seleccionado${count>1?'s':''}${withEmail>0?` · ${withEmail} con email`:''}${withPhone>0?` · ${withPhone} con WA`:''}${withIG>0?` · 📸 ${withIG} IG`:''}`;
   const igBtn = document.getElementById('btn-ig-campaign-open');
   if (igBtn) igBtn.style.display = withIG > 0 ? 'inline-flex' : 'none';
+  const waBtn = document.getElementById('btn-wa-campaign-launch');
+  if (waBtn) waBtn.style.display = withPhone > 0 ? 'inline-flex' : 'none';
 }
 
 function renderIGBadge(username) {
@@ -7267,24 +7370,42 @@ function applyProspectFilters() {
   prospectsData = orig;
 }
 
+function getSelectedWaTemplate() {
+  const sel = document.getElementById('wa-template-select');
+  const key = sel ? sel.value : WA_TEMPLATES[0].key;
+  return WA_TEMPLATES.find(t => t.key === key) || WA_TEMPLATES[0];
+}
+
+function initWaTemplateBar() {
+  const bar = document.getElementById('wa-template-bar');
+  const sel = document.getElementById('wa-template-select');
+  if (!bar || !sel) return;
+  if (!sel.options.length) {
+    WA_TEMPLATES.forEach(t => { const o = document.createElement('option'); o.value = t.key; o.textContent = t.label; sel.appendChild(o); });
+  }
+  bar.style.display = 'flex';
+}
+
 function renderProspects() {
   const out = document.getElementById('prospects-results');
   if (!prospectsData.length) { out.innerHTML = '<div class="empty">Sin resultados. Probá con otra búsqueda.</div>'; return; }
   const savedEmails = getProspectEmails();
   selectedProspects.clear();
   selectedProspectsIG.clear();
+  initWaTemplateBar();
 
   // Aplicar filtro de Instagram si está activo
   const filterIG = document.getElementById('f-instagram')?.checked;
   const displayData = filterIG ? prospectsData.filter(p => p.ig_username) : prospectsData;
 
   out.innerHTML = `
-    <!-- Barra de campaña email -->
+    <!-- Barra de campaña email + WA -->
     <div id="campaign-bar" style="display:none;position:sticky;top:60px;z-index:50;background:rgba(13,17,23,0.95);border:1px solid rgba(0,229,204,0.3);border-radius:var(--r);padding:10px 16px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:12px;backdrop-filter:blur(8px)">
       <span id="campaign-count" style="font-size:13px;color:var(--cyan);font-weight:500"></span>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" id="btn-deselect-all">Deseleccionar todo</button>
-        <button class="btn btn-sm" id="btn-campaign-send" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">📧 Enviar campaña email</button>
+        <button class="btn btn-sm" id="btn-wa-campaign-launch" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);font-weight:600;display:none">💬 Campaña WA</button>
+        <button class="btn btn-sm" id="btn-campaign-send" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">📧 Campaña email</button>
         <button class="btn btn-sm" id="btn-ig-campaign-open" style="background:linear-gradient(135deg,rgba(131,58,180,0.15),rgba(253,29,29,0.08));color:#a78bfa;border-color:rgba(131,58,180,0.3);font-weight:600;display:none">📸 Campaña IG DM</button>
       </div>
     </div>
@@ -7299,6 +7420,7 @@ function renderProspects() {
     <div style="display:flex;flex-direction:column;gap:8px">
       ${displayData.map((p, i) => {
         const savedEmail = savedEmails[p.id] || '';
+        const waPhone = p.phone ? formatWhatsApp(p.phone) : null;
         return `
         <div class="card" style="padding:1rem;margin-bottom:0" id="prospect-${i}">
           <div style="display:flex;align-items:flex-start;gap:12px">
@@ -7322,7 +7444,8 @@ function renderProspects() {
               </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-              ${p.phone ? `<a href="https://wa.me/${formatWhatsApp(p.phone)}" target="_blank" class="btn btn-green btn-sm" style="text-align:center">💬 WA</a>` : ''}
+              ${waPhone ? `<button class="btn btn-green btn-sm prospect-wa-btn" data-idx="${i}" style="text-align:center;white-space:nowrap">💬 WA</button>` : ''}
+              <button class="btn btn-sm prospect-to-lead" data-idx="${i}" style="font-size:11px;color:var(--amber);border-color:rgba(245,158,11,0.3);white-space:nowrap" title="Agregar como lead al pipeline">→ Lead</button>
               ${p.website ? `<button class="btn btn-sm prospect-find-ig-single" data-pid="${p.id}" data-website="${p.website}" data-name="${p.name.replace(/"/g,'')}" style="font-size:11px;padding:4px 8px;${p.ig_username?'opacity:0.5':''}">📸 IG</button>` : ''}
               <button class="btn btn-cyan btn-sm" data-enrich-idx="${i}" style="font-size:11px">🦏</button>
             </div>
@@ -7434,6 +7557,51 @@ function renderProspects() {
     const mainFilter = document.getElementById('f-instagram');
     if (mainFilter) mainFilter.checked = this.checked;
     renderProspects();
+  });
+
+  // WhatsApp con plantilla
+  out.querySelectorAll('.prospect-wa-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const i = +this.dataset.idx;
+      const p = prospectsData[i];
+      if (!p?.phone) return;
+      const tpl = getSelectedWaTemplate();
+      const msg = buildWaMsg(tpl, p.name, p.name);
+      window.open(`https://wa.me/${formatWhatsApp(p.phone)}?text=${encodeURIComponent(msg)}`, '_blank');
+    });
+  });
+
+  // Convertir prospecto a lead
+  out.querySelectorAll('.prospect-to-lead').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const i = +this.dataset.idx;
+      const p = prospectsData[i];
+      const leadData = {
+        name: p.name, company: p.name,
+        phone: p.phone || '', email: getProspectEmails()[p.id] || '',
+        address: p.address || '', source: 'Prospectos',
+        status: 'nuevo', updated_at: new Date().toISOString(),
+        notes: `Origen: Google Places. Rating: ${p.rating||'—'}. Web: ${p.website||'—'}`
+      };
+      this.disabled = true; this.textContent = '⏳';
+      try {
+        if (!leadsData.length) await loadLeads();
+        const [nl] = await sbFetch('rhinos_leads', 'POST', leadData);
+        leadsData.unshift(nl);
+        renderLeadsMetrics(); renderLeadsAlerts(); renderLeadsList(); renderTagFilters();
+        this.textContent = '✅ Creado';
+        this.style.color = 'var(--green)';
+        showToast(`${p.name} agregado al pipeline 🦏`);
+      } catch(e) { showToast('Error: ' + e.message); this.disabled = false; this.textContent = '→ Lead'; }
+    });
+  });
+
+  // Campaña WA masiva
+  const waCampBtn = document.getElementById('btn-wa-campaign-launch');
+  if (waCampBtn) waCampBtn.addEventListener('click', () => {
+    const prospects = [...selectedProspects].map(i => prospectsData[i]).filter(p => p?.phone);
+    if (!prospects.length) { showToast('Ningún prospecto seleccionado tiene teléfono'); return; }
+    launchWaCampaign(prospects);
   });
 
   // Botón campaña IG
@@ -9809,82 +9977,143 @@ document.getElementById('btn-balance-print').addEventListener('click', () => {
 
 // ── GUIDE / TOUR ─────────────────────────────────────
 const GUIDE_STEPS = [
-  {
-    title: '¡Bienvenido a RhinosApp CRM! 🦏',
-    desc: 'Este tour rápido te muestra las funciones principales del sistema. Dura menos de 2 minutos.',
-    target: null
-  },
-  {
-    title: 'Dashboard',
-    desc: 'Métricas en tiempo real de Instagram: seguidores, alcance e impresiones de los últimos 7 días. Hacé clic en cualquier post para ver y responder comentarios.',
-    target: '[data-sec="dashboard"]'
-  },
-  {
-    title: 'Posts — Comentarios',
-    desc: 'Gestioná los comentarios de todos tus posts. Seleccioná un post a la izquierda y respondé con IA o manualmente con un solo clic.',
-    target: '[data-sec="posts"]'
-  },
-  {
-    title: 'DMs — Mensajes directos',
-    desc: 'Generador de respuestas con IA para DMs de Instagram. Pegás el mensaje recibido, elegís el objetivo (precio, demo, objeción) y la IA te escribe la respuesta.',
-    target: '[data-sec="dms"]'
-  },
-  {
-    title: 'Gmail',
-    desc: 'Bandeja de entrada integrada. Leé, respondé y enviá emails de comercial@rhinosapp.com sin salir del CRM. La IA puede generar respuestas automáticas.',
-    target: '[data-sec="gmail"]'
-  },
-  {
-    title: 'Generador de Contenido',
-    desc: 'Creá captions, hashtags e ideas visuales para Instagram con IA. También genera imágenes con DALL-E 3 con la identidad visual de RhinosApp.',
-    target: '[data-sec="contenido"]'
-  },
-  {
-    title: 'Calendario',
-    desc: 'Google Calendar integrado. Creá eventos, visualizá el mes y generá un plan de contenido mensual con IA según el foco de la semana.',
-    target: '[data-sec="calendario"]'
-  },
-  {
-    title: '🎯 Leads — Pipeline de ventas',
-    desc: 'Seguimiento de todos los prospectos calientes. Estados: Nuevo → Contactado → Demo → Cliente. Te avisa automáticamente cuando hay leads sin contactar hace días.',
-    target: '[data-sec="leads"]'
-  },
-  {
-    title: 'Prospectos',
-    desc: 'Buscá distribuidoras de alimentos en toda Argentina con Google Maps. Filtrá por provincia, ciudad y tipo de negocio. La IA analiza cada prospecto y sugiere cómo contactarlo.',
-    target: '[data-sec="prospectos"]'
-  },
-  {
-    title: '💰 Finanzas',
-    desc: 'Registrá ingresos, gastos, inversiones y gastos pendientes. Los gastos fijos (Vercel, Gmail, AFIP) se aplican solos cada mes. Recibís un resumen semanal por WhatsApp los lunes.',
-    target: '[data-sec="finanzas"]'
-  },
-  {
-    title: '📋 Tareas',
-    desc: 'Agenda del equipo. Asigná tareas a Manu, Guille, Poli o Rami con prioridad, fecha límite y categoría. Vista de estado: pendiente, en progreso, completada.',
-    target: '[data-sec="tareas"]'
-  },
-  {
-    title: 'Agente IA',
-    desc: 'Especialista en marketing de RhinosApp. Conoce el producto, el cliente objetivo y la marca. Preguntale ideas de posts, estrategias, cómo manejar objeciones o cualquier cosa.',
-    target: '[data-sec="agente"]'
-  },
-  {
-    title: '📄 Presupuestos',
-    desc: 'Generá presupuestos profesionales en segundos. Editá el texto directo en la vista previa, descargá el PDF y envialo por Gmail con el cuerpo generado por IA.',
-    target: '[data-sec="presupuestos"]'
-  },
-  {
-    title: '💳 Clientes & Cobros',
-    desc: 'Nuevo módulo en Finanzas para gestionar tus clientes de suscripción. Agregás clientes con su precio mensual, generás los cobros de cada mes, marcás quién pagó (se registra automáticamente como ingreso) y enviás emails de solicitud o recordatorio con IA. Expandí la guía "📖 ¿Cómo usar?" dentro del módulo para ver el paso a paso.',
-    target: '[data-ftab="cobros"]'
-  },
-  {
-    title: '¡Listo! Ya sabés todo 🦏',
-    desc: 'Podés relanzar este tour en cualquier momento con el botón <strong style="color:var(--cyan)">?</strong> en la barra superior. Cualquier duda, el Agente IA está para ayudarte.',
-    target: null
-  }
+  // ── Bienvenida ──
+  { module: null, title: '¡Bienvenido a RhinosApp CRM! 🦏', target: null,
+    desc: 'Este tour completo te explica <strong>cada módulo, cada métrica y cada botón</strong> del sistema. Usá las flechas para avanzar, o hacé clic en el botón <strong style="color:var(--cyan)">ⓘ</strong> dentro de cualquier sección para ir directo a su explicación.' },
+
+  // ── Búsqueda Global ──
+  { module: 'global', title: '🔍 Búsqueda global', target: '#global-search-input',
+    desc: 'Buscás en <strong>leads, clientes y presupuestos al mismo tiempo</strong> desde la barra superior. Escribís el nombre, empresa, email o teléfono y aparecen resultados de todos los módulos. Clic en un resultado navega directo a ese registro.' },
+
+  // ── Dashboard ──
+  { module: 'dashboard', title: '📊 Dashboard — Panel principal', target: '[data-sec="dashboard"]',
+    desc: 'Vista ejecutiva del negocio en tiempo real. Muestra <strong>métricas de Instagram</strong> (seguidores, alcance, impresiones) y las métricas comerciales: pipeline de ventas, proyección del mes, alertas de leads.' },
+  { module: 'dashboard', title: '📊 Dashboard — Métricas comerciales clave', target: '[data-sec="dashboard"]',
+    desc: '<strong>Valor del pipeline:</strong> suma total de los deal_value de todos los leads activos — te dice cuánto dinero hay "en juego" hoy.<br><br><strong>Proyección del mes:</strong> si el ritmo de cierre actual se mantiene, cuánto MRR nuevo se espera a fin de mes. Fórmula: (cierres del mes × deal_value promedio × días restantes / días transcurridos).<br><br><strong>Conversiones:</strong> leads que pasaron a "cliente" este mes.' },
+  { module: 'dashboard', title: '📊 Dashboard — Tasa de conversión', target: '[data-sec="dashboard"]',
+    desc: '<strong>Tasa de conversión del pipeline</strong> = clientes cerrados / total leads × 100. Un ratio sano para ventas B2B consultivas es 15–25%. Si está por debajo del 10%, hay que revisar la calidad de los leads o el proceso de demo.<br><br>Clic en cualquier tarjeta métrica filtra automáticamente los leads de ese estado.' },
+
+  // ── Mi día ──
+  { module: 'mi-dia', title: '🌅 Mi día — Vista personalizada', target: '[data-sec="mi-dia"]',
+    desc: 'Sección exclusiva para <strong>vendedores</strong>: muestra solo sus leads, sus follow-ups y sus alertas. El admin ve todo el equipo; el vendedor ve solo lo suyo.<br><br>Aparece automáticamente al iniciar sesión. Siempre empezá el día acá.' },
+  { module: 'mi-dia', title: '🌅 Mi día — Follow-ups y prioridades', target: '[data-sec="mi-dia"]',
+    desc: '<strong>Vencidos ⚠️:</strong> follow-ups con fecha pasada — urgente contactar.<br><strong>Para hoy 📅:</strong> los que tenés agendados para este día.<br><strong>Sin actividad +7d 💤:</strong> leads que no tocaste hace una semana — en riesgo de enfriarse.<br><br>Clic en cualquier lead del resumen abre el detalle completo en Leads.' },
+
+  // ── Leads ──
+  { module: 'leads', title: '🎯 Leads — El corazón del CRM', target: '[data-sec="leads"]',
+    desc: 'Gestión completa del <strong>pipeline comercial</strong>. Cada lead tiene un estado que representa su etapa de venta: <span style="color:var(--cyan)">Nuevo</span> → <span style="color:var(--amber)">Contactado</span> → <span style="color:var(--green)">Demo agendada</span> → <span style="color:#22c55e">Cliente 🦏</span>.<br><br>Los leads Perdido e Imposible salen del pipeline activo.' },
+  { module: 'leads', title: '🎯 Leads — Crear y editar leads', target: '[data-sec="leads"]',
+    desc: 'Botón <strong>"+ Nuevo"</strong> abre el formulario. Campos clave:<br>• <strong>Deal Value:</strong> MRR estimado en ARS — es lo que usamos para calcular el valor del pipeline<br>• <strong>Próximo follow-up:</strong> la fecha en que tenés que volver a contactar<br>• <strong>Vendedor asignado:</strong> quién lo trabaja<br>• <strong>Tags:</strong> etiquetas libres para clasificar (ej: "caliente", "precio", "demo-pendiente")<br><br>El sistema detecta duplicados por email y teléfono automáticamente.' },
+  { module: 'leads', title: '🎯 Leads — Follow-ups y alertas automáticas', target: '[data-sec="leads"]',
+    desc: 'El CRM genera alertas automáticas arriba de la lista:<br>• <strong>⚠️ Follow-up vencido:</strong> la fecha de seguimiento ya pasó<br>• <strong>💤 Sin actividad +7 días:</strong> ninguna interacción registrada en una semana<br><br>Cada alerta tiene botón WA para contactar directo. La badge roja en el nav muestra el total de leads en alerta.' },
+  { module: 'leads', title: '🎯 Leads — Tags y filtros', target: '[data-sec="leads"]',
+    desc: '<strong>Tags</strong> (etiquetas): se guardan como texto separado por comas. Cuando hay tags cargados, aparece una fila de chips de filtro arriba de la lista.<br><br>Combinar filtro por <strong>estado + tag</strong> para segmentar: ej. todos los leads "contactado" con tag "precio" = lista para enviar mensaje de objeción de precio.<br><br>La barra de búsqueda también filtra por tags.' },
+  { module: 'leads', title: '🎯 Leads — Cambio de estado', target: '[data-sec="leads"]',
+    desc: 'Hacé clic en el badge de estado en el detalle del lead para cambiarlo. Podés agregar un <strong>comentario del cambio</strong> que queda registrado en el historial de interacciones.<br><br><strong>Cuando el estado pasa a "Cliente"</strong>, el sistema automáticamente crea el cliente en el módulo de Finanzas con el deal_value como precio mensual. No hay que cargarlo dos veces.' },
+  { module: 'leads', title: '🎯 Leads — Pipeline Kanban', target: '[data-sec="leads"]',
+    desc: 'La pestaña <strong>"📊 Pipeline"</strong> muestra los leads en columnas por estado, como tablero Kanban.<br><br>Podés <strong>arrastrar y soltar</strong> una tarjeta de columna a columna para cambiar el estado directamente. El cambio se guarda en Supabase en tiempo real.<br><br>Las tarjetas con ⚠️ borde naranja tienen follow-up vencido.' },
+  { module: 'leads', title: '🎯 Leads — WhatsApp con plantilla', target: '[data-sec="leads"]',
+    desc: 'En el detalle de cada lead, el botón <strong>💬 WA</strong> abre WhatsApp con el número del lead. El botón <strong>▼</strong> al lado abre el selector de plantillas:<br>• 👋 Primer contacto · 📋 Enviar info · 🔔 Seguimiento · 📅 Confirmar demo · 🤝 Cierre · ♻️ Reactivar<br><br>Cada plantilla inserta automáticamente el nombre y empresa del lead. Solo tenés que apretar Enviar en WhatsApp.' },
+  { module: 'leads', title: '🎯 Leads — Historial de interacciones', target: '[data-sec="leads"]',
+    desc: 'Cada lead tiene un <strong>historial completo</strong> de todas las interacciones: llamadas, emails, demos, cambios de estado, mensajes de IA generados.<br><br>Para agregar una interacción manual: elegí el tipo (llamada, email, WhatsApp, reunión) y escribí las notas. Esto alimenta las métricas de "última actividad" y evita que el lead entre en alerta de inactividad.' },
+
+  // ── Agente IA ──
+  { module: 'agente', title: '🤖 Agente IA — Tu redactor de ventas', target: '[data-sec="agente"]',
+    desc: 'Genera mensajes comerciales personalizados en segundos. Conoce <strong>todos los módulos de RhinosApp, los precios actuales y las objeciones típicas</strong>.<br><br>Puede escribir en formato Email (con asunto) o WhatsApp (corto y directo). Los precios que menciona se toman en tiempo real de la tabla de tiers.' },
+  { module: 'agente', title: '🤖 Agente IA — 13 plantillas', target: '[data-sec="agente"]',
+    desc: 'Las tarjetas de plantilla cubren todo el ciclo comercial:<br>• <strong>Primer contacto / Pitch:</strong> para leads nuevos<br>• <strong>Presupuesto:</strong> incluye precios reales actualizados<br>• <strong>Follow-up / Cierre:</strong> para avanzar en el pipeline<br>• <strong>Objeciones:</strong> precio, Excel, "somos chicos"<br>• <strong>Post-venta:</strong> onboarding, cobro vencido, pedido de referidos<br><br>Seleccioná una plantilla y completá los campos de contexto.' },
+  { module: 'agente', title: '🤖 Agente IA — Contexto del lead', target: '[data-sec="agente"]',
+    desc: 'Si entrás al Agente desde el botón <strong>"🤖 Mensaje IA"</strong> en el detalle de un lead, el nombre, empresa, email y teléfono se cargan automáticamente.<br><br>También podés elegir un lead del selector — al seleccionarlo se auto-completan todos los datos. El mensaje generado queda registrado automáticamente en el historial de interacciones del lead.' },
+  { module: 'agente', title: '🤖 Agente IA — Mensajes guardados', target: '[data-sec="agente"]',
+    desc: 'Después de generar un mensaje, podés guardarlo con el botón <strong>💾 Guardar</strong>. Los mensajes guardados se almacenan localmente (no se pierden al cerrar el browser).<br><br>Sirven para tener una librería de mensajes que funcionaron bien y reutilizarlos. Expandí la sección "Mensajes guardados" en el panel izquierdo.' },
+
+  // ── Prospectos ──
+  { module: 'prospectos', title: '🔍 Prospectos — Búsqueda masiva', target: '[data-sec="prospectos"]',
+    desc: 'Buscá <strong>distribuidoras en toda Argentina</strong> usando Google Places. Elegí el tipo de negocio, provincia y ciudad, y el sistema devuelve empresas reales con nombre, dirección, teléfono y web.<br><br><strong>Búsqueda masiva:</strong> busca con múltiples keywords al mismo tiempo para cubrir más variantes del rubro.' },
+  { module: 'prospectos', title: '🔍 Prospectos — Enriquecer con IA 🦏', target: '[data-sec="prospectos"]',
+    desc: 'El botón <strong>🦏 Analizar</strong> en cada prospecto pide a la IA que analice la empresa y devuelva:<br>• Tamaño estimado<br>• Módulos de RhinosApp más relevantes para ese rubro<br>• Sugerencia de cómo abordar la conversación<br>• Posibles objeciones y cómo manejarlas<br><br>Ideal para preparar el primer contacto.' },
+  { module: 'prospectos', title: '🔍 Prospectos — WhatsApp con plantilla', target: '[data-sec="prospectos"]',
+    desc: 'Cada prospecto con teléfono tiene botón <strong>💬 WA</strong>. Antes de hacer clic, elegí la plantilla en la barra verde superior:<br><br>👋 Primer contacto · 📋 Enviar info · 🔔 Seguimiento · 📅 Confirmar demo · 🤝 Cierre · ♻️ Reactivar<br><br>El mensaje se personaliza con el nombre y empresa del prospecto. Solo hay que abrir el chat y enviar.' },
+  { module: 'prospectos', title: '🔍 Prospectos — Campaña WA masiva', target: '[data-sec="prospectos"]',
+    desc: 'Seleccioná varios prospectos con el checkbox → aparece la barra de campaña → botón <strong>💬 Campaña WA</strong>.<br><br>El CRM te muestra cada prospecto uno por uno con el mensaje listo. Apretás "Abrir WhatsApp" → enviás → "Siguiente". Podés contactar 20 prospectos en 10 minutos sin perder contexto ni escribir nada manualmente.' },
+  { module: 'prospectos', title: '🔍 Prospectos — Convertir a lead', target: '[data-sec="prospectos"]',
+    desc: 'El botón <strong>→ Lead</strong> en cada prospecto lo agrega directamente al pipeline de Leads con estado "Nuevo", origen "Prospectos" y todos sus datos (nombre, teléfono, dirección, web).<br><br>A partir de ahí entra en el flujo comercial normal: follow-up, cambios de estado, historial de interacciones.' },
+  { module: 'prospectos', title: '🔍 Prospectos — Campaña Email + Instagram', target: '[data-sec="prospectos"]',
+    desc: '<strong>Campaña Email:</strong> seleccioná prospectos, cargá o buscá automáticamente los emails (botón "🔍 Email auto" busca en el sitio web), y enviá un email personalizado masivo desde Gmail.<br><br><strong>Campaña IG DM:</strong> busca el Instagram de cada empresa (botón 📸) y genera mensajes de DM con IA para enviar desde la cuenta @rhinosapp.' },
+
+  // ── Presupuestos ──
+  { module: 'presupuestos', title: '📄 Presupuestos — Crear en segundos', target: '[data-sec="presupuestos"]',
+    desc: 'Completá cliente, empresa y plan → la IA genera el texto completo del presupuesto con precios actualizados automáticamente desde la tabla de tiers.<br><br>Podés <strong>editar el texto directamente en la vista previa</strong> antes de descargarlo. El PDF queda listo para enviar.' },
+  { module: 'presupuestos', title: '📄 Presupuestos — Estados y seguimiento', target: '[data-sec="presupuestos"]',
+    desc: 'Cada presupuesto en el historial tiene un estado:<br>• <strong>Borrador:</strong> aún no enviado<br>• <strong>Enviado:</strong> el cliente lo recibió<br>• <strong>Visto:</strong> lo abrió (si usás Gmail tracking)<br>• <strong>Aceptado:</strong> cerrado ✅<br>• <strong>Rechazado:</strong> perdido ❌<br><br>Cambiá el estado desde el selector en cada fila del historial.' },
+  { module: 'presupuestos', title: '📄 Presupuestos — Enviar por Gmail', target: '[data-sec="presupuestos"]',
+    desc: 'El botón <strong>📧 Gmail</strong> abre el compositor con el destinatario y asunto pre-llenados, y el cuerpo del email generado por IA en tono profesional y cercano.<br><br>Solo hay que hacer clic en Enviar. El email queda en el Enviados de comercial@rhinosapp.com.' },
+
+  // ── Vendedores ──
+  { module: 'vendedores', title: '👤 Vendedores — Gestión del equipo', target: '[data-sec="vendedores"]',
+    desc: 'Agregás cada vendedor con nombre, email, teléfono y porcentaje de comisión. El sistema les envía un link de invitación por email para que creen su contraseña y accedan al CRM.<br><br>Métricas del panel: total activos, leads asignados, leads en pipeline activo, conversiones del mes.' },
+  { module: 'vendedores', title: '👤 Vendedores — Permisos por módulo', target: '[data-sec="vendedores"]',
+    desc: 'Cada vendedor tiene <strong>permisos configurables por sección</strong>: podés habilitar solo Leads + Agente IA, o dar acceso a Prospectos, Presupuestos, etc.<br><br>Los módulos sin permiso no aparecen en el nav cuando el vendedor inicia sesión. Ideal para mantener el foco y la confidencialidad.' },
+  { module: 'vendedores', title: '👤 Vendedores — Comisiones', target: '[data-sec="vendedores"]',
+    desc: 'La tarjeta de comisiones calcula automáticamente:<br><strong>Comisión = deal_value de clientes cerrados este mes × % de comisión del vendedor</strong><br><br>Exportable a CSV para liquidar. Esto requiere que los leads convertidos a cliente tengan el deal_value cargado correctamente.' },
+  { module: 'vendedores', title: '👤 Vendedores — Recordatorio diario', target: '[data-sec="vendedores"]',
+    desc: 'El botón <strong>📧 Recordatorio</strong> envía un email a cada vendedor activo con su resumen del día: follow-ups vencidos + los de hoy + total de leads activos.<br><br>Ideal para ejecutarlo cada mañana o programarlo como rutina del equipo.' },
+
+  // ── Finanzas ──
+  { module: 'finanzas', title: '💰 Finanzas — Ingresos y gastos', target: '[data-sec="finanzas"]',
+    desc: 'Registrá todas las transacciones del negocio. Tipos: <strong>Ingreso, Gasto, Inversión, Deuda</strong>. Los gastos recurrentes (Vercel, Supabase, Gmail, AFIP) se pueden cargar como plantillas y se aplican automáticamente.<br><br>Los ingresos de cobros a clientes se suman aquí automáticamente cuando marcás un pago.' },
+  { module: 'finanzas', title: '💰 Finanzas — Cobros a clientes (MRR)', target: '[data-sec="finanzas"]',
+    desc: 'En la pestaña <strong>Cobros</strong> gestionás los pagos mensuales de cada cliente. Generás los cobros del mes, marcás quién pagó (se registra como ingreso automáticamente), y enviás recordatorios por email con IA a los que deben.<br><br><strong>MRR (Monthly Recurring Revenue):</strong> suma de los precios mensuales de todos los clientes activos.' },
+  { module: 'finanzas', title: '💰 Finanzas — Balance y rentabilidad', target: '[data-sec="balance"]',
+    desc: 'En la sección <strong>Balance</strong> ves el resumen financiero del mes: ingresos vs. gastos, margen bruto, MRR proyectado.<br><br><strong>Margen bruto</strong> = (Ingresos - Gastos operativos) / Ingresos × 100. Para un SaaS sano, debería ser >60%.' },
+
+  // ── Gmail ──
+  { module: 'gmail', title: '📧 Gmail — Bandeja integrada', target: '[data-sec="gmail"]',
+    desc: 'Leé y respondé emails de <strong>comercial@rhinosapp.com</strong> sin salir del CRM. Conectás la cuenta con Google OAuth y el sistema sincroniza la bandeja en tiempo real.<br><br>Ideal para no perder el hilo de conversaciones de ventas mientras trabajás en los leads.' },
+  { module: 'gmail', title: '📧 Gmail — Respuestas con IA', target: '[data-sec="gmail"]',
+    desc: 'Al abrir un email, el botón <strong>🤖 Responder con IA</strong> analiza el asunto y cuerpo del email y genera una respuesta profesional en español rioplatense con un CTA claro (demo, WhatsApp o web según el contexto).<br><br>Podés editar la respuesta antes de enviar.' },
+
+  // ── Tareas ──
+  { module: 'tareas', title: '📋 Tareas — Agenda del equipo', target: '[data-sec="tareas"]',
+    desc: 'Creá tareas con título, descripción, prioridad (baja/media/alta/urgente), fecha límite, categoría y asignado.<br><br>Las tareas aparecen en el dashboard. Las urgentes con fecha vencida generan alertas. Filtros por estado: pendiente, en progreso, completada.' },
+  { module: 'tareas', title: '📋 Emails automáticos', target: '[data-sec="tareas"]',
+    desc: 'Además de las tareas manuales, el módulo incluye <strong>emails automáticos programados</strong>: onboarding de clientes, recordatorios de pago, felicitaciones de cumpleaños.<br><br>Se configuran una vez y se envían solos en la fecha correcta.' },
+
+  // ── Calendario ──
+  { module: 'calendario', title: '📅 Calendario — Google Calendar', target: '[data-sec="calendario"]',
+    desc: 'Google Calendar conectado directamente. Creá eventos de demos, reuniones y follow-ups sin salir del CRM. El calendario se sincroniza automáticamente con tu Google Calendar personal.<br><br>Botón <strong>"Plan de contenido IA"</strong> genera un plan mensual de posts para Instagram según el foco que elijas.' },
+
+  // ── Analytics ──
+  { module: 'analytics', title: '📈 Analytics Web — GA4', target: '[data-sec="analytics"]',
+    desc: 'Dashboard de Google Analytics 4 para <strong>rhinosapp.vercel.app</strong>. Conectás con OAuth y muestra: usuarios activos, sesiones, páginas vistas, tasa de rebote, duración de sesión.<br><br>Rangos: 7, 30 o 90 días. Los datos se actualizan al cambiar el rango o al hacer clic en ↻.' },
+
+  // ── Blog y Web ──
+  { module: 'webcontent', title: '🌐 Blog y Web — Editar la landing', target: '[data-sec="webcontent"]',
+    desc: 'Editá textos, precios y secciones de <strong>rhinosapp.vercel.app</strong> directamente desde el CRM. Los cambios se guardan en GitHub y Vercel redespliega el sitio automáticamente en minutos.<br><br>No hace falta saber programar ni entrar a GitHub.' },
+  { module: 'webcontent', title: '🌐 Leads de la calculadora web', target: '[data-sec="leads"]',
+    desc: 'En la pestaña <strong>"🌐 De la calculadora web"</strong> ves todos los leads que llenaron la calculadora de precio en el sitio web.<br><br>Cada uno muestra qué plan necesitan, cuánto pagan hoy, cuánto ahorran con RhinosApp y sus datos de contacto. Cuando llega uno nuevo, el sistema envía un email de notificación automático a comercial@rhinosapp.com.' },
+
+  // ── Instagram ──
+  { module: 'posts', title: '📸 Instagram — Posts y comentarios', target: '[data-sec="posts"]',
+    desc: 'Gestión completa de comentarios de todos los posts. Panel izquierdo: lista de posts con comentario pendientes. Panel derecho: comentarios del post seleccionado.<br><br>Respondé con IA en un clic o escribí manualmente. La IA mantiene el tono de marca: cercano, directo, sin corporativismos.' },
+  { module: 'dms', title: '💬 Instagram — DMs', target: '[data-sec="dms"]',
+    desc: 'Generador de respuestas para DMs entrantes. Pegás el mensaje recibido, elegís el objetivo (precio, demo, objeción) y la IA escribe la respuesta perfecta.<br><br>Ideal para responder de forma consistente y rápida a los DMs de ventas sin perder el tono de marca.' },
+  { module: 'contenido', title: '🎨 Contenido IG — Generador', target: '[data-sec="contenido"]',
+    desc: 'Generá captions, hashtags e ideas visuales para Instagram con IA. También genera imágenes con DALL-E con la identidad visual de RhinosApp.<br><br>Formatos disponibles: post estático, carrusel, Reel, Story. La IA adapta el tono según el objetivo: engagement, educacional, comercial.' },
+
+  // ── Final ──
+  { module: null, title: '¡Tour completo! 🦏', target: null,
+    desc: 'Ya conocés todo RhinosApp CRM. Podés volver a ver la guía de cualquier módulo con el botón <strong style="color:var(--cyan)">ⓘ</strong> en el encabezado de cada sección.<br><br>Flujo comercial recomendado:<br>1. Buscá prospectos → Convertí los mejores a leads<br>2. Trabajalos desde "Mi día" con WA + plantillas<br>3. Generá presupuestos y cerrá con el Agente IA<br>4. Cobrá y gestioná desde Finanzas<br><br>¿Dudas? El Agente IA está siempre disponible. 🚀' }
 ];
+
+function startModuleGuide(moduleKey) {
+  const idx = GUIDE_STEPS.findIndex(s => s.module === moduleKey);
+  if (idx < 0) return startGuide();
+  guideCurrentStep = idx;
+  document.getElementById('guide-overlay').style.display = 'block';
+  document.getElementById('guide-card').style.display = 'block';
+  renderGuideStep();
+}
 
 let guideCurrentStep = 0;
 let guidePrevHighlight = null;
@@ -9942,11 +10171,19 @@ function renderGuideStep() {
   document.getElementById('guide-desc').innerHTML = step.desc;
   document.getElementById('guide-counter').textContent = `Paso ${guideCurrentStep + 1} de ${total}`;
 
-  // Dots
+  // Dots — show up to 9 dots centered on current step
   const dots = document.getElementById('guide-dots');
-  dots.innerHTML = GUIDE_STEPS.map((_, i) => `
-    <div style="width:6px;height:6px;border-radius:50%;background:${i === guideCurrentStep ? 'var(--cyan)' : 'var(--surface3)'}"></div>
-  `).join('');
+  const maxDots = 9, half = Math.floor(maxDots / 2);
+  let start = Math.max(0, guideCurrentStep - half);
+  let end = Math.min(total - 1, start + maxDots - 1);
+  if (end - start < maxDots - 1) start = Math.max(0, end - maxDots + 1);
+  dots.innerHTML = Array.from({ length: end - start + 1 }, (_, j) => {
+    const i = start + j;
+    return `<div style="width:6px;height:6px;border-radius:50%;cursor:pointer;background:${i === guideCurrentStep ? 'var(--cyan)' : 'var(--surface3)'}" onclick="guideCurrentStep=${i};renderGuideStep()"></div>`;
+  }).join('');
+  // Module badge
+  const modEl = document.getElementById('guide-module');
+  if (modEl) modEl.textContent = step.module ? `📍 ${step.module.charAt(0).toUpperCase() + step.module.slice(1)}` : '';
 
   // Buttons
   document.getElementById('guide-prev').style.display = guideCurrentStep === 0 ? 'none' : 'inline-flex';
@@ -11149,6 +11386,55 @@ function closeGlobalSearch() {
 document.getElementById('global-search-input')?.addEventListener('input', function() { runGlobalSearch(this.value.trim()); });
 document.getElementById('global-search-input')?.addEventListener('keydown', function(e) { if(e.key==='Escape') { closeGlobalSearch(); this.value=''; } });
 document.getElementById('gsearch-overlay')?.addEventListener('click', closeGlobalSearch);
+
+// ── CAMPAÑA WHATSAPP MASIVA ────────────────────────────
+let _waCampList = [];
+let _waCampIdx = 0;
+
+function launchWaCampaign(prospects) {
+  _waCampList = prospects;
+  _waCampIdx = 0;
+  const modal = document.getElementById('wa-campaign-modal');
+  modal.style.display = 'flex';
+  renderWaCampStep();
+}
+
+function renderWaCampStep() {
+  const modal = document.getElementById('wa-campaign-modal');
+  const done = document.getElementById('wa-camp-done');
+  const mainContent = modal.querySelectorAll('[id^="wa-camp-"]:not(#wa-camp-done):not(#wa-camp-progress)');
+
+  if (_waCampIdx >= _waCampList.length) {
+    done.style.display = 'block';
+    mainContent.forEach(el => { if (el.id !== 'wa-camp-done') el.style.display = 'none'; });
+    document.getElementById('wa-camp-progress').textContent = `✅ ${_waCampList.length} contactos`;
+    return;
+  }
+  done.style.display = 'none';
+
+  const p = _waCampList[_waCampIdx];
+  const tpl = getSelectedWaTemplate();
+  const msg = buildWaMsg(tpl, p.name, p.name);
+  const waNum = formatWhatsApp(p.phone);
+
+  document.getElementById('wa-camp-progress').textContent = `${_waCampIdx + 1} / ${_waCampList.length}`;
+  document.getElementById('wa-camp-name').textContent = p.name;
+  document.getElementById('wa-camp-phone').textContent = p.phone || '';
+  document.getElementById('wa-camp-preview').textContent = msg;
+  const openBtn = document.getElementById('btn-wa-camp-open');
+  openBtn.href = `https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
+  openBtn.style.display = 'inline-flex';
+  document.getElementById('btn-wa-camp-next').style.display = 'inline-flex';
+  document.getElementById('btn-wa-camp-next').textContent = _waCampIdx < _waCampList.length - 1 ? 'Siguiente →' : 'Finalizar ✓';
+}
+
+document.getElementById('btn-wa-camp-next')?.addEventListener('click', () => {
+  _waCampIdx++;
+  renderWaCampStep();
+});
+document.getElementById('btn-wa-camp-close')?.addEventListener('click', () => {
+  document.getElementById('wa-campaign-modal').style.display = 'none';
+});
 
 // ── RECORDATORIO DIARIO ─────────────────────────────────
 document.getElementById('btn-daily-reminder')?.addEventListener('click', async function() {
