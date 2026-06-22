@@ -1540,6 +1540,65 @@ La respuesta debe:
       result = { reply };
     }
 
+    // ── Invitar vendedor al CRM (genera link Supabase + envía por Gmail) ──
+    else if (action === 'vendedor_invite' || action === 'vendedor_reset_admin') {
+      const { email, nombre, access_token: gmailToken, type: linkType } = body;
+      const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+      if (!SERVICE_KEY) throw new Error('Falta SUPABASE_SERVICE_KEY en las variables de entorno de Vercel (Project → Settings → Environment Variables)');
+      if (!gmailToken) throw new Error('Token de Gmail no disponible. Asegurate de estar logueado con Gmail.');
+
+      const sbHostname = new URL(SB_URL_CONF).hostname;
+
+      // Generar invite link o recovery link vía Supabase Admin
+      const genLinkType = (action === 'vendedor_reset_admin') ? 'recovery' : 'invite';
+      const genPayload = JSON.stringify({ type: genLinkType, email, redirect_to: 'https://rhinos-crm.vercel.app/auth/callback' });
+      const linkData = await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: sbHostname, path: '/auth/v1/admin/generate_link', method: 'POST',
+          headers: {
+            'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY,
+            'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(genPayload)
+          }
+        }, (res) => {
+          let raw = ''; res.on('data', c => raw += c);
+          res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+        });
+        req.on('error', reject); req.write(genPayload); req.end();
+      });
+
+      if (linkData.error) throw new Error('Supabase: ' + (linkData.error.message || JSON.stringify(linkData.error)));
+      const inviteUrl = linkData.properties?.action_link || linkData.action_link;
+      if (!inviteUrl) throw new Error('Supabase no devolvió el link. Verificá que el email no esté ya registrado en Auth.');
+
+      // Armar email según tipo
+      const isInvite = (action === 'vendedor_invite');
+      const emailSubject = isInvite
+        ? `Bienvenido/a al CRM de RhinosApp — ${nombre || email}`
+        : `Restablecer contraseña — CRM RhinosApp`;
+      const emailBody = isInvite
+        ? `Hola ${nombre || 'vendedor/a'}!\n\nFuiste invitado/a a acceder al CRM de RhinosApp.\n\n🔐 Hacé clic en el siguiente link para crear tu contraseña:\n${inviteUrl}\n\n⚠️ El link es válido por 24 horas.\n\nUna vez que configures tu contraseña, iniciá sesión en:\n🔗 https://rhinos-crm.vercel.app\n→ Usá la pestaña "Vendedor" con tu email: ${email}\n\nDesde el CRM vas a poder gestionar tus leads, ver la agenda y crear presupuestos.\n\n¡Éxitos!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`
+        : `Hola ${nombre || ''}!\n\nRecibiste este email porque se solicitó un restablecimiento de contraseña para tu acceso al CRM de RhinosApp.\n\n🔐 Hacé clic en el siguiente link para crear una nueva contraseña:\n${inviteUrl}\n\n⚠️ El link es válido por 24 horas.\n\nSi no solicitaste este cambio, ignorá este email.\n\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com`;
+
+      // Enviar por Gmail
+      const encodedSubj = '=?UTF-8?B?' + Buffer.from(emailSubject).toString('base64') + '?=';
+      const rawEmail = `MIME-Version: 1.0\r\nFrom: comercial@rhinosapp.com\r\nTo: ${email}\r\nSubject: ${encodedSubj}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${emailBody}`;
+      const encodedEmail = Buffer.from(rawEmail).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+      const gmailPayload = JSON.stringify({ raw: encodedEmail });
+
+      await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: 'gmail.googleapis.com', path: '/gmail/v1/users/me/messages/send', method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + gmailToken, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(gmailPayload) }
+        }, (res) => {
+          let raw = ''; res.on('data', c => raw += c);
+          res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { reject(new Error(raw)); } });
+        });
+        req.on('error', reject); req.write(gmailPayload); req.end();
+      });
+
+      result = { ok: true, email, type: genLinkType };
+    }
+
     else {
       return res.status(400).json({ error: 'Unknown action: ' + action });
     }
