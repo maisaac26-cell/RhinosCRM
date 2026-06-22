@@ -152,6 +152,21 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 .agent-input-row{display:flex;gap:8px;align-items:flex-end}
 .agent-input-row textarea{flex:1;min-height:40px;max-height:100px;resize:none}
 
+/* AGENTE IA VENTAS */
+.agente-layout{display:grid;grid-template-columns:260px 1fr;gap:1.5rem;align-items:start}
+@media(max-width:900px){.agente-layout{grid-template-columns:1fr}}
+.agente-tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px;margin-bottom:1rem}
+.agente-tpl-card{display:flex;flex-direction:column;gap:3px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;text-align:left;transition:all 0.15s;width:100%;font-family:var(--font)}
+.agente-tpl-card:hover{border-color:rgba(0,229,204,0.4);background:rgba(0,229,204,0.05)}
+.agente-tpl-card.active-gen{border-color:var(--cyan);background:rgba(0,229,204,0.08);opacity:0.75;pointer-events:none}
+.tpl-icon{font-size:15px;line-height:1;margin-bottom:2px}
+.tpl-label{font-size:10px;font-weight:700;color:var(--text);font-family:var(--display);text-transform:uppercase;letter-spacing:0.05em;line-height:1.2}
+.tpl-desc{font-size:10px;color:var(--text3);line-height:1.3}
+.format-toggle{display:flex;gap:3px;background:var(--surface2);border-radius:var(--r);padding:3px}
+.fmt-btn{flex:1;padding:6px 8px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:11px;color:var(--text2);font-family:var(--font);transition:all 0.15s;font-weight:500}
+.fmt-btn.active{background:var(--surface);color:var(--cyan);border:1px solid var(--border)}
+.agente-output-text{white-space:pre-wrap;font-size:13px;line-height:1.8;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);min-height:80px;user-select:text}
+
 /* CHIPS */
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem}
 .chip{font-size:11px;padding:4px 12px;border:1px solid var(--border2);border-radius:20px;cursor:pointer;background:transparent;font-family:var(--font);color:var(--text2);transition:all 0.15s}
@@ -2087,26 +2102,77 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   <div class="section" id="s-agente">
     <div class="section-header">
       <div class="page-title">AGENTE <span>IA</span></div>
-      <div class="page-sub">Especialista en marketing para RhinosApp. Conoce el producto y la marca.</div>
+      <div class="page-sub">Mensajes comerciales listos para enviar. Conectado con los precios reales de RhinosApp.</div>
     </div>
-    <div class="card">
-      <div class="chips">
-        <button class="chip hot" data-q="Dame 5 ideas de posts para esta semana. Que conecten con el dolor real del distribuidor: stock en Excel, cobros que se pierden, vendedores sin control.">Ideas esta semana</button>
-        <button class="chip hot" data-q="Escribime un caption mostrando la diferencia entre cómo trabaja hoy un distribuidor (Excel, WhatsApp, papel) vs con RhinosApp. Tono directo, que genere identificación.">Excel vs Rhinos</button>
-        <button class="chip" data-q="¿Cómo respondería a alguien que dice que ya usa Excel y le va bien? Sin sonar agresivo, que genere curiosidad.">Objeción Excel</button>
-        <button class="chip" data-q="Creame una estrategia de contenido para el próximo mes en Instagram. Foco en captación de distribuidoras de alimentos en Argentina.">Estrategia del mes</button>
-        <button class="chip" data-q="Dame 15 hashtags para RhinosApp. Mezcla de rubro distribuidor + gestión pyme + software Argentina.">Hashtags</button>
-        <button class="chip" data-q="Analizá qué tipo de contenido funciona mejor en Instagram para vender software a dueños de distribuidoras que no son tech-savvy.">Qué contenido funciona</button>
-      </div>
-      <div class="agent-wrap" id="agent-msgs">
-        <div class="amsg agent">
-          <div class="amsg-avatar agent">🦏</div>
-          <div class="amsg-bubble">Hola. Soy el agente de marketing de <strong>RhinosApp</strong>. Conozco el producto, la marca y el cliente objetivo — el dueño de distribuidora que hoy tiene todo en Excel y WhatsApp. ¿En qué te ayudo?</div>
+    <div class="agente-layout">
+      <!-- Contexto -->
+      <div>
+        <div class="card">
+          <div class="card-title">Contexto del mensaje</div>
+          <div class="field"><label>Nombre del contacto</label><input id="agente-nombre" placeholder="Ej: Gabriel Souberain"/></div>
+          <div class="field"><label>Empresa</label><input id="agente-empresa" placeholder="Ej: Distribuidora El Gaucho"/></div>
+          <div class="field"><label>Email del contacto</label><input id="agente-email-dest" placeholder="contacto@empresa.com" type="email"/></div>
+          <div class="field"><label>Teléfono WhatsApp</label><input id="agente-telefono" placeholder="+54 9 11 1234-5678"/></div>
+          <div class="field"><label>O seleccioná un lead del CRM</label>
+            <select id="agente-lead-select">
+              <option value="">— Seleccionar lead —</option>
+            </select>
+          </div>
+          <div class="field"><label>Formato de salida</label>
+            <div class="format-toggle">
+              <button class="fmt-btn active" data-fmt="email">📧 Email</button>
+              <button class="fmt-btn" data-fmt="whatsapp">💬 WhatsApp</button>
+            </div>
+          </div>
+          <div class="field" id="agente-asunto-field"><label>Asunto personalizado <span style="color:var(--text3);font-weight:400">(opcional)</span></label>
+            <input id="agente-asunto" placeholder="Se genera automáticamente"/>
+          </div>
+          <div class="field">
+            <label>Contexto adicional <span style="color:var(--text3);font-weight:400">(opcional)</span></label>
+            <textarea id="agente-extra" rows="3" placeholder="Ej: Tiene 50 vendedores, vende quesos en Córdoba, ya probó otro sistema..."></textarea>
+          </div>
         </div>
       </div>
-      <div class="agent-input-row">
-        <textarea id="agent-input" placeholder="Preguntá cualquier cosa..." rows="1"></textarea>
-        <button class="btn btn-cyan" id="btn-agent-send">Enviar</button>
+
+      <!-- Main -->
+      <div>
+        <!-- Templates -->
+        <div class="card">
+          <div class="card-title">Elegí el tipo de mensaje</div>
+          <div class="agente-tpl-grid" id="agente-tpl-grid"></div>
+          <div style="padding-top:14px;border-top:1px solid var(--border)">
+            <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:6px">O escribí tu propia instrucción</label>
+            <div class="agent-input-row">
+              <textarea id="agent-input" placeholder="Ej: Felicitá al cliente por su primer mes con RhinosApp..." rows="2"></textarea>
+              <button class="btn btn-cyan" id="btn-agent-send">Generar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading -->
+        <div class="card" id="agente-loading-card" style="display:none">
+          <div class="empty"><div class="loader"></div><br><br>Generando mensaje...</div>
+        </div>
+
+        <!-- Output -->
+        <div class="card" id="agente-output-card" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div>
+              <div class="card-title" style="margin:0">Mensaje generado</div>
+              <span class="badge badge-cyan" id="agente-tpl-badge" style="margin-top:4px;display:inline-block;font-size:10px"></span>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-sm btn-cyan" id="btn-agente-copy">Copiar</button>
+              <button class="btn btn-sm" id="btn-agente-gmail" style="background:rgba(99,102,241,0.15);color:#818cf8;border-color:rgba(99,102,241,0.3)">📧 Gmail</button>
+              <button class="btn btn-sm" id="btn-agente-wa" style="background:rgba(34,197,94,0.12);color:var(--green);border-color:rgba(34,197,94,0.25)">💬 WhatsApp</button>
+              <button class="btn btn-sm" id="btn-agente-regen" style="color:var(--text3)">↺ Regenerar</button>
+            </div>
+          </div>
+          <div id="agente-subject-row" style="display:none;margin-bottom:10px">
+            <div class="field" style="margin:0"><label>Asunto</label><input id="agente-subject-out" readonly style="font-size:12px;color:var(--text)"/></div>
+          </div>
+          <div class="agente-output-text" id="agente-output-body"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -2529,6 +2595,7 @@ document.querySelectorAll('.nav-btn[data-sec]').forEach(btn => {
     if (this.dataset.sec === 'calendario') loadCalendar();
     if (this.dataset.sec === 'posts') loadPostsSide();
     if (this.dataset.sec === 'webcontent') loadWebContent();
+    if (this.dataset.sec === 'agente') initAgente();
     // Cerrar sidebar en mobile al navegar
     closeMobileSidebar();
   });
@@ -3883,45 +3950,231 @@ document.getElementById('btn-save-event').addEventListener('click', async functi
 
 document.querySelector('.nav-btn[data-sec="calendario"]').addEventListener('click', loadCalendar);
 
-// ── AGENTE ───────────────────────────────────────────
-let agentHistory = [];
-function appendAgentMsg(role, text) {
-  const wrap = document.getElementById('agent-msgs');
-  const div = document.createElement('div');
-  div.className = 'amsg ' + role;
-  const isUser = role === 'user';
-  div.innerHTML = `<div class="amsg-avatar ${isUser?'user':'agent'}">${isUser?'Vos':'🦏'}</div><div class="amsg-bubble">${text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</div>`;
-  wrap.appendChild(div);
-  wrap.scrollTop = wrap.scrollHeight;
-}
-function appendAgentTyping() {
-  const wrap = document.getElementById('agent-msgs');
-  const div = document.createElement('div');
-  div.className = 'amsg agent'; div.id = 'agent-typing';
-  div.innerHTML = `<div class="amsg-avatar agent">🦏</div><div class="amsg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
-  wrap.appendChild(div); wrap.scrollTop = wrap.scrollHeight;
-}
-async function sendAgent(text) {
-  if (!text.trim()) return;
-  document.getElementById('agent-input').value = '';
-  appendAgentMsg('user', text);
-  agentHistory.push({ role: 'user', content: text });
-  appendAgentTyping();
-  document.getElementById('btn-agent-send').disabled = true;
-  try {
-    const r = await callAPI('ai_agent', { messages: agentHistory, system: AGENT_SYSTEM });
-    document.getElementById('agent-typing')?.remove();
-    appendAgentMsg('agent', r.reply);
-    agentHistory.push({ role: 'assistant', content: r.reply });
-  } catch(e) {
-    document.getElementById('agent-typing')?.remove();
-    appendAgentMsg('agent', 'Error: ' + e.message);
+// ── AGENTE IA VENTAS ─────────────────────────────────
+const AGENTE_TEMPLATES = [
+  { key: 'primer-contacto',   icon: '👋', label: 'Primer contacto',     desc: 'Cold outreach al lead nuevo' },
+  { key: 'pitch-producto',    icon: '🚀', label: 'Pitch de producto',    desc: 'Presentación completa de RhinosApp' },
+  { key: 'envio-presupuesto', icon: '📋', label: 'Presupuesto',          desc: 'Con precios reales actualizados' },
+  { key: 'follow-up',         icon: '🔔', label: 'Follow-up',            desc: 'Recordatorio amigable de seguimiento' },
+  { key: 'cierre',            icon: '🤝', label: 'Cierre de venta',      desc: 'Para cerrar el trato' },
+  { key: 'objecion-precio',   icon: '💰', label: 'Obj: precio',          desc: 'Respuesta a "es muy caro"' },
+  { key: 'objecion-excel',    icon: '📊', label: 'Obj: Excel',           desc: 'Respuesta a "ya uso Excel"' },
+  { key: 'objecion-tamano',   icon: '🏢', label: 'Obj: tamaño empresa',  desc: 'Respuesta a "somos chicos"' },
+  { key: 'confirmar-demo',    icon: '📅', label: 'Confirmar demo',       desc: 'Reunión ya agendada' },
+  { key: 'onboarding',        icon: '🎉', label: 'Bienvenida cliente',   desc: 'Nuevo cliente que acaba de entrar' },
+  { key: 'reactivacion',      icon: '♻️', label: 'Reactivar lead',       desc: 'Retomar un contacto frío' },
+  { key: 'cobro-vencido',     icon: '💳', label: 'Cobro vencido',        desc: 'Recordatorio de pago pendiente' },
+  { key: 'pedir-referido',    icon: '⭐', label: 'Pedir referido',       desc: 'Solicitar recomendación a cliente' },
+];
+
+let _agenteFormat = 'email';
+let _agenteLastKey = null;
+
+function initAgente() {
+  const grid = document.getElementById('agente-tpl-grid');
+  if (grid && !grid.dataset.rendered) {
+    grid.dataset.rendered = '1';
+    grid.innerHTML = AGENTE_TEMPLATES.map(t =>
+      `<button class="agente-tpl-card" data-tpl="${t.key}">
+        <span class="tpl-icon">${t.icon}</span>
+        <span class="tpl-label">${t.label}</span>
+        <span class="tpl-desc">${t.desc}</span>
+      </button>`).join('');
+    grid.querySelectorAll('.agente-tpl-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tpl = AGENTE_TEMPLATES.find(t => t.key === btn.dataset.tpl);
+        generateAgenteMessage(btn.dataset.tpl, tpl?.label || btn.dataset.tpl);
+      });
+    });
   }
-  document.getElementById('btn-agent-send').disabled = false;
+  const sel = document.getElementById('agente-lead-select');
+  if (sel && typeof leadsData !== 'undefined' && leadsData.length) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Seleccionar lead —</option>' +
+      leadsData.map(l => {
+        const n = (l.nombre||'').replace(/"/g,'&quot;');
+        const em = (l.empresa||'').replace(/"/g,'&quot;');
+        const mail = (l.email||'').replace(/"/g,'&quot;');
+        const tel = (l.telefono||l.whatsapp||'').replace(/"/g,'&quot;');
+        return `<option value="${l.id}" data-n="${n}" data-e="${em}" data-m="${mail}" data-t="${tel}">${l.nombre||''}${l.empresa?' — '+l.empresa:''}</option>`;
+      }).join('');
+    if (cur) sel.value = cur;
+  }
 }
-document.getElementById('btn-agent-send').addEventListener('click',()=>sendAgent(document.getElementById('agent-input').value));
-document.getElementById('agent-input').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAgent(this.value);}});
-document.querySelectorAll('.chip[data-q]').forEach(c=>c.addEventListener('click',function(){sendAgent(this.dataset.q);}));
+
+document.getElementById('agente-lead-select').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  if (!opt.value) return;
+  if (opt.dataset.n)  document.getElementById('agente-nombre').value = opt.dataset.n;
+  if (opt.dataset.e)  document.getElementById('agente-empresa').value = opt.dataset.e;
+  if (opt.dataset.m)  document.getElementById('agente-email-dest').value = opt.dataset.m;
+  if (opt.dataset.t)  document.getElementById('agente-telefono').value = opt.dataset.t;
+});
+
+document.querySelectorAll('.fmt-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    _agenteFormat = this.dataset.fmt;
+    document.getElementById('agente-asunto-field').style.display = _agenteFormat === 'email' ? '' : 'none';
+  });
+});
+
+function buildSalesSystem(format) {
+  const tiers = (typeof presupuestoTiers !== 'undefined' && presupuestoTiers.length) ? presupuestoTiers : [];
+  const preciosText = tiers.length
+    ? tiers.map(t => `- ${t.desc}: ARS $${Number(t.price).toLocaleString('es-AR')}/mes${t.note ? ' ('+t.note+')' : ''}`).join('\n')
+    : '(precios no disponibles aún)';
+  const fmtInstr = format === 'whatsapp'
+    ? 'FORMATO: WhatsApp. Usá emojis de forma estratégica. Máximo 180 palabras. Tono cercano e informal. Párrafos cortos, sin bullets ni encabezados.'
+    : 'FORMATO: Email. La primera línea DEBE ser exactamente: "Asunto: [el asunto aquí]". Luego una línea en blanco. Luego el cuerpo. Máximo 280 palabras. Tono profesional y directo. Firmá al final: Equipo RhinosApp 🦏 | comercial@rhinosapp.com | +54 9 11 6822-3306';
+  return `Sos el agente de ventas de RhinosApp.
+
+PRODUCTO: ERP+CRM para distribuidores de alimentos (quesos, fiambres, bebidas, lácteos) en Argentina.
+MÓDULOS: ARCA (facturación electrónica), IA comercial, compras, ventas/preventa, cobranzas, stock con pesos variables, despacho, CRM, WhatsApp integrado.
+CLIENTE OBJETIVO: dueño de distribuidora, 35-55 años, Argentina. Hoy usa Excel/WhatsApp/papel. Dolores: no sabe el stock en tiempo real, no sabe quién le debe plata, tiene todo en la cabeza.
+DIFERENCIADORES: integración ARCA incluida desde el día 1, IA comercial nativa, pesos variables (kg/litros), WhatsApp nativo.
+
+PRECIOS ACTUALES (usar estos precios exactos en los mensajes):
+${preciosText}
+
+CONTACTO: comercial@rhinosapp.com | +54 9 11 6822-3306 | rhinosapp.vercel.app | @rhinosapp
+
+${fmtInstr}
+
+REGLA CRÍTICA: generás UN SOLO mensaje listo para copiar y pegar. Sin texto previo. Sin "aquí está el mensaje". Sin explicaciones. Arrancá directo con el contenido del mensaje.`;
+}
+
+function buildTemplatePrompt(key, ctx) {
+  const { nombre, empresa, extra } = ctx;
+  const who = nombre
+    ? `El contacto se llama ${nombre}${empresa ? ', trabaja en ' + empresa : ''}.`
+    : 'El contacto no tiene nombre definido — usá un saludo genérico tipo "Hola" o "Buenos días".';
+  const extraCtx = extra ? ` Contexto adicional: ${extra}` : '';
+  const map = {
+    'primer-contacto':   `Escribí un primer contacto (cold outreach) para un dueño de distribuidora. ${who} Primera vez que lo contactamos. Generá curiosidad sin sonar a spam. Mencioná brevemente el dolor (Excel, cobros perdidos, stock en la cabeza). Invitalo a una demo corta de 20 minutos.${extraCtx}`,
+    'pitch-producto':    `Escribí un pitch completo de RhinosApp. ${who} Explicá los módulos principales con beneficios concretos en lenguaje de negocio (no técnico). Mostrá el ROI. Terminá con una propuesta de siguiente paso concreto.${extraCtx}`,
+    'envio-presupuesto': `Escribí el mensaje para acompañar el envío de un presupuesto de RhinosApp. ${who} Mencioná los precios de las licencias disponibles. Explicá brevemente qué incluye cada tier. Generá urgencia genuina. Dejá el siguiente paso claro.${extraCtx}`,
+    'follow-up':         `Escribí un follow-up / recordatorio. ${who} Ya fue contactado antes pero no respondió. Tono amigable, no insistente. Recordale el valor de RhinosApp en una oración. Invitalo a responder cuando tenga 5 minutos.${extraCtx}`,
+    'cierre':            `Escribí un mensaje de cierre de venta. ${who} Ya tuvo demos y conoce el producto. Falta que decida. Generá urgencia real, destacá el ROI, quitá fricción de la decisión. El siguiente paso debe ser concreto: firmar o pagar.${extraCtx}`,
+    'objecion-precio':   `Respondé la objeción "es muy caro" o "no tenemos presupuesto". ${who} No bajes el precio. Reencuadrá el costo como inversión. Compará con lo que pierde sin sistema (errores, tiempo, ventas caídas). Usá los precios reales.${extraCtx}`,
+    'objecion-excel':    `Respondé la objeción "ya usamos Excel y nos va bien". ${who} Respetá que Excel sirvió hasta ahora. Mostrá dónde falla a escala: stock en tiempo real, cobranzas automáticas, ARCA. Sin atacar, con datos concretos.${extraCtx}`,
+    'objecion-tamano':   `Respondé la objeción "somos una empresa chica" o "no somos tan grandes para un sistema". ${who} Explicá que RhinosApp está diseñado para distribuidoras en crecimiento. Este es el momento ideal para implementarlo antes de que la operación se desborde.${extraCtx}`,
+    'confirmar-demo':    `Escribí un mensaje para confirmar una demo ya agendada. ${who} Tiene una reunión programada. Confirmá el horario, adelantá 3-4 módulos clave que va a ver. Generá anticipación para que llegue motivado.${extraCtx}`,
+    'onboarding':        `Escribí el mensaje de bienvenida a un nuevo cliente que acaba de contratar RhinosApp. ${who} Tono celebratorio pero profesional. Explicá los próximos pasos (configuración, capacitación, soporte). Dales seguridad de que tomaron la decisión correcta.${extraCtx}`,
+    'reactivacion':      `Escribí un mensaje para reactivar un lead que se enfrió. ${who} Pasaron semanas o meses sin contacto. No menciones el tiempo que pasó. Usá una novedad del producto como gancho. Tono natural, no desesperado.${extraCtx}`,
+    'cobro-vencido':     `Escribí un mensaje para recordar un cobro vencido a un cliente activo. ${who} Tono cordial y profesional, nunca agresivo. Recordá amablemente el pago pendiente. Facilitá el contacto para resolver. Que no se sienta atacado.${extraCtx}`,
+    'pedir-referido':    `Escribí un mensaje para pedirle a un cliente satisfecho que nos recomiende. ${who} Está usando RhinosApp y le va bien. Pedile que piense en algún colega distribuidor que se beneficiaría. Podés ofrecer un incentivo (mes gratis, descuento).${extraCtx}`,
+  };
+  return map[key] || `Generá un mensaje comercial de tipo "${key}" para RhinosApp. ${who}${extraCtx}`;
+}
+
+async function generateAgenteMessage(templateKey, label) {
+  const nombre  = document.getElementById('agente-nombre').value.trim();
+  const empresa = document.getElementById('agente-empresa').value.trim();
+  const extra   = document.getElementById('agente-extra').value.trim();
+
+  const userPrompt = templateKey === '__libre__'
+    ? document.getElementById('agent-input').value.trim()
+    : buildTemplatePrompt(templateKey, { nombre, empresa, extra });
+
+  if (!userPrompt) { showToast('Escribí una instrucción'); return; }
+
+  _agenteLastKey = templateKey;
+
+  document.getElementById('agente-output-card').style.display = 'none';
+  document.getElementById('agente-loading-card').style.display = '';
+
+  document.querySelectorAll('.agente-tpl-card').forEach(c => c.classList.remove('active-gen'));
+  const activeCard = document.querySelector(`.agente-tpl-card[data-tpl="${templateKey}"]`);
+  if (activeCard) activeCard.classList.add('active-gen');
+
+  try {
+    const r = await callAPI('ai_agent', {
+      messages: [{ role: 'user', content: userPrompt }],
+      system: buildSalesSystem(_agenteFormat)
+    });
+
+    document.getElementById('agente-loading-card').style.display = 'none';
+    if (activeCard) activeCard.classList.remove('active-gen');
+
+    let subject = '';
+    let body = (r.reply || '').trim();
+
+    if (_agenteFormat === 'email') {
+      const lines = body.split('\n');
+      const subjectIdx = lines.findIndex(l => l.trim().toLowerCase().startsWith('asunto:'));
+      if (subjectIdx !== -1) {
+        subject = lines[subjectIdx].replace(/^asunto:\s*/i, '').trim();
+        body = lines.slice(subjectIdx + 1).join('\n').replace(/^\s*\n/, '').trim();
+      }
+      const custom = document.getElementById('agente-asunto').value.trim();
+      if (custom) subject = custom;
+    }
+
+    const subjectRow = document.getElementById('agente-subject-row');
+    if (_agenteFormat === 'email' && subject) {
+      document.getElementById('agente-subject-out').value = subject;
+      subjectRow.style.display = '';
+    } else {
+      subjectRow.style.display = 'none';
+    }
+
+    document.getElementById('agente-output-body').textContent = body;
+    document.getElementById('agente-tpl-badge').textContent = label || templateKey;
+    document.getElementById('agente-output-card').style.display = '';
+    document.getElementById('agente-output-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch(e) {
+    document.getElementById('agente-loading-card').style.display = 'none';
+    if (activeCard) activeCard.classList.remove('active-gen');
+    showToast('Error al generar: ' + e.message);
+  }
+}
+
+document.getElementById('btn-agent-send').addEventListener('click', () => {
+  const v = document.getElementById('agent-input').value.trim();
+  if (v) generateAgenteMessage('__libre__', 'Instrucción libre');
+});
+document.getElementById('agent-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const v = this.value.trim();
+    if (v) generateAgenteMessage('__libre__', 'Instrucción libre');
+  }
+});
+
+document.getElementById('btn-agente-copy').addEventListener('click', function() {
+  const body    = document.getElementById('agente-output-body').textContent;
+  const subject = document.getElementById('agente-subject-out').value;
+  const text    = (_agenteFormat === 'email' && subject) ? `Asunto: ${subject}\n\n${body}` : body;
+  navigator.clipboard.writeText(text).then(() => showToast('Copiado al portapapeles ✓'));
+});
+
+document.getElementById('btn-agente-gmail').addEventListener('click', function() {
+  const body    = document.getElementById('agente-output-body').textContent;
+  const subject = document.getElementById('agente-subject-out').value || 'Mensaje de RhinosApp';
+  const dest    = document.getElementById('agente-email-dest').value.trim();
+  document.getElementById('compose-to').value      = dest;
+  document.getElementById('compose-subject').value = subject;
+  document.getElementById('compose-body').value    = body;
+  document.querySelector('.nav-btn[data-sec="gmail"]').click();
+  document.getElementById('compose-modal').style.display = 'block';
+});
+
+document.getElementById('btn-agente-wa').addEventListener('click', function() {
+  const body = document.getElementById('agente-output-body').textContent;
+  const tel  = document.getElementById('agente-telefono').value.replace(/\D/g, '');
+  const url  = tel
+    ? `https://wa.me/${tel}?text=${encodeURIComponent(body)}`
+    : `https://wa.me/?text=${encodeURIComponent(body)}`;
+  window.open(url, '_blank');
+});
+
+document.getElementById('btn-agente-regen').addEventListener('click', function() {
+  if (!_agenteLastKey) return;
+  const tpl = AGENTE_TEMPLATES.find(t => t.key === _agenteLastKey);
+  generateAgenteMessage(_agenteLastKey, tpl?.label || _agenteLastKey);
+});
 
 // ── CRM LOGIN ─────────────────────────────────────────
 const ALLOWED_EMAILS = ['comercial@rhinosapp.com', 'maisaac26@gmail.com'];
