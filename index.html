@@ -733,6 +733,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="tab-row">
       <button class="tab-btn active" data-wctab="articulos">📝 Artículos</button>
       <button class="tab-btn" data-wctab="contenido">🧩 Contenido de la página</button>
+      <button class="tab-btn" data-wctab="leads">🎯 Leads</button>
     </div>
 
     <!-- ARTICULOS -->
@@ -798,6 +799,33 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         </div>
       </div>
       <div id="wc-content-status" style="margin-top:8px;font-size:12px"></div>
+    </div>
+
+    <!-- LEADS -->
+    <div class="tab-content" id="wctab-leads">
+      <div class="card" style="border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.05);margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="card-title" style="margin-bottom:4px">🎯 Leads de la calculadora de ahorro</div>
+            <div style="font-size:12px;color:var(--text2)">Personas que usaron la calculadora en la web y dejaron sus datos.</div>
+          </div>
+          <button class="btn btn-sm" id="btn-leads-refresh" style="background:rgba(99,102,241,0.15);color:#818cf8;border-color:rgba(99,102,241,0.3)">↻ Actualizar</button>
+        </div>
+        <!-- Resumen rápido -->
+        <div id="leads-summary" style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap"></div>
+      </div>
+
+      <!-- Filtro de estado -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-sm leads-filter-btn active" data-filter="todos" style="background:rgba(99,102,241,0.15);color:#818cf8;border-color:rgba(99,102,241,0.3)">Todos</button>
+        <button class="btn btn-sm leads-filter-btn" data-filter="nuevo">🔵 Nuevo</button>
+        <button class="btn btn-sm leads-filter-btn" data-filter="contactado">📞 Contactado</button>
+        <button class="btn btn-sm leads-filter-btn" data-filter="demo">📅 Demo agendada</button>
+        <button class="btn btn-sm leads-filter-btn" data-filter="cerrado">✅ Cerrado</button>
+        <button class="btn btn-sm leads-filter-btn" data-filter="descartado">❌ Descartado</button>
+      </div>
+
+      <div id="leads-list"><div class="empty">Cargando leads...</div></div>
     </div>
   </div>
 
@@ -9127,6 +9155,143 @@ document.getElementById('btn-wc-confirm-publish').addEventListener('click', asyn
     status.innerHTML = '<span style="color:var(--green)">✓ Publicado. Va a estar en vivo en 1-2 minutos.</span>';
   } catch (e) {
     status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+});
+
+// ── LEADS ─────────────────────────────────────────────
+let wcLeads = [];
+let leadsFilter = 'todos';
+
+const LEAD_STATUS = {
+  nuevo:       { label: '🔵 Nuevo',          color: '#818cf8' },
+  contactado:  { label: '📞 Contactado',     color: '#f59e0b' },
+  demo:        { label: '📅 Demo agendada',  color: '#5dd9c1' },
+  cerrado:     { label: '✅ Cerrado',        color: '#22c55e' },
+  descartado:  { label: '❌ Descartado',     color: '#6b7280' },
+};
+
+function fmtARS(n) {
+  return n ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n) : '—';
+}
+
+async function loadLeads() {
+  document.getElementById('leads-list').innerHTML = '<div class="empty">Cargando...</div>';
+  try {
+    const r = await callWcAPI('wc_get_leads');
+    if (r.error) throw new Error(r.error);
+    wcLeads = r.leads || [];
+    renderLeadsSummary();
+    renderLeads();
+  } catch (e) {
+    document.getElementById('leads-list').innerHTML = `<div class="empty" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+function renderLeadsSummary() {
+  const total   = wcLeads.length;
+  const nuevos  = wcLeads.filter(l => l.status === 'nuevo').length;
+  const demos   = wcLeads.filter(l => l.status === 'demo').length;
+  const cerrados = wcLeads.filter(l => l.status === 'cerrado').length;
+  const totalSavings = wcLeads.reduce((s, l) => s + (l.savings || 0), 0);
+
+  document.getElementById('leads-summary').innerHTML = [
+    { label: 'Total leads',      value: total,          color: '#818cf8' },
+    { label: 'Sin contactar',    value: nuevos,         color: '#f59e0b' },
+    { label: 'Demo agendada',    value: demos,          color: '#5dd9c1' },
+    { label: 'Cerrados',         value: cerrados,       color: '#22c55e' },
+    { label: 'Ahorro total/mes', value: fmtARS(totalSavings < 0 ? 0 : totalSavings), color: '#a78bfa' },
+  ].map(s => `
+    <div style="background:var(--surface2);border-radius:8px;padding:10px 16px;min-width:120px">
+      <div style="font-size:20px;font-weight:700;color:${s.color}">${s.value}</div>
+      <div style="font-size:11px;color:var(--text3)">${s.label}</div>
+    </div>
+  `).join('');
+}
+
+function renderLeads() {
+  const filtered = leadsFilter === 'todos' ? wcLeads : wcLeads.filter(l => l.status === leadsFilter);
+  const el = document.getElementById('leads-list');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty">No hay leads con este filtro.</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map(lead => {
+    const st = LEAD_STATUS[lead.status] || LEAD_STATUS.nuevo;
+    const isSaving = lead.savings > 0;
+    const statusOptions = Object.entries(LEAD_STATUS).map(([k, v]) =>
+      `<option value="${k}" ${lead.status === k ? 'selected' : ''}>${v.label}</option>`
+    ).join('');
+
+    return `
+    <div class="card" style="margin-bottom:8px;border-color:rgba(99,102,241,0.2)">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:14px;color:var(--text1)">${lead.name || 'Sin nombre'}</span>
+            <span style="font-size:11px;color:var(--text3)">${lead.date}</span>
+            <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${st.color}22;color:${st.color};font-weight:600">${st.label}</span>
+          </div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+            ${lead.email ? `<a href="mailto:${lead.email}" style="font-size:12px;color:var(--cyan);text-decoration:none">✉ ${lead.email}</a>` : ''}
+            ${lead.phone ? `<a href="https://wa.me/${lead.phone.replace(/\D/g,'')}" target="_blank" style="font-size:12px;color:#22c55e;text-decoration:none">💬 ${lead.phone}</a>` : ''}
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--text3)">👥 ${lead.users} usuario${lead.users !== 1 ? 's' : ''}</span>
+            <span style="font-size:11px;color:var(--text3)">Paga hoy: <b style="color:var(--text1)">${fmtARS(lead.currentCost)}/mes</b></span>
+            <span style="font-size:11px;color:var(--text3)">Con Rhinosapp: <b style="color:var(--cyan)">${fmtARS(lead.rhinosCost)}/mes</b></span>
+            ${isSaving
+              ? `<span style="font-size:11px;font-weight:700;color:#22c55e">↓ Ahorra ${fmtARS(lead.savings)}/mes · ${fmtARS(lead.savings * 12)}/año</span>`
+              : `<span style="font-size:11px;color:var(--text3)">Diferencia: ${fmtARS(Math.abs(lead.savings))}/mes más</span>`
+            }
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <select class="lead-status-sel" data-lead-id="${lead.id}"
+            style="font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text1);cursor:pointer">
+            ${statusOptions}
+          </select>
+          <div style="display:flex;gap:4px">
+            ${lead.email ? `<a href="mailto:${lead.email}?subject=Tu análisis de ahorro con Rhinosapp&body=Hola ${lead.name || ''},%0D%0A%0D%0ATe escribimos de Rhinosapp. Según la calculadora de nuestra web, con ${lead.users} usuario${lead.users !== 1 ? 's' : ''} tu plan sería de ${fmtARS(lead.rhinosCost)}/mes.%0D%0A%0D%0A¡Agendemos una demo y te mostramos todo en vivo!%0D%0A%0D%0AEl equipo Rhinosapp" class="btn btn-sm" style="font-size:11px;color:var(--cyan)">✉ Email</a>` : ''}
+            ${lead.phone ? `<a href="https://wa.me/${lead.phone.replace(/\D/g,'')}?text=Hola ${encodeURIComponent(lead.name || '')}%2C te escribimos de Rhinosapp. Viste nuestra calculadora y detectamos que con ${lead.users} usuarios tu plan sería de ${encodeURIComponent(fmtARS(lead.rhinosCost))}/mes. ¿Hablamos?" target="_blank" class="btn btn-sm" style="font-size:11px;color:#22c55e">💬 WhatsApp</a>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.lead-status-sel').forEach(sel => {
+    sel.addEventListener('change', async function() {
+      const id = this.dataset.leadId;
+      const status = this.value;
+      try {
+        await callWcAPI('wc_update_lead_status', { id, status });
+        const lead = wcLeads.find(l => l.id === id);
+        if (lead) { lead.status = status; renderLeadsSummary(); }
+      } catch (e) {
+        alert('Error al actualizar: ' + e.message);
+        await loadLeads();
+      }
+    });
+  });
+}
+
+// Filtros de leads
+document.querySelectorAll('.leads-filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.leads-filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    leadsFilter = this.dataset.filter;
+    renderLeads();
+  });
+});
+
+document.getElementById('btn-leads-refresh').addEventListener('click', loadLeads);
+
+// Cargar leads cuando se abre el tab
+document.querySelectorAll('.tab-btn[data-wctab]').forEach(btn => {
+  if (btn.dataset.wctab === 'leads') {
+    btn.addEventListener('click', () => { if (!wcLeads.length) loadLeads(); });
   }
 });
 

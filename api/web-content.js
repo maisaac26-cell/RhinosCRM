@@ -6,6 +6,7 @@
 const GITHUB_API = 'https://api.github.com';
 const BLOG_PATH = 'content/blog-posts.json';
 const SITE_CONTENT_PATH = 'content/site-content.json';
+const LEADS_PATH = 'content/leads.json';
 
 function getConfig() {
   const token = process.env.GITHUB_TOKEN;
@@ -147,6 +148,32 @@ Respondé SOLO con un JSON válido (sin markdown, sin texto adicional, sin \`\`\
   return parsed;
 }
 
+// ── Lectura de facturas con Gemini Vision ──
+async function readInvoiceWithAI(imageBase64, mimeType) {
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY no configurada');
+
+  const payload = JSON.stringify({
+    contents: [{
+      parts: [
+        { text: 'Analizá este documento. Es una factura o comprobante de pago de un software de gestión, ERP o servicio SaaS. Extraé el monto total mensual en pesos argentinos (ARS). Devolvé SOLO el número entero, sin puntos, comas, signos $ ni texto adicional. Si hay múltiples montos, devolvé el total mensual a pagar. Si no podés determinarlo, respondé 0.' },
+        { inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } }
+      ]
+    }],
+    generationConfig: { temperature: 0, maxOutputTokens: 32 }
+  });
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+  });
+  const data = await res.json();
+  if (data.error) throw new Error('Gemini: ' + data.error.message);
+  const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '0';
+  return parseInt(text.replace(/\D/g, ''), 10) || 0;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Content-Type', 'application/json');
@@ -164,7 +191,75 @@ module.exports = async function handler(req, res) {
   try {
     let result;
 
-    if (action === 'wc_generate_blog_post') {
+    if (action === 'wc_read_invoice') {
+      const { imageBase64, mimeType } = body;
+      if (!imageBase64) throw new Error('Falta imageBase64');
+      const amount = await readInvoiceWithAI(imageBase64, mimeType);
+      result = { amount };
+    }
+
+    else if (action === 'wc_save_lead') {
+      const { lead } = body;
+      if (!lead || (!lead.email && !lead.phone)) throw new Error('El lead debe tener al menos email o teléfono');
+
+      let existingLeads = [];
+      let sha = null;
+      try {
+        const file = await githubGetFile(LEADS_PATH);
+        existingLeads = JSON.parse(file.content);
+        sha = file.sha;
+      } catch {}
+
+      const newLead = {
+        id: Date.now().toString(),
+        date: lead.date || todayISO(),
+        name: lead.name || '',
+        email: lead.email || '',
+        phone: lead.phone || '',
+        users: lead.users || 0,
+        currentCost: lead.currentCost || 0,
+        rhinosCost: lead.rhinosCost || 0,
+        savings: lead.savings || 0,
+        status: 'nuevo',
+      };
+      existingLeads.unshift(newLead);
+
+      if (sha) {
+        await githubPutFile(LEADS_PATH, JSON.stringify(existingLeads, null, 2) + '\n', sha, `[CRM] Nuevo lead: ${newLead.email || newLead.phone}`);
+      } else {
+        // File doesn't exist yet – create it via PUT with empty sha trick (use createFile pattern)
+        const { token, repo, branch } = getConfig();
+        await fetch(`${GITHUB_API}/repos/${repo}/contents/${LEADS_PATH}`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'rhinos-crm', Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: `[CRM] Crear leads.json`, content: Buffer.from(JSON.stringify(existingLeads, null, 2) + '\n', 'utf-8').toString('base64'), branch }),
+        });
+      }
+      result = { ok: true, lead: newLead };
+    }
+
+    else if (action === 'wc_get_leads') {
+      try {
+        const { content } = await githubGetFile(LEADS_PATH);
+        result = { leads: JSON.parse(content) };
+      } catch {
+        result = { leads: [] };
+      }
+    }
+
+    else if (action === 'wc_update_lead_status') {
+      const { id, status } = body;
+      if (!id || !status) throw new Error('Falta id o status');
+      const { content, sha } = await githubGetFile(LEADS_PATH);
+      const leads = JSON.parse(content);
+      const idx = leads.findIndex(l => l.id === id);
+      if (idx === -1) throw new Error('Lead no encontrado');
+      leads[idx].status = status;
+      await githubPutFile(LEADS_PATH, JSON.stringify(leads, null, 2) + '\n', sha, `[CRM] Actualizar lead ${id}`);
+      result = { ok: true };
+    }
+
+    else if (action === 'wc_generate_blog_post') {
       const { topic } = body;
       const post = await generateBlogPostWithAI(topic);
       result = { post: { ...post, date: todayISO() } };
