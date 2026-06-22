@@ -236,6 +236,16 @@ module.exports = async function handler(req, res) {
         });
       }
       result = { ok: true, lead: newLead };
+
+      // Fire-and-forget notification to admin via api.js webhook
+      try {
+        const apiHost = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://rhinos-crm.vercel.app';
+        fetch(`${apiHost}/api/api`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'webhook_new_lead', lead: newLead })
+        }).catch(() => {}); // fire-and-forget
+      } catch(e) { /* notification failure doesn't block lead save */ }
     }
 
     else if (action === 'wc_get_leads') {

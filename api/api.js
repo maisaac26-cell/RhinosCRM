@@ -1599,6 +1599,56 @@ La respuesta debe:
       result = { ok: true, email, type: genLinkType };
     }
 
+    else if (action === 'webhook_new_lead') {
+      // Triggered when a new web calculator lead arrives
+      // Reads Gmail tokens from Supabase and sends notification to admin
+      const { lead } = body;
+      if (!lead) { result = { ok: false, reason: 'no lead data' }; }
+      else {
+        // Fetch Gmail tokens from Supabase config
+        const configRows = await new Promise((resolve) => {
+          const req = https.request({
+            hostname: new URL(SB_URL_CONF).hostname,
+            path: '/rest/v1/rhinos_config?key=in.(gmail_access_token,gmail_refresh_token,gmail_client_id,gmail_client_secret)',
+            method: 'GET',
+            headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF }
+          }, (r) => { let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>{ try{resolve(JSON.parse(raw));}catch(e){resolve([]);} }); });
+          req.on('error',()=>resolve([])); req.end();
+        });
+        const cfg = {};
+        if (Array.isArray(configRows)) configRows.forEach(r => { cfg[r.key] = r.value; });
+        if (!cfg.gmail_access_token) { result = { ok: false, reason: 'gmail_access_token not found in config' }; }
+        else {
+          // Try to send notification
+          try {
+            const fmtARS = n => `$${Number(n||0).toLocaleString('es-AR')}`;
+            const emailText = `Nuevo lead desde la calculadora web de RhinosApp!\n\n` +
+              `Nombre: ${lead.name || '(sin nombre)'}\n` +
+              `Email: ${lead.email || '—'}\n` +
+              `Teléfono: ${lead.phone || '—'}\n` +
+              `Usuarios: ${lead.users || '—'}\n` +
+              `Costo actual: ${fmtARS(lead.currentCost)}/mes\n` +
+              `Rhinosapp: ${fmtARS(lead.rhinosCost)}/mes\n` +
+              `Ahorro: ${fmtARS(lead.savings)}/mes\n\n` +
+              `Ver leads: https://rhinos-crm.vercel.app → Leads → De la calculadora web\n\n` +
+              `Equipo RhinosApp 🦏`;
+            const encodedSubj = '=?UTF-8?B?' + Buffer.from(`🦏 Nuevo lead web: ${lead.name||lead.email||lead.phone||'Anónimo'}`).toString('base64') + '?=';
+            const rawEmail = `MIME-Version: 1.0\r\nTo: comercial@rhinosapp.com\r\nSubject: ${encodedSubj}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${emailText}`;
+            const encoded = Buffer.from(rawEmail).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+            const gmailPayload = JSON.stringify({ raw: encoded });
+            await new Promise((resolve, reject) => {
+              const req = https.request({
+                hostname:'gmail.googleapis.com', path:'/gmail/v1/users/me/messages/send', method:'POST',
+                headers:{'Authorization':'Bearer '+cfg.gmail_access_token,'Content-Type':'application/json','Content-Length':Buffer.byteLength(gmailPayload)}
+              }, (res) => { let raw=''; res.on('data',c=>raw+=c); res.on('end',()=>resolve(JSON.parse(raw||'{}')));});
+              req.on('error', reject); req.write(gmailPayload); req.end();
+            });
+            result = { ok: true, notified: 'comercial@rhinosapp.com' };
+          } catch(e) { result = { ok: false, reason: e.message }; }
+        }
+      }
+    }
+
     else {
       return res.status(400).json({ error: 'Unknown action: ' + action });
     }

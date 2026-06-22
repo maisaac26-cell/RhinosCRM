@@ -480,8 +480,16 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   <!-- Navegación agrupada -->
   <div class="nav">
 
+    <!-- Búsqueda global -->
+    <div style="padding:6px 8px 4px">
+      <div style="position:relative">
+        <input id="global-search-input" placeholder="🔍 Buscar..." style="width:100%;box-sizing:border-box;font-size:12px;padding:6px 10px 6px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font)" autocomplete="off"/>
+      </div>
+    </div>
+
     <div class="nav-group-label">General</div>
     <button class="nav-btn active" data-sec="dashboard"><span class="nav-icon">📊</span>Dashboard</button>
+    <button class="nav-btn" data-sec="mi-dia" id="nav-btn-mi-dia" style="display:none"><span class="nav-icon">🌅</span>Mi día</button>
 
     <div class="nav-group-label">Comercial</div>
     <button class="nav-btn" data-sec="leads"><span class="nav-icon">🎯</span>Leads<span id="nav-leads-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;line-height:1.4"></span></button>
@@ -526,6 +534,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
   </div>
 
+</div>
+
+<!-- GLOBAL SEARCH OVERLAY -->
+<div id="gsearch-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:8000;pointer-events:all"></div>
+<div id="gsearch-panel" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:8001;background:var(--surface);border:1px solid var(--border2);border-radius:12px;width:560px;max-width:92vw;max-height:70vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,0.5);padding:12px">
+  <div id="gsearch-results" style="display:flex;flex-direction:column;gap:4px">
+    <div class="empty" style="padding:1rem;font-size:12px">Escribí para buscar...</div>
+  </div>
 </div>
 
 <!-- GUIDE OVERLAY -->
@@ -1149,6 +1165,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <button class="lead-filter-btn" data-status="perdido" style="font-size:10px;padding:3px 8px;border:1px solid rgba(239,68,68,0.3);border-radius:10px;background:transparent;cursor:pointer;font-family:var(--font);color:var(--red)">Perdido</button>
             <button class="lead-filter-btn" data-status="imposible" style="font-size:10px;padding:3px 8px;border:1px solid rgba(100,116,139,0.4);border-radius:10px;background:transparent;cursor:pointer;font-family:var(--font);color:#94a3b8">Imposible</button>
           </div>
+          <div id="tag-filter-row" style="display:none;gap:4px;margin-bottom:8px;flex-wrap:wrap"></div>
           <div id="leads-list" style="display:flex;flex-direction:column;gap:4px;max-height:600px;overflow-y:auto"></div>
         </div>
       </div>
@@ -1262,8 +1279,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <!-- LISTA -->
       <div>
         <div class="card" style="padding:0.75rem">
-          <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
+          <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
             <div style="font-size:13px;font-weight:500;color:var(--text);flex:1">Equipo de ventas</div>
+            <button class="btn btn-sm" id="btn-daily-reminder" style="color:var(--amber);border-color:rgba(245,158,11,0.3);font-size:11px" title="Enviar resumen diario de seguimientos a cada vendedor">📧 Recordatorio</button>
             <button class="btn btn-sm" id="btn-new-vendedor" style="background:rgba(0,229,204,0.1);color:var(--cyan);border-color:rgba(0,229,204,0.3);white-space:nowrap">+ Agregar</button>
           </div>
           <div id="vendedores-list" style="display:flex;flex-direction:column;gap:6px"></div>
@@ -2580,6 +2598,20 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div id="ga-countries"><div class="empty"><div class="loader"></div></div></div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- MI DÍA -->
+  <div class="section" id="s-mi-dia">
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">🌅 <span id="mi-dia-title">MI DÍA</span></div>
+        <div class="page-sub">Tu resumen personalizado de hoy — seguimientos, leads activos y alertas.</div>
+      </div>
+      <button class="btn btn-sm btn-cyan" id="btn-mi-dia-refresh">↻ Actualizar</button>
+    </div>
+    <div id="mi-dia-content">
+      <div class="empty">Cargando...</div>
     </div>
   </div>
 
@@ -4392,6 +4424,9 @@ function applyVendedorPermisos(permisos) {
     const btn = document.querySelector(`.nav-btn[data-sec="${key}"]`);
     if (btn) btn.style.display = effective[key] ? '' : 'none';
   });
+  // Show "Mi día" for vendedores
+  const miDiaBtn = document.getElementById('nav-btn-mi-dia');
+  if (miDiaBtn) miDiaBtn.style.display = '';
   // Group labels: hide if all children hidden
   document.querySelectorAll('.nav-group-label').forEach(label => {
     let next = label.nextElementSibling;
@@ -4402,6 +4437,11 @@ function applyVendedorPermisos(permisos) {
     }
     label.style.display = allHidden ? 'none' : '';
   });
+}
+
+async function onVendedorLogin() {
+  await loadLeads();
+  document.querySelector('.nav-btn[data-sec="mi-dia"]')?.click();
 }
 
 function getCRMSession() {
@@ -4642,6 +4682,7 @@ async function initCRMAuth() {
       if (vendedorPermisos !== null) applyVendedorPermisos(vendedorPermisos);
       loadCommercialDashboard();
       initGmail();
+      if (vendedorPermisos !== null) onVendedorLogin();
     } catch(e) {
       document.getElementById('login-screen').style.display = 'flex';
       const errEl = document.getElementById('login-error');
@@ -4731,6 +4772,7 @@ document.getElementById('btn-vendedor-login')?.addEventListener('click', async f
     showApp(session);
     applyVendedorPermisos(vRows[0].permisos || {});
     loadCommercialDashboard();
+    onVendedorLogin();
   } catch(e) {
     errEl.textContent = e.message;
     errEl.style.display = 'block';
@@ -5083,6 +5125,7 @@ async function loadLeads() {
     renderLeadsMetrics();
     renderLeadsAlerts();
     renderLeadsList();
+    renderTagFilters();
     updateNavBadge();
   } catch(e) { showToast('Error cargando leads: ' + e.message); }
 }
@@ -5145,15 +5188,33 @@ function renderLeadsAlerts() {
   });
 }
 
+let _currentTagFilter = '';
+
+function renderTagFilters() {
+  const row = document.getElementById('tag-filter-row');
+  if (!row) return;
+  const allTags = new Set();
+  leadsData.forEach(l => { if (l.tags) l.tags.split(',').forEach(t => { const tt = t.trim(); if (tt) allTags.add(tt); }); });
+  if (!allTags.size) { row.style.display = 'none'; _currentTagFilter = ''; return; }
+  row.style.display = 'flex';
+  row.innerHTML = `<button class="tag-filter-chip" data-tag="" style="font-size:10px;padding:3px 8px;border:1px solid var(--border2);border-radius:10px;background:${!_currentTagFilter?'var(--cyan)':'transparent'};color:${!_currentTagFilter?'#000':'var(--text3)'};cursor:pointer;font-family:var(--font)">Todos</button>` +
+    [...allTags].map(t => `<button class="tag-filter-chip" data-tag="${t}" style="font-size:10px;padding:3px 8px;border:1px solid rgba(0,229,204,0.3);border-radius:10px;background:${_currentTagFilter===t?'var(--cyan)':'transparent'};color:${_currentTagFilter===t?'#000':'var(--cyan)'};cursor:pointer;font-family:var(--font)"># ${t}</button>`).join('');
+  row.querySelectorAll('.tag-filter-chip').forEach(btn => {
+    btn.addEventListener('click', function() { _currentTagFilter = this.dataset.tag; renderTagFilters(); renderLeadsList(); });
+  });
+}
+
 function renderLeadsList() {
   const search = document.getElementById('leads-search').value.toLowerCase();
   const list = document.getElementById('leads-list');
   let filtered = leadsData;
   if (currentLeadFilter) filtered = filtered.filter(l => l.status === currentLeadFilter);
+  if (_currentTagFilter) filtered = filtered.filter(l => l.tags && l.tags.split(',').map(t=>t.trim()).includes(_currentTagFilter));
   if (search) filtered = filtered.filter(l =>
     l.name?.toLowerCase().includes(search) ||
     l.company?.toLowerCase().includes(search) ||
-    l.phone?.includes(search)
+    l.phone?.includes(search) ||
+    l.tags?.toLowerCase().includes(search)
   );
   if (!filtered.length) { list.innerHTML = '<div class="empty" style="padding:1.5rem">Sin leads</div>'; return; }
   const now = Date.now();
@@ -5165,6 +5226,7 @@ function renderLeadsList() {
     const isOverdue = l.next_followup && l.next_followup < new Date().toISOString().slice(0,10);
     const pStep = cfg.pipeline;
     const pipelineHTML = pStep >= 0 ? `<div style="display:flex;gap:2px;margin-top:5px">${PIPELINE_STEPS.map((s,i)=>`<div style="flex:1;height:3px;border-radius:2px;background:${i<=pStep?STATUS_CONFIG[s].color:'var(--surface3)'}"></div>`).join('')}</div>` : '';
+    const tagsHTML = l.tags ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">${l.tags.split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,204,0.12);color:var(--cyan);border:1px solid rgba(0,229,204,0.25)">#${t}</span>`).join('')}</div>` : '';
     return `<div class="lead-item" data-lead-id="${l.id}" style="padding:9px 10px;border-radius:var(--r);border:1px solid ${isSelected?'var(--amber)':'var(--border)'};background:${isSelected?'rgba(245,158,11,0.05)':'var(--surface)'};cursor:pointer;margin-bottom:3px;border-left:3px solid ${cfg.color}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px">
         <div>
@@ -5179,6 +5241,7 @@ function renderLeadsList() {
         ${l.next_followup?`<span style="font-size:10px;color:${isOverdue?'var(--red)':'var(--amber)'};font-weight:${isOverdue?'600':'400'}">📅 ${isOverdue?'⚠ ':''} ${l.next_followup}</span>`:''}
         ${(()=>{const v=vendedoresData.find(x=>x.id===l.vendedor_id);return v?`<span style="font-size:10px;color:var(--cyan)">👤 ${v.nombre.split(' ')[0]}</span>`:''})()}
       </div>
+      ${tagsHTML}
       ${pipelineHTML}
     </div>`;
   }).join('');
@@ -5320,9 +5383,34 @@ async function openLead(lead) {
       }
       lead.status = pendingStatus;
       leadsData = leadsData.map(l => l.id === lead.id ? {...l, status: pendingStatus} : l);
+
+      // Auto-conversión: si el nuevo estado es "cliente", crear en Finanzas automáticamente
+      if (pendingStatus === 'cliente') {
+        const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
+        if (!existing) {
+          const newClient = {
+            id: 'cli_' + Date.now(),
+            nombre: lead.name,
+            empresa: lead.company || lead.name,
+            email: lead.email || '',
+            precio: lead.deal_value || 0,
+            inicio: new Date().toISOString().slice(0, 10),
+            estado: 'activo',
+            moneda: 'ARS',
+            emails_cc: '',
+            dias_plazo: 10,
+            notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido automáticamente desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
+          };
+          saveClients([...getClients(), newClient]);
+          showToast('✅ Lead convertido a cliente en Finanzas 🦏');
+        } else {
+          showToast('Estado actualizado — ya existía cliente en Finanzas 🦏');
+        }
+      }
+
       pendingStatus = null;
       renderLeadsMetrics(); renderLeadsAlerts(); renderLeadsList(); openLead(lead);
-      showToast('Estado actualizado 🦏');
+      if (lead.status !== 'cliente') showToast('Estado actualizado 🦏');
     } catch(e) { showToast('Error: ' + e.message); }
     this.disabled = false;
   });
@@ -5481,6 +5569,7 @@ function showLeadForm(lead) {
         </select>
       </div>
       <div class="field"><label>Valor del deal <span style="color:var(--text3);font-weight:400">(MRR estimado ARS/mes)</span></label><input type="number" id="lf-deal-value" value="${lead?.deal_value||''}" placeholder="Ej: 278600"/></div>
+      <div class="field"><label>Tags <span style="color:var(--text3);font-weight:400">(separados por coma)</span></label><input id="lf-tags" value="${lead?.tags||''}" placeholder="Ej: caliente, demo-pendiente, precio"/></div>
       <div class="field"><label>Notas</label><textarea id="lf-notes" rows="3" placeholder="Contexto, objeciones, qué necesita...">${lead?.notes||''}</textarea></div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-green" id="btn-save-lead">${isNew?'Crear lead':'Guardar'}</button>
@@ -5507,21 +5596,34 @@ function showLeadForm(lead) {
       notes: document.getElementById('lf-notes').value.trim(),
       vendedor_id: document.getElementById('lf-vendedor').value || null,
       deal_value: parseFloat(document.getElementById('lf-deal-value').value) || null,
+      tags: document.getElementById('lf-tags').value.trim() || null,
       updated_at: new Date().toISOString()
     };
     if (!data.name) { showToast('El nombre es obligatorio'); return; }
+
+    // Detección de duplicados (solo para leads nuevos o si email/phone cambiaron)
+    if (isNew || (lead && (data.email !== lead.email || data.phone !== lead.phone))) {
+      const dupEmail = data.email && leadsData.find(l => l.id !== lead?.id && l.email && l.email.toLowerCase() === data.email.toLowerCase());
+      const dupPhone = data.phone && leadsData.find(l => l.id !== lead?.id && l.phone && l.phone.replace(/\s/g,'') === data.phone.replace(/\s/g,''));
+      if (dupEmail || dupPhone) {
+        const dupLead = dupEmail || dupPhone;
+        const field = dupEmail ? `email (${data.email})` : `teléfono (${data.phone})`;
+        if (!window.confirm(`⚠️ Ya existe el lead "${dupLead.name}" con el mismo ${field}.\n\n¿Querés guardarlo igual?`)) return;
+      }
+    }
+
     this.disabled = true;
     try {
       if (isNew) {
         const [nl] = await sbFetch('rhinos_leads', 'POST', data);
         leadsData.unshift(nl);
-        renderLeadsMetrics(); renderLeadsAlerts(); renderLeadsList();
+        renderLeadsMetrics(); renderLeadsAlerts(); renderLeadsList(); renderTagFilters();
         openLead(nl); showToast('Lead creado 🦏');
       } else {
         await sbFetch(`rhinos_leads?id=eq.${lead.id}`, 'PATCH', data);
         const updated = {...lead, ...data};
         leadsData = leadsData.map(l => l.id === lead.id ? updated : l);
-        renderLeadsMetrics(); renderLeadsAlerts(); renderLeadsList();
+        renderLeadsMetrics(); renderLeadsAlerts(); renderLeadsList(); renderTagFilters();
         openLead(updated); showToast('Lead actualizado 🦏');
       }
     } catch(e) { showToast('Error: ' + e.message); }
@@ -5602,6 +5704,7 @@ function renderKanban() {
       const fuDate = l.next_followup ? new Date(l.next_followup) : null;
       const overdue = fuDate && fuDate < today;
       const v = vendedoresData.find(x => x.id === l.vendedor_id);
+      const tagsKC = l.tags ? l.tags.split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<span style="font-size:9px;padding:1px 5px;border-radius:6px;background:rgba(0,229,204,0.12);color:var(--cyan)">#${t}</span>`).join('') : '';
       return `<div class="kanban-card${overdue?' kc-overdue':''}" draggable="true" data-kid="${l.id}">
         <div class="kc-name">${l.name}</div>
         ${l.company ? `<div class="kc-company">${l.company}</div>` : ''}
@@ -5613,6 +5716,7 @@ function renderKanban() {
         ${l.next_followup ? `<div style="font-size:10px;margin-top:4px" class="${overdue?'kc-fu':''}">
           ${overdue?'⚠️':'📅'} ${l.next_followup}
         </div>` : ''}
+        ${tagsKC ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:5px">${tagsKC}</div>` : ''}
       </div>`;
     }).join('');
   });
@@ -10925,6 +11029,153 @@ document.getElementById('btn-export-clientes')?.addEventListener('click', () => 
 
 document.querySelector('.nav-btn[data-sec="posts"]')?.addEventListener('click', loadDashboard);
 document.querySelector('.nav-btn[data-sec="clientes-comercial"]')?.addEventListener('click', loadClientesComercial);
+
+// ── MI DÍA ────────────────────────────────────────────
+function loadMiDia() {
+  const v = _currentVendedor;
+  if (!v) return;
+  const content = document.getElementById('mi-dia-content');
+  if (!content) return;
+  const titleEl = document.getElementById('mi-dia-title');
+  if (titleEl) titleEl.textContent = `MI DÍA — ${(v.nombre||'').toUpperCase()}`;
+  const today = new Date().toISOString().slice(0, 10);
+  const myLeads = leadsData.filter(l => l.vendedor_id === v.id && l.status !== 'cliente' && l.status !== 'perdido' && l.status !== 'imposible');
+  const overdueFollowups = myLeads.filter(l => l.next_followup && l.next_followup < today);
+  const todayFollowups = myLeads.filter(l => l.next_followup === today);
+  const noActivity = myLeads.filter(l => {
+    if (!l.updated_at) return true;
+    return Math.floor((Date.now() - new Date(l.updated_at).getTime()) / 86400000) > 7;
+  });
+  let html = `<div class="metrics-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="metric-card"><div class="m-label">Mis leads activos</div><div class="m-val cyan">${myLeads.length}</div></div>
+    <div class="metric-card"><div class="m-label">Follow-ups hoy</div><div class="m-val" style="color:var(--amber)">${todayFollowups.length}</div></div>
+    <div class="metric-card"><div class="m-label">Vencidos</div><div class="m-val" style="color:var(--red)">${overdueFollowups.length}</div></div>
+    <div class="metric-card"><div class="m-label">Sin actividad +7d</div><div class="m-val" style="color:#a78bfa">${noActivity.length}</div></div>
+  </div>`;
+  if (overdueFollowups.length) {
+    html += `<div class="card" style="border-color:rgba(239,68,68,0.3)"><div class="card-title" style="color:var(--red)">⚠️ Follow-ups vencidos (${overdueFollowups.length})</div>${overdueFollowups.map(l=>renderMiDiaRow(l,'red')).join('')}</div>`;
+  }
+  if (todayFollowups.length) {
+    html += `<div class="card" style="border-color:rgba(245,158,11,0.3)"><div class="card-title" style="color:var(--amber)">📅 Para hoy (${todayFollowups.length})</div>${todayFollowups.map(l=>renderMiDiaRow(l,'amber')).join('')}</div>`;
+  }
+  if (noActivity.length) {
+    html += `<div class="card" style="border-color:rgba(167,139,250,0.3)"><div class="card-title" style="color:#a78bfa">💤 Sin actividad +7 días (${noActivity.length})</div>${noActivity.map(l=>renderMiDiaRow(l,'purple')).join('')}</div>`;
+  }
+  const upcoming = myLeads.filter(l => l.next_followup && l.next_followup > today).sort((a,b)=>a.next_followup.localeCompare(b.next_followup)).slice(0,8);
+  if (upcoming.length) {
+    html += `<div class="card"><div class="card-title">📋 Próximos follow-ups</div>${upcoming.map(l=>renderMiDiaRow(l,'cyan')).join('')}</div>`;
+  }
+  if (!overdueFollowups.length && !todayFollowups.length && !noActivity.length && !upcoming.length) {
+    html += `<div class="card" style="text-align:center;padding:2rem"><div style="font-size:36px;margin-bottom:8px">🎉</div><div style="color:var(--text2)">¡Todo al día! Sin seguimientos pendientes.</div></div>`;
+  }
+  content.innerHTML = html;
+  content.querySelectorAll('[data-mdc]').forEach(el => {
+    el.addEventListener('click', function() {
+      const lead = leadsData.find(l => String(l.id) === String(this.dataset.mdc));
+      if (!lead) return;
+      document.querySelector('.nav-btn[data-sec="leads"]').click();
+      setTimeout(() => openLead(lead), 300);
+    });
+  });
+}
+
+function renderMiDiaRow(l, color) {
+  const cfg = STATUS_CONFIG[l.status] || STATUS_CONFIG.nuevo;
+  const colorMap = { red:'var(--red)', amber:'var(--amber)', cyan:'var(--cyan)', purple:'#a78bfa' };
+  return `<div data-mdc="${l.id}" style="padding:8px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface2);cursor:pointer;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+    <div><span style="font-size:13px;font-weight:500">${l.name}</span>${l.company?`<span style="font-size:11px;color:var(--text3);margin-left:6px">${l.company}</span>`:''}</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      ${l.next_followup?`<span style="font-size:10px;color:${colorMap[color]||'var(--cyan)'}">${l.next_followup}</span>`:''}
+      <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:${cfg.color}22;color:${cfg.color}">${cfg.label}</span>
+    </div>
+  </div>`;
+}
+
+document.querySelector('.nav-btn[data-sec="mi-dia"]')?.addEventListener('click', async () => {
+  if (!leadsData.length) await loadLeads();
+  loadMiDia();
+});
+document.getElementById('btn-mi-dia-refresh')?.addEventListener('click', async () => {
+  await loadLeads(); loadMiDia();
+});
+
+// ── BÚSQUEDA GLOBAL ────────────────────────────────────
+function runGlobalSearch(query) {
+  const overlay = document.getElementById('gsearch-overlay');
+  const panel   = document.getElementById('gsearch-panel');
+  const results = document.getElementById('gsearch-results');
+  if (!query || query.length < 2) { overlay.style.display='none'; panel.style.display='none'; return; }
+  overlay.style.display = 'block'; panel.style.display = 'block';
+  const q = query.toLowerCase();
+  const matchedLeads = leadsData.filter(l =>
+    l.name?.toLowerCase().includes(q)||l.company?.toLowerCase().includes(q)||l.email?.toLowerCase().includes(q)||l.phone?.includes(q)||l.tags?.toLowerCase().includes(q)
+  ).slice(0,6);
+  const clients = (typeof getClients === 'function') ? getClients() : [];
+  const matchedClients = clients.filter(c => c.nombre?.toLowerCase().includes(q)||c.empresa?.toLowerCase().includes(q)||c.email?.toLowerCase().includes(q)).slice(0,4);
+  let presHistory = []; try { presHistory = JSON.parse(localStorage.getItem('rhinos_pres_history')||'[]'); } catch(e){}
+  const matchedPres = presHistory.filter(p => p.cliente?.toLowerCase().includes(q)||p.empresa?.toLowerCase().includes(q)).slice(0,4);
+  let html = '';
+  if (matchedLeads.length) {
+    html += `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;padding:4px 8px 2px">🎯 Leads</div>`;
+    html += matchedLeads.map(l => { const cfg=STATUS_CONFIG[l.status]||STATUS_CONFIG.nuevo; return `<div class="gsearch-item" data-gst="lead" data-gsid="${l.id}" style="padding:8px 10px;border-radius:var(--r);cursor:pointer"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">${l.name}</div>${l.company?`<div style="font-size:11px;color:var(--text3)">${l.company}</div>`:''}</div><span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${cfg.color}22;color:${cfg.color}">${cfg.label}</span></div></div>`; }).join('');
+  }
+  if (matchedClients.length) {
+    html += `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;padding:4px 8px 2px;margin-top:4px">🏢 Clientes</div>`;
+    html += matchedClients.map(c=>`<div class="gsearch-item" data-gst="cliente" data-gsid="${c.id}" style="padding:8px 10px;border-radius:var(--r);cursor:pointer"><div style="font-size:13px;font-weight:500">${c.nombre||c.empresa}</div>${c.empresa&&c.nombre!==c.empresa?`<div style="font-size:11px;color:var(--text3)">${c.empresa}</div>`:''}</div>`).join('');
+  }
+  if (matchedPres.length) {
+    html += `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;padding:4px 8px 2px;margin-top:4px">📄 Presupuestos</div>`;
+    html += matchedPres.map(p=>`<div class="gsearch-item" data-gst="presupuesto" data-gsid="${p.id||''}" style="padding:8px 10px;border-radius:var(--r);cursor:pointer"><div style="font-size:13px;font-weight:500">${p.cliente||p.empresa||'—'}</div><div style="font-size:11px;color:var(--text3)">${p.tier||''} ${p.status||''}</div></div>`).join('');
+  }
+  if (!html) html = `<div class="empty" style="padding:1.5rem;font-size:12px">Sin resultados para "${query}"</div>`;
+  results.innerHTML = html;
+  results.querySelectorAll('.gsearch-item').forEach(el => {
+    el.style.transition='background 0.1s';
+    el.addEventListener('mouseenter',()=>el.style.background='var(--surface2)');
+    el.addEventListener('mouseleave',()=>el.style.background='');
+    el.addEventListener('click', function() {
+      closeGlobalSearch(); document.getElementById('global-search-input').value='';
+      const type=this.dataset.gst, id=this.dataset.gsid;
+      if (type==='lead') { const lead=leadsData.find(l=>String(l.id)===String(id)); if(lead){document.querySelector('.nav-btn[data-sec="leads"]').click();setTimeout(()=>openLead(lead),300);} }
+      else if (type==='cliente') document.querySelector('.nav-btn[data-sec="finanzas"]')?.click();
+      else if (type==='presupuesto') document.querySelector('.nav-btn[data-sec="presupuestos"]')?.click();
+    });
+  });
+}
+function closeGlobalSearch() {
+  document.getElementById('gsearch-overlay').style.display='none';
+  document.getElementById('gsearch-panel').style.display='none';
+}
+document.getElementById('global-search-input')?.addEventListener('input', function() { runGlobalSearch(this.value.trim()); });
+document.getElementById('global-search-input')?.addEventListener('keydown', function(e) { if(e.key==='Escape') { closeGlobalSearch(); this.value=''; } });
+document.getElementById('gsearch-overlay')?.addEventListener('click', closeGlobalSearch);
+
+// ── RECORDATORIO DIARIO ─────────────────────────────────
+document.getElementById('btn-daily-reminder')?.addEventListener('click', async function() {
+  this.disabled=true; this.textContent='⏳ Enviando...';
+  try {
+    const token = await getAccessToken();
+    if (!token) throw new Error('Autenticá Gmail primero (sección Gmail)');
+    if (!leadsData.length) await loadLeads();
+    const today = new Date().toISOString().slice(0,10);
+    const activeVendedores = vendedoresData.filter(v=>v.activo&&v.login_email);
+    let sent=0;
+    for (const v of activeVendedores) {
+      const myLeads = leadsData.filter(l=>l.vendedor_id===v.id&&l.status!=='cliente'&&l.status!=='perdido'&&l.status!=='imposible');
+      const overdueFollowups = myLeads.filter(l=>l.next_followup&&l.next_followup<today);
+      const todayFollowups = myLeads.filter(l=>l.next_followup===today);
+      if (!overdueFollowups.length&&!todayFollowups.length) continue;
+      const lines=[];
+      if (overdueFollowups.length) { lines.push(`⚠️ Follow-ups VENCIDOS (${overdueFollowups.length}):`); overdueFollowups.forEach(l=>lines.push(`  • ${l.name}${l.company?' - '+l.company:''} — ${l.next_followup}`)); lines.push(''); }
+      if (todayFollowups.length) { lines.push(`📅 Para HOY (${todayFollowups.length}):`); todayFollowups.forEach(l=>lines.push(`  • ${l.name}${l.company?' - '+l.company:''}`)); lines.push(''); }
+      lines.push(`Total leads activos: ${myLeads.length}\n\nhttps://rhinos-crm.vercel.app\n\nEquipo RhinosApp 🦏`);
+      await callAPI('gmail_send',{access_token:token,to:v.login_email,subject:`📋 Tu resumen del día — ${new Date().toLocaleDateString('es-AR')}`,body:`Hola ${v.nombre}!\n\nAquí tu resumen de seguimientos para hoy:\n\n${lines.join('\n')}`});
+      sent++;
+    }
+    showToast(sent>0?`✅ Recordatorio enviado a ${sent} vendedor${sent>1?'es':''}`: 'Sin vendedores con follow-ups pendientes hoy');
+  } catch(e) { showToast('Error: '+e.message); }
+  this.disabled=false; this.textContent='📧 Recordatorio';
+});
 
 // ── INIT ──────────────────────
 initCRMAuth().then(() => {
