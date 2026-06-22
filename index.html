@@ -477,9 +477,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   </div>
 
   <!-- Footer del sidebar -->
-  <div class="sidebar-footer">
-    <div id="crm-user" style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></div>
-    <button id="btn-guide" onclick="startGuide()" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;display:none;flex-shrink:0" title="Guía de uso">?</button>
+  <div class="sidebar-footer" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px">
+    <div id="crm-user" style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button id="btn-crm-logout-sidebar" style="flex:1;font-size:11px;color:var(--red);border:1px solid rgba(239,68,68,0.25);border-radius:var(--r);padding:5px 8px;background:rgba(239,68,68,0.06);cursor:pointer;font-family:var(--font);font-weight:500;display:none">
+        ↩ Cerrar sesión
+      </button>
+      <button id="btn-guide" onclick="startGuide()" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;display:none;flex-shrink:0" title="Guía de uso">?</button>
+    </div>
   </div>
 
 </div>
@@ -4023,16 +4028,21 @@ function showApp(session) {
   // Show user info in topbar
   const userEl = document.getElementById('crm-user');
   if (userEl) {
-    userEl.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px">
-        ${session.picture ? `<img src="${session.picture}" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border2)"/>` : ''}
-        <span style="font-size:12px;color:var(--text2)">${session.email}</span>
-        <button id="btn-crm-logout" style="font-size:11px;color:var(--text3);border:1px solid var(--border);border-radius:var(--r);padding:3px 8px;background:transparent;cursor:pointer;font-family:var(--font)">Salir</button>
-      </div>`;
-    document.getElementById('btn-crm-logout').addEventListener('click', () => {
+    const name = session.name || session.email?.split('@')[0] || '';
+    userEl.innerHTML = session.picture
+      ? `<div style="display:flex;align-items:center;gap:6px"><img src="${session.picture}" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--border2);flex-shrink:0"/><span style="overflow:hidden;text-overflow:ellipsis">${name}</span></div>`
+      : `<span>${name}</span>`;
+  }
+  const logoutBtn = document.getElementById('btn-crm-logout-sidebar');
+  if (logoutBtn) {
+    logoutBtn.style.display = 'block';
+    logoutBtn.onclick = () => {
+      if (!confirm('¿Cerrar sesión?')) return;
       clearCRMSession();
+      _sbSession = null;
+      _currentVendedor = null;
       showLoginScreen();
-    });
+    };
   }
   // 1. Primero migrar cualquier dato que quede en localStorage (corre UNA sola vez por browser)
   // 2. Luego cargar todo desde Supabase
