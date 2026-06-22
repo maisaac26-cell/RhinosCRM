@@ -577,7 +577,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
 
     <!-- KPIs Comerciales -->
-    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem">
+    <div class="metrics-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px">
       <div class="metric-card" style="cursor:pointer" onclick="document.querySelector('.nav-btn[data-sec=\'leads\']').click()">
         <div class="m-label">Leads activos</div><div class="m-val" id="db-leads-activos">—</div><div class="m-sub">en pipeline</div>
       </div>
@@ -586,6 +586,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
       <div class="metric-card">
         <div class="m-label">Conversión</div><div class="m-val" id="db-conversion">—</div><div class="m-sub">leads → clientes</div>
+      </div>
+    </div>
+    <div class="metrics-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:1.5rem">
+      <div class="metric-card">
+        <div class="m-label">Valor del pipeline</div><div class="m-val green" id="db-pipeline-value">—</div><div class="m-sub">MRR estimado activos</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Proyección del mes</div><div class="m-val cyan" id="db-proyeccion">—</div><div class="m-sub" id="db-proyeccion-sub">cierres estimados</div>
       </div>
       <div class="metric-card" style="cursor:pointer" onclick="document.querySelector('.nav-btn[data-sec=\'tareas\']').click()">
         <div class="m-label">Tareas pendientes</div><div class="m-val" id="db-tareas-pend">—</div><div class="m-sub">del equipo</div>
@@ -1109,7 +1117,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
     <!-- MÉTRICAS RÁPIDAS -->
     <div class="metrics-row" id="leads-metrics" style="grid-template-columns:repeat(7,minmax(0,1fr))">
-      <div class="metric-card" style="cursor:pointer" data-filter-status=""><div class="m-label">Total</div><div class="m-val" id="lm-total" style="color:var(--text)">0</div></div>
+      <div class="metric-card" style="cursor:pointer" data-filter-status=""><div class="m-label">Total</div><div class="m-val" id="lm-total" style="color:var(--text)">0</div><div class="m-sub green" id="lm-pipeline-value"></div></div>
       <div class="metric-card" style="cursor:pointer" data-filter-status="nuevo"><div class="m-label">Nuevos</div><div class="m-val" id="lm-nuevo" style="color:var(--cyan)">0</div></div>
       <div class="metric-card" style="cursor:pointer" data-filter-status="contactado"><div class="m-label">Contactados</div><div class="m-val" id="lm-contactado" style="color:var(--amber)">0</div></div>
       <div class="metric-card" style="cursor:pointer" data-filter-status="demo"><div class="m-label">Demo agendada</div><div class="m-val" id="lm-demo" style="color:var(--green)">0</div></div>
@@ -1128,6 +1136,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <div style="display:flex;gap:6px;margin-bottom:10px">
             <input id="leads-search" placeholder="Buscar lead..." style="flex:1;font-size:12px;padding:6px 10px"/>
             <button class="btn btn-sm" id="btn-export-leads" title="Exportar CSV" style="color:var(--text2);padding:5px 9px">⬇ CSV</button>
+            <button class="btn btn-sm" id="btn-import-leads" title="Importar desde CSV" style="color:var(--green);padding:5px 9px">⬆ CSV</button>
+            <input type="file" id="leads-csv-input" accept=".csv" style="display:none"/>
             <button class="btn btn-sm btn-amber" id="btn-new-lead" style="background:rgba(245,158,11,0.15);color:var(--amber);border-color:rgba(245,158,11,0.3);white-space:nowrap">+ Nuevo</button>
           </div>
           <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">
@@ -1264,6 +1274,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <div id="vendedores-ranking" style="display:flex;flex-direction:column;gap:6px">
             <div class="empty">Cargando...</div>
           </div>
+        </div>
+        <!-- Comisiones -->
+        <div class="card">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+            Comisiones del mes
+            <span id="comisiones-mes-label" style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0"></span>
+          </div>
+          <div id="vendedores-comisiones"><div class="empty">Cargando...</div></div>
         </div>
       </div>
       <!-- FORMULARIO / DETALLE -->
@@ -2196,6 +2214,15 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           </div>
         </div>
 
+        <!-- Mensajes guardados -->
+        <div class="card" id="agente-saved-card" style="display:none">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+            Mensajes guardados
+            <span id="agente-saved-count" class="badge badge-cyan"></span>
+          </div>
+          <div id="agente-saved-list"></div>
+        </div>
+
         <!-- Loading -->
         <div class="card" id="agente-loading-card" style="display:none">
           <div class="empty"><div class="loader"></div><br><br>Generando mensaje...</div>
@@ -2212,6 +2239,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <button class="btn btn-sm btn-cyan" id="btn-agente-copy">Copiar</button>
               <button class="btn btn-sm" id="btn-agente-gmail" style="background:rgba(99,102,241,0.15);color:#818cf8;border-color:rgba(99,102,241,0.3)">📧 Gmail</button>
               <button class="btn btn-sm" id="btn-agente-wa" style="background:rgba(34,197,94,0.12);color:var(--green);border-color:rgba(34,197,94,0.25)">💬 WhatsApp</button>
+              <button class="btn btn-sm" id="btn-agente-save" style="color:var(--amber);border-color:rgba(245,158,11,0.3)">⭐ Guardar</button>
               <button class="btn btn-sm" id="btn-agente-regen" style="color:var(--text3)">↺ Regenerar</button>
             </div>
           </div>
@@ -4049,6 +4077,7 @@ function initAgente() {
       });
     });
   }
+  renderSavedMsgs();
   const sel = document.getElementById('agente-lead-select');
   if (sel && typeof leadsData !== 'undefined' && leadsData.length) {
     const cur = sel.value;
@@ -4248,6 +4277,73 @@ document.getElementById('btn-agente-regen').addEventListener('click', function()
   const tpl = AGENTE_TEMPLATES.find(t => t.key === _agenteLastKey);
   generateAgenteMessage(_agenteLastKey, tpl?.label || _agenteLastKey);
 });
+
+// ── MENSAJES GUARDADOS ────────────────────────────────
+const SAVED_MSGS_KEY = 'rhinos_saved_msgs';
+function getSavedMsgs() { try { return JSON.parse(localStorage.getItem(SAVED_MSGS_KEY)||'[]'); } catch(e) { return []; } }
+function setSavedMsgs(msgs) { localStorage.setItem(SAVED_MSGS_KEY, JSON.stringify(msgs)); }
+
+document.getElementById('btn-agente-save').addEventListener('click', () => {
+  const body    = document.getElementById('agente-output-body').textContent;
+  const subject = document.getElementById('agente-subject-out').value;
+  const label   = document.getElementById('agente-tpl-badge').textContent;
+  if (!body) { showToast('Primero generá un mensaje'); return; }
+  const msgs = getSavedMsgs();
+  msgs.unshift({ id: Date.now(), label, format: _agenteFormat, subject, body, savedAt: new Date().toLocaleDateString('es-AR') });
+  if (msgs.length > 30) msgs.pop();
+  setSavedMsgs(msgs);
+  renderSavedMsgs();
+  showToast('Mensaje guardado ⭐');
+});
+
+function renderSavedMsgs() {
+  const msgs  = getSavedMsgs();
+  const card  = document.getElementById('agente-saved-card');
+  const list  = document.getElementById('agente-saved-list');
+  const count = document.getElementById('agente-saved-count');
+  if (!msgs.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  if (count) count.textContent = msgs.length;
+  list.innerHTML = msgs.map(m => `
+    <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge badge-cyan" style="font-size:9px">${m.label}</span>
+          <span style="font-size:10px;color:var(--text3)">${m.savedAt} · ${m.format==='email'?'📧 Email':'💬 WhatsApp'}</span>
+        </div>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm" data-use-sid="${m.id}" style="font-size:10px;padding:2px 8px;color:var(--cyan)">Usar</button>
+          <button class="btn btn-sm" data-del-sid="${m.id}" style="font-size:10px;padding:2px 6px;color:var(--red)">✕</button>
+        </div>
+      </div>
+      ${m.subject ? `<div style="font-size:11px;color:var(--text2);margin-bottom:3px">Asunto: ${m.subject}</div>` : ''}
+      <div style="font-size:11px;color:var(--text3);line-height:1.5;max-height:44px;overflow:hidden">${m.body.slice(0,180)}${m.body.length>180?'…':''}</div>
+    </div>`).join('');
+
+  list.querySelectorAll('[data-use-sid]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const msg = getSavedMsgs().find(m => String(m.id) === String(btn.dataset.useSid));
+      if (!msg) return;
+      _agenteFormat = msg.format || 'email';
+      document.querySelectorAll('.fmt-btn').forEach(b => b.classList.toggle('active', b.dataset.fmt === _agenteFormat));
+      document.getElementById('agente-asunto-field').style.display = _agenteFormat === 'email' ? '' : 'none';
+      const sr = document.getElementById('agente-subject-row');
+      if (msg.subject) { document.getElementById('agente-subject-out').value = msg.subject; sr.style.display = ''; }
+      else { sr.style.display = 'none'; }
+      document.getElementById('agente-output-body').textContent = msg.body;
+      document.getElementById('agente-tpl-badge').textContent   = msg.label;
+      document.getElementById('agente-output-card').style.display = '';
+      document.getElementById('agente-output-card').scrollIntoView({ behavior:'smooth', block:'nearest' });
+    });
+  });
+
+  list.querySelectorAll('[data-del-sid]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setSavedMsgs(getSavedMsgs().filter(m => String(m.id) !== String(btn.dataset.delSid)));
+      renderSavedMsgs();
+    });
+  });
+}
 
 // ── CRM LOGIN ─────────────────────────────────────────
 const ALLOWED_EMAILS = ['comercial@rhinosapp.com', 'maisaac26@gmail.com'];
@@ -5006,24 +5102,41 @@ function renderLeadsMetrics() {
     const el = document.getElementById('lm-' + s);
     if (el) el.textContent = leadsData.filter(l => l.status === s).length;
   });
+  const pv = leadsData.filter(l => !['perdido','imposible'].includes(l.status)).reduce((s,l) => s + (parseFloat(l.deal_value)||0), 0);
+  const pvEl = document.getElementById('lm-pipeline-value');
+  if (pvEl) pvEl.textContent = pv > 0 ? '$' + fmtNum(Math.round(pv)) + '/mes pipeline' : '';
 }
 
 function renderLeadsAlerts() {
   const today = new Date().toISOString().slice(0,10);
-  const overdue = leadsData.filter(l => l.next_followup && l.next_followup <= today && l.status !== 'cliente' && l.status !== 'perdido');
+  const overdue = leadsData.filter(l => l.next_followup && l.next_followup <= today && !['cliente','perdido','imposible'].includes(l.status));
+  const inactive = leadsData.filter(l => {
+    if (['cliente','perdido','imposible'].includes(l.status)) return false;
+    const last = l.updated_at || l.created_at;
+    return last && Math.floor((Date.now() - new Date(last)) / 86400000) >= 7;
+  }).filter(l => !overdue.find(o => o.id === l.id));
   const alertEl = document.getElementById('leads-alerts');
-  if (!overdue.length) { alertEl.innerHTML = ''; return; }
-  alertEl.innerHTML = `<div class="card" style="border-color:rgba(245,158,11,0.4);background:rgba(245,158,11,0.05);margin-bottom:1rem;padding:0.75rem 1rem">
-    <div style="font-size:12px;color:var(--amber);font-weight:500;margin-bottom:6px">⚠️ ${overdue.length} lead${overdue.length>1?'s':''} con follow-up pendiente</div>
-    ${overdue.map(l => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(245,158,11,0.15);cursor:pointer" data-open-lead="${l.id}">
-        <span style="font-size:12px;color:var(--text)">${l.name}${l.company?' — '+l.company:''}</span>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span style="font-size:11px;color:var(--amber)">${l.next_followup === today ? 'Hoy' : 'Vencido: '+l.next_followup}</span>
-          ${l.phone ? `<a href="https://wa.me/${formatWhatsApp(l.phone)}" target="_blank" class="btn btn-green btn-sm" style="padding:2px 8px;font-size:10px">WhatsApp</a>` : ''}
-        </div>
-      </div>`).join('')}
-  </div>`;
+  if (!overdue.length && !inactive.length) { alertEl.innerHTML = ''; return; }
+
+  const makeRows = (list, color, dateLabel) => list.map(l => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid ${color}22;cursor:pointer" data-open-lead="${l.id}">
+      <span style="font-size:12px;color:var(--text)">${l.name}${l.company?' — '+l.company:''}</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:11px;color:${color}">${dateLabel(l)}</span>
+        ${l.phone ? `<a href="https://wa.me/${formatWhatsApp(l.phone)}" target="_blank" class="btn btn-green btn-sm" style="padding:2px 8px;font-size:10px" onclick="event.stopPropagation()">WA</a>` : ''}
+      </div>
+    </div>`).join('');
+
+  alertEl.innerHTML = `
+    ${overdue.length ? `<div class="card" style="border-color:rgba(245,158,11,0.4);background:rgba(245,158,11,0.04);margin-bottom:0.75rem;padding:0.75rem 1rem">
+      <div style="font-size:12px;color:var(--amber);font-weight:600;margin-bottom:6px">⚠️ ${overdue.length} follow-up${overdue.length>1?'s':''} vencido${overdue.length>1?'s':''}</div>
+      ${makeRows(overdue,'var(--amber)', l => l.next_followup === today ? 'Hoy' : 'Vencido: '+l.next_followup)}
+    </div>` : ''}
+    ${inactive.length ? `<div class="card" style="border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.04);margin-bottom:0.75rem;padding:0.75rem 1rem">
+      <div style="font-size:12px;color:#818cf8;font-weight:600;margin-bottom:6px">🕐 ${inactive.length} lead${inactive.length>1?'s':''} sin actividad hace +7 días</div>
+      ${makeRows(inactive,'#818cf8', l => { const d = Math.floor((Date.now()-new Date(l.updated_at||l.created_at))/86400000); return d+'d sin actividad'; })}
+    </div>` : ''}`;
+
   alertEl.querySelectorAll('[data-open-lead]').forEach(el => {
     el.addEventListener('click', function() {
       const lead = leadsData.find(l => l.id === this.dataset.openLead);
@@ -5110,6 +5223,7 @@ async function openLead(lead) {
         ${lead.phone?`<span>📞 ${lead.phone}</span>`:''}
         ${lead.source?`<span>🔗 ${lead.source}</span>`:''}
         ${lead.address?`<span>📍 ${lead.address}</span>`:''}
+        ${lead.deal_value?`<span style="color:var(--green);font-weight:600">💰 $${Number(lead.deal_value).toLocaleString('es-AR')}/mes</span>`:''}
         ${lead.next_followup?`<span style="color:var(--amber)">📅 Follow-up: ${lead.next_followup}</span>`:''}
         ${lead.vendedor_id?(()=>{const v=vendedoresData.find(x=>x.id===lead.vendedor_id);return v?`<span style="color:var(--cyan)">👤 ${v.nombre}</span>`:''})():''}
       </div>
@@ -5366,6 +5480,7 @@ function showLeadForm(lead) {
           ${vendedoresData.filter(v=>v.activo).map(v=>`<option value="${v.id}" ${lead?.vendedor_id===v.id?'selected':''}>${v.nombre}</option>`).join('')}
         </select>
       </div>
+      <div class="field"><label>Valor del deal <span style="color:var(--text3);font-weight:400">(MRR estimado ARS/mes)</span></label><input type="number" id="lf-deal-value" value="${lead?.deal_value||''}" placeholder="Ej: 278600"/></div>
       <div class="field"><label>Notas</label><textarea id="lf-notes" rows="3" placeholder="Contexto, objeciones, qué necesita...">${lead?.notes||''}</textarea></div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-green" id="btn-save-lead">${isNew?'Crear lead':'Guardar'}</button>
@@ -5391,6 +5506,7 @@ function showLeadForm(lead) {
       address: document.getElementById('lf-address').value.trim(),
       notes: document.getElementById('lf-notes').value.trim(),
       vendedor_id: document.getElementById('lf-vendedor').value || null,
+      deal_value: parseFloat(document.getElementById('lf-deal-value').value) || null,
       updated_at: new Date().toISOString()
     };
     if (!data.name) { showToast('El nombre es obligatorio'); return; }
@@ -5431,6 +5547,44 @@ document.querySelectorAll('[data-filter-status]').forEach(card => {
 });
 document.querySelector('.nav-btn[data-sec="leads"]').addEventListener('click', loadLeads);
 
+document.getElementById('btn-import-leads').addEventListener('click', () => document.getElementById('leads-csv-input').click());
+document.getElementById('leads-csv-input').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) { showToast('CSV vacío'); return; }
+
+  // Detectar si la primera línea es encabezado
+  const first = lines[0].toLowerCase();
+  const hasHeader = first.includes('name') || first.includes('nombre') || first.includes('empresa') || first.includes('company');
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  let imported = 0, errors = 0;
+  for (const line of dataLines) {
+    const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    if (!cols[0]) continue;
+    const data = {
+      name:       cols[0] || '',
+      company:    cols[1] || '',
+      email:      cols[2] || '',
+      phone:      cols[3] || '',
+      status:     STATUS_CONFIG[cols[4]] ? cols[4] : 'nuevo',
+      source:     cols[5] || 'CSV',
+      deal_value: parseFloat(cols[6]) || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (!data.name) continue;
+    try {
+      const [nl] = await sbFetch('rhinos_leads', 'POST', data);
+      if (nl) { leadsData.unshift(nl); imported++; }
+    } catch(e) { errors++; }
+  }
+  renderLeadsMetrics(); renderLeadsAlerts(); renderLeadsList();
+  showToast(`${imported} leads importados${errors ? ' · '+errors+' errores' : ''}`);
+  this.value = '';
+});
+
 function renderKanban() {
   const KCOLS = ['nuevo','contactado','demo','cliente'];
   KCOLS.forEach(status => {
@@ -5455,7 +5609,8 @@ function renderKanban() {
           <span style="color:var(--text3)">${l.source||''}</span>
           ${v ? `<span style="color:var(--cyan)">👤 ${v.nombre}</span>` : ''}
         </div>
-        ${l.next_followup ? `<div style="font-size:10px;margin-top:5px" class="${overdue?'kc-fu':''}">
+        ${l.deal_value ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:4px">💰 $${Number(l.deal_value).toLocaleString('es-AR')}/mes</div>` : ''}
+        ${l.next_followup ? `<div style="font-size:10px;margin-top:4px" class="${overdue?'kc-fu':''}">
           ${overdue?'⚠️':'📅'} ${l.next_followup}
         </div>` : ''}
       </div>`;
@@ -7730,7 +7885,10 @@ function renderPresHistory() {
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">${tiersResumen}</div>
       ${p.nota ? `<div style="font-size:11px;color:var(--amber);margin-bottom:8px">📝 ${p.nota}</div>` : ''}
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <select class="pres-status-sel" data-pres-id="${p.id}" style="font-size:11px;padding:3px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);font-family:var(--font);color:${{Borrador:'var(--text3)',Enviado:'#818cf8',Visto:'var(--cyan)',Aceptado:'var(--green)',Rechazado:'var(--red)'}[p.status||'Borrador']}">
+          ${['Borrador','Enviado','Visto','Aceptado','Rechazado'].map(s=>`<option value="${s}" ${(p.status||'Borrador')===s?'selected':''}>${s}</option>`).join('')}
+        </select>
         <button class="btn btn-sm btn-cyan" data-load-pres='${JSON.stringify(p).replace(/'/g,"&#39;")}'>↩ Cargar</button>
         <button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-del-pres="${p.id}">✕</button>
       </div>
@@ -7756,6 +7914,17 @@ function renderPresHistory() {
       document.getElementById('ptab-nuevo').style.display = 'block';
       document.getElementById('ptab-historial').style.display = 'none';
       showToast('Presupuesto cargado — generá la vista previa 🦏');
+    });
+  });
+
+  list.querySelectorAll('.pres-status-sel').forEach(sel => {
+    sel.addEventListener('change', function() {
+      const id     = String(this.dataset.presId);
+      const status = this.value;
+      const colors = { Borrador:'var(--text3)', Enviado:'#818cf8', Visto:'var(--cyan)', Aceptado:'var(--green)', Rechazado:'var(--red)' };
+      this.style.color = colors[status] || 'var(--text3)';
+      _presHistory = _presHistory.map(p => String(p.id)===id ? {...p, status} : p);
+      sbFetch(`rhinos_pres_history?id=eq.${encodeURIComponent(id)}`, 'PATCH', { status }).catch(()=>{});
     });
   });
 
@@ -10213,6 +10382,7 @@ async function loadVendedores() {
     renderVendedoresMetrics();
     renderVendedoresList();
     renderVendedoresRanking();
+    renderComisiones();
     showVendedorForm(null);
   } catch(e) { showToast('Error: ' + e.message); }
 }
@@ -10301,6 +10471,64 @@ function renderVendedoresRanking() {
         </tbody>
       </table>
     </div>`;
+}
+
+function renderComisiones() {
+  const el = document.getElementById('vendedores-comisiones');
+  if (!el) return;
+  const thisMonth = new Date().toISOString().slice(0,7);
+  const monthLabel = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  const lbl = document.getElementById('comisiones-mes-label');
+  if (lbl) lbl.textContent = monthLabel;
+
+  const rows = vendedoresData.filter(v => v.activo).map(v => {
+    const closed = leadsData.filter(l =>
+      l.vendedor_id === v.id &&
+      l.status === 'cliente' &&
+      (l.updated_at||'').startsWith(thisMonth)
+    );
+    const mrr       = closed.reduce((s,l) => s + (parseFloat(l.deal_value)||0), 0);
+    const pct       = parseFloat(v.comision_porcentaje) || 0;
+    const comision  = mrr * (pct / 100);
+    return { v, closed: closed.length, mrr, pct, comision };
+  });
+
+  const total = rows.reduce((s,r) => s + r.comision, 0);
+  const hasComision = rows.some(r => r.pct > 0);
+
+  if (!hasComision) {
+    el.innerHTML = '<div class="empty" style="font-size:12px">Configurá el % de comisión en cada vendedor para ver los cálculos.</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="overflow-x:auto">
+      <table class="perf-table">
+        <thead><tr><th>Vendedor</th><th>Cerrados</th><th>MRR cerrado</th><th>Comisión</th><th style="color:var(--green)">A pagar</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr>
+            <td style="font-weight:600;color:var(--text)">${r.v.nombre}</td>
+            <td><span style="color:var(--green);font-weight:600">${r.closed}</span></td>
+            <td style="color:var(--cyan)">${r.mrr ? '$'+Math.round(r.mrr).toLocaleString('es-AR') : '—'}</td>
+            <td style="color:var(--text3)">${r.pct ? r.pct+'%' : '—'}</td>
+            <td style="font-weight:700;color:${r.comision>0?'var(--green)':'var(--text3)'}">${r.comision ? '$'+Math.round(r.comision).toLocaleString('es-AR') : '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+      <span style="font-size:12px;color:var(--text2)">Total a pagar</span>
+      <span style="font-size:20px;font-weight:800;color:var(--green);font-family:var(--display)">${total ? '$'+Math.round(total).toLocaleString('es-AR') : '—'}</span>
+    </div>
+    <button class="btn btn-sm" id="btn-export-comisiones" style="margin-top:10px;color:var(--text2)">⬇ Exportar CSV</button>`;
+
+  document.getElementById('btn-export-comisiones')?.addEventListener('click', () => {
+    const csv = ['Vendedor,Leads cerrados,MRR cerrado,Comisión %,A pagar',
+      ...rows.map(r => `"${r.v.nombre}",${r.closed},${r.mrr},${r.pct}%,${Math.round(r.comision)}`)
+    ].join('\n');
+    const a = document.createElement('a'); a.href = 'data:text/csv,' + encodeURIComponent(csv);
+    a.download = `comisiones-${thisMonth}.csv`; a.click();
+  });
 }
 
 function renderPermisosPanel(v) {
@@ -10437,6 +10665,7 @@ document.getElementById('btn-save-vendedor')?.addEventListener('click', async fu
     renderVendedoresMetrics();
     renderVendedoresList();
     renderVendedoresRanking();
+    renderComisiones();
     const v = vendedoresData.find(x => x.id === currentVendedorId);
     if (v) openVendedor(v);
   } catch(e) { showToast('Error: ' + e.message); }
@@ -10492,6 +10721,21 @@ async function loadCommercialDashboard() {
     // Tareas pendientes
     const tareasPend = (tasks||[]).filter(t => t.status === 'pendiente').length;
     document.getElementById('db-tareas-pend').textContent = tareasPend;
+
+    // Valor del pipeline
+    const pipelineValue = (leadsData||[]).filter(l => !['perdido','imposible'].includes(l.status)).reduce((s,l) => s+(parseFloat(l.deal_value)||0), 0);
+    document.getElementById('db-pipeline-value').textContent = pipelineValue ? '$'+fmtNum(Math.round(pipelineValue)) : '—';
+
+    // Proyección del mes
+    const now2 = new Date();
+    const daysInMonth = new Date(now2.getFullYear(), now2.getMonth()+1, 0).getDate();
+    const dayOfMonth  = now2.getDate();
+    const closedThisMonth = (leadsData||[]).filter(l => l.status==='cliente' && (l.updated_at||'').startsWith(thisMonth)).length;
+    const projected = dayOfMonth > 0 ? Math.round(closedThisMonth / dayOfMonth * daysInMonth) : 0;
+    const projEl    = document.getElementById('db-proyeccion');
+    const projSub   = document.getElementById('db-proyeccion-sub');
+    if (projEl) projEl.textContent = projected || '—';
+    if (projSub) projSub.textContent = `${closedThisMonth} cerrados, día ${dayOfMonth}/${daysInMonth}`;
 
     // Pipeline funnel
     const pipelineEl = document.getElementById('db-pipeline');
