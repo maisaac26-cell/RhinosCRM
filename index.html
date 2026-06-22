@@ -224,6 +224,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 .badge-red{background:rgba(239,68,68,0.15);color:var(--red)}
 #toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--cyan);color:#000;font-size:12px;font-weight:700;padding:9px 16px;border-radius:var(--r);transform:translateY(80px);opacity:0;transition:all 0.25s;z-index:999;font-family:var(--display);letter-spacing:0.06em;text-transform:uppercase}
 #toast.show{transform:translateY(0);opacity:1}
+@keyframes notif-slide-in{from{transform:translateX(340px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes notif-pulse{0%,100%{box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 0 0 rgba(139,92,246,0.5)}60%{box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 0 8px rgba(139,92,246,0)}}
 .refresh-btn{font-size:11px;color:var(--text3);border:none;background:none;cursor:pointer;font-family:var(--font);padding:0}
 .refresh-btn:hover{color:var(--cyan)}
 .section-header{margin-bottom:1.5rem}
@@ -10626,7 +10628,7 @@ function wlRenderList() {
       `<option value="${k}" ${lead.status === k ? 'selected' : ''}>${v.label}</option>`).join('');
     const waMsg = encodeURIComponent(`Hola ${lead.name || ''}, te escribimos de Rhinosapp. Viste nuestra calculadora y con ${lead.users} usuario${lead.users!==1?'s':''} tu plan sería ${wlFmtARS(lead.rhinosCost)}/mes. ¿Hablamos?`);
     const emailBody = `Hola ${lead.name || ''},%0D%0A%0D%0ATe escribimos de Rhinosapp. Según la calculadora de nuestra web, con ${lead.users} usuario${lead.users!==1?'s':''} tu plan sería de ${wlFmtARS(lead.rhinosCost)}/mes.%0D%0A%0D%0A¡Agendemos una demo y te mostramos todo en vivo!%0D%0A%0D%0AEl equipo Rhinosapp`;
-    return `<div class="card" style="margin-bottom:8px;border-color:rgba(99,102,241,0.2)">
+    return `<div id="wl-row-${lead.id}" class="card" style="margin-bottom:8px;border-color:rgba(99,102,241,0.2)">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
@@ -11475,8 +11477,86 @@ initCRMAuth().then(() => {
     if (!localStorage.getItem('rhinos_guide_done')) {
       setTimeout(startGuide, 800);
     }
+    // Polling de leads web (admin solamente)
+    if (isAdmin()) setTimeout(startWlPolling, 3000);
   }
 });
+
+// ── NOTIFICACIONES IN-APP: nuevos leads web ──────────────────────────────────
+let _wlPollingInterval = null;
+
+function startWlPolling() {
+  _wlPollCheck(true); // baseline silencioso
+  _wlPollingInterval = setInterval(() => _wlPollCheck(false), 60000);
+}
+
+async function _wlPollCheck(isBaseline) {
+  try {
+    const r = await callWcAPI('wc_get_leads');
+    if (!r?.leads?.length) return;
+
+    const lastSeenId = localStorage.getItem('rhinos_wl_last_id') || '0';
+    const newLeads = r.leads.filter(l => String(l.id) > String(lastSeenId));
+    const maxId = r.leads.reduce((m, l) => String(l.id) > String(m) ? String(l.id) : String(m), '0');
+    localStorage.setItem('rhinos_wl_last_id', maxId);
+
+    if (isBaseline) return;
+    newLeads.forEach(lead => showLeadNotif(lead));
+  } catch(e) { /* polling nunca debe romper la UI */ }
+}
+
+function showLeadNotif(lead) {
+  // Si ya hay una, apilamos reemplazando (o podríamos acumular — simple por ahora)
+  document.getElementById('lead-notif')?.remove();
+
+  const name = lead.name || lead.email || 'Sin nombre';
+  const plan = lead.rhinosCost ? wlFmtARS(lead.rhinosCost) + '/mes' : '';
+  const savings = lead.savings > 0 ? `Ahorro: ${wlFmtARS(lead.savings)}/mes` : '';
+
+  const notif = document.createElement('div');
+  notif.id = 'lead-notif';
+  notif.style.cssText = [
+    'position:fixed;top:72px;right:16px;z-index:8999;width:300px',
+    'background:linear-gradient(135deg,rgba(99,102,241,0.97),rgba(139,92,246,0.97))',
+    'backdrop-filter:blur(12px)',
+    'border:1px solid rgba(139,92,246,0.5)',
+    'border-radius:14px;padding:16px 18px',
+    'box-shadow:0 8px 32px rgba(0,0,0,0.45)',
+    'animation:notif-slide-in 0.35s cubic-bezier(0.22,1,0.36,1),notif-pulse 1.8s ease 0.4s 3',
+  ].join(';');
+
+  notif.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div style="font-size:10px;color:rgba(255,255,255,0.65);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px">🔔 Nuevo lead de la web</div>
+      <button onclick="document.getElementById('lead-notif').remove()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:16px;padding:0;line-height:1;margin-top:-2px">✕</button>
+    </div>
+    <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:2px">${name}</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:${savings?'1px':'10px'}">${plan || 'Sin costo estimado'}</div>
+    ${savings ? `<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:10px">${savings}</div>` : ''}
+    <div style="display:flex;gap:8px">
+      <button onclick="goToWebLead('${lead.id}')" style="flex:1;padding:8px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);border-radius:8px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:var(--font)">Ver lead →</button>
+      ${lead.phone ? `<a href="https://wa.me/${formatWhatsApp(lead.phone)}?text=${encodeURIComponent('Hola '+name+'! Te escribimos de RhinosApp, viste nuestra calculadora de ahorro. ¿Hablamos?')}" target="_blank" style="padding:8px 12px;background:rgba(37,211,102,0.25);border:1px solid rgba(37,211,102,0.4);border-radius:8px;color:#4ade80;font-size:14px;display:flex;align-items:center;text-decoration:none" title="Abrir WhatsApp">💬</a>` : ''}
+    </div>`;
+
+  document.body.appendChild(notif);
+  setTimeout(() => notif.remove(), 15000);
+}
+
+function goToWebLead(leadId) {
+  document.getElementById('lead-notif')?.remove();
+  document.querySelector('.nav-btn[data-sec="leads"]')?.click();
+  setTimeout(() => {
+    document.querySelector('.tab-btn[data-leadstab="web"]')?.click();
+    setTimeout(() => {
+      const el = document.getElementById('wl-row-' + leadId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.outline = '2px solid rgba(139,92,246,0.8)';
+      el.style.transition = 'outline 0.3s';
+      setTimeout(() => { el.style.outline = ''; }, 3500);
+    }, 600);
+  }, 250);
+}
 </script>
 </body>
 </html>
