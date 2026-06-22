@@ -152,6 +152,30 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 .agent-input-row{display:flex;gap:8px;align-items:flex-end}
 .agent-input-row textarea{flex:1;min-height:40px;max-height:100px;resize:none}
 
+/* KANBAN PIPELINE */
+.kanban-board{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:start}
+@media(max-width:960px){.kanban-board{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:580px){.kanban-board{grid-template-columns:1fr}}
+.kanban-col{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rl);padding:12px;display:flex;flex-direction:column;gap:6px;min-height:160px;transition:background 0.15s,border-color 0.15s}
+.kanban-col.drag-over{background:rgba(0,229,204,0.06);border-color:rgba(0,229,204,0.35)}
+.kcol-hdr{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text2);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.kcol-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.kcol-badge{margin-left:auto;background:var(--surface3);border-radius:8px;padding:1px 7px;font-size:10px;color:var(--text3);font-weight:600}
+.kanban-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;cursor:pointer;transition:border-color 0.15s,transform 0.1s,box-shadow 0.15s;user-select:none}
+.kanban-card:hover{border-color:rgba(0,229,204,0.35);box-shadow:0 2px 10px rgba(0,0,0,0.25);transform:translateY(-1px)}
+.kanban-card.dragging{opacity:0.35;transform:rotate(1deg)}
+.kanban-card.kc-overdue{border-left:2px solid var(--amber)}
+.kc-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:1px}
+.kc-company{font-size:10px;color:var(--text3);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kc-footer{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text3);flex-wrap:wrap;gap:3px}
+.kc-fu{color:var(--amber);font-weight:500}
+/* VENDEDOR PERFORMANCE TABLE */
+.perf-table{width:100%;border-collapse:collapse;font-size:12px}
+.perf-table th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)}
+.perf-table td{padding:8px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle}
+.perf-table tr:last-child td{border-bottom:none}
+.perf-table tr:hover td{background:var(--surface2)}
+
 /* AGENTE IA VENTAS */
 .agente-layout{display:grid;grid-template-columns:260px 1fr;gap:1.5rem;align-items:start}
 @media(max-width:900px){.agente-layout{grid-template-columns:1fr}}
@@ -1076,6 +1100,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
     <div class="tab-row">
       <button class="tab-btn active" data-leadstab="crm">📋 CRM</button>
+      <button class="tab-btn" data-leadstab="pipeline">📊 Pipeline</button>
       <button class="tab-btn" data-leadstab="web">🌐 De la calculadora web</button>
     </div>
 
@@ -1150,6 +1175,28 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="wl-list"><div class="empty">Cargando...</div></div>
     </div><!-- /leadstab-web -->
 
+    <!-- TAB: PIPELINE KANBAN -->
+    <div id="leadstab-pipeline" style="display:none">
+      <div class="kanban-board" id="kanban-board">
+        <div class="kanban-col" data-kcol="nuevo">
+          <div class="kcol-hdr"><span class="kcol-dot" style="background:var(--cyan)"></span>Nuevo<span class="kcol-badge" id="kcol-count-nuevo">0</span></div>
+          <div id="kcol-nuevo"></div>
+        </div>
+        <div class="kanban-col" data-kcol="contactado">
+          <div class="kcol-hdr"><span class="kcol-dot" style="background:var(--amber)"></span>Contactado<span class="kcol-badge" id="kcol-count-contactado">0</span></div>
+          <div id="kcol-contactado"></div>
+        </div>
+        <div class="kanban-col" data-kcol="demo">
+          <div class="kcol-hdr"><span class="kcol-dot" style="background:var(--green)"></span>Demo agendada<span class="kcol-badge" id="kcol-count-demo">0</span></div>
+          <div id="kcol-demo"></div>
+        </div>
+        <div class="kanban-col" data-kcol="cliente">
+          <div class="kcol-hdr"><span class="kcol-dot" style="background:#22c55e"></span>Cliente 🦏<span class="kcol-badge" id="kcol-count-cliente">0</span></div>
+          <div id="kcol-cliente"></div>
+        </div>
+      </div>
+    </div><!-- /leadstab-pipeline -->
+
   </div>
 
   <!-- CLIENTES COMERCIAL -->
@@ -1211,9 +1258,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           </div>
           <div id="vendedores-list" style="display:flex;flex-direction:column;gap:6px"></div>
         </div>
-        <!-- Ranking -->
+        <!-- Performance -->
         <div class="card">
-          <div class="card-title">Ranking de conversión</div>
+          <div class="card-title">Performance del equipo</div>
           <div id="vendedores-ranking" style="display:flex;flex-direction:column;gap:6px">
             <div class="empty">Cargando...</div>
           </div>
@@ -3967,8 +4014,23 @@ const AGENTE_TEMPLATES = [
   { key: 'pedir-referido',    icon: '⭐', label: 'Pedir referido',       desc: 'Solicitar recomendación a cliente' },
 ];
 
-let _agenteFormat = 'email';
+let _agenteFormat  = 'email';
 let _agenteLastKey = null;
+let _agenteLeadId  = null;
+
+function openAgenteWithLead(lead) {
+  _agenteLeadId = lead.id;
+  document.querySelector('.nav-btn[data-sec="agente"]').click();
+  setTimeout(() => {
+    document.getElementById('agente-nombre').value     = lead.name    || '';
+    document.getElementById('agente-empresa').value    = lead.company || '';
+    document.getElementById('agente-email-dest').value = lead.email   || '';
+    document.getElementById('agente-telefono').value   = lead.phone   || '';
+    const sel = document.getElementById('agente-lead-select');
+    if (sel) { for (let i=0;i<sel.options.length;i++) { if (String(sel.options[i].value)===String(lead.id)) { sel.selectedIndex=i; break; } } }
+    showToast(`Lead cargado: ${lead.name}`);
+  }, 60);
+}
 
 function initAgente() {
   const grid = document.getElementById('agente-tpl-grid');
@@ -4124,6 +4186,17 @@ async function generateAgenteMessage(templateKey, label) {
     document.getElementById('agente-tpl-badge').textContent = label || templateKey;
     document.getElementById('agente-output-card').style.display = '';
     document.getElementById('agente-output-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Auto-log en el historial del lead si hay uno activo
+    if (_agenteLeadId && templateKey !== '__libre__') {
+      try {
+        await sbFetch('rhinos_lead_interactions', 'POST', {
+          lead_id: _agenteLeadId,
+          type: 'mensaje_ia',
+          note: `[Agente IA — ${label}] ${body.slice(0, 140)}${body.length > 140 ? '…' : ''}`
+        });
+      } catch(e) {}
+    }
   } catch(e) {
     document.getElementById('agente-loading-card').style.display = 'none';
     if (activeCard) activeCard.classList.remove('active-gen');
@@ -5030,6 +5103,8 @@ async function openLead(lead) {
         ${lead.phone?`<a href="https://wa.me/${formatWhatsApp(lead.phone)}" target="_blank" class="btn btn-green btn-sm">💬 WhatsApp</a>`:''}
         ${lead.email?`<a href="mailto:${lead.email}" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">📧 Email</a>`:''}
         ${lead.instagram?`<a href="https://instagram.com/${lead.instagram.replace('@','')}" target="_blank" class="btn btn-sm" style="color:#e1306c;border-color:rgba(225,48,108,0.3)">📸 IG</a>`:''}
+        <button class="btn btn-sm" id="btn-lead-agente" style="background:rgba(0,229,204,0.1);color:var(--cyan);border-color:rgba(0,229,204,0.3)">🤖 Mensaje IA</button>
+        <button class="btn btn-sm" id="btn-lead-presupuesto" style="background:rgba(99,102,241,0.1);color:#818cf8;border-color:rgba(99,102,241,0.3)">📄 Presupuesto</button>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:10px">
         ${lead.phone?`<span>📞 ${lead.phone}</span>`:''}
@@ -5074,6 +5149,7 @@ async function openLead(lead) {
           <option value="instagram">📸 Instagram</option>
           <option value="reunion">🤝 Reunión</option>
           <option value="demo">🖥️ Demo</option>
+          <option value="mensaje_ia">🤖 Mensaje IA</option>
           <option value="nota">📝 Nota</option>
         </select>
       </div>
@@ -5241,6 +5317,20 @@ Dame: 1) QUÉ HACER ahora (acción concreta) 2) MENSAJE para WhatsApp listo para
   });
 
   document.getElementById('btn-edit-lead').addEventListener('click', () => showLeadForm(lead));
+
+  document.getElementById('btn-lead-agente').addEventListener('click', () => openAgenteWithLead(lead));
+
+  document.getElementById('btn-lead-presupuesto').addEventListener('click', () => {
+    document.querySelector('.nav-btn[data-sec="presupuestos"]').click();
+    setTimeout(() => {
+      document.querySelector('[data-ptab="nuevo"]')?.click();
+      const cl = document.getElementById('pres-cliente');
+      const em = document.getElementById('pres-empresa');
+      if (cl) cl.value = lead.name  || '';
+      if (em) em.value = lead.company || '';
+      showToast('Datos del lead cargados en presupuesto');
+    }, 120);
+  });
 }
 
 function showLeadForm(lead) {
@@ -5340,6 +5430,73 @@ document.querySelectorAll('[data-filter-status]').forEach(card => {
   });
 });
 document.querySelector('.nav-btn[data-sec="leads"]').addEventListener('click', loadLeads);
+
+function renderKanban() {
+  const KCOLS = ['nuevo','contactado','demo','cliente'];
+  KCOLS.forEach(status => {
+    const leads = leadsData.filter(l => l.status === status);
+    const countEl = document.getElementById(`kcol-count-${status}`);
+    const colEl   = document.getElementById(`kcol-${status}`);
+    if (!colEl) return;
+    if (countEl) countEl.textContent = leads.length;
+    if (!leads.length) {
+      colEl.innerHTML = `<div style="font-size:11px;color:var(--text3);text-align:center;padding:20px 8px;opacity:0.6">Sin leads</div>`;
+      return;
+    }
+    colEl.innerHTML = leads.map(l => {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const fuDate = l.next_followup ? new Date(l.next_followup) : null;
+      const overdue = fuDate && fuDate < today;
+      const v = vendedoresData.find(x => x.id === l.vendedor_id);
+      return `<div class="kanban-card${overdue?' kc-overdue':''}" draggable="true" data-kid="${l.id}">
+        <div class="kc-name">${l.name}</div>
+        ${l.company ? `<div class="kc-company">${l.company}</div>` : ''}
+        <div class="kc-footer">
+          <span style="color:var(--text3)">${l.source||''}</span>
+          ${v ? `<span style="color:var(--cyan)">👤 ${v.nombre}</span>` : ''}
+        </div>
+        ${l.next_followup ? `<div style="font-size:10px;margin-top:5px" class="${overdue?'kc-fu':''}">
+          ${overdue?'⚠️':'📅'} ${l.next_followup}
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  });
+
+  // Drag & drop
+  document.querySelectorAll('.kanban-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', card.dataset.kid);
+      setTimeout(() => card.classList.add('dragging'), 0);
+    });
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+    card.addEventListener('click', () => {
+      const lead = leadsData.find(l => String(l.id) === String(card.dataset.kid));
+      if (!lead) return;
+      document.querySelector('[data-leadstab="crm"]').click();
+      openLead(lead);
+    });
+  });
+
+  document.querySelectorAll('.kanban-col').forEach(col => {
+    col.addEventListener('dragover',  e => { e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', async e => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      const kid       = e.dataTransfer.getData('text/plain');
+      const newStatus = col.dataset.kcol;
+      const lead      = leadsData.find(l => String(l.id) === String(kid));
+      if (!lead || lead.status === newStatus) return;
+      try {
+        await sbFetch(`rhinos_leads?id=eq.${lead.id}`, 'PATCH', { status: newStatus, updated_at: new Date().toISOString() });
+        leadsData = leadsData.map(l => l.id === lead.id ? {...l, status: newStatus} : l);
+        renderKanban();
+        renderLeadsMetrics();
+        showToast(`${lead.name} → ${STATUS_CONFIG[newStatus].label}`);
+      } catch(err) { showToast('Error: ' + err.message); }
+    });
+  });
+}
 document.querySelector('.nav-btn[data-sec="prospectos"]')?.addEventListener('click', loadProspectEmailsFromSupabase);
 
 // Filtro Instagram desde el panel principal
@@ -10006,9 +10163,11 @@ document.querySelectorAll('[data-leadstab]').forEach(btn => {
     document.querySelectorAll('[data-leadstab]').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
     const tab = this.dataset.leadstab;
-    document.getElementById('leadstab-crm').style.display = tab === 'crm' ? '' : 'none';
-    document.getElementById('leadstab-web').style.display = tab === 'web' ? '' : 'none';
+    document.getElementById('leadstab-crm').style.display      = tab === 'crm'      ? '' : 'none';
+    document.getElementById('leadstab-pipeline').style.display = tab === 'pipeline' ? '' : 'none';
+    document.getElementById('leadstab-web').style.display      = tab === 'web'      ? '' : 'none';
     if (tab === 'web' && !wlLeads.length) wlLoadLeads();
+    if (tab === 'pipeline') renderKanban();
   });
 });
 
@@ -10105,22 +10264,43 @@ function renderVendedoresList() {
 function renderVendedoresRanking() {
   const el = document.getElementById('vendedores-ranking');
   if (!vendedoresData.length) { el.innerHTML = '<div class="empty">Sin datos</div>'; return; }
-  const ranked = vendedoresData.map(v => {
-    const myLeads = leadsData.filter(l => l.vendedor_id === v.id);
-    const clientes = myLeads.filter(l => l.status === 'cliente').length;
-    const conv = myLeads.length ? Math.round(clientes / myLeads.length * 100) : 0;
-    return { v, total: myLeads.length, clientes, conv };
-  }).sort((a,b) => b.clientes - a.clientes);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const rows = vendedoresData.map(v => {
+    const all     = leadsData.filter(l => l.vendedor_id === v.id);
+    const demos   = all.filter(l => l.status === 'demo').length;
+    const cerr    = all.filter(l => l.status === 'cliente').length;
+    const activos = all.filter(l => !['cliente','perdido','imposible'].includes(l.status)).length;
+    const venc    = all.filter(l => l.next_followup && new Date(l.next_followup) < today && !['cliente','perdido','imposible'].includes(l.status)).length;
+    const conv    = all.length ? Math.round(cerr / all.length * 100) : 0;
+    return { v, total: all.length, activos, demos, cerr, venc, conv };
+  }).sort((a,b) => b.cerr - a.cerr || b.conv - a.conv);
 
-  el.innerHTML = ranked.map((r,i) => `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="font-family:var(--display);font-size:20px;font-weight:800;color:${i===0?'var(--amber)':i===1?'var(--text2)':'var(--text3)'};width:24px">${i+1}</div>
-      <div style="flex:1">
-        <div style="font-size:13px;color:var(--text)">${r.v.nombre}</div>
-        <div style="font-size:11px;color:var(--text3)">${r.total} leads · ${r.clientes} cerrados</div>
-      </div>
-      <div style="font-size:16px;font-weight:700;color:${r.conv>50?'var(--green)':r.conv>20?'var(--amber)':'var(--text2)'};font-family:var(--display)">${r.conv}%</div>
-    </div>`).join('');
+  el.innerHTML = `
+    <div style="overflow-x:auto">
+      <table class="perf-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Vendedor</th><th>Leads</th><th>Activos</th><th>Demo</th><th>Cerrados</th><th>FU vencidos</th><th>Conv %</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r,i) => `
+          <tr style="cursor:pointer" onclick="openVendedor(vendedoresData.find(v=>v.id==='${r.v.id}')||vendedoresData.find(v=>v.id===${r.v.id}))">
+            <td style="font-family:var(--display);font-weight:800;font-size:16px;color:${i===0?'var(--amber)':i===1?'#94a3b8':'var(--text3)'}">${i+1}</td>
+            <td>
+              <div style="font-size:12px;font-weight:600;color:var(--text)">${r.v.nombre}</div>
+              ${r.v.meta_leads ? `<div style="font-size:10px;color:var(--text3)">Meta: ${r.v.meta_leads}/mes</div>` : ''}
+            </td>
+            <td style="font-weight:600">${r.total}</td>
+            <td><span style="color:var(--cyan)">${r.activos}</span></td>
+            <td><span style="color:var(--green)">${r.demos}</span></td>
+            <td><span style="font-weight:700;color:${r.cerr>0?'var(--green)':'var(--text2)'}">${r.cerr}</span></td>
+            <td><span style="color:${r.venc>0?'var(--amber)':'var(--text3)'}">${r.venc>0?'⚠️ '+r.venc:'—'}</span></td>
+            <td><span style="font-weight:700;color:${r.conv>50?'var(--green)':r.conv>20?'var(--amber)':'var(--text2)'};font-family:var(--display)">${r.conv}%</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 function renderPermisosPanel(v) {
