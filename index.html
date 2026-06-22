@@ -401,6 +401,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
     <div class="nav-group-label">Comercial</div>
     <button class="nav-btn" data-sec="leads"><span class="nav-icon">🎯</span>Leads<span id="nav-leads-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;line-height:1.4"></span></button>
+    <button class="nav-btn" data-sec="clientes-comercial"><span class="nav-icon">🏢</span>Clientes</button>
     <button class="nav-btn" data-sec="vendedores"><span class="nav-icon">👤</span>Vendedores</button>
     <button class="nav-btn" data-sec="prospectos"><span class="nav-icon">🔍</span>Prospectos</button>
     <button class="nav-btn" data-sec="presupuestos"><span class="nav-icon">📄</span>Presupuestos</button>
@@ -462,36 +463,63 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   <!-- DASHBOARD -->
   <div class="section active" id="s-dashboard">
-    <div class="section-header">
-      <div class="page-title">DASH<span>BOARD</span></div>
-      <div class="page-sub"><span class="status-dot"></span>Métricas en tiempo real de @rhinosapp</div>
-    </div>
-
-    <div id="ig-profile-bar" class="ig-profile">
-      <div class="ig-avatar" id="ig-avatar">R</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div>
-        <div class="ig-name" id="ig-name">Cargando...</div>
-        <div class="ig-handle">@rhinosapp</div>
-        <div class="ig-bio" id="ig-bio"></div>
+        <div class="page-title">DASH<span>BOARD</span></div>
+        <div class="page-sub"><span class="status-dot"></span>Vista ejecutiva del negocio RhinosApp</div>
       </div>
-      <button class="refresh-btn" id="btn-refresh" style="margin-left:auto">↻ Actualizar</button>
+      <button class="btn btn-sm" id="btn-db-refresh" style="color:var(--text2);margin-top:8px">↻ Actualizar</button>
     </div>
 
-    <div class="metrics-row" id="metrics-row">
-      <div class="metric-card"><div class="m-label">Seguidores</div><div class="m-val cyan" id="m-followers">—</div><div class="m-sub">cuenta total</div></div>
-      <div class="metric-card"><div class="m-label">Posts</div><div class="m-val" id="m-posts">—</div><div class="m-sub">publicaciones</div></div>
-      <div class="metric-card"><div class="m-label">Alcance 7d</div><div class="m-val green" id="m-reach">—</div><div class="m-sub">personas únicas</div></div>
-      <div class="metric-card"><div class="m-label">Impresiones 7d</div><div class="m-val" id="m-impressions">—</div><div class="m-sub">vistas totales</div></div>
+    <!-- KPIs Financieros -->
+    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:10px">
+      <div class="metric-card" style="cursor:pointer" onclick="document.querySelector('.nav-btn[data-sec=\'finanzas\']').click()">
+        <div class="m-label">MRR</div><div class="m-val cyan" id="db-mrr">—</div><div class="m-sub">ingresos recurrentes</div>
+      </div>
+      <div class="metric-card" style="cursor:pointer" onclick="document.querySelector('.nav-btn[data-sec=\'finanzas\']').click()">
+        <div class="m-label">Cobros pendientes</div><div class="m-val" id="db-cobros-pend" style="color:var(--amber)">—</div><div class="m-sub" id="db-cobros-pend-monto">este mes</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Clientes activos</div><div class="m-val green" id="db-clientes">—</div><div class="m-sub">con suscripción</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Nuevos este mes</div><div class="m-val" id="db-nuevos-mes">—</div><div class="m-sub">clientes cerrados</div>
+      </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">Últimos posts <span style="margin-left:auto;font-size:11px;color:var(--text3);font-family:var(--font);text-transform:none;letter-spacing:0">Hacé clic para ver comentarios</span></div>
-      <div class="media-grid" id="media-grid"><div class="empty"><div class="loader"></div><br>Cargando posts...</div></div>
+    <!-- KPIs Comerciales -->
+    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem">
+      <div class="metric-card" style="cursor:pointer" onclick="document.querySelector('.nav-btn[data-sec=\'leads\']').click()">
+        <div class="m-label">Leads activos</div><div class="m-val" id="db-leads-activos">—</div><div class="m-sub">en pipeline</div>
+      </div>
+      <div class="metric-card" style="cursor:pointer" onclick="document.querySelector('.nav-btn[data-sec=\'leads\']').click()">
+        <div class="m-label">Follow-ups vencidos</div><div class="m-val" id="db-followups" style="color:var(--red)">—</div><div class="m-sub">requieren atención</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Conversión</div><div class="m-val" id="db-conversion">—</div><div class="m-sub">leads → clientes</div>
+      </div>
+      <div class="metric-card" style="cursor:pointer" onclick="document.querySelector('.nav-btn[data-sec=\'tareas\']').click()">
+        <div class="m-label">Tareas pendientes</div><div class="m-val" id="db-tareas-pend">—</div><div class="m-sub">del equipo</div>
+      </div>
     </div>
 
-    <div class="card" id="comments-card" style="display:none">
-      <div class="card-title">Comentarios del post <button class="btn btn-sm" id="btn-close-comments" style="margin-left:auto">✕ Cerrar</button></div>
-      <div id="comments-list"><div class="empty">Seleccioná un post</div></div>
+    <div class="grid2">
+      <!-- Pipeline funnel -->
+      <div class="card">
+        <div class="card-title">Pipeline de leads</div>
+        <div id="db-pipeline" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+      <!-- Actividad reciente -->
+      <div class="card">
+        <div class="card-title">Últimos clientes cerrados</div>
+        <div id="db-clientes-recientes"><div class="empty">Cargando...</div></div>
+      </div>
+    </div>
+
+    <!-- Vendedores ranking rápido -->
+    <div class="card" id="db-vendedores-card">
+      <div class="card-title">Rendimiento del equipo <span style="margin-left:auto;font-size:11px;font-family:var(--font);text-transform:none;letter-spacing:0;color:var(--text3)">Este mes</span></div>
+      <div id="db-vendedores-perf" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px"></div>
     </div>
 
     <!-- Card conexión Analytics -->
@@ -504,39 +532,48 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         🔗 Conectar con Google Analytics
       </button>
     </div>
-
-    <!-- Card conexión Instagram -->
-    <div class="card" id="ig-config-card">
-      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        📡 Conexión Instagram
-        <span id="ig-status-badge" style="font-size:10px;padding:2px 10px;border-radius:10px;background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.25)">Verificando...</span>
-      </div>
-      <div id="ig-config-info" style="font-size:13px;color:var(--text2);margin-bottom:1rem">Cargando estado del token...</div>
-
-      <div id="ig-token-form" style="display:none">
-        <div class="field" style="margin-bottom:8px">
-          <label>Nuevo token de acceso de Instagram</label>
-          <input id="ig-new-token" type="password" placeholder="Pegá el nuevo token de Meta aquí..." style="font-size:12px"/>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button id="btn-save-ig-token" class="btn btn-cyan" style="flex:1;justify-content:center">✅ Validar y guardar token</button>
-          <button onclick="document.getElementById('ig-token-form').style.display='none'" class="btn" style="color:var(--text2)">Cancelar</button>
-        </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--text3)">
-          💡 Conseguí el token en: <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--cyan)">Meta Graph API Explorer</a> → seleccioná la app → generá token con permisos <code>instagram_basic, instagram_content_publish, pages_read_engagement</code>
-        </div>
-      </div>
-
-      <button id="btn-show-ig-form" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">🔄 Actualizar token</button>
-    </div>
   </div>
 
-  <!-- POSTS -->
+  <!-- POSTS / INSTAGRAM -->
   <div class="section" id="s-posts">
-    <div class="section-header">
-      <div class="page-title">COM<span>ENTARIOS</span></div>
-      <div class="page-sub">Gestioná los comentarios de todos tus posts.</div>
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">INSTA<span>GRAM</span></div>
+        <div class="page-sub">Perfil, posts y comentarios de @rhinosapp.</div>
+      </div>
+      <button class="refresh-btn" id="btn-refresh" style="margin-top:12px">↻ Actualizar</button>
     </div>
+
+    <!-- Perfil Instagram -->
+    <div id="ig-profile-bar" class="ig-profile">
+      <div class="ig-avatar" id="ig-avatar">R</div>
+      <div>
+        <div class="ig-name" id="ig-name">Cargando...</div>
+        <div class="ig-handle">@rhinosapp</div>
+        <div class="ig-bio" id="ig-bio"></div>
+      </div>
+    </div>
+
+    <!-- Métricas Instagram -->
+    <div class="metrics-row" id="metrics-row" style="margin-bottom:1.25rem">
+      <div class="metric-card"><div class="m-label">Seguidores</div><div class="m-val cyan" id="m-followers">—</div><div class="m-sub">cuenta total</div></div>
+      <div class="metric-card"><div class="m-label">Posts</div><div class="m-val" id="m-posts">—</div><div class="m-sub">publicaciones</div></div>
+      <div class="metric-card"><div class="m-label">Alcance 7d</div><div class="m-val green" id="m-reach">—</div><div class="m-sub">personas únicas</div></div>
+      <div class="metric-card"><div class="m-label">Impresiones 7d</div><div class="m-val" id="m-impressions">—</div><div class="m-sub">vistas totales</div></div>
+    </div>
+
+    <!-- Grid de posts + comentarios -->
+    <div class="card">
+      <div class="card-title">Últimos posts <span style="margin-left:auto;font-size:11px;color:var(--text3);font-family:var(--font);text-transform:none;letter-spacing:0">Hacé clic para ver comentarios</span></div>
+      <div class="media-grid" id="media-grid"><div class="empty"><div class="loader"></div><br>Cargando posts...</div></div>
+    </div>
+
+    <div class="card" id="comments-card" style="display:none">
+      <div class="card-title">Comentarios del post <button class="btn btn-sm" id="btn-close-comments" style="margin-left:auto">✕ Cerrar</button></div>
+      <div id="comments-list"><div class="empty">Seleccioná un post</div></div>
+    </div>
+
+    <!-- Panel comentarios por post (vista lateral) -->
     <div class="grid3">
       <div>
         <div class="card">
@@ -550,6 +587,29 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <div id="comments-detail"><div class="empty">Seleccioná un post</div></div>
         </div>
       </div>
+    </div>
+
+    <!-- Configuración de token Instagram -->
+    <div class="card" id="ig-config-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        📡 Conexión Instagram
+        <span id="ig-status-badge" style="font-size:10px;padding:2px 10px;border-radius:10px;background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.25)">Verificando...</span>
+      </div>
+      <div id="ig-config-info" style="font-size:13px;color:var(--text2);margin-bottom:1rem">Cargando estado del token...</div>
+      <div id="ig-token-form" style="display:none">
+        <div class="field" style="margin-bottom:8px">
+          <label>Nuevo token de acceso de Instagram</label>
+          <input id="ig-new-token" type="password" placeholder="Pegá el nuevo token de Meta aquí..." style="font-size:12px"/>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="btn-save-ig-token" class="btn btn-cyan" style="flex:1;justify-content:center">✅ Validar y guardar token</button>
+          <button onclick="document.getElementById('ig-token-form').style.display='none'" class="btn" style="color:var(--text2)">Cancelar</button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+          💡 Conseguí el token en: <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--cyan)">Meta Graph API Explorer</a> → seleccioná la app → generá token con permisos <code>instagram_basic, instagram_content_publish, pages_read_engagement</code>
+        </div>
+      </div>
+      <button id="btn-show-ig-form" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">🔄 Actualizar token</button>
     </div>
   </div>
 
@@ -1027,6 +1087,43 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   </div>
 
+  <!-- CLIENTES COMERCIAL -->
+  <div class="section" id="s-clientes-comercial">
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">CLIEN<span>TES</span></div>
+        <div class="page-sub">Todos los clientes activos de RhinosApp.</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-sm" id="btn-export-clientes" style="color:var(--text2)">⬇ CSV</button>
+        <button class="btn btn-sm" id="btn-cc-refresh" style="color:var(--text2)">↻ Actualizar</button>
+      </div>
+    </div>
+
+    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.25rem">
+      <div class="metric-card"><div class="m-label">Total clientes</div><div class="m-val cyan" id="cc-total">—</div><div class="m-sub">activos</div></div>
+      <div class="metric-card"><div class="m-label">Nuevos este mes</div><div class="m-val green" id="cc-nuevos">—</div><div class="m-sub">incorporados</div></div>
+      <div class="metric-card"><div class="m-label">Con vendedor</div><div class="m-val" id="cc-con-vendedor">—</div><div class="m-sub">asignado</div></div>
+      <div class="metric-card"><div class="m-label">Sin vendedor</div><div class="m-val" id="cc-sin-vendedor" style="color:var(--amber)">—</div><div class="m-sub">sin asignar</div></div>
+    </div>
+
+    <div class="grid3">
+      <!-- Lista clientes -->
+      <div>
+        <div class="card" style="padding:0.75rem">
+          <div style="margin-bottom:10px">
+            <input id="cc-search" placeholder="Buscar cliente..." style="font-size:12px;padding:6px 10px"/>
+          </div>
+          <div id="cc-list" style="display:flex;flex-direction:column;gap:4px;max-height:600px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <!-- Detalle cliente -->
+      <div id="cc-detail">
+        <div class="empty" style="padding:3rem">Seleccioná un cliente</div>
+      </div>
+    </div>
+  </div>
+
   <!-- VENDEDORES -->
   <div class="section" id="s-vendedores">
     <div class="section-header">
@@ -1060,9 +1157,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <!-- FORMULARIO / DETALLE -->
       <div id="vendedor-detail">
         <div class="card" style="border-color:rgba(0,229,204,0.15)">
-          <div class="card-title">Datos del vendedor</div>
+          <div class="card-title">Datos del vendedor
+            <button id="btn-send-bienvenida" class="btn btn-sm" style="margin-left:auto;color:var(--cyan);border-color:rgba(0,229,204,0.3);display:none">📧 Email bienvenida</button>
+          </div>
           <div class="field"><label>Nombre completo *</label><input id="vf-nombre" placeholder="Juan García"/></div>
-          <div class="field"><label>Email</label><input id="vf-email" type="email" placeholder="juan@rhinosapp.com"/></div>
+          <div class="grid2">
+            <div class="field"><label>Email de contacto</label><input id="vf-email" type="email" placeholder="juan@empresa.com"/></div>
+            <div class="field"><label>Email de login Google *</label><input id="vf-login-email" type="email" placeholder="juan@gmail.com"/></div>
+          </div>
           <div class="field"><label>Teléfono / WhatsApp</label><input id="vf-telefono" placeholder="+54 9 11 xxxx-xxxx"/></div>
           <div class="grid2">
             <div class="field"><label>Meta de leads / mes</label><input id="vf-meta" type="number" min="0" placeholder="10"/></div>
@@ -1077,7 +1179,18 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <button class="btn" id="btn-cancel-vendedor" style="color:var(--text2)">Cancelar</button>
           </div>
         </div>
-        <!-- Leads del vendedor seleccionado -->
+
+        <!-- PERMISOS — solo visible para comercial@rhinosapp.com -->
+        <div class="card" id="vendedor-permisos-card" style="display:none;border-color:rgba(245,158,11,0.2)">
+          <div class="card-title" style="color:var(--amber)">🔒 Permisos de acceso al CRM</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:1rem">
+            Definí a qué módulos puede acceder este vendedor cuando inicie sesión con su cuenta Google.
+          </div>
+          <div id="permisos-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-bottom:1rem"></div>
+          <button class="btn btn-sm" id="btn-save-permisos" style="background:rgba(245,158,11,0.1);color:var(--amber);border-color:rgba(245,158,11,0.3)">✓ Guardar permisos</button>
+        </div>
+
+        <!-- Leads del vendedor -->
         <div class="card" id="vendedor-leads-card" style="display:none">
           <div class="card-title">Leads asignados <span class="ct-accent" id="vendedor-leads-name"></span></div>
           <div id="vendedor-leads-list"></div>
@@ -2519,6 +2632,7 @@ document.getElementById('btn-close-comments').addEventListener('click', () => {
   document.querySelectorAll('.media-card').forEach(c => c.classList.remove('selected'));
 });
 document.getElementById('btn-refresh').addEventListener('click', loadDashboard);
+document.getElementById('btn-db-refresh')?.addEventListener('click', loadCommercialDashboard);
 
 // ── INSTAGRAM CONFIG CARD ─────────────────────────────
 async function loadIgConfigStatus() {
@@ -3758,7 +3872,62 @@ document.querySelectorAll('.chip[data-q]').forEach(c=>c.addEventListener('click'
 
 // ── CRM LOGIN ─────────────────────────────────────────
 const ALLOWED_EMAILS = ['comercial@rhinosapp.com', 'maisaac26@gmail.com'];
+const CRM_ADMIN_EMAIL = 'comercial@rhinosapp.com';
 const CRM_SESSION_KEY = 'rhinos_crm_session';
+
+const MODULES_PERMISOS = [
+  { key: 'dashboard',          label: 'Dashboard',      group: 'General' },
+  { key: 'leads',              label: 'Leads',          group: 'Comercial' },
+  { key: 'clientes-comercial', label: 'Clientes',       group: 'Comercial' },
+  { key: 'prospectos',         label: 'Prospectos',     group: 'Comercial' },
+  { key: 'presupuestos',       label: 'Presupuestos',   group: 'Comercial' },
+  { key: 'vendedores',         label: 'Vendedores',     group: 'Comercial' },
+  { key: 'finanzas',           label: 'Finanzas',       group: 'Finanzas' },
+  { key: 'balance',            label: 'Balance',        group: 'Finanzas' },
+  { key: 'gmail',              label: 'Gmail',          group: 'Gmail' },
+  { key: 'calendario',         label: 'Calendario',     group: 'Gmail' },
+  { key: 'tareas',             label: 'Tareas',         group: 'Operaciones' },
+  { key: 'agente',             label: 'Agente IA',      group: 'Operaciones' },
+  { key: 'analytics',          label: 'Analytics Web',  group: 'Analytics' },
+  { key: 'posts',              label: 'Instagram',      group: 'Instagram' },
+  { key: 'dms',                label: 'DMs',            group: 'Instagram' },
+  { key: 'contenido',          label: 'Contenido',      group: 'Instagram' },
+  { key: 'webcontent',         label: 'Blog y Web',     group: 'Web' },
+];
+
+const DEFAULT_VENDEDOR_PERMISOS = {
+  dashboard: true, leads: true, 'clientes-comercial': true,
+  prospectos: true, presupuestos: true, calendario: true,
+  tareas: true, agente: true,
+  vendedores: false, finanzas: false, balance: false,
+  gmail: false, analytics: false, posts: false,
+  dms: false, contenido: false, webcontent: false,
+};
+
+let _currentVendedor = null; // set when a vendedor (non-admin) logs in
+
+function isAdmin() {
+  const s = getCRMSession();
+  return s && s.email === CRM_ADMIN_EMAIL;
+}
+
+function applyVendedorPermisos(permisos) {
+  const effective = { ...DEFAULT_VENDEDOR_PERMISOS, ...permisos };
+  MODULES_PERMISOS.forEach(({ key }) => {
+    const btn = document.querySelector(`.nav-btn[data-sec="${key}"]`);
+    if (btn) btn.style.display = effective[key] ? '' : 'none';
+  });
+  // Group labels: hide if all children hidden
+  document.querySelectorAll('.nav-group-label').forEach(label => {
+    let next = label.nextElementSibling;
+    let allHidden = true;
+    while (next && !next.classList.contains('nav-group-label')) {
+      if (next.classList.contains('nav-btn') && next.style.display !== 'none') allHidden = false;
+      next = next.nextElementSibling;
+    }
+    label.style.display = allHidden ? 'none' : '';
+  });
+}
 
 function getCRMSession() {
   try {
@@ -3924,7 +4093,22 @@ async function initialDataSync() {
 async function initCRMAuth() {
   // Check existing session
   const session = getCRMSession();
-  if (session) { showApp(session); return; }
+  if (session) {
+    showApp(session);
+    // Re-apply vendedor permissions if not admin
+    if (!ALLOWED_EMAILS.includes(session.email?.toLowerCase())) {
+      try {
+        const vRows = await sbFetch(`rhinos_vendedores?login_email=eq.${encodeURIComponent(session.email)}&activo=eq.true`);
+        if (vRows && vRows.length) {
+          _currentVendedor = vRows[0];
+          applyVendedorPermisos(vRows[0].permisos || {});
+        } else {
+          clearCRMSession(); showLoginScreen(); return;
+        }
+      } catch(e) {}
+    }
+    return;
+  }
 
   // Check OAuth callback
   const urlParams = new URLSearchParams(window.location.search);
@@ -3944,12 +4128,28 @@ async function initCRMAuth() {
       }).then(r => r.json());
 
       const email = userInfo.email || '';
+      let vendedorPermisos = null;
+
       if (!ALLOWED_EMAILS.includes(email.toLowerCase())) {
-        document.getElementById('login-screen').style.display = 'flex';
-        const errEl = document.getElementById('login-error');
-        errEl.style.display = 'block';
-        errEl.textContent = `Acceso denegado para ${email}. Solo cuentas autorizadas de RhinosApp.`;
-        return;
+        // Check if this is a registered vendedor
+        try {
+          const vRows = await sbFetch(`rhinos_vendedores?login_email=eq.${encodeURIComponent(email)}&activo=eq.true`);
+          if (!vRows || !vRows.length) {
+            document.getElementById('login-screen').style.display = 'flex';
+            const errEl = document.getElementById('login-error');
+            errEl.style.display = 'block';
+            errEl.textContent = `Acceso denegado para ${email}. Contactá a comercial@rhinosapp.com para solicitar acceso.`;
+            return;
+          }
+          _currentVendedor = vRows[0];
+          vendedorPermisos = vRows[0].permisos || {};
+        } catch(e) {
+          document.getElementById('login-screen').style.display = 'flex';
+          const errEl = document.getElementById('login-error');
+          errEl.style.display = 'block';
+          errEl.textContent = 'Error verificando acceso: ' + e.message;
+          return;
+        }
       }
 
       const session = saveCRMSession(email, userInfo.name, userInfo.picture);
@@ -3959,7 +4159,8 @@ async function initCRMAuth() {
       saveGmailTokens(tokens);
 
       showApp(session);
-      loadDashboard();
+      if (vendedorPermisos !== null) applyVendedorPermisos(vendedorPermisos);
+      loadCommercialDashboard();
       initGmail();
     } catch(e) {
       document.getElementById('login-screen').style.display = 'flex';
@@ -9476,15 +9677,39 @@ function renderVendedoresRanking() {
     </div>`).join('');
 }
 
+function renderPermisosPanel(v) {
+  const card = document.getElementById('vendedor-permisos-card');
+  const bienvenidaBtn = document.getElementById('btn-send-bienvenida');
+  if (!isAdmin() || !v) { card.style.display = 'none'; if(bienvenidaBtn) bienvenidaBtn.style.display='none'; return; }
+  card.style.display = 'block';
+  if(bienvenidaBtn) bienvenidaBtn.style.display = 'flex';
+
+  const permisos = { ...DEFAULT_VENDEDOR_PERMISOS, ...(v.permisos || {}) };
+  const groups = {};
+  MODULES_PERMISOS.forEach(m => { if (!groups[m.group]) groups[m.group] = []; groups[m.group].push(m); });
+
+  const grid = document.getElementById('permisos-grid');
+  grid.innerHTML = Object.entries(groups).map(([grp, mods]) => `
+    <div style="grid-column:1/-1;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-top:8px">${grp}</div>
+    ${mods.map(m => `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);text-transform:none;letter-spacing:0;margin-bottom:4px">
+        <input type="checkbox" data-perm="${m.key}" style="width:auto;cursor:pointer" ${permisos[m.key]?'checked':''}/>
+        ${m.label}
+      </label>`).join('')}
+  `).join('');
+}
+
 function openVendedor(v) {
   currentVendedorId = v.id;
   renderVendedoresList();
   document.getElementById('vf-nombre').value = v.nombre || '';
   document.getElementById('vf-email').value = v.email || '';
+  document.getElementById('vf-login-email').value = v.login_email || '';
   document.getElementById('vf-telefono').value = v.telefono || '';
   document.getElementById('vf-meta').value = v.meta_leads || '';
   document.getElementById('vf-comision').value = v.comision_porcentaje || '';
   document.getElementById('vf-activo').checked = v.activo !== false;
+  renderPermisosPanel(v);
 
   const leadsCard = document.getElementById('vendedor-leads-card');
   const leadsName = document.getElementById('vendedor-leads-name');
@@ -9506,23 +9731,56 @@ function showVendedorForm(v) {
   currentVendedorId = v?.id || null;
   document.getElementById('vf-nombre').value = v?.nombre || '';
   document.getElementById('vf-email').value = v?.email || '';
+  document.getElementById('vf-login-email').value = v?.login_email || '';
   document.getElementById('vf-telefono').value = v?.telefono || '';
   document.getElementById('vf-meta').value = v?.meta_leads || '';
   document.getElementById('vf-comision').value = v?.comision_porcentaje || '';
   document.getElementById('vf-activo').checked = v?.activo !== false;
   document.getElementById('vendedor-leads-card').style.display = 'none';
+  renderPermisosPanel(v || null);
   renderVendedoresList();
 }
 
 document.getElementById('btn-new-vendedor')?.addEventListener('click', () => showVendedorForm(null));
 document.getElementById('btn-cancel-vendedor')?.addEventListener('click', () => showVendedorForm(null));
 
+document.getElementById('btn-save-permisos')?.addEventListener('click', async function() {
+  if (!currentVendedorId) return;
+  const permisos = {};
+  document.querySelectorAll('#permisos-grid [data-perm]').forEach(cb => { permisos[cb.dataset.perm] = cb.checked; });
+  this.disabled = true;
+  try {
+    await sbFetch(`rhinos_vendedores?id=eq.${currentVendedorId}`, 'PATCH', { permisos });
+    vendedoresData = vendedoresData.map(v => v.id === currentVendedorId ? {...v, permisos} : v);
+    showToast('Permisos guardados ✓');
+  } catch(e) { showToast('Error: ' + e.message); }
+  this.disabled = false;
+});
+
+document.getElementById('btn-send-bienvenida')?.addEventListener('click', async function() {
+  const v = vendedoresData.find(x => x.id === currentVendedorId);
+  if (!v) return;
+  const destEmail = v.login_email || v.email;
+  if (!destEmail) { showToast('El vendedor no tiene email configurado'); return; }
+  this.disabled = true; this.textContent = '⏳ Enviando...';
+  try {
+    const subject = `¡Bienvenido al CRM de RhinosApp, ${v.nombre.split(' ')[0]}!`;
+    const body = `Hola ${v.nombre},\n\nTe damos la bienvenida al equipo comercial de RhinosApp.\n\nPodés acceder al CRM en cualquier momento desde:\n🔗 https://rhinos-crm.vercel.app\n\nIniciá sesión con tu cuenta de Google: ${destEmail}\n\nDesde el CRM vas a poder gestionar tus leads, ver la agenda, crear presupuestos y mucho más.\n\nCualquier duda, escribinos por WhatsApp o respondé este email.\n\n¡Éxitos!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com | +54 9 11 6822-3306`;
+    const r = await callAPI('gmail_send', { to: destEmail, subject, body });
+    if (r.error) throw new Error(r.error);
+    showToast('Email enviado a ' + destEmail);
+  } catch(e) { showToast('Error enviando: ' + e.message); }
+  this.disabled = false; this.textContent = '📧 Email bienvenida';
+});
+
 document.getElementById('btn-save-vendedor')?.addEventListener('click', async function() {
   const nombre = document.getElementById('vf-nombre').value.trim();
   if (!nombre) { showToast('El nombre es obligatorio'); return; }
+  const loginEmail = document.getElementById('vf-login-email').value.trim().toLowerCase();
   const data = {
     nombre,
     email: document.getElementById('vf-email').value.trim(),
+    login_email: loginEmail || null,
     telefono: document.getElementById('vf-telefono').value.trim(),
     meta_leads: parseInt(document.getElementById('vf-meta').value) || 0,
     comision_porcentaje: parseFloat(document.getElementById('vf-comision').value) || 0,
@@ -9535,14 +9793,14 @@ document.getElementById('btn-save-vendedor')?.addEventListener('click', async fu
       vendedoresData = vendedoresData.map(v => v.id === currentVendedorId ? {...v,...data} : v);
       showToast('Vendedor actualizado');
     } else {
-      const [nv] = await sbFetch('rhinos_vendedores', 'POST', data);
-      vendedoresData.push(nv);
+      const [nv] = await sbFetch('rhinos_vendedores', 'POST', { ...data, permisos: DEFAULT_VENDEDOR_PERMISOS });
+      if (nv) { vendedoresData.push(nv); currentVendedorId = nv.id; }
       showToast('Vendedor creado 🦏');
     }
     renderVendedoresMetrics();
     renderVendedoresList();
     renderVendedoresRanking();
-    const v = vendedoresData.find(x => x.id === (currentVendedorId || vendedoresData[vendedoresData.length-1]?.id));
+    const v = vendedoresData.find(x => x.id === currentVendedorId);
     if (v) openVendedor(v);
   } catch(e) { showToast('Error: ' + e.message); }
   this.disabled = false;
@@ -9550,11 +9808,248 @@ document.getElementById('btn-save-vendedor')?.addEventListener('click', async fu
 
 document.querySelector('.nav-btn[data-sec="vendedores"]')?.addEventListener('click', loadVendedores);
 
+// ── DASHBOARD COMERCIAL ───────────────────────────────
+async function loadCommercialDashboard() {
+  try {
+    const [leads, clients, cobros, tasks] = await Promise.all([
+      leadsData.length ? Promise.resolve(leadsData) : sbFetch('rhinos_leads?order=created_at.desc').catch(()=>[]),
+      sbFetch('rhinos_clients?order=nombre.asc').catch(()=>[]),
+      sbFetch('rhinos_cobros?order=created_at.desc').catch(()=>[]),
+      sbFetch('rhinos_tasks?order=created_at.desc').catch(()=>[]),
+    ]);
+    if (!leadsData.length && leads.length) leadsData = leads;
+    if (!vendedoresData.length) vendedoresData = await sbFetch('rhinos_vendedores?order=nombre.asc').catch(()=>[]);
+
+    const today = new Date().toISOString().slice(0,10);
+    const thisMonth = today.slice(0,7);
+
+    // MRR
+    const mrr = (clients||[]).reduce((s,c) => s + (parseFloat(c.monthly_price)||0), 0);
+    document.getElementById('db-mrr').textContent = mrr ? '$' + fmtNum(Math.round(mrr)) : '—';
+
+    // Cobros pendientes
+    const cobPend = (cobros||[]).filter(c => c.status === 'pendiente' && c.periodo === thisMonth);
+    document.getElementById('db-cobros-pend').textContent = cobPend.length || '0';
+    const montoPend = cobPend.reduce((s,c) => s + (parseFloat(c.monto)||0), 0);
+    document.getElementById('db-cobros-pend-monto').textContent = montoPend ? '$' + fmtNum(Math.round(montoPend)) : 'sin cobros';
+
+    // Clientes
+    document.getElementById('db-clientes').textContent = (clients||[]).length;
+    const nuevosMes = (clients||[]).filter(c => (c.created_at||'').startsWith(thisMonth)).length;
+    document.getElementById('db-nuevos-mes').textContent = nuevosMes || '0';
+
+    // Leads activos en pipeline
+    const leadsActivos = (leadsData||[]).filter(l => !['cliente','perdido','imposible'].includes(l.status));
+    document.getElementById('db-leads-activos').textContent = leadsActivos.length;
+
+    // Follow-ups vencidos
+    const fupVencidos = (leadsData||[]).filter(l => l.next_followup && l.next_followup < today && !['cliente','perdido','imposible'].includes(l.status));
+    document.getElementById('db-followups').textContent = fupVencidos.length;
+
+    // Conversión
+    const totalLeads = (leadsData||[]).length;
+    const clientesLeads = (leadsData||[]).filter(l => l.status === 'cliente').length;
+    const conv = totalLeads ? Math.round(clientesLeads / totalLeads * 100) : 0;
+    document.getElementById('db-conversion').textContent = conv + '%';
+
+    // Tareas pendientes
+    const tareasPend = (tasks||[]).filter(t => t.status === 'pendiente').length;
+    document.getElementById('db-tareas-pend').textContent = tareasPend;
+
+    // Pipeline funnel
+    const pipelineEl = document.getElementById('db-pipeline');
+    const stages = [
+      { key: 'nuevo',      label: 'Nuevos',          color: 'var(--cyan)' },
+      { key: 'contactado', label: 'Contactados',      color: 'var(--amber)' },
+      { key: 'demo',       label: 'Demo agendada',    color: 'var(--green)' },
+      { key: 'cliente',    label: 'Clientes 🦏',      color: '#22c55e' },
+      { key: 'perdido',    label: 'Perdidos',         color: 'var(--red)' },
+      { key: 'imposible',  label: 'Imposibles',       color: '#64748b' },
+    ];
+    const maxCount = Math.max(...stages.map(s => (leadsData||[]).filter(l => l.status===s.key).length), 1);
+    pipelineEl.innerHTML = stages.map(s => {
+      const count = (leadsData||[]).filter(l => l.status === s.key).length;
+      const pct = Math.round(count / maxCount * 100);
+      return `<div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:12px;color:var(--text2);width:110px;flex-shrink:0">${s.label}</div>
+        <div style="flex:1;background:var(--surface3);border-radius:4px;height:8px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${s.color};border-radius:4px;transition:width 0.4s"></div>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:${s.color};font-family:var(--display);width:24px;text-align:right">${count}</div>
+      </div>`;
+    }).join('');
+
+    // Últimos clientes cerrados (leads con status=cliente, ordenados por updated_at)
+    const recentClientes = [...(leadsData||[])].filter(l => l.status==='cliente')
+      .sort((a,b) => new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at))
+      .slice(0,6);
+    const recEl = document.getElementById('db-clientes-recientes');
+    if (!recentClientes.length) {
+      recEl.innerHTML = '<div class="empty">Sin clientes cerrados aún</div>';
+    } else {
+      recEl.innerHTML = recentClientes.map(l => {
+        const v = vendedoresData.find(x => x.id === l.vendedor_id);
+        return `<div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
+          onclick="document.querySelector('.nav-btn[data-sec=\\'leads\\']').click();setTimeout(()=>{const lead=leadsData.find(x=>x.id==='${l.id}');if(lead)openLead(lead);},600)">
+          <div>
+            <div style="font-size:13px;color:var(--text)">${l.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${l.company||''} ${v?'· '+v.nombre:''}</div>
+          </div>
+          <div style="font-size:11px;color:var(--text3)">${(l.updated_at||l.created_at||'').slice(0,10)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Rendimiento vendedores
+    const vpEl = document.getElementById('db-vendedores-perf');
+    if (!vendedoresData.filter(v=>v.activo).length) {
+      vpEl.innerHTML = '<div class="empty" style="grid-column:1/-1">Sin vendedores activos</div>';
+    } else {
+      vpEl.innerHTML = vendedoresData.filter(v=>v.activo).map(v => {
+        const vLeads = (leadsData||[]).filter(l => l.vendedor_id === v.id);
+        const vClientes = vLeads.filter(l => l.status === 'cliente').length;
+        const vActivos = vLeads.filter(l => !['cliente','perdido','imposible'].includes(l.status)).length;
+        const vConv = vLeads.length ? Math.round(vClientes/vLeads.length*100) : 0;
+        return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:12px">
+          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:6px">${v.nombre}</div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)">
+            <span>🎯 ${vActivos} activos</span>
+            <span>🦏 ${vClientes} cerrados</span>
+            <span style="color:${vConv>50?'var(--green)':vConv>20?'var(--amber)':'var(--text3)'}">Conv: ${vConv}%</span>
+          </div>
+          ${v.meta_leads ? `<div style="margin-top:8px;background:var(--surface3);border-radius:3px;height:4px"><div style="height:100%;width:${Math.min(100,Math.round(vClientes/(v.meta_leads||1)*100))}%;background:var(--cyan);border-radius:3px"></div></div>
+          <div style="font-size:10px;color:var(--text3);margin-top:3px">${vClientes}/${v.meta_leads} meta mensual</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+  } catch(e) { console.error('Dashboard error:', e); }
+}
+
+// ── CLIENTES COMERCIAL ────────────────────────────────
+let _ccClients = [];
+
+async function loadClientesComercial() {
+  try {
+    if (!vendedoresData.length) vendedoresData = await sbFetch('rhinos_vendedores?order=nombre.asc').catch(()=>[]);
+    _ccClients = await sbFetch('rhinos_clients?order=nombre.asc') || [];
+    renderClientesComercialMetrics();
+    renderClientesComercialList();
+  } catch(e) { showToast('Error cargando clientes: ' + e.message); }
+}
+
+function renderClientesComercialMetrics() {
+  const thisMonth = new Date().toISOString().slice(0,7);
+  document.getElementById('cc-total').textContent = _ccClients.length;
+  document.getElementById('cc-nuevos').textContent = _ccClients.filter(c => (c.created_at||'').startsWith(thisMonth)).length;
+  document.getElementById('cc-con-vendedor').textContent = _ccClients.filter(c => c.vendedor_id).length;
+  document.getElementById('cc-sin-vendedor').textContent = _ccClients.filter(c => !c.vendedor_id).length;
+}
+
+function renderClientesComercialList() {
+  const search = document.getElementById('cc-search').value.toLowerCase();
+  const list = document.getElementById('cc-list');
+  let filtered = _ccClients;
+  if (search) filtered = filtered.filter(c => c.nombre?.toLowerCase().includes(search) || c.email?.toLowerCase().includes(search) || c.empresa?.toLowerCase().includes(search));
+  if (!filtered.length) { list.innerHTML = '<div class="empty">Sin clientes</div>'; return; }
+  list.innerHTML = filtered.map(c => {
+    const v = vendedoresData.find(x => x.id === c.vendedor_id);
+    return `<div class="cc-item" data-cid="${c.id}" style="padding:9px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);cursor:pointer;border-left:3px solid var(--green)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${c.nombre}</div>
+          ${c.empresa?`<div style="font-size:11px;color:var(--text2)">${c.empresa}</div>`:''}
+        </div>
+        ${v?`<span style="font-size:10px;color:var(--cyan)">👤 ${v.nombre.split(' ')[0]}</span>`:''}
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">
+        ${c.email?`📧 ${c.email} &nbsp;`:''}${c.phone?`📞 ${c.phone}`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.cc-item').forEach(el => {
+    el.addEventListener('click', function() {
+      const c = _ccClients.find(x => x.id === this.dataset.cid);
+      if (c) openClienteComercial(c);
+    });
+  });
+}
+
+function openClienteComercial(c) {
+  const detail = document.getElementById('cc-detail');
+  const v = vendedoresData.find(x => x.id === c.vendedor_id);
+  const lead = leadsData.find(l => l.email === c.email || l.phone === c.phone);
+  detail.innerHTML = `
+    <div class="card" style="border-color:rgba(34,197,94,0.2)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem">
+        <div>
+          <div style="font-size:20px;font-weight:600">${c.nombre}</div>
+          <div style="font-size:13px;color:var(--text2)">${c.empresa||''}</div>
+        </div>
+        <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(34,197,94,0.12);color:var(--green)">Cliente activo</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem">
+        ${c.phone?`<a href="https://wa.me/${formatWhatsApp(c.phone)}" target="_blank" class="btn btn-green btn-sm">💬 WhatsApp</a>`:''}
+        ${c.email?`<a href="mailto:${c.email}" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">📧 Email</a>`:''}
+        ${lead?`<button class="btn btn-sm" onclick="document.querySelector('.nav-btn[data-sec=\\'leads\\']').click();setTimeout(()=>openLead(leadsData.find(x=>x.id==='${lead.id}')),600)" style="color:var(--amber);border-color:rgba(245,158,11,0.3)">🎯 Ver en Leads</button>`:''}
+        ${isAdmin()?`<button class="btn btn-sm" onclick="document.querySelector('.nav-btn[data-sec=\\'finanzas\\']').click()" style="color:var(--text2)">💰 Ver en Finanzas</button>`:''}
+      </div>
+      <div style="font-size:12px;color:var(--text2);display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
+        ${c.email?`<span>📧 ${c.email}</span>`:''}
+        ${c.phone?`<span>📞 ${c.phone}</span>`:''}
+        ${v?`<span style="color:var(--cyan)">👤 Vendedor: ${v.nombre}</span>`:'<span style="color:var(--amber)">👤 Sin vendedor asignado</span>'}
+        ${c.created_at?`<span>📅 Cliente desde: ${c.created_at.slice(0,10)}</span>`:''}
+      </div>
+      ${c.notes?`<div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:var(--r);padding:8px 12px;line-height:1.6">${c.notes}</div>`:''}
+    </div>
+    ${isAdmin() ? `<div class="card" style="border-color:rgba(0,229,204,0.1)">
+      <div class="card-title">Asignar vendedor</div>
+      <div style="display:flex;gap:8px">
+        <select id="cc-vendedor-sel" style="flex:1">
+          <option value="">Sin asignar</option>
+          ${vendedoresData.filter(x=>x.activo).map(x=>`<option value="${x.id}" ${c.vendedor_id===x.id?'selected':''}>${x.nombre}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm btn-cyan" id="btn-cc-assign-vendedor">Guardar</button>
+      </div>
+    </div>` : ''}
+  `;
+
+  if (isAdmin()) {
+    detail.querySelector('#btn-cc-assign-vendedor')?.addEventListener('click', async function() {
+      const vid = detail.querySelector('#cc-vendedor-sel').value;
+      await sbFetch(`rhinos_clients?id=eq.${c.id}`, 'PATCH', { vendedor_id: vid || null });
+      c.vendedor_id = vid || null;
+      renderClientesComercialMetrics();
+      renderClientesComercialList();
+      showToast('Vendedor asignado');
+    });
+  }
+}
+
+document.getElementById('cc-search')?.addEventListener('input', renderClientesComercialList);
+document.getElementById('btn-cc-refresh')?.addEventListener('click', loadClientesComercial);
+document.getElementById('btn-export-clientes')?.addEventListener('click', () => {
+  const cols = ['nombre','empresa','email','telefono','vendedor','fecha_alta'];
+  const rows = _ccClients.map(c => {
+    const v = vendedoresData.find(x => x.id === c.vendedor_id);
+    return [c.nombre, c.empresa, c.email, c.phone, v?v.nombre:'', (c.created_at||'').slice(0,10)]
+      .map(x => '"' + String(x||'').replace(/"/g,'""') + '"');
+  });
+  const csv = [cols.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
+  a.download = 'clientes_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+});
+
+document.querySelector('.nav-btn[data-sec="posts"]')?.addEventListener('click', loadDashboard);
+document.querySelector('.nav-btn[data-sec="clientes-comercial"]')?.addEventListener('click', loadClientesComercial);
+
 // ── INIT ──────────────────────
 initCRMAuth().then(() => {
   const session = getCRMSession();
   if (session) {
-    loadDashboard();
+    loadCommercialDashboard();
     initGmail();
     // Mostrar botón guía
     document.getElementById('btn-guide').style.display = 'flex';
