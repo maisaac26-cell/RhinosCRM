@@ -400,7 +400,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <button class="nav-btn active" data-sec="dashboard"><span class="nav-icon">📊</span>Dashboard</button>
 
     <div class="nav-group-label">Comercial</div>
-    <button class="nav-btn" data-sec="leads"><span class="nav-icon">🎯</span>Leads</button>
+    <button class="nav-btn" data-sec="leads"><span class="nav-icon">🎯</span>Leads<span id="nav-leads-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;line-height:1.4"></span></button>
+    <button class="nav-btn" data-sec="vendedores"><span class="nav-icon">👤</span>Vendedores</button>
     <button class="nav-btn" data-sec="prospectos"><span class="nav-icon">🔍</span>Prospectos</button>
     <button class="nav-btn" data-sec="presupuestos"><span class="nav-icon">📄</span>Presupuestos</button>
 
@@ -976,6 +977,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="card" style="padding:0.75rem">
           <div style="display:flex;gap:6px;margin-bottom:10px">
             <input id="leads-search" placeholder="Buscar lead..." style="flex:1;font-size:12px;padding:6px 10px"/>
+            <button class="btn btn-sm" id="btn-export-leads" title="Exportar CSV" style="color:var(--text2);padding:5px 9px">⬇ CSV</button>
             <button class="btn btn-sm btn-amber" id="btn-new-lead" style="background:rgba(245,158,11,0.15);color:var(--amber);border-color:rgba(245,158,11,0.3);white-space:nowrap">+ Nuevo</button>
           </div>
           <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">
@@ -1023,6 +1025,65 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="wl-list"><div class="empty">Cargando...</div></div>
     </div><!-- /leadstab-web -->
 
+  </div>
+
+  <!-- VENDEDORES -->
+  <div class="section" id="s-vendedores">
+    <div class="section-header">
+      <div class="page-title">VENDE<span>DORES</span></div>
+      <div class="page-sub">Gestioná tu equipo de ventas y asignalos a leads y clientes.</div>
+    </div>
+    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="metric-card"><div class="m-label">Vendedores</div><div class="m-val cyan" id="vm-total">—</div><div class="m-sub">activos</div></div>
+      <div class="metric-card"><div class="m-label">Leads asignados</div><div class="m-val" id="vm-leads-asignados">—</div><div class="m-sub">del total</div></div>
+      <div class="metric-card"><div class="m-label">Leads activos</div><div class="m-val green" id="vm-leads-activos">—</div><div class="m-sub">en pipeline</div></div>
+      <div class="metric-card"><div class="m-label">Conversiones</div><div class="m-val" id="vm-clientes">—</div><div class="m-sub">clientes cerrados</div></div>
+    </div>
+    <div class="grid2">
+      <!-- LISTA -->
+      <div>
+        <div class="card" style="padding:0.75rem">
+          <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
+            <div style="font-size:13px;font-weight:500;color:var(--text);flex:1">Equipo de ventas</div>
+            <button class="btn btn-sm" id="btn-new-vendedor" style="background:rgba(0,229,204,0.1);color:var(--cyan);border-color:rgba(0,229,204,0.3);white-space:nowrap">+ Agregar</button>
+          </div>
+          <div id="vendedores-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <!-- Ranking -->
+        <div class="card">
+          <div class="card-title">Ranking de conversión</div>
+          <div id="vendedores-ranking" style="display:flex;flex-direction:column;gap:6px">
+            <div class="empty">Cargando...</div>
+          </div>
+        </div>
+      </div>
+      <!-- FORMULARIO / DETALLE -->
+      <div id="vendedor-detail">
+        <div class="card" style="border-color:rgba(0,229,204,0.15)">
+          <div class="card-title">Datos del vendedor</div>
+          <div class="field"><label>Nombre completo *</label><input id="vf-nombre" placeholder="Juan García"/></div>
+          <div class="field"><label>Email</label><input id="vf-email" type="email" placeholder="juan@rhinosapp.com"/></div>
+          <div class="field"><label>Teléfono / WhatsApp</label><input id="vf-telefono" placeholder="+54 9 11 xxxx-xxxx"/></div>
+          <div class="grid2">
+            <div class="field"><label>Meta de leads / mes</label><input id="vf-meta" type="number" min="0" placeholder="10"/></div>
+            <div class="field"><label>Comisión (%)</label><input id="vf-comision" type="number" min="0" step="0.5" placeholder="5"/></div>
+          </div>
+          <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+            <input type="checkbox" id="vf-activo" style="width:auto;cursor:pointer" checked/>
+            <label for="vf-activo" style="margin:0;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px">Vendedor activo</label>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-green" id="btn-save-vendedor">Guardar</button>
+            <button class="btn" id="btn-cancel-vendedor" style="color:var(--text2)">Cancelar</button>
+          </div>
+        </div>
+        <!-- Leads del vendedor seleccionado -->
+        <div class="card" id="vendedor-leads-card" style="display:none">
+          <div class="card-title">Leads asignados <span class="ct-accent" id="vendedor-leads-name"></span></div>
+          <div id="vendedor-leads-list"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- PROSPECTOS -->
@@ -4185,6 +4246,8 @@ document.getElementById('btn-send-compose').addEventListener('click', async func
 let leadsData = [];
 let currentLeadFilter = '';
 let currentLeadId = null;
+let vendedoresData = [];
+let currentVendedorId = null;
 
 const STATUS_CONFIG = {
   nuevo:      { color: 'var(--cyan)',  label: 'Nuevo',            pipeline: 0 },
@@ -4197,11 +4260,24 @@ const STATUS_CONFIG = {
 
 async function loadLeads() {
   try {
-    leadsData = await sbFetch('rhinos_leads?order=created_at.desc');
+    [leadsData, vendedoresData] = await Promise.all([
+      sbFetch('rhinos_leads?order=created_at.desc'),
+      vendedoresData.length ? Promise.resolve(vendedoresData) : sbFetch('rhinos_vendedores?order=nombre.asc').catch(()=>[])
+    ]);
     renderLeadsMetrics();
     renderLeadsAlerts();
     renderLeadsList();
+    updateNavBadge();
   } catch(e) { showToast('Error cargando leads: ' + e.message); }
+}
+
+function updateNavBadge() {
+  const today = new Date().toISOString().slice(0,10);
+  const overdue = leadsData.filter(l => l.next_followup && l.next_followup <= today && l.status !== 'cliente' && l.status !== 'perdido' && l.status !== 'imposible').length;
+  const badge = document.getElementById('nav-leads-badge');
+  if (!badge) return;
+  if (overdue > 0) { badge.textContent = overdue; badge.style.display = 'inline'; }
+  else { badge.style.display = 'none'; }
 }
 
 function renderLeadsMetrics() {
@@ -4268,6 +4344,7 @@ function renderLeadsList() {
         ${l.source?`<span style="font-size:10px;color:var(--text3)">🔗 ${l.source}</span>`:''}
         ${daysSince!==null?`<span style="font-size:10px;color:var(--text3)">📆 hace ${daysSince}d</span>`:''}
         ${l.next_followup?`<span style="font-size:10px;color:${isOverdue?'var(--red)':'var(--amber)'};font-weight:${isOverdue?'600':'400'}">📅 ${isOverdue?'⚠ ':''} ${l.next_followup}</span>`:''}
+        ${(()=>{const v=vendedoresData.find(x=>x.id===l.vendedor_id);return v?`<span style="font-size:10px;color:var(--cyan)">👤 ${v.nombre.split(' ')[0]}</span>`:''})()}
       </div>
       ${pipelineHTML}
     </div>`;
@@ -4312,6 +4389,7 @@ async function openLead(lead) {
         ${lead.source?`<span>🔗 ${lead.source}</span>`:''}
         ${lead.address?`<span>📍 ${lead.address}</span>`:''}
         ${lead.next_followup?`<span style="color:var(--amber)">📅 Follow-up: ${lead.next_followup}</span>`:''}
+        ${lead.vendedor_id?(()=>{const v=vendedoresData.find(x=>x.id===lead.vendedor_id);return v?`<span style="color:var(--cyan)">👤 ${v.nombre}</span>`:''})():''}
       </div>
       ${lead.notes?`<div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:var(--r);padding:8px 12px;margin-bottom:1rem;line-height:1.6">${lead.notes}</div>`:''}
 
@@ -4545,6 +4623,12 @@ function showLeadForm(lead) {
         <div class="field"><label>Próximo follow-up</label><input type="date" id="lf-followup" value="${lead?.next_followup||''}"/></div>
       </div>
       <div class="field"><label>Dirección / Zona</label><input id="lf-address" value="${lead?.address||''}" placeholder="Quilmes, Buenos Aires"/></div>
+      <div class="field"><label>Vendedor asignado</label>
+        <select id="lf-vendedor">
+          <option value="">Sin asignar</option>
+          ${vendedoresData.filter(v=>v.activo).map(v=>`<option value="${v.id}" ${lead?.vendedor_id===v.id?'selected':''}>${v.nombre}</option>`).join('')}
+        </select>
+      </div>
       <div class="field"><label>Notas</label><textarea id="lf-notes" rows="3" placeholder="Contexto, objeciones, qué necesita...">${lead?.notes||''}</textarea></div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-green" id="btn-save-lead">${isNew?'Crear lead':'Guardar'}</button>
@@ -4569,6 +4653,7 @@ function showLeadForm(lead) {
       next_followup: document.getElementById('lf-followup').value || null,
       address: document.getElementById('lf-address').value.trim(),
       notes: document.getElementById('lf-notes').value.trim(),
+      vendedor_id: document.getElementById('lf-vendedor').value || null,
       updated_at: new Date().toISOString()
     };
     if (!data.name) { showToast('El nombre es obligatorio'); return; }
@@ -9291,6 +9376,179 @@ document.querySelectorAll('.wl-filter-btn').forEach(btn => {
 });
 
 document.getElementById('btn-wl-refresh').addEventListener('click', wlLoadLeads);
+
+// ── CSV EXPORT ────────────────
+function exportLeadsCSV() {
+  const cols = ['nombre','empresa','telefono','email','instagram','origen','estado','vendedor','proximo_followup','direccion','notas','fecha_creacion'];
+  const rows = leadsData.map(l => {
+    const v = vendedoresData.find(x => x.id === l.vendedor_id);
+    return [
+      l.name, l.company, l.phone, l.email, l.instagram,
+      l.source, l.status, v ? v.nombre : '',
+      l.next_followup, l.address, l.notes,
+      l.created_at ? l.created_at.slice(0,10) : ''
+    ].map(c => '"' + String(c||'').replace(/"/g,'""') + '"');
+  });
+  const csv = [cols.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
+  a.download = 'leads_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+document.getElementById('btn-export-leads')?.addEventListener('click', exportLeadsCSV);
+
+// ── MÓDULO VENDEDORES ─────────
+async function loadVendedores() {
+  try {
+    [vendedoresData, leadsData] = await Promise.all([
+      sbFetch('rhinos_vendedores?order=nombre.asc').catch(()=>[]),
+      leadsData.length ? Promise.resolve(leadsData) : sbFetch('rhinos_leads?order=created_at.desc').catch(()=>[])
+    ]);
+    renderVendedoresMetrics();
+    renderVendedoresList();
+    renderVendedoresRanking();
+    showVendedorForm(null);
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+function renderVendedoresMetrics() {
+  const activos = vendedoresData.filter(v => v.activo);
+  const asignados = leadsData.filter(l => l.vendedor_id).length;
+  const activos_leads = leadsData.filter(l => l.vendedor_id && l.status !== 'cliente' && l.status !== 'perdido' && l.status !== 'imposible').length;
+  const clientes = leadsData.filter(l => l.vendedor_id && l.status === 'cliente').length;
+  document.getElementById('vm-total').textContent = activos.length;
+  document.getElementById('vm-leads-asignados').textContent = asignados;
+  document.getElementById('vm-leads-activos').textContent = activos_leads;
+  document.getElementById('vm-clientes').textContent = clientes;
+}
+
+function renderVendedoresList() {
+  const el = document.getElementById('vendedores-list');
+  if (!vendedoresData.length) {
+    el.innerHTML = '<div class="empty">No hay vendedores. Creá el primero.</div>';
+    return;
+  }
+  el.innerHTML = vendedoresData.map(v => {
+    const myLeads = leadsData.filter(l => l.vendedor_id === v.id);
+    const activos = myLeads.filter(l => l.status !== 'cliente' && l.status !== 'perdido' && l.status !== 'imposible').length;
+    const clientes = myLeads.filter(l => l.status === 'cliente').length;
+    const isSelected = v.id === currentVendedorId;
+    return `<div class="vendedor-item" data-vid="${v.id}" style="padding:10px 12px;border-radius:var(--r);border:1px solid ${isSelected?'var(--cyan)':'var(--border)'};background:${isSelected?'rgba(0,229,204,0.05)':'var(--surface2)'};cursor:pointer;transition:all 0.15s">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${v.nombre}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${v.email||''}</div>
+        </div>
+        <div style="text-align:right">
+          <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${v.activo?'rgba(34,197,94,0.12)':'rgba(100,116,139,0.15)'};color:${v.activo?'var(--green)':'#64748b'}">${v.activo?'Activo':'Inactivo'}</span>
+          <div style="font-size:10px;color:var(--text3);margin-top:4px">🎯 ${activos} activos · 🦏 ${clientes} clientes</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.vendedor-item').forEach(item => {
+    item.addEventListener('click', function() {
+      const v = vendedoresData.find(x => x.id === this.dataset.vid);
+      if (v) openVendedor(v);
+    });
+  });
+}
+
+function renderVendedoresRanking() {
+  const el = document.getElementById('vendedores-ranking');
+  if (!vendedoresData.length) { el.innerHTML = '<div class="empty">Sin datos</div>'; return; }
+  const ranked = vendedoresData.map(v => {
+    const myLeads = leadsData.filter(l => l.vendedor_id === v.id);
+    const clientes = myLeads.filter(l => l.status === 'cliente').length;
+    const conv = myLeads.length ? Math.round(clientes / myLeads.length * 100) : 0;
+    return { v, total: myLeads.length, clientes, conv };
+  }).sort((a,b) => b.clientes - a.clientes);
+
+  el.innerHTML = ranked.map((r,i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="font-family:var(--display);font-size:20px;font-weight:800;color:${i===0?'var(--amber)':i===1?'var(--text2)':'var(--text3)'};width:24px">${i+1}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;color:var(--text)">${r.v.nombre}</div>
+        <div style="font-size:11px;color:var(--text3)">${r.total} leads · ${r.clientes} cerrados</div>
+      </div>
+      <div style="font-size:16px;font-weight:700;color:${r.conv>50?'var(--green)':r.conv>20?'var(--amber)':'var(--text2)'};font-family:var(--display)">${r.conv}%</div>
+    </div>`).join('');
+}
+
+function openVendedor(v) {
+  currentVendedorId = v.id;
+  renderVendedoresList();
+  document.getElementById('vf-nombre').value = v.nombre || '';
+  document.getElementById('vf-email').value = v.email || '';
+  document.getElementById('vf-telefono').value = v.telefono || '';
+  document.getElementById('vf-meta').value = v.meta_leads || '';
+  document.getElementById('vf-comision').value = v.comision_porcentaje || '';
+  document.getElementById('vf-activo').checked = v.activo !== false;
+
+  const leadsCard = document.getElementById('vendedor-leads-card');
+  const leadsName = document.getElementById('vendedor-leads-name');
+  const leadsList = document.getElementById('vendedor-leads-list');
+  leadsName.textContent = v.nombre;
+  leadsCard.style.display = 'block';
+  const myLeads = leadsData.filter(l => l.vendedor_id === v.id);
+  if (!myLeads.length) { leadsList.innerHTML = '<div class="empty">Sin leads asignados</div>'; return; }
+  leadsList.innerHTML = myLeads.map(l => {
+    const cfg = STATUS_CONFIG[l.status] || STATUS_CONFIG.nuevo;
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="document.querySelector('.nav-btn[data-sec=\\'leads\\']').click();setTimeout(()=>{const lead=leadsData.find(x=>x.id==='${l.id}');if(lead)openLead(lead);},600)">
+      <div><div style="font-size:13px;color:var(--text)">${l.name}</div><div style="font-size:11px;color:var(--text3)">${l.company||''}</div></div>
+      <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${cfg.color}22;color:${cfg.color}">${cfg.label}</span>
+    </div>`;
+  }).join('');
+}
+
+function showVendedorForm(v) {
+  currentVendedorId = v?.id || null;
+  document.getElementById('vf-nombre').value = v?.nombre || '';
+  document.getElementById('vf-email').value = v?.email || '';
+  document.getElementById('vf-telefono').value = v?.telefono || '';
+  document.getElementById('vf-meta').value = v?.meta_leads || '';
+  document.getElementById('vf-comision').value = v?.comision_porcentaje || '';
+  document.getElementById('vf-activo').checked = v?.activo !== false;
+  document.getElementById('vendedor-leads-card').style.display = 'none';
+  renderVendedoresList();
+}
+
+document.getElementById('btn-new-vendedor')?.addEventListener('click', () => showVendedorForm(null));
+document.getElementById('btn-cancel-vendedor')?.addEventListener('click', () => showVendedorForm(null));
+
+document.getElementById('btn-save-vendedor')?.addEventListener('click', async function() {
+  const nombre = document.getElementById('vf-nombre').value.trim();
+  if (!nombre) { showToast('El nombre es obligatorio'); return; }
+  const data = {
+    nombre,
+    email: document.getElementById('vf-email').value.trim(),
+    telefono: document.getElementById('vf-telefono').value.trim(),
+    meta_leads: parseInt(document.getElementById('vf-meta').value) || 0,
+    comision_porcentaje: parseFloat(document.getElementById('vf-comision').value) || 0,
+    activo: document.getElementById('vf-activo').checked
+  };
+  this.disabled = true;
+  try {
+    if (currentVendedorId) {
+      await sbFetch(`rhinos_vendedores?id=eq.${currentVendedorId}`, 'PATCH', data);
+      vendedoresData = vendedoresData.map(v => v.id === currentVendedorId ? {...v,...data} : v);
+      showToast('Vendedor actualizado');
+    } else {
+      const [nv] = await sbFetch('rhinos_vendedores', 'POST', data);
+      vendedoresData.push(nv);
+      showToast('Vendedor creado 🦏');
+    }
+    renderVendedoresMetrics();
+    renderVendedoresList();
+    renderVendedoresRanking();
+    const v = vendedoresData.find(x => x.id === (currentVendedorId || vendedoresData[vendedoresData.length-1]?.id));
+    if (v) openVendedor(v);
+  } catch(e) { showToast('Error: ' + e.message); }
+  this.disabled = false;
+});
+
+document.querySelector('.nav-btn[data-sec="vendedores"]')?.addEventListener('click', loadVendedores);
 
 // ── INIT ──────────────────────
 initCRMAuth().then(() => {
