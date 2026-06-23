@@ -8410,7 +8410,10 @@ function getClients() { return _clients; }
 function saveClients(arr) {
   _clients = arr;
   if (!arr.length) return Promise.resolve();
-  return sbUpsert('rhinos_clients', arr);
+  // frecuencia_pago requiere ALTER TABLE — la excluimos del payload de Supabase
+  // hasta que la columna exista, para que el upsert nunca falle por schema mismatch
+  const rows = arr.map(({ frecuencia_pago, ...rest }) => rest);
+  return sbUpsert('rhinos_clients', rows);
 }
 async function syncClientsSupabase() {
   try { _clients = (await sbFetch('rhinos_clients?order=nombre.asc')) || []; } catch(e) { console.warn('Load clientes:', e.message); }
