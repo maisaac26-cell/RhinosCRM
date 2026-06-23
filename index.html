@@ -5475,23 +5475,23 @@ async function openLead(lead) {
       if (pendingStatus === 'cliente') {
         const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
         if (!existing) {
-          const newClient = {
-            id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+          const inserted = await insertClientDB({
             nombre: lead.name,
             empresa: lead.company || lead.name,
             email: lead.email || '',
             precio: lead.deal_value || 0,
-            frecuencia_pago: 'mensual',
             inicio: new Date().toISOString().slice(0, 10),
             estado: 'activo',
             moneda: 'ARS',
             emails_cc: '',
             dias_plazo: 10,
             notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido automáticamente desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
-          };
-          await saveClients([...getClients(), newClient]);
-          await syncClientsSupabase();
-          _ccClients = [..._clients];
+          });
+          if (inserted) {
+            const merged = { ...inserted, frecuencia_pago: 'mensual' };
+            _clients = [..._clients, merged];
+            _ccClients = [..._clients];
+          }
           showToast('✅ Lead convertido a cliente en Finanzas 🦏');
         } else {
           showToast('Estado actualizado — ya existía cliente en Finanzas 🦏');
@@ -5510,23 +5510,23 @@ async function openLead(lead) {
     btnToClient.addEventListener('click', async function() {
       const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
       if (existing) { showToast('Ya existe un cliente con ese nombre/email en Finanzas'); return; }
-      const newClient = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+      const inserted = await insertClientDB({
         nombre: lead.name,
         empresa: lead.company || lead.name,
         email: lead.email || '',
         precio: lead.deal_value || 0,
-        frecuencia_pago: 'mensual',
         inicio: new Date().toISOString().slice(0, 10),
         estado: 'activo',
         moneda: 'ARS',
         emails_cc: '',
         dias_plazo: 10,
         notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
-      };
-      await saveClients([...getClients(), newClient]);
-      await syncClientsSupabase();
-      _ccClients = [..._clients];
+      });
+      if (inserted) {
+        const merged = { ...inserted, frecuencia_pago: 'mensual' };
+        _clients = [..._clients, merged];
+        _ccClients = [..._clients];
+      }
       showToast('✅ Cliente registrado en Finanzas 🦏');
       document.querySelector('.nav-btn[data-sec="finanzas"]').click();
     });
@@ -8410,10 +8410,23 @@ function getClients() { return _clients; }
 function saveClients(arr) {
   _clients = arr;
   if (!arr.length) return Promise.resolve();
-  // frecuencia_pago requiere ALTER TABLE — la excluimos del payload de Supabase
-  // hasta que la columna exista, para que el upsert nunca falle por schema mismatch
   const rows = arr.map(({ frecuencia_pago, ...rest }) => rest);
   return sbUpsert('rhinos_clients', rows);
+}
+
+// Inserta un cliente nuevo en Supabase vía POST y devuelve la fila creada.
+// Usa sbFetch (supabase_proxy) con return=representation — no necesita ID previo,
+// no silencia errores, y no sobreescribe _clients.
+async function insertClientDB(data) {
+  try {
+    const res = await sbFetch('rhinos_clients', 'POST', data);
+    const row = Array.isArray(res) ? res[0] : res;
+    if (!row || row.code) throw new Error(row?.message || 'Insert sin respuesta');
+    return row;
+  } catch(e) {
+    showToast('Error guardando cliente: ' + e.message);
+    return null;
+  }
 }
 async function syncClientsSupabase() {
   try { _clients = (await sbFetch('rhinos_clients?order=nombre.asc')) || []; } catch(e) { console.warn('Load clientes:', e.message); }
