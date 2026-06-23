@@ -2005,6 +2005,15 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                 </div>
               </div>
               <div class="field" style="margin:0"><label>Fecha inicio</label><input id="cli-inicio" type="date"/></div>
+              <div class="field" style="margin:0"><label>Frecuencia de pago</label>
+                <select id="cli-frecuencia">
+                  <option value="mensual">Mensual</option>
+                  <option value="bimestral">Bimestral (cada 2 meses)</option>
+                  <option value="trimestral">Trimestral (cada 3 meses)</option>
+                  <option value="semestral">Semestral (cada 6 meses)</option>
+                  <option value="anual">Anual (1 vez por año)</option>
+                </select>
+              </div>
               <div class="field" style="margin:0"><label>Plazo de pago</label>
                 <div style="display:flex;align-items:center;gap:6px">
                   <input id="cli-dias-plazo" type="number" min="1" max="90" value="10" style="padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface2);color:var(--text);width:70px;font-size:13px"/>
@@ -5467,11 +5476,12 @@ async function openLead(lead) {
         const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
         if (!existing) {
           const newClient = {
-            id: 'cli_' + Date.now(),
+            id: Date.now().toString(36) + Math.random().toString(36).slice(2),
             nombre: lead.name,
             empresa: lead.company || lead.name,
             email: lead.email || '',
             precio: lead.deal_value || 0,
+            frecuencia_pago: 'mensual',
             inicio: new Date().toISOString().slice(0, 10),
             estado: 'activo',
             moneda: 'ARS',
@@ -5479,7 +5489,9 @@ async function openLead(lead) {
             dias_plazo: 10,
             notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido automáticamente desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
           };
-          saveClients([...getClients(), newClient]);
+          await saveClients([...getClients(), newClient]);
+          await syncClientsSupabase();
+          _ccClients = [..._clients];
           showToast('✅ Lead convertido a cliente en Finanzas 🦏');
         } else {
           showToast('Estado actualizado — ya existía cliente en Finanzas 🦏');
@@ -5499,19 +5511,22 @@ async function openLead(lead) {
       const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
       if (existing) { showToast('Ya existe un cliente con ese nombre/email en Finanzas'); return; }
       const newClient = {
-        id: 'cli_' + Date.now(),
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2),
         nombre: lead.name,
         empresa: lead.company || lead.name,
         email: lead.email || '',
-        precio: 0,
+        precio: lead.deal_value || 0,
+        frecuencia_pago: 'mensual',
         inicio: new Date().toISOString().slice(0, 10),
         estado: 'activo',
-        moneda: 'USD',
+        moneda: 'ARS',
         emails_cc: '',
         dias_plazo: 10,
         notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
       };
-      saveClients([...getClients(), newClient]);
+      await saveClients([...getClients(), newClient]);
+      await syncClientsSupabase();
+      _ccClients = [..._clients];
       showToast('✅ Cliente registrado en Finanzas 🦏');
       document.querySelector('.nav-btn[data-sec="finanzas"]').click();
     });
@@ -8367,12 +8382,35 @@ const DEFAULT_TEMPLATES = {
   }
 };
 
+// ── FRECUENCIA DE PAGO ───────────────────────────────
+const FREQ_MESES  = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+const FREQ_LABEL  = { mensual: 'Mensual', bimestral: 'Bimestral', trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual' };
+const FREQ_COLOR  = { mensual: 'var(--cyan)', bimestral: '#818cf8', trimestral: '#f59e0b', semestral: '#a78bfa', anual: '#22c55e' };
+
+// Devuelve el MRR mensual normalizado de un cliente en ARS
+function clientMRR(c) {
+  const meses = FREQ_MESES[c.frecuencia_pago || 'mensual'] || 1;
+  return toARS((+c.precio || 0) / meses, c.moneda || 'ARS');
+}
+
+// ¿Es este período (YYYY-MM) un mes en que el cliente debe pagar?
+function isPaymentMonth(c, periodo) {
+  const meses = FREQ_MESES[c.frecuencia_pago || 'mensual'] || 1;
+  if (meses === 1) return true;
+  const inicio = (c.inicio || new Date().toISOString().slice(0, 10)).slice(0, 7);
+  const [sy, sm] = inicio.split('-').map(Number);
+  const [py, pm] = periodo.split('-').map(Number);
+  const diff = (py - sy) * 12 + (pm - sm);
+  return diff >= 0 && diff % meses === 0;
+}
+
 // ── CLIENTES — en memoria, fuente: Supabase ──────────
 let _clients = [];
 function getClients() { return _clients; }
 function saveClients(arr) {
   _clients = arr;
-  if (arr.length) callAPI('supabase_upsert_clients', { clients: arr }).catch(e => console.warn('Sync clientes:', e.message));
+  if (!arr.length) return Promise.resolve();
+  return sbUpsert('rhinos_clients', arr);
 }
 async function syncClientsSupabase() {
   try { _clients = (await sbFetch('rhinos_clients?order=nombre.asc')) || []; } catch(e) { console.warn('Load clientes:', e.message); }
@@ -8440,8 +8478,8 @@ function cobPeriodLabel(p) {
 function renderClientStats() {
   const clients = getClients().filter(c => c.estado === 'activo');
   const cobros = getCobros().filter(c => c.periodo === cobCurrentPeriod);
-  // MRR en ARS (conversión automática)
-  const mrrARS = clients.reduce((a,c) => a + toARS(c.precio, c.moneda||'USD'), 0);
+  // MRR en ARS — normalizado por frecuencia de pago
+  const mrrARS = clients.reduce((a,c) => a + clientMRR(c), 0);
   const cobradoARS = cobros.filter(c => c.status === 'pagado').reduce((a,c) => {
     const cli = clients.find(x => x.id === c.clientId);
     return a + toARS(c.monto, cli?.moneda||'USD');
@@ -8464,7 +8502,7 @@ function renderClientes() {
     <thead><tr style="border-bottom:1px solid var(--border)">
       <th style="text-align:left;padding:6px 8px;color:var(--text2);font-size:11px">Nombre / Empresa</th>
       <th class="mob-hide" style="text-align:left;padding:6px 8px;color:var(--text2);font-size:11px">Email</th>
-      <th style="text-align:right;padding:6px 8px;color:var(--text2);font-size:11px">Precio/mes</th>
+      <th style="text-align:right;padding:6px 8px;color:var(--text2);font-size:11px">Precio / MRR</th>
       <th style="text-align:center;padding:6px 8px;color:var(--text2);font-size:11px">Estado</th>
       <th style="padding:6px 8px"></th>
     </tr></thead>
@@ -8472,9 +8510,10 @@ function renderClientes() {
       <tr style="border-bottom:1px solid var(--border)">
         <td style="padding:8px"><div style="font-weight:500;color:var(--text)">${c.nombre}</div><div style="font-size:11px;color:var(--text3)">${c.empresa||'—'}</div><div class="mob-hide" style="font-size:10px;color:var(--text3)">${c.email}</div></td>
         <td class="mob-hide" style="padding:8px;color:var(--text2)">${c.email}</td>
-        <td style="padding:8px;text-align:right;font-weight:600;color:var(--green)">
-          ${fmtMoneda(c.precio, c.moneda||'ARS')}
-          ${(c.moneda||'ARS')==='USD'?`<div style="font-size:10px;color:var(--text3)">${fmtARS(toARS(c.precio,'USD'))}</div>`:''}
+        <td style="padding:8px;text-align:right">
+          <div style="font-weight:600;color:var(--green)">${fmtMoneda(c.precio, c.moneda||'ARS')}</div>
+          <div style="font-size:10px;color:${FREQ_COLOR[c.frecuencia_pago||'mensual']};font-weight:600;margin-top:1px">${FREQ_LABEL[c.frecuencia_pago||'mensual']}</div>
+          ${(c.frecuencia_pago && c.frecuencia_pago !== 'mensual') ? `<div style="font-size:10px;color:var(--text3)">MRR: ${fmtARS(clientMRR(c))}</div>` : ''}
         </td>
         <td style="padding:8px;text-align:center"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.estado==='activo'?'rgba(34,197,94,0.12)':c.estado==='pausado'?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)'};color:${c.estado==='activo'?'var(--green)':c.estado==='pausado'?'var(--amber)':'var(--red)'}">${c.estado}</span></td>
         <td style="padding:8px;display:flex;gap:4px">
@@ -8499,7 +8538,8 @@ function renderClientes() {
       document.getElementById('cli-precio').value = c.precio;
       document.getElementById('cli-inicio').value = c.inicio||'';
       document.getElementById('cli-estado').value = c.estado;
-      document.getElementById('cli-moneda').value = c.moneda||'USD';
+      document.getElementById('cli-moneda').value = c.moneda||'ARS';
+      document.getElementById('cli-frecuencia').value = c.frecuencia_pago||'mensual';
       document.getElementById('cli-emails-cc').value = c.emails_cc||'';
       document.getElementById('cli-dias-plazo').value = c.dias_plazo||10;
       document.getElementById('cli-notas').value = c.notas||'';
@@ -8668,27 +8708,33 @@ function renderCobrosPeriodo() {
 
   list.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">
     ${clients.map(c => {
-      const cobro = cobros.find(x => x.clientId === c.id) || { status: 'sin_generar', monto: c.precio };
+      const payMonth = isPaymentMonth(c, cobCurrentPeriod);
+      const cobro = cobros.find(x => x.clientId === c.id) || { status: payMonth ? 'sin_generar' : 'no_corresponde', monto: c.precio };
       const statusStyles = {
-        pagado: { bg:'rgba(34,197,94,0.12)', color:'var(--green)', label:'✓ Pagado' },
-        pendiente: { bg:'rgba(245,158,11,0.12)', color:'var(--amber)', label:'⏳ Pendiente' },
-        vencido: { bg:'rgba(239,68,68,0.12)', color:'var(--red)', label:'⚠ Vencido' },
-        sin_generar: { bg:'rgba(75,85,99,0.2)', color:'var(--text3)', label:'— Sin generar' }
+        pagado:        { bg:'rgba(34,197,94,0.12)',  color:'var(--green)', label:'✓ Pagado' },
+        pendiente:     { bg:'rgba(245,158,11,0.12)', color:'var(--amber)', label:'⏳ Pendiente' },
+        vencido:       { bg:'rgba(239,68,68,0.12)',  color:'var(--red)',   label:'⚠ Vencido' },
+        sin_generar:   { bg:'rgba(75,85,99,0.2)',    color:'var(--text3)', label:'— Sin generar' },
+        no_corresponde:{ bg:'rgba(75,85,99,0.1)',    color:'var(--text3)', label:'◌ No corresponde' },
       };
       const s = statusStyles[cobro.status] || statusStyles.sin_generar;
+      const freq = FREQ_LABEL[c.frecuencia_pago||'mensual'];
       const fVenc = calcFechaVencimiento(cobCurrentPeriod, c.dias_plazo||10);
-      return `<div class="card" style="padding:12px;margin-bottom:0;display:flex;align-items:center;gap:12px">
+      return `<div class="card" style="padding:12px;margin-bottom:0;display:flex;align-items:center;gap:12px;${!payMonth?'opacity:0.5':''}">
         <div style="flex:1">
           <div style="font-size:14px;font-weight:500;color:var(--text)">${c.nombre} ${c.empresa?'<span style="font-size:11px;color:var(--text3)">· '+c.empresa+'</span>':''}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">${c.email} · <span style="color:var(--amber)">Vence: ${fmtFecha(fVenc)}</span> (${c.dias_plazo||10} días)</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${c.email} · <span style="color:${FREQ_COLOR[c.frecuencia_pago||'mensual']}">${freq}</span>${payMonth ? ` · <span style="color:var(--amber)">Vence: ${fmtFecha(fVenc)}</span>` : ' · no paga este mes'}</div>
         </div>
-        <div style="font-size:13px;font-weight:600;color:var(--green)">${fmtMoneda(cobro.monto||c.precio, c.moneda||'USD')}</div>
+        <div style="text-align:right">
+          <div style="font-size:13px;font-weight:600;color:${payMonth?'var(--green)':'var(--text3)'}">${payMonth ? fmtMoneda(cobro.monto||c.precio, c.moneda||'ARS') : '—'}</div>
+          ${(c.frecuencia_pago && c.frecuencia_pago !== 'mensual') ? `<div style="font-size:10px;color:var(--text3)">MRR: ${fmtARS(clientMRR(c))}</div>` : ''}
+        </div>
         <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${s.bg};color:${s.color}">${s.label}</span>
         <div style="display:flex;gap:5px">
-          ${cobro.status !== 'pagado' ? `<button class="btn btn-sm" data-pagar="${c.id}" data-monto="${cobro.monto||c.precio}" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);font-size:11px">✓ Pagado</button>` : ''}
-          ${cobro.status === 'pendiente' ? `<button class="btn btn-sm" data-vencer="${c.id}" style="background:rgba(239,68,68,0.1);color:var(--red);border-color:rgba(239,68,68,0.2);font-size:11px">Vencido</button>` : ''}
-          <button class="btn btn-sm" data-email-cli="${c.id}" style="font-size:11px">📧</button>
-          ${cobro.status !== 'sin_generar' ? `<button class="btn btn-sm" data-del-cobro-periodo="${c.id}" style="color:var(--text3);border-color:var(--border2);font-size:11px" title="Eliminar cobro">✕</button>` : ''}
+          ${payMonth && cobro.status !== 'pagado' ? `<button class="btn btn-sm" data-pagar="${c.id}" data-monto="${cobro.monto||c.precio}" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);font-size:11px">✓ Pagado</button>` : ''}
+          ${payMonth && cobro.status === 'pendiente' ? `<button class="btn btn-sm" data-vencer="${c.id}" style="background:rgba(239,68,68,0.1);color:var(--red);border-color:rgba(239,68,68,0.2);font-size:11px">Vencido</button>` : ''}
+          ${payMonth ? `<button class="btn btn-sm" data-email-cli="${c.id}" style="font-size:11px">📧</button>` : ''}
+          ${payMonth && cobro.status !== 'sin_generar' && cobro.status !== 'no_corresponde' ? `<button class="btn btn-sm" data-del-cobro-periodo="${c.id}" style="color:var(--text3);border-color:var(--border2);font-size:11px" title="Eliminar cobro">✕</button>` : ''}
         </div>
       </div>`;
     }).join('')}
@@ -8784,6 +8830,7 @@ document.getElementById('btn-generar-cobros').addEventListener('click', () => {
   const cobros = getCobros();
   let added = 0;
   clients.forEach(c => {
+    if (!isPaymentMonth(c, cobCurrentPeriod)) return;
     if (!cobros.find(x => x.clientId === c.id && x.periodo === cobCurrentPeriod)) {
       cobros.push({ clientId: c.id, periodo: cobCurrentPeriod, status: 'pendiente', monto: +c.precio||0 });
       added++;
@@ -8801,6 +8848,7 @@ document.getElementById('btn-marcar-todos-pagados').addEventListener('click', as
   const today = new Date().toISOString().slice(0,10);
   const tcHoy = getTcOficial();
   for (const c of clients) {
+    if (!isPaymentMonth(c, cobCurrentPeriod)) continue;
     const idx = cobros.findIndex(x => x.clientId === c.id && x.periodo === cobCurrentPeriod);
     if (idx >= 0 && cobros[idx].status !== 'pagado') {
       cobros[idx] = {...cobros[idx], status:'pagado', fechaPago: today};
@@ -8860,10 +8908,12 @@ document.getElementById('btn-guardar-cliente').addEventListener('click', () => {
   const precio = document.getElementById('cli-precio').value;
   if (!nombre || !email) { showToast('Nombre y email son obligatorios'); return; }
   const clients = getClients();
-  const moneda = document.getElementById('cli-moneda').value || 'USD';
+  const moneda = document.getElementById('cli-moneda').value || 'ARS';
   const emailsCC = document.getElementById('cli-emails-cc').value.trim();
   const diasPlazo = +document.getElementById('cli-dias-plazo').value || 10;
-  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, emails_cc: emailsCC, precio: +precio||0, moneda, dias_plazo: diasPlazo, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
+  const frecuencia_pago = document.getElementById('cli-frecuencia').value || 'mensual';
+  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, emails_cc: emailsCC, precio: +precio||0, moneda, frecuencia_pago, dias_plazo: diasPlazo, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
+  const wasNew = !clientEditId;
   if (clientEditId) {
     const idx = clients.findIndex(c => c.id === clientEditId);
     if (idx >= 0) clients[idx] = {...clients[idx], ...data};
@@ -8874,7 +8924,7 @@ document.getElementById('btn-guardar-cliente').addEventListener('click', () => {
   clientEditId = null;
   document.getElementById('form-cliente').style.display = 'none';
   renderClientes();
-  showToast(clientEditId ? 'Cliente actualizado 🦏' : 'Cliente agregado 🦏');
+  showToast(wasNew ? 'Cliente agregado 🦏' : 'Cliente actualizado 🦏');
 });
 
 // Emails tab
@@ -11020,20 +11070,21 @@ document.querySelector('.nav-btn[data-sec="vendedores"]')?.addEventListener('cli
 // ── DASHBOARD COMERCIAL ───────────────────────────────
 async function loadCommercialDashboard() {
   try {
-    const [leads, clients, cobros, tasks] = await Promise.all([
+    const [leads, cobros, tasks] = await Promise.all([
       leadsData.length ? Promise.resolve(leadsData) : sbFetch('rhinos_leads?order=created_at.desc').catch(()=>[]),
-      sbFetch('rhinos_clients?order=nombre.asc').catch(()=>[]),
       sbFetch('rhinos_cobros?order=created_at.desc').catch(()=>[]),
       sbFetch('rhinos_tasks?order=created_at.desc').catch(()=>[]),
     ]);
+    await syncClientsSupabase(); // garantiza que _clients esté poblado
+    const clients = getClients();
     if (!leadsData.length && leads.length) leadsData = leads;
     if (!vendedoresData.length) vendedoresData = await sbFetch('rhinos_vendedores?order=nombre.asc').catch(()=>[]);
 
     const today = new Date().toISOString().slice(0,10);
     const thisMonth = today.slice(0,7);
 
-    // MRR
-    const mrr = (clients||[]).reduce((s,c) => s + (parseFloat(c.monthly_price)||0), 0);
+    // MRR — normalizado a mensual por frecuencia de pago
+    const mrr = clients.reduce((s,c) => s + clientMRR(c), 0);
     document.getElementById('db-mrr').textContent = mrr ? '$' + fmtNum(Math.round(mrr)) : '—';
 
     // Cobros pendientes
