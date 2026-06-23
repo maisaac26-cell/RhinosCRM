@@ -4190,11 +4190,11 @@ function initAgente() {
     const cur = sel.value;
     sel.innerHTML = '<option value="">— Seleccionar lead —</option>' +
       leadsData.map(l => {
-        const n = (l.nombre||'').replace(/"/g,'&quot;');
-        const em = (l.empresa||'').replace(/"/g,'&quot;');
+        const n  = (l.name   ||l.nombre||'').replace(/"/g,'&quot;');
+        const em = (l.company||l.empresa||'').replace(/"/g,'&quot;');
         const mail = (l.email||'').replace(/"/g,'&quot;');
-        const tel = (l.telefono||l.whatsapp||'').replace(/"/g,'&quot;');
-        return `<option value="${l.id}" data-n="${n}" data-e="${em}" data-m="${mail}" data-t="${tel}">${l.nombre||''}${l.empresa?' — '+l.empresa:''}</option>`;
+        const tel = (l.phone ||l.telefono||l.whatsapp||'').replace(/"/g,'&quot;');
+        return `<option value="${l.id}" data-n="${n}" data-e="${em}" data-m="${mail}" data-t="${tel}">${n}${em?' — '+em:''}</option>`;
       }).join('');
     if (cur) sel.value = cur;
   }
