@@ -11222,7 +11222,11 @@ let _ccClients = [];
 async function loadClientesComercial() {
   try {
     if (!vendedoresData.length) vendedoresData = await sbFetch('rhinos_vendedores?order=nombre.asc').catch(()=>[]);
-    _ccClients = await sbFetch('rhinos_clients?order=nombre.asc') || [];
+    const remote = await sbFetch('rhinos_clients?order=nombre.asc') || [];
+    // Preservar clientes locales recién agregados que aún no llegaron a Supabase
+    const remoteIds = new Set(remote.map(c => c.id));
+    const localOnly = _clients.filter(c => c.id && !remoteIds.has(c.id));
+    _ccClients = [...remote, ...localOnly];
     renderClientesComercialMetrics();
     renderClientesComercialList();
   } catch(e) { showToast('Error cargando clientes: ' + e.message); }
