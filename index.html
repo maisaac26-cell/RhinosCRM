@@ -6394,7 +6394,8 @@ async function loadFinanzas() {
     [finTx, finPartners] = await Promise.all([
       sbFetch('rhinos_transactions?order=date.desc'),
       sbFetch('rhinos_partners?order=name.asc'),
-      syncRecurringTxsFromSupabase()
+      syncRecurringTxsFromSupabase(),
+      syncSueldosFromSupabase()
     ]);
     syncRecurringFromSupabase();
     await applyRecurring();
@@ -6445,11 +6446,17 @@ function renderResumen() {
   // Pendientes
   const pendCard = document.getElementById('pendientes-card');
   const pendEl = document.getElementById('fin-pendientes');
-  if (pendientes.length) {
+  // Sueldos pendientes — se muestran junto a transacciones pendientes
+  const sueldosPend = (_sueldos || []).filter(s => s.status === 'pendiente');
+  const tc = getTcOficial() || 1;
+
+  if (pendientes.length || sueldosPend.length) {
     pendCard.style.display = 'block';
-    const totalPend = pendientes.reduce((a, t) => a + +t.amount, 0);
-    document.getElementById('pendientes-total').textContent = '— ' + fmtUSD(totalPend) + ' comprometidos';
-    pendEl.innerHTML = pendientes.map(t => `
+    const totalTx = pendientes.reduce((a, t) => a + +t.amount, 0);
+    const totalSued = sueldosPend.reduce((a, s) => a + (s.moneda === 'USD' ? +s.monto * tc : +s.monto), 0);
+    document.getElementById('pendientes-total').textContent = '— ' + fmtARS2(totalTx + totalSued) + ' comprometidos';
+
+    const txRows = pendientes.map(t => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
         <div>
           <div style="font-size:13px;color:var(--text)">${t.description}</div>
@@ -6457,10 +6464,34 @@ function renderResumen() {
           ${t.notes ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">${t.notes}</div>` : ''}
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:13px;font-weight:500;color:var(--amber)">−${fmtUSD(+t.amount)}</span>
+          <span style="font-size:13px;font-weight:500;color:var(--amber)">−${fmtARS2(+t.amount)}</span>
           <button class="btn btn-sm" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);padding:4px 10px;font-size:11px" data-pagar="${t.id}">✓ Pagar</button>
         </div>
       </div>`).join('');
+
+    const suedRows = sueldosPend.map(s => {
+      const montoARS = s.moneda === 'USD' ? +s.monto * tc : +s.monto;
+      const salFmt = s.moneda === 'USD'
+        ? `USD ${(+s.monto).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2})} (≈ ${fmtARS2(montoARS)})`
+        : fmtARS2(+s.monto);
+      return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.3)">👥 sueldo</span>
+            <span style="font-size:13px;color:var(--text)">Sueldo — ${s.empleado_nombre}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">Sueldos · ${s.periodo}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:500;color:var(--amber)">−${salFmt}</span>
+          <button class="btn btn-sm" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);padding:4px 10px;font-size:11px" data-pagar-sueldo="${s.id}">✓ Pagar</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    pendEl.innerHTML = txRows + suedRows;
+
     pendEl.querySelectorAll('[data-pagar]').forEach(btn => {
       btn.addEventListener('click', async function() {
         const id = this.dataset.pagar;
@@ -6478,6 +6509,12 @@ function renderResumen() {
           renderResumen(); renderTransacciones(); renderSocios();
           showToast('Gasto marcado como pagado 🦏');
         } catch(e) { showToast('Error: ' + e.message); this.disabled = false; }
+      });
+    });
+
+    pendEl.querySelectorAll('[data-pagar-sueldo]').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        await pagarSueldo(this.dataset.pagarSueldo);
       });
     });
   } else {
