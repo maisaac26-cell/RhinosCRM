@@ -7227,7 +7227,7 @@ async function applyRecurring() {
   const list = getRecurring();
   if (!list.length) return;
   const now = new Date();
-  const currentMonth = now.toISOString().slice(0, 7); // "YYYY-MM"
+  const currentMonth = localMonthStr(now); // "YYYY-MM" — hora local
   const today = now.getDate();
   let applied = 0;
 
@@ -7404,7 +7404,7 @@ document.getElementById('btn-add-tx').addEventListener('click', async function()
       notifyWhatsApp('Nueva transacción', newTx);
       if (isRecurring) {
         const recurring = getRecurring();
-        const currentMonth = new Date().toISOString().slice(0, 7);
+        const currentMonth = localMonthStr();
         recurring.push({ id: Date.now().toString(), type, amount, description, category, partner, notes, day: recurringDay, last_applied: currentMonth });
         saveRecurring(recurring);
         renderRecurring();
@@ -8798,7 +8798,7 @@ loadTcFromSupabase(); // en background al inicio
 const CLIENTS_KEY = 'rhinos_clients';
 const COBROS_KEY  = 'rhinos_cobros';
 const TEMPLATES_KEY = 'rhinos_email_templates';
-let cobCurrentPeriod = new Date().toISOString().slice(0,7);
+let cobCurrentPeriod = localMonthStr();
 let clientEditId = null;
 
 const DEFAULT_TEMPLATES = {
@@ -9807,7 +9807,7 @@ document.querySelector('.tab-btn[data-ftab="empleados"]').addEventListener('clic
 // SUELDOS — SEGUIMIENTO MENSUAL DE PAGOS
 // ══════════════════════════════════════════════════
 let _sueldos = [];
-let _sueldosPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
+let _sueldosPeriod = localMonthStr(); // YYYY-MM
 
 async function syncSueldosFromSupabase() {
   try {
@@ -9966,7 +9966,7 @@ function renderDashboardAlertas() {
 
   const alertas = [];
   const hoy = new Date();
-  const hoyStr = hoy.toISOString().slice(0, 10);
+  const hoyStr = localDateStr(hoy);
 
   // Cobros vencidos del período actual
   const cobros = getCobros().filter(c => c.status === 'vencido');
@@ -10009,7 +10009,7 @@ function renderDashboardAlertas() {
 
   // Leads fríos — sin actividad hace más de 7 días y sin followup futuro
   const hoy7 = new Date(); hoy7.setDate(hoy7.getDate() - 7);
-  const cutoff = hoy7.toISOString().slice(0, 10);
+  const cutoff = localDateStr(hoy7);
   const frios = (leadsData || []).filter(l => {
     if (['cliente','perdido','imposible'].includes(l.status)) return false;
     const lastAct = (l.updated_at || l.created_at || '').slice(0, 10);
@@ -10049,11 +10049,20 @@ function renderDashboardAlertas() {
 // ══════════════════════════════════════════════════
 
 // ── Helpers de datos ─────────────────────────────
+// Helpers en hora local — evitan el desfase UTC (ej: UTC-3 en Argentina)
+function localMonthStr(d) {
+  const t = d || new Date();
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`;
+}
+function localDateStr(d) {
+  const t = d || new Date();
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+}
 function lastNMonths(n) {
   const months = [], d = new Date();
   for (let i = n-1; i >= 0; i--) {
     const t = new Date(d.getFullYear(), d.getMonth()-i, 1);
-    months.push(t.toISOString().slice(0,7));
+    months.push(`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`);
   }
   return months;
 }
@@ -10158,7 +10167,7 @@ function repGetMonthData(months) {
 
 // ── TAB: RESUMEN ──────────────────────────────────
 function renderResumenTab() {
-  const months=lastNMonths(6), now=new Date().toISOString().slice(0,7);
+  const months=lastNMonths(6), now=localMonthStr();
   const {ingByM,gasM,balM}=repGetMonthData(months);
   const tc=getTcOficial()||1;
   const clients=getClients().filter(c=>c.estado==='activo');
@@ -10569,7 +10578,7 @@ function renderClientTimeline(c) {
 // COMISIONES → FINANZAS (liquidar como gasto)
 // ══════════════════════════════════════════════════
 async function liquidarComisiones() {
-  const thisMonth = new Date().toISOString().slice(0, 7);
+  const thisMonth = localMonthStr();
   const tc = getTcOficial() || 1;
   const rows = vendedoresData.filter(v => v.activo).map(v => {
     const closed = leadsData.filter(l =>
@@ -10607,7 +10616,7 @@ function renderGoals() {
   const el = document.getElementById('db-goals-list');
   if (!el) return;
   const g = loadGoals();
-  const thisMonth = new Date().toISOString().slice(0, 7);
+  const thisMonth = localMonthStr();
   const tc = getTcOficial() || 1;
 
   // Calcular actuales
@@ -10857,7 +10866,7 @@ function renderCashFlow() {
   const now = new Date();
   for (let i = 0; i <= 2; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    months.push(d.toISOString().slice(0, 7));
+    months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
   }
   const tc = getTcOficial() || 1;
   const clients  = (typeof getClients  === 'function' ? getClients()  : []).filter(c => c.estado === 'activo');
@@ -11013,7 +11022,7 @@ async function addTeamNote(type, entityId, text) {
 // ══════════════════════════════════════════════════
 let _proveedores = [];
 let _facturasProv = [];
-let _fprovPeriod = new Date().toISOString().slice(0, 7);
+let _fprovPeriod = localMonthStr();
 let _provEditId = null;
 
 async function syncProveedoresFromSupabase() {
@@ -13329,7 +13338,7 @@ function renderVendedoresRanking() {
 function renderComisiones() {
   const el = document.getElementById('vendedores-comisiones');
   if (!el) return;
-  const thisMonth = new Date().toISOString().slice(0,7);
+  const thisMonth = localMonthStr();
   const monthLabel = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
   const lbl = document.getElementById('comisiones-mes-label');
   if (lbl) lbl.textContent = monthLabel;
@@ -13685,7 +13694,7 @@ async function loadClientesComercial() {
 }
 
 function renderClientesComercialMetrics() {
-  const thisMonth = new Date().toISOString().slice(0,7);
+  const thisMonth = localMonthStr();
   document.getElementById('cc-total').textContent = _ccClients.length;
   document.getElementById('cc-nuevos').textContent = _ccClients.filter(c => (c.created_at||'').startsWith(thisMonth)).length;
   document.getElementById('cc-con-vendedor').textContent = _ccClients.filter(c => c.vendedor_id).length;
