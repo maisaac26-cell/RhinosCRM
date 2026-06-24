@@ -8736,26 +8736,31 @@ function isPaymentMonth(c, periodo) {
 // ── CLIENTES — en memoria, fuente: Supabase ──────────
 let _clients = [];
 function getClients() { return _clients; }
+// Columnas opcionales que pueden no existir aún en Supabase — se stripean del payload
+const _OPTIONAL_CLI_COLS = ['frecuencia_pago', 'contrato_fin', 'contrato_notas', 'tags'];
+function stripOptionalCliCols(obj) {
+  const r = { ...obj };
+  _OPTIONAL_CLI_COLS.forEach(k => delete r[k]);
+  return r;
+}
+
 function saveClients(arr) {
   _clients = arr;
   if (!arr.length) return Promise.resolve();
-  const rows = arr.map(({ frecuencia_pago, ...rest }) => rest);
-  return sbUpsert('rhinos_clients', rows);
+  return sbUpsert('rhinos_clients', arr.map(stripOptionalCliCols));
 }
 
-// Inserta un cliente nuevo: usa el mismo flujo que el formulario manual (sbUpsert),
-// actualiza _clients en memoria sin llamar syncClientsSupabase (que sobreescribiría).
+// Inserta un cliente nuevo directamente en Supabase con sbFetch POST (no batch),
+// actualiza _clients/_ccClients en memoria inmediatamente.
 function insertClientDB(data) {
-  const newClient = {
-    frecuencia_pago: 'mensual',
-    ...data,
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-    createdAt: new Date().toISOString().slice(0, 10),
-  };
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const created_at = new Date().toISOString();
+  const newClient = { frecuencia_pago: 'mensual', ...data, id, created_at };
   _clients = [..._clients, newClient];
   _ccClients = [..._clients];
-  // sbUpsert fire-and-forget — idéntico a lo que hace btn-guardar-cliente
-  sbUpsert('rhinos_clients', _clients.map(({ frecuencia_pago: _f, ...r }) => r));
+  // Insertar solo el nuevo cliente con campos core — usa POST (no upsert batch)
+  sbFetch('rhinos_clients', 'POST', stripOptionalCliCols(newClient))
+    .catch(e => console.warn('Insert client:', e.message));
   return newClient;
 }
 async function syncClientsSupabase() {
