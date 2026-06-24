@@ -2728,6 +2728,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn active" data-rtab="finanzas">💰 Finanzas</button>
       <button class="tab-btn" data-rtab="ventas">🎯 Ventas</button>
       <button class="tab-btn" data-rtab="nomina">👥 Nómina</button>
+      <button class="tab-btn" data-rtab="exportar" style="background:rgba(34,197,94,0.08);color:var(--green);border:1px solid rgba(34,197,94,0.2)">📋 Exportar Excel</button>
     </div>
 
     <!-- FINANZAS TAB -->
@@ -2773,6 +2774,60 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <div class="card-title">Costo nómina vs ingresos</div>
           <div id="rep-nomina-ratio"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- EXPORTAR TAB -->
+    <div class="rtab-content" id="rtab-exportar" style="display:none">
+      <div class="card" style="border-color:rgba(34,197,94,0.25)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+          <div>
+            <div style="font-family:var(--display);font-size:15px;font-weight:800;color:var(--text)">📋 FOTO DEL MES — EXPORTAR EXCEL</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:4px">Genera un Excel con 8 hojas: resumen, clientes, cobros, transacciones, leads, empleados, proveedores y gastos fijos.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="month" id="export-periodo" style="font-size:13px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font)"/>
+            <button class="btn btn-green" id="btn-generar-excel" style="font-weight:700;padding:8px 20px;font-size:13px">⬇ Generar Excel</button>
+          </div>
+        </div>
+
+        <!-- Preview de lo que incluye -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+          <div style="background:var(--surface3);border-radius:var(--r);padding:10px 12px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--cyan);margin-bottom:6px">Hoja 1 · Resumen</div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.7">MRR · Ingresos · Gastos · Balance · Pipeline · Conversión</div>
+          </div>
+          <div style="background:var(--surface3);border-radius:var(--r);padding:10px 12px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green);margin-bottom:6px">Hoja 2 · Clientes</div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.7">Todos los clientes activos con precio, estado, cobro del mes</div>
+          </div>
+          <div style="background:var(--surface3);border-radius:var(--r);padding:10px 12px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--amber);margin-bottom:6px">Hoja 3 · Cobros</div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.7">Estado de cobros del período: pagado · pendiente · vencido</div>
+          </div>
+          <div style="background:var(--surface3);border-radius:var(--r);padding:10px 12px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:6px">Hoja 4 · Transacciones</div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.7">Todas las transacciones del mes con tipo, monto y TC</div>
+          </div>
+          <div style="background:var(--surface3);border-radius:var(--r);padding:10px 12px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#818cf8;margin-bottom:6px">Hoja 5 · Leads</div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.7">Pipeline completo: estado, vendedor, deal value, fuente</div>
+          </div>
+          <div style="background:var(--surface3);border-radius:var(--r);padding:10px 12px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--cyan);margin-bottom:6px">Hoja 6 · Empleados</div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.7">Nómina + estado del sueldo del período</div>
+          </div>
+          <div style="background:var(--surface3);border-radius:var(--r);padding:10px 12px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--amber);margin-bottom:6px">Hoja 7 · Proveedores</div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.7">Lista + estado de factura del período</div>
+          </div>
+          <div style="background:var(--surface3);border-radius:var(--r);padding:10px 12px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Hoja 8 · Gastos Fijos</div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.7">Todos los gastos recurrentes configurados con monto y día</div>
+          </div>
+        </div>
+
+        <div id="export-preview" style="display:none;padding:12px 14px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:var(--r);font-size:12px;color:var(--text2)"></div>
       </div>
     </div>
   </div>
@@ -10880,6 +10935,248 @@ document.querySelector('.nav-btn[data-sec="proveedores"]')?.addEventListener('cl
   renderProveedoresList();
   renderFacturasProv();
 });
+
+// ══════════════════════════════════════════════════
+// EXPORTAR EXCEL — FOTO MENSUAL DEL NEGOCIO
+// ══════════════════════════════════════════════════
+
+// Inicializar selector de mes con el mes actual
+document.getElementById('export-periodo')?.setAttribute('value', new Date().toISOString().slice(0,7));
+
+document.querySelector('.tab-btn[data-rtab="exportar"]')?.addEventListener('click', () => {
+  if (!document.getElementById('export-periodo').value)
+    document.getElementById('export-periodo').value = new Date().toISOString().slice(0,7);
+});
+
+// ── Helpers SpreadsheetML ─────────────────────────
+function xlsEsc(v) {
+  return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function xlsCell(value, type, style) {
+  const t = type || (typeof value === 'number' ? 'Number' : 'String');
+  const s = style ? ` ss:StyleID="${style}"` : '';
+  return `<Cell${s}><Data ss:Type="${t}">${xlsEsc(value ?? '')}</Data></Cell>`;
+}
+function xlsRow(...cells) { return `<Row>${cells.join('')}</Row>`; }
+function xlsSheet(name, colWidths, headerRow, dataRows) {
+  const safeName = name.replace(/[\/\\?*\[\]]/g,'').slice(0,31);
+  const cols = colWidths.map(w => `<Column ss:Width="${w}"/>`).join('');
+  return `<Worksheet ss:Name="${safeName}"><Table>${cols}${headerRow}${dataRows.join('')}</Table></Worksheet>`;
+}
+
+// ── Generador principal ───────────────────────────
+async function generarExcelMensual() {
+  const periodo = document.getElementById('export-periodo').value;
+  if (!periodo) { showToast('Seleccioná un período'); return; }
+
+  const btn = document.getElementById('btn-generar-excel');
+  btn.disabled = true; btn.textContent = '⏳ Generando...';
+
+  // Asegurar datos cargados
+  if (!finTx.length) finTx = await sbFetch('rhinos_transactions?order=date.desc').catch(()=>[]);
+  if (!leadsData.length) leadsData = await sbFetch('rhinos_leads?order=created_at.desc').catch(()=>[]);
+  if (!_clients.length) await syncClientsSupabase();
+  if (!_cobros.length) await syncCobrosFromSupabase();
+  if (!_empleados.length) await syncEmpleadosFromSupabase();
+  if (!_sueldos.length) await syncSueldosFromSupabase();
+  if (!_proveedores.length) await syncProveedoresFromSupabase();
+  if (!_facturasProv.length) await syncFacturasProvFromSupabase();
+  if (!_recurring.length) await syncRecurringTxsFromSupabase();
+  if (!vendedoresData.length) vendedoresData = await sbFetch('rhinos_vendedores?order=nombre.asc').catch(()=>[]);
+
+  const tc = getTcOficial() || 1;
+  const [y, m] = periodo.split('-');
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const periodoLabel = `${meses[+m-1]} ${y}`;
+
+  // ── DATOS ─────────────────────────────────────────
+  const txMes = finTx.filter(t => (t.date||'').startsWith(periodo));
+  const ingMes = txMes.filter(t=>t.type==='ingreso').reduce((s,t)=>s+txToARS(t),0);
+  const gasMes = txMes.filter(t=>t.type==='gasto').reduce((s,t)=>s+txToARS(t),0);
+  const clients = getClients().filter(c=>c.estado==='activo');
+  const mrr = clients.reduce((s,c)=>s+clientMRR(c),0);
+  const cobMes = getCobros().filter(c=>c.periodo===periodo);
+  const cobroPagados = cobMes.filter(c=>c.status==='pagado').length;
+  const cobroPend = cobMes.filter(c=>c.status==='pendiente').length;
+  const leadsNuevos = leadsData.filter(l=>(l.created_at||'').startsWith(periodo)).length;
+  const leadsConv = leadsData.filter(l=>l.status==='cliente'&&(l.updated_at||'').startsWith(periodo)).length;
+  const sueldosMes = _sueldos.filter(s=>s.periodo===periodo);
+  const factProvMes = _facturasProv.filter(f=>f.periodo===periodo);
+  const masaSalMes = sueldosMes.reduce((s,x)=>s+(x.moneda==='USD'?+x.monto*tc:+x.monto),0);
+  const gastProvMes = factProvMes.filter(f=>f.status==='pagado').reduce((s,f)=>s+(f.moneda==='USD'?+f.monto*tc:+f.monto),0);
+
+  // ── ESTILOS ───────────────────────────────────────
+  const styles = `<Styles>
+    <Style ss:ID="H"><Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="11"/><Interior ss:Color="#0A0A0A" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>
+    <Style ss:ID="HG"><Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="11"/><Interior ss:Color="#166534" ss:Pattern="Solid"/></Style>
+    <Style ss:ID="HA"><Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="11"/><Interior ss:Color="#92400E" ss:Pattern="Solid"/></Style>
+    <Style ss:ID="HP"><Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="11"/><Interior ss:Color="#312E81" ss:Pattern="Solid"/></Style>
+    <Style ss:ID="HR"><Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="11"/><Interior ss:Color="#991B1B" ss:Pattern="Solid"/></Style>
+    <Style ss:ID="HB"><Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="11"/><Interior ss:Color="#1E40AF" ss:Pattern="Solid"/></Style>
+    <Style ss:ID="lbl"><Font ss:Bold="1"/></Style>
+    <Style ss:ID="pos"><Font ss:Color="#166534" ss:Bold="1"/></Style>
+    <Style ss:ID="neg"><Font ss:Color="#991B1B" ss:Bold="1"/></Style>
+    <Style ss:ID="amb"><Font ss:Color="#92400E" ss:Bold="1"/></Style>
+    <Style ss:ID="num"><NumberFormat ss:Format="#,##0.00"/></Style>
+    <Style ss:ID="pct"><NumberFormat ss:Format="0.0%"/></Style>
+    <Style ss:ID="alt"><Interior ss:Color="#F9FAFB" ss:Pattern="Solid"/></Style>
+  </Styles>`;
+
+  // ── HOJA 1: RESUMEN ───────────────────────────────
+  const sh1 = xlsSheet('Resumen', [200,180,120],
+    xlsRow(xlsCell('RESUMEN DEL PERÍODO — ' + periodoLabel,'String','H'), xlsCell('Valor','String','H'), xlsCell('Moneda','String','H')),
+    [
+      xlsRow(xlsCell('FINANCIERO','String','lbl'), xlsCell(''), xlsCell('')),
+      xlsRow(xlsCell('MRR (ingresos recurrentes mensuales)'), xlsCell(Math.round(mrr),'Number'), xlsCell('ARS')),
+      xlsRow(xlsCell('Ingresos del mes'), xlsCell(Math.round(ingMes),'Number'), xlsCell('ARS')),
+      xlsRow(xlsCell('Gastos del mes'), xlsCell(Math.round(gasMes),'Number'), xlsCell('ARS')),
+      xlsRow(xlsCell('Balance del mes'), xlsCell(Math.round(ingMes-gasMes),'Number'), xlsCell('ARS')),
+      xlsRow(xlsCell('Masa salarial pagada'), xlsCell(Math.round(masaSalMes),'Number'), xlsCell('ARS')),
+      xlsRow(xlsCell('Gasto proveedores pagado'), xlsCell(Math.round(gastProvMes),'Number'), xlsCell('ARS')),
+      xlsRow(xlsCell('Tipo de cambio USD/ARS'), xlsCell(tc,'Number'), xlsCell('ARS/USD')),
+      xlsRow(xlsCell('')),
+      xlsRow(xlsCell('CLIENTES & COBROS','String','lbl'), xlsCell(''), xlsCell('')),
+      xlsRow(xlsCell('Clientes activos'), xlsCell(clients.length,'Number'), xlsCell('')),
+      xlsRow(xlsCell('Cobros pagados en el período'), xlsCell(cobroPagados,'Number'), xlsCell('')),
+      xlsRow(xlsCell('Cobros pendientes'), xlsCell(cobroPend,'Number'), xlsCell('')),
+      xlsRow(xlsCell('')),
+      xlsRow(xlsCell('COMERCIAL','String','lbl'), xlsCell(''), xlsCell('')),
+      xlsRow(xlsCell('Leads nuevos en el período'), xlsCell(leadsNuevos,'Number'), xlsCell('')),
+      xlsRow(xlsCell('Leads convertidos a cliente'), xlsCell(leadsConv,'Number'), xlsCell('')),
+      xlsRow(xlsCell('Tasa de conversión'), xlsCell(leadsNuevos > 0 ? Math.round(leadsConv/leadsNuevos*100)/100 : 0,'Number'), xlsCell('%')),
+      xlsRow(xlsCell('Leads totales en pipeline'), xlsCell(leadsData.filter(l=>!['cliente','perdido','imposible'].includes(l.status)).length,'Number'), xlsCell('')),
+      xlsRow(xlsCell('')),
+      xlsRow(xlsCell('NÓMINA','String','lbl'), xlsCell(''), xlsCell('')),
+      xlsRow(xlsCell('Empleados activos'), xlsCell(_empleados.filter(e=>e.estado!=='baja').length,'Number'), xlsCell('')),
+      xlsRow(xlsCell('Sueldos pagados en el período'), xlsCell(sueldosMes.filter(s=>s.status==='pagado').length,'Number'), xlsCell('')),
+      xlsRow(xlsCell('Sueldos pendientes'), xlsCell(sueldosMes.filter(s=>s.status==='pendiente').length,'Number'), xlsCell('')),
+    ]
+  );
+
+  // ── HOJA 2: CLIENTES ──────────────────────────────
+  const sh2 = xlsSheet('Clientes', [140,140,160,80,80,100,80,90,130,120],
+    xlsRow(xlsCell('Nombre','String','HG'),xlsCell('Empresa','String','HG'),xlsCell('Email','String','HG'),xlsCell('Precio','String','HG'),xlsCell('Moneda','String','HG'),xlsCell('Frecuencia','String','HG'),xlsCell('Estado','String','HG'),xlsCell('MRR ARS','String','HG'),xlsCell('Cobro en período','String','HG'),xlsCell('Vendedor','String','HG')),
+    getClients().map((c,i) => {
+      const cobro = cobMes.find(x=>x.clientId===c.id);
+      const v = vendedoresData.find(x=>x.id===c.vendedor_id);
+      return xlsRow(
+        xlsCell(c.nombre), xlsCell(c.empresa||''), xlsCell(c.email||''),
+        xlsCell(+c.precio||0,'Number'), xlsCell(c.moneda||'ARS'),
+        xlsCell(c.frecuencia_pago||'mensual'), xlsCell(c.estado||'activo'),
+        xlsCell(Math.round(clientMRR(c)),'Number'),
+        xlsCell(cobro ? cobro.status : 'sin generar'),
+        xlsCell(v ? v.nombre : 'Sin asignar')
+      );
+    })
+  );
+
+  // ── HOJA 3: COBROS DEL MES ────────────────────────
+  const sh3 = xlsSheet('Cobros', [140,80,80,80,100,110],
+    xlsRow(xlsCell('Cliente','String','HA'),xlsCell('Período','String','HA'),xlsCell('Monto','String','HA'),xlsCell('Moneda','String','HA'),xlsCell('Estado','String','HA'),xlsCell('Fecha de pago','String','HA')),
+    cobMes.map(cobro => {
+      const c = getClients().find(x=>x.id===cobro.clientId);
+      return xlsRow(
+        xlsCell(c?.nombre||cobro.clientId), xlsCell(cobro.periodo),
+        xlsCell(+cobro.monto||0,'Number'), xlsCell(c?.moneda||'ARS'),
+        xlsCell(cobro.status), xlsCell(cobro.fechaPago||'')
+      );
+    })
+  );
+
+  // ── HOJA 4: TRANSACCIONES ─────────────────────────
+  const sh4 = xlsSheet('Transacciones', [90,200,110,100,90,100,80,90,80],
+    xlsRow(xlsCell('Tipo','String','HR'),xlsCell('Descripción','String','HR'),xlsCell('Categoría','String','HR'),xlsCell('Partner','String','HR'),xlsCell('Fecha','String','HR'),xlsCell('Monto ARS','String','HR'),xlsCell('Mon. orig.','String','HR'),xlsCell('Monto orig.','String','HR'),xlsCell('TC día','String','HR')),
+    txMes.map(t => xlsRow(
+      xlsCell(t.type), xlsCell(t.description||''), xlsCell(t.category||''),
+      xlsCell(t.partner||''), xlsCell(t.date||''),
+      xlsCell(Math.round(txToARS(t)),'Number'),
+      xlsCell(t.currency_original||t.currency||'ARS'),
+      xlsCell(+(t.amount_original||t.amount)||0,'Number'),
+      xlsCell(t.tc_dia ? +t.tc_dia : '',(t.tc_dia ? 'Number' : 'String'))
+    ))
+  );
+
+  // ── HOJA 5: LEADS ─────────────────────────────────
+  const sh5 = xlsSheet('Leads', [140,140,110,160,90,100,90,80,100,110],
+    xlsRow(xlsCell('Nombre','String','HP'),xlsCell('Empresa','String','HP'),xlsCell('Teléfono','String','HP'),xlsCell('Email','String','HP'),xlsCell('Estado','String','HP'),xlsCell('Vendedor','String','HP'),xlsCell('Deal value','String','HP'),xlsCell('Fuente','String','HP'),xlsCell('Follow-up','String','HP'),xlsCell('Creado','String','HP')),
+    leadsData.map(l => {
+      const v = vendedoresData.find(x=>x.id===l.vendedor_id);
+      return xlsRow(
+        xlsCell(l.name||''), xlsCell(l.company||''), xlsCell(l.phone||''),
+        xlsCell(l.email||''), xlsCell(l.status||''), xlsCell(v?v.nombre:''),
+        xlsCell(+(l.deal_value||0),'Number'), xlsCell(l.source||''),
+        xlsCell(l.next_followup||''), xlsCell((l.created_at||'').slice(0,10))
+      );
+    })
+  );
+
+  // ── HOJA 6: EMPLEADOS ─────────────────────────────
+  const sh6 = xlsSheet('Empleados', [140,140,90,70,80,80,100,100],
+    xlsRow(xlsCell('Nombre','String','HB'),xlsCell('Cargo','String','HB'),xlsCell('Salario','String','HB'),xlsCell('Moneda','String','HB'),xlsCell('Día pago','String','HB'),xlsCell('Estado','String','HB'),xlsCell('Sueldo período','String','HB'),xlsCell('Estado sueldo','String','HB')),
+    _empleados.map(e => {
+      const sueldo = sueldosMes.find(s=>s.empleado_id===e.id);
+      return xlsRow(
+        xlsCell(e.nombre), xlsCell(e.cargo||''),
+        xlsCell(+e.salario||0,'Number'), xlsCell(e.moneda||'ARS'),
+        xlsCell(+e.dia_pago||25,'Number'), xlsCell(e.estado||'activo'),
+        xlsCell(sueldo ? +sueldo.monto : 0,'Number'),
+        xlsCell(sueldo ? sueldo.status : 'sin generar')
+      );
+    })
+  );
+
+  // ── HOJA 7: PROVEEDORES ───────────────────────────
+  const sh7 = xlsSheet('Proveedores', [140,130,90,70,80,80,100,100],
+    xlsRow(xlsCell('Nombre','String','HA'),xlsCell('Servicio','String','HA'),xlsCell('Precio','String','HA'),xlsCell('Moneda','String','HA'),xlsCell('Día factura','String','HA'),xlsCell('Estado','String','HA'),xlsCell('Factura período','String','HA'),xlsCell('Estado factura','String','HA')),
+    _proveedores.map(p => {
+      const fac = factProvMes.find(f=>f.proveedor_id===p.id);
+      return xlsRow(
+        xlsCell(p.nombre), xlsCell(p.servicio||''),
+        xlsCell(+p.precio||0,'Number'), xlsCell(p.moneda||'ARS'),
+        xlsCell(+p.dia_factura||1,'Number'), xlsCell(p.estado||'activo'),
+        xlsCell(fac ? +fac.monto : 0,'Number'),
+        xlsCell(fac ? fac.status : 'sin generar')
+      );
+    })
+  );
+
+  // ── HOJA 8: GASTOS FIJOS ──────────────────────────
+  const sh8 = xlsSheet('Gastos Fijos', [200,90,110,90,70,120],
+    xlsRow(xlsCell('Descripción','String','H'),xlsCell('Tipo','String','H'),xlsCell('Categoría','String','H'),xlsCell('Monto','String','H'),xlsCell('Moneda','String','H'),xlsCell('Día del mes','String','H')),
+    _recurring.map(r => xlsRow(
+      xlsCell(r.description||''), xlsCell(r.type||'gasto'),
+      xlsCell(r.category||''), xlsCell(+r.amount||0,'Number'),
+      xlsCell(r.currency||'ARS'), xlsCell(+r.day||1,'Number')
+    ))
+  );
+
+  // ── ARMAR WORKBOOK ────────────────────────────────
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:x="urn:schemas-microsoft-com:office:excel">
+  ${styles}
+  ${[sh1,sh2,sh3,sh4,sh5,sh6,sh7,sh8].join('\n')}
+</Workbook>`;
+
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `RhinosCRM_${periodo}.xls`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  // Preview
+  const prev = document.getElementById('export-preview');
+  prev.style.display = 'block';
+  prev.innerHTML = `✅ <strong>Exportado:</strong> RhinosCRM_${periodo}.xls · ${periodoLabel} · 8 hojas · ${txMes.length} transacciones · ${clients.length} clientes · ${leadsData.length} leads`;
+
+  btn.disabled = false; btn.textContent = '⬇ Generar Excel';
+  showToast(`📋 Excel de ${periodoLabel} descargado 🦏`);
+}
+
+document.getElementById('btn-generar-excel')?.addEventListener('click', generarExcelMensual);
 
 // ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
