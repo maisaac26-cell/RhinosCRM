@@ -503,6 +503,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="nav-group-label">Finanzas</div>
     <button class="nav-btn" data-sec="finanzas"><span class="nav-icon">💰</span>Finanzas</button>
     <button class="nav-btn" data-sec="balance"><span class="nav-icon">⚖️</span>Balance</button>
+    <button class="nav-btn" data-sec="reportes"><span class="nav-icon">📊</span>Reportes</button>
 
     <div class="nav-group-label">Gmail</div>
     <button class="nav-btn" data-sec="gmail"><span class="nav-icon">📧</span>Gmail</button>
@@ -620,6 +621,15 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div class="metric-card" style="cursor:pointer" onclick="document.querySelector('.nav-btn[data-sec=\'tareas\']').click()">
         <div class="m-label">Tareas pendientes</div><div class="m-val" id="db-tareas-pend">—</div><div class="m-sub">del equipo</div>
       </div>
+    </div>
+
+    <!-- ALERTAS INTELIGENTES -->
+    <div id="db-alertas-card" style="display:none;background:var(--surface2);border:1px solid rgba(239,68,68,0.3);border-radius:var(--r);padding:14px;margin-bottom:1.25rem">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:16px">⚠</span>
+        <span style="font-family:var(--display);font-size:12px;font-weight:800;letter-spacing:.06em;color:var(--red)">ALERTAS</span>
+      </div>
+      <div id="db-alertas-list" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
 
     <div class="grid2">
@@ -2029,6 +2039,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                 </select>
               </div>
             </div>
+            <div class="field" style="margin:0"><label>Vencimiento de contrato</label><input id="cli-contrato-fin" type="date"/></div>
+            <div class="field" style="margin:0"><label>Notas contrato</label><input id="cli-contrato-notas" placeholder="Renovación automática, condiciones..."/></div>
             <div class="field" style="margin-bottom:8px"><label>Emails adicionales <span style="font-weight:400;color:var(--text3)">(CC — separados por coma)</span></label><input id="cli-emails-cc" placeholder="contabilidad@empresa.com, gerencia@empresa.com" style="font-size:12px"/></div>
             <div class="field" style="margin-bottom:10px"><label>Notas (opcional)</label><input id="cli-notas" placeholder="Condiciones especiales, descuentos..."/></div>
             <div style="display:flex;gap:8px">
@@ -2653,6 +2665,71 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
   </div>
   <!-- FIN BALANCE -->
+
+  <!-- ══════════════════════════════════════════════════ -->
+  <!-- REPORTES — EVOLUCIÓN DEL NEGOCIO                  -->
+  <!-- ══════════════════════════════════════════════════ -->
+  <div class="section" id="s-reportes">
+    <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end">
+      <div>
+        <div class="page-title">REPO<span>RTES</span></div>
+        <div class="page-sub">Evolución del negocio — últimos 6 meses</div>
+      </div>
+      <button class="btn btn-sm" id="btn-rep-refresh" style="color:var(--text2)">↻ Actualizar</button>
+    </div>
+
+    <div class="tab-row" id="rep-tabs">
+      <button class="tab-btn active" data-rtab="finanzas">💰 Finanzas</button>
+      <button class="tab-btn" data-rtab="ventas">🎯 Ventas</button>
+      <button class="tab-btn" data-rtab="nomina">👥 Nómina</button>
+    </div>
+
+    <!-- FINANZAS TAB -->
+    <div class="rtab-content" id="rtab-finanzas">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">Ingresos vs Gastos — últimos 6 meses</div>
+          <div id="rep-ing-gas"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Top categorías de gasto</div>
+          <div id="rep-cats"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Balance acumulado mensual</div>
+        <div id="rep-balance"></div>
+      </div>
+    </div>
+
+    <!-- VENTAS TAB -->
+    <div class="rtab-content" id="rtab-ventas" style="display:none">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">Leads nuevos vs conversiones por mes</div>
+          <div id="rep-leads"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Tasa de conversión mensual</div>
+          <div id="rep-conversion"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NÓMINA TAB -->
+    <div class="rtab-content" id="rtab-nomina" style="display:none">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">Masa salarial mensual pagada</div>
+          <div id="rep-nomina"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Costo nómina vs ingresos</div>
+          <div id="rep-nomina-ratio"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ══════════════════════════════════════════════════ -->
   <!-- ANALYTICS WEB — Google Analytics 4                -->
@@ -8667,6 +8744,8 @@ function renderClientes() {
       document.getElementById('cli-emails-cc').value = c.emails_cc||'';
       document.getElementById('cli-dias-plazo').value = c.dias_plazo||10;
       document.getElementById('cli-notas').value = c.notas||'';
+      document.getElementById('cli-contrato-fin').value = c.contrato_fin||'';
+      document.getElementById('cli-contrato-notas').value = c.contrato_notas||'';
       document.getElementById('form-cliente-titulo').textContent = 'Editar cliente';
       document.getElementById('form-cliente').style.display = 'block';
     });
@@ -9018,7 +9097,7 @@ document.querySelectorAll('.ctab-btn').forEach(btn => {
 // Formulario cliente
 document.getElementById('btn-nuevo-cliente').addEventListener('click', () => {
   clientEditId = null;
-  ['cli-nombre','cli-empresa','cli-email','cli-emails-cc','cli-precio','cli-inicio','cli-notas'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['cli-nombre','cli-empresa','cli-email','cli-emails-cc','cli-precio','cli-inicio','cli-notas','cli-contrato-fin','cli-contrato-notas'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   const dpEl = document.getElementById('cli-dias-plazo'); if(dpEl) dpEl.value = '10';
   document.getElementById('cli-estado').value = 'activo';
   document.getElementById('cli-inicio').value = new Date().toISOString().slice(0,10);
@@ -9036,7 +9115,9 @@ document.getElementById('btn-guardar-cliente').addEventListener('click', () => {
   const emailsCC = document.getElementById('cli-emails-cc').value.trim();
   const diasPlazo = +document.getElementById('cli-dias-plazo').value || 10;
   const frecuencia_pago = document.getElementById('cli-frecuencia').value || 'mensual';
-  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, emails_cc: emailsCC, precio: +precio||0, moneda, frecuencia_pago, dias_plazo: diasPlazo, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim() };
+  const contrato_fin = document.getElementById('cli-contrato-fin').value || null;
+  const contrato_notas = document.getElementById('cli-contrato-notas').value.trim() || null;
+  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, emails_cc: emailsCC, precio: +precio||0, moneda, frecuencia_pago, dias_plazo: diasPlazo, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim(), contrato_fin, contrato_notas };
   const wasNew = !clientEditId;
   if (clientEditId) {
     const idx = clients.findIndex(c => c.id === clientEditId);
@@ -9558,6 +9639,363 @@ document.getElementById('btn-sued-next').addEventListener('click', () => {
   renderSueldosPeriodo();
 });
 document.getElementById('btn-sued-generar').addEventListener('click', generarSueldosMes);
+
+// ══════════════════════════════════════════════════
+// ALERTAS INTELIGENTES — COBROS VENCIDOS + CONTRATOS
+// ══════════════════════════════════════════════════
+function renderDashboardAlertas() {
+  const card = document.getElementById('db-alertas-card');
+  const list = document.getElementById('db-alertas-list');
+  if (!card || !list) return;
+
+  const alertas = [];
+  const hoy = new Date();
+  const hoyStr = hoy.toISOString().slice(0, 10);
+
+  // Cobros vencidos del período actual
+  const cobros = getCobros().filter(c => c.status === 'vencido');
+  const clients = getClients();
+  cobros.forEach(cobro => {
+    const c = clients.find(x => x.id === cobro.clientId);
+    if (!c) return;
+    const wa = formatWhatsApp(c.phone);
+    const monto = fmtMoneda ? fmtMoneda(cobro.monto || c.precio, c.moneda || 'ARS') : '$' + cobro.monto;
+    alertas.push(`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:var(--r)">
+        <span style="font-size:16px;flex-shrink:0">💳</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${c.nombre}</div>
+          <div style="font-size:11px;color:var(--red)">Cobro vencido · ${cobro.periodo} · ${monto}</div>
+        </div>
+        ${wa ? `<a href="https://wa.me/${wa}?text=${encodeURIComponent('Hola ' + c.nombre.split(' ')[0] + ', te recordamos que tenés un pago pendiente correspondiente a ' + cobro.periodo + ' por ' + monto + '. Cualquier consulta estamos a disposición. Saludos, RhinosApp.')}" target="_blank" class="btn btn-sm" style="color:var(--green);border-color:rgba(34,197,94,0.3);flex-shrink:0;font-size:11px">💬 Recordatorio WA</a>` : ''}
+        <button class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.25);font-size:11px;flex-shrink:0" onclick="document.querySelector('.nav-btn[data-sec=\"finanzas\"]').click();setTimeout(()=>document.querySelector('.tab-btn[data-ftab=\"cobros\"]').click(),400)">Ver →</button>
+      </div>`);
+  });
+
+  // Contratos próximos a vencer (< 30 días)
+  clients.filter(c => c.contrato_fin && c.estado === 'activo').forEach(c => {
+    const fin = new Date(c.contrato_fin + 'T12:00');
+    const diff = Math.round((fin - hoy) / 86400000);
+    if (diff < 0 || diff > 30) return;
+    const urgColor = diff <= 7 ? 'var(--red)' : diff <= 15 ? 'var(--amber)' : 'var(--cyan)';
+    const urgLabel = diff === 0 ? '¡Vence hoy!' : diff < 0 ? 'Vencido' : `Vence en ${diff} días`;
+    alertas.push(`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:var(--r)">
+        <span style="font-size:16px;flex-shrink:0">📋</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${c.nombre}</div>
+          <div style="font-size:11px;color:${urgColor}">Contrato · ${urgLabel} · ${c.contrato_fin}</div>
+          ${c.contrato_notas ? `<div style="font-size:11px;color:var(--text3)">${c.contrato_notas}</div>` : ''}
+        </div>
+        <button class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.25);font-size:11px;flex-shrink:0" onclick="document.querySelector('.nav-btn[data-sec=\"finanzas\"]').click();setTimeout(()=>document.querySelector('.tab-btn[data-ftab=\"cobros\"]').click(),400)">Ver →</button>
+      </div>`);
+  });
+
+  if (alertas.length) {
+    card.style.display = 'block';
+    list.innerHTML = alertas.join('');
+  } else {
+    card.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════════
+// REPORTES — GRÁFICOS SVG
+// ══════════════════════════════════════════════════
+
+// Últimos N meses en formato YYYY-MM
+function lastNMonths(n) {
+  const months = [];
+  const d = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const t = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    months.push(t.toISOString().slice(0, 7));
+  }
+  return months;
+}
+
+function monthLabel(ym) {
+  const [y, m] = ym.split('-');
+  return ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][+m-1] + ' ' + y.slice(2);
+}
+
+function svgGroupedBar(months, series, height = 180) {
+  const W = 560, H = height, PL = 52, PR = 10, PT = 20, PB = 30;
+  const cW = W - PL - PR, cH = H - PT - PB;
+  const n = months.length, ns = series.length;
+  const allV = series.flatMap(s => s.values);
+  const maxV = Math.max(...allV, 1);
+  const bW = Math.min((cW / n) * 0.7 / ns, 36);
+  const gW = cW / n;
+
+  const yTicks = [0, 0.5, 1].map(f => ({ y: PT + cH * (1 - f), v: maxV * f }));
+  const grid = yTicks.map(t =>
+    `<line x1="${PL}" x2="${W-PR}" y1="${t.y.toFixed(1)}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+     <text x="${PL-4}" y="${(t.y+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#6b7280">${fmtNum(Math.round(t.v))}</text>`
+  ).join('');
+
+  const bars = series.flatMap((s, si) => months.map((_, li) => {
+    const v = s.values[li] || 0;
+    const bH = (v / maxV) * cH;
+    const x = PL + li * gW + gW * 0.15 + si * (bW + 2);
+    const y = PT + cH - bH;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW.toFixed(1)}" height="${Math.max(bH,0).toFixed(1)}" fill="${s.color}" rx="2" opacity="0.85"/>`;
+  })).join('');
+
+  const xLbls = months.map((m, i) =>
+    `<text x="${(PL + i*gW + gW/2).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="#6b7280">${monthLabel(m)}</text>`
+  ).join('');
+
+  const legend = series.map((s, i) =>
+    `<rect x="${PL + i*80}" y="4" width="10" height="10" fill="${s.color}" rx="2"/>
+     <text x="${PL + i*80 + 14}" y="13" font-size="9" fill="#9ca3af">${s.name}</text>`
+  ).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">${grid}${bars}${xLbls}${legend}</svg>`;
+}
+
+function svgHorizBars(items) {
+  const W = 520, rowH = 30, PL = 110, PR = 60, PT = 8;
+  const H = PT + items.length * rowH + 8;
+  const maxV = Math.max(...items.map(x => x.value), 1);
+  const cW = W - PL - PR;
+  const bars = items.map((item, i) => {
+    const bW = (item.value / maxV) * cW;
+    const y = PT + i * rowH;
+    return `<text x="${PL-6}" y="${y+rowH/2+4}" text-anchor="end" font-size="10" fill="#9ca3af">${(item.label||'').slice(0,13)}</text>
+      <rect x="${PL}" y="${y+5}" width="${bW.toFixed(1)}" height="${rowH-10}" fill="${item.color||'#00e5cc'}" rx="3" opacity="0.8"/>
+      <text x="${PL+bW+5}" y="${y+rowH/2+4}" font-size="10" fill="#6b7280">${fmtNum(Math.round(item.value))}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">${bars}</svg>`;
+}
+
+function svgLineBar(months, values, color, height = 130) {
+  const W = 560, H = height, PL = 52, PR = 10, PT = 16, PB = 28;
+  const cW = W - PL - PR, cH = H - PT - PB;
+  const maxV = Math.max(...values, 1);
+  const bW = Math.min(cW / months.length * 0.55, 40);
+  const gW = cW / months.length;
+
+  const bars = months.map((_, i) => {
+    const v = values[i] || 0;
+    const bH = (v / maxV) * cH;
+    const x = PL + i * gW + (gW - bW) / 2;
+    const y = PT + cH - bH;
+    const lbl = v >= 100 ? fmtNum(Math.round(v)) : v > 0 ? v.toFixed(1)+'%' : '';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW.toFixed(1)}" height="${Math.max(bH,0).toFixed(1)}" fill="${color}" rx="2" opacity="0.8"/>
+      ${v > 0 ? `<text x="${(x+bW/2).toFixed(1)}" y="${(y-3).toFixed(1)}" text-anchor="middle" font-size="9" fill="${color}">${lbl}</text>` : ''}
+      <text x="${(PL+i*gW+gW/2).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="9" fill="#6b7280">${monthLabel(months[i])}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">${bars}</svg>`;
+}
+
+function renderReportes() {
+  const months = lastNMonths(6);
+
+  // ── FINANZAS TAB ──────────────────────────────
+  // Agrupar transacciones por mes
+  const ingByMonth = {}, gastosByMonth = {}, balByMonth = {};
+  months.forEach(m => { ingByMonth[m] = 0; gastosByMonth[m] = 0; });
+  (finTx || []).forEach(t => {
+    const m = (t.date || '').slice(0, 7);
+    if (!months.includes(m)) return;
+    const ars = txToARS(t);
+    if (t.type === 'ingreso') ingByMonth[m] = (ingByMonth[m] || 0) + ars;
+    if (t.type === 'gasto') gastosByMonth[m] = (gastosByMonth[m] || 0) + ars;
+  });
+  months.forEach(m => { balByMonth[m] = (ingByMonth[m] || 0) - (gastosByMonth[m] || 0); });
+
+  const ingGasSvg = svgGroupedBar(months, [
+    { name: 'Ingresos', color: '#22c55e', values: months.map(m => ingByMonth[m] || 0) },
+    { name: 'Gastos',   color: '#ef4444', values: months.map(m => gastosByMonth[m] || 0) }
+  ]);
+
+  // Top categorías
+  const cats = {};
+  const catColors = ['#00e5cc','#818cf8','#f59e0b','#ec4899','#22c55e','#3b82f6'];
+  (finTx || []).filter(t => t.type === 'gasto').forEach(t => {
+    cats[t.category || 'Sin categoría'] = (cats[t.category || 'Sin categoría'] || 0) + txToARS(t);
+  });
+  const catItems = Object.entries(cats).sort((a,b) => b[1]-a[1]).slice(0, 6)
+    .map(([label, value], i) => ({ label, value, color: catColors[i % catColors.length] }));
+  const catSvg = catItems.length ? svgHorizBars(catItems) : '<div class="empty">Sin datos</div>';
+
+  // Balance acumulado
+  const balSvg = svgGroupedBar(months, [
+    { name: 'Balance',  color: '#818cf8', values: months.map(m => Math.max(balByMonth[m] || 0, 0)) },
+    { name: 'Déficit',  color: '#ef4444', values: months.map(m => Math.max(-(balByMonth[m] || 0), 0)) }
+  ], 140);
+
+  const repIngGas = document.getElementById('rep-ing-gas');
+  const repCats = document.getElementById('rep-cats');
+  const repBal = document.getElementById('rep-balance');
+  if (repIngGas) repIngGas.innerHTML = ingGasSvg;
+  if (repCats) repCats.innerHTML = catSvg;
+  if (repBal) repBal.innerHTML = balSvg;
+
+  // ── VENTAS TAB ────────────────────────────────
+  const leadsByMonth = {}, convByMonth = {};
+  months.forEach(m => { leadsByMonth[m] = 0; convByMonth[m] = 0; });
+  (leadsData || []).forEach(l => {
+    const mc = (l.created_at || '').slice(0, 7);
+    if (months.includes(mc)) leadsByMonth[mc] = (leadsByMonth[mc] || 0) + 1;
+    if (l.status === 'cliente') {
+      const mu = (l.updated_at || '').slice(0, 7);
+      if (months.includes(mu)) convByMonth[mu] = (convByMonth[mu] || 0) + 1;
+    }
+  });
+
+  const leadsSvg = svgGroupedBar(months, [
+    { name: 'Leads nuevos',  color: '#818cf8', values: months.map(m => leadsByMonth[m] || 0) },
+    { name: 'Conversiones',  color: '#22c55e', values: months.map(m => convByMonth[m] || 0) }
+  ], 160);
+
+  const convPct = months.map(m => {
+    const tot = leadsByMonth[m] || 0;
+    return tot > 0 ? +((convByMonth[m] || 0) / tot * 100).toFixed(1) : 0;
+  });
+  const convSvg = svgLineBar(months, convPct, '#f59e0b', 130);
+
+  const repLeads = document.getElementById('rep-leads');
+  const repConv = document.getElementById('rep-conversion');
+  if (repLeads) repLeads.innerHTML = leadsSvg;
+  if (repConv) repConv.innerHTML = `<div style="font-size:11px;color:var(--text3);margin-bottom:6px">% de leads convertidos a cliente por mes de creación</div>` + convSvg;
+
+  // ── NÓMINA TAB ────────────────────────────────
+  const nominaByMonth = {};
+  months.forEach(m => { nominaByMonth[m] = 0; });
+  const tc = getTcOficial() || 1;
+  (_sueldos || []).filter(s => s.status === 'pagado').forEach(s => {
+    const m = s.periodo;
+    if (!months.includes(m)) return;
+    nominaByMonth[m] = (nominaByMonth[m] || 0) + (s.moneda === 'USD' ? +s.monto * tc : +s.monto);
+  });
+
+  const nominaSvg = svgLineBar(months, months.map(m => nominaByMonth[m] || 0), '#818cf8');
+
+  // Ratio nómina / ingresos
+  const ratioSvg = svgGroupedBar(months, [
+    { name: 'Ingresos', color: '#22c55e', values: months.map(m => ingByMonth[m] || 0) },
+    { name: 'Nómina',   color: '#818cf8', values: months.map(m => nominaByMonth[m] || 0) }
+  ], 150);
+
+  const repNomina = document.getElementById('rep-nomina');
+  const repNominaRatio = document.getElementById('rep-nomina-ratio');
+  if (repNomina) repNomina.innerHTML = nominaSvg;
+  if (repNominaRatio) repNominaRatio.innerHTML = ratioSvg;
+}
+
+// Tab switcher Reportes
+document.querySelectorAll('.tab-btn[data-rtab]').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn[data-rtab]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.rtab-content').forEach(t => t.style.display = 'none');
+    this.classList.add('active');
+    document.getElementById('rtab-' + this.dataset.rtab).style.display = 'block';
+  });
+});
+
+// Nav listener para Reportes
+document.querySelector('.nav-btn[data-sec="reportes"]')?.addEventListener('click', async () => {
+  // Asegurar que finTx y leadsData estén cargados
+  if (!finTx.length) {
+    finTx = await sbFetch('rhinos_transactions?order=date.desc').catch(() => []);
+  }
+  if (!leadsData.length) {
+    leadsData = await sbFetch('rhinos_leads?order=created_at.desc').catch(() => []);
+  }
+  if (!_sueldos.length) await syncSueldosFromSupabase();
+  renderReportes();
+});
+document.getElementById('btn-rep-refresh')?.addEventListener('click', renderReportes);
+
+// ══════════════════════════════════════════════════
+// TIMELINE DE CLIENTE
+// ══════════════════════════════════════════════════
+function renderClientTimeline(c) {
+  const events = [];
+  const tc = getTcOficial() || 1;
+
+  // Lead convertido
+  const lead = leadsData.find(l => l.email === c.email || l.name === c.nombre);
+  if (lead) {
+    events.push({ date: lead.updated_at || lead.created_at, icon: '🎯', color: '#818cf8',
+      title: 'Lead convertido a cliente', sub: `Origen: ${lead.source || '—'} · ${lead.status}` });
+    if (lead.created_at && lead.created_at !== lead.updated_at) {
+      events.push({ date: lead.created_at, icon: '📥', color: '#6b7280',
+        title: 'Lead ingresado al pipeline', sub: `${lead.source || '—'} · ${lead.name}` });
+    }
+  }
+
+  // Alta como cliente
+  if (c.createdAt || c.created_at) {
+    events.push({ date: c.createdAt || c.created_at, icon: '✅', color: '#22c55e',
+      title: 'Alta en Clientes', sub: `${c.empresa || c.nombre} · ${c.frecuencia_pago || 'mensual'}` });
+  }
+
+  // Cobros pagados
+  getCobros().filter(x => x.clientId === c.id && x.status === 'pagado').forEach(x => {
+    events.push({ date: x.fechaPago || x.periodo + '-01', icon: '💳', color: '#22c55e',
+      title: `Cobro pagado — ${x.periodo}`, sub: fmtMoneda ? fmtMoneda(x.monto || c.precio, c.moneda || 'ARS') : '$' + x.monto });
+  });
+
+  // Transacciones vinculadas (por nombre o empresa)
+  const nameMatch = (t) => {
+    const p = (t.partner || '').toLowerCase();
+    return p === (c.nombre||'').toLowerCase() || p === (c.empresa||'').toLowerCase();
+  };
+  (finTx || []).filter(nameMatch).forEach(t => {
+    events.push({ date: t.date, icon: t.type === 'ingreso' ? '💰' : '💸', color: t.type === 'ingreso' ? '#22c55e' : '#ef4444',
+      title: t.description || t.category, sub: `${t.category || ''} · ${fmtARS2(txToARS(t))}` });
+  });
+
+  if (!events.length) return '<div class="empty" style="font-size:12px;padding:12px">Sin actividad registrada aún.</div>';
+
+  events.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  return `<div style="position:relative;padding-left:20px">
+    <div style="position:absolute;left:7px;top:0;bottom:0;width:2px;background:var(--border)"></div>
+    ${events.map(e => `
+    <div style="position:relative;margin-bottom:12px">
+      <div style="position:absolute;left:-20px;top:2px;width:16px;height:16px;border-radius:50%;background:${e.color};display:flex;align-items:center;justify-content:center;font-size:9px">${e.icon}</div>
+      <div style="font-size:12px;font-weight:600;color:var(--text)">${e.title}</div>
+      <div style="font-size:11px;color:var(--text3)">${(e.date||'').slice(0,10)} · ${e.sub}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════
+// COMISIONES → FINANZAS (liquidar como gasto)
+// ══════════════════════════════════════════════════
+async function liquidarComisiones() {
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const tc = getTcOficial() || 1;
+  const rows = vendedoresData.filter(v => v.activo).map(v => {
+    const closed = leadsData.filter(l =>
+      l.vendedor_id === v.id && l.status === 'cliente' &&
+      (l.updated_at || '').startsWith(thisMonth)
+    );
+    const mrr = closed.reduce((s, l) => s + (parseFloat(l.deal_value) || 0), 0);
+    const pct = parseFloat(v.comision_porcentaje) || 0;
+    return { v, comision: mrr * pct / 100 };
+  }).filter(r => r.comision > 0);
+
+  if (!rows.length) { showToast('No hay comisiones a liquidar este mes'); return; }
+  if (!confirm(`¿Registrar ${rows.length} comisión${rows.length > 1 ? 'es' : ''} como gastos pendientes en Finanzas?`)) return;
+
+  for (const r of rows) {
+    const [newTx] = await sbFetch('rhinos_transactions', 'POST', {
+      type: 'pendiente', amount: Math.round(r.comision),
+      date: new Date().toISOString().slice(0, 10),
+      description: `Comisión — ${r.v.nombre}`,
+      category: 'Comisiones', partner: r.v.nombre,
+      notes: `Mes ${thisMonth}`, currency: 'ARS'
+    }).catch(() => []);
+    if (newTx) finTx.unshift(newTx);
+  }
+  showToast(`✅ ${rows.length} comisión${rows.length > 1 ? 'es' : ''} registrada${rows.length > 1 ? 's' : ''} como pendiente en Finanzas 🦏`);
+}
 
 // ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
@@ -11415,7 +11853,10 @@ function renderComisiones() {
       <span style="font-size:12px;color:var(--text2)">Total a pagar</span>
       <span style="font-size:20px;font-weight:800;color:var(--green);font-family:var(--display)">${total ? '$'+Math.round(total).toLocaleString('es-AR') : '—'}</span>
     </div>
-    <button class="btn btn-sm" id="btn-export-comisiones" style="margin-top:10px;color:var(--text2)">⬇ Exportar CSV</button>`;
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-sm" id="btn-export-comisiones" style="color:var(--text2)">⬇ Exportar CSV</button>
+      <button class="btn btn-sm" id="btn-liquidar-comisiones" style="color:var(--amber);border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.08)">💳 Liquidar en Finanzas</button>
+    </div>`;
 
   document.getElementById('btn-export-comisiones')?.addEventListener('click', () => {
     const csv = ['Vendedor,Leads cerrados,MRR cerrado,Comisión %,A pagar',
@@ -11424,6 +11865,7 @@ function renderComisiones() {
     const a = document.createElement('a'); a.href = 'data:text/csv,' + encodeURIComponent(csv);
     a.download = `comisiones-${thisMonth}.csv`; a.click();
   });
+  document.getElementById('btn-liquidar-comisiones')?.addEventListener('click', liquidarComisiones);
 }
 
 function renderPermisosPanel(v) {
@@ -11677,6 +12119,9 @@ async function loadCommercialDashboard() {
       }).join('');
     }
 
+    // Alertas inteligentes
+    renderDashboardAlertas();
+
     // Rendimiento vendedores
     const vpEl = document.getElementById('db-vendedores-perf');
     if (!vendedoresData.filter(v=>v.activo).length) {
@@ -11782,6 +12227,15 @@ function openClienteComercial(c) {
         ${c.created_at?`<span>📅 Cliente desde: ${c.created_at.slice(0,10)}</span>`:''}
       </div>
       ${c.notes?`<div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:var(--r);padding:8px 12px;line-height:1.6">${c.notes}</div>`:''}
+      ${c.contrato_fin ? `<div style="margin-top:10px;padding:8px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:var(--r);font-size:12px">
+        <span style="color:var(--amber);font-weight:600">📋 Contrato:</span> vence ${c.contrato_fin}
+        ${(()=>{const diff=Math.round((new Date(c.contrato_fin+'T12:00')-new Date())/86400000);return diff<=30?` <span style="color:${diff<=7?'var(--red)':'var(--amber)'}">— en ${diff} días</span>`:''})()}
+        ${c.contrato_notas ? ` · ${c.contrato_notas}` : ''}
+      </div>` : ''}
+    </div>
+    <div class="card" style="border-color:rgba(0,229,204,0.1)">
+      <div class="card-title">Historial de actividad</div>
+      ${renderClientTimeline(c)}
     </div>
     ${isAdmin() ? `<div class="card" style="border-color:rgba(0,229,204,0.1)">
       <div class="card-title">Asignar vendedor</div>
