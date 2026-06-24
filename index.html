@@ -8846,7 +8846,8 @@ function isPaymentMonth(c, periodo) {
 let _clients = [];
 function getClients() { return _clients; }
 // Columnas opcionales que pueden no existir aún en Supabase — se stripean del payload
-const _OPTIONAL_CLI_COLS = ['frecuencia_pago', 'contrato_fin', 'contrato_notas', 'tags'];
+// created_at y createdAt no existen en la tabla — se generan automáticamente o no aplican
+const _OPTIONAL_CLI_COLS = ['frecuencia_pago', 'contrato_fin', 'contrato_notas', 'tags', 'created_at', 'createdAt'];
 function stripOptionalCliCols(obj) {
   const r = { ...obj };
   _OPTIONAL_CLI_COLS.forEach(k => delete r[k]);
