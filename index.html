@@ -2802,7 +2802,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="card" style="padding:12px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <span style="font-size:13px;font-weight:600">Proveedores</span>
-            <button class="btn btn-sm btn-green" id="btn-nuevo-prov">+ Nuevo</button>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm" id="btn-import-gastos-fijos" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);font-size:11px" title="Importar gastos fijos existentes como proveedores">↳ Importar gastos fijos</button>
+              <button class="btn btn-sm btn-green" id="btn-nuevo-prov">+ Nuevo</button>
+            </div>
           </div>
           <!-- Formulario -->
           <div id="prov-form" style="display:none;background:var(--surface3);border-radius:var(--r);padding:12px;margin-bottom:12px;border:1px solid rgba(0,229,204,0.2)">
@@ -10714,11 +10717,12 @@ function openProvForm(p = null) {
 
 async function deleteProveedor(id) {
   const p = _proveedores.find(x => x.id === id);
-  if (!confirm(`¿Eliminar proveedor "${p?.nombre}"?`)) return;
+  if (!confirm(`¿Eliminar proveedor "${p?.nombre}"? También se eliminará su gasto fijo recurrente.`)) return;
   sbFetch(`rhinos_proveedores?id=eq.${encodeURIComponent(id)}`, 'DELETE').catch(() => {});
   _proveedores = _proveedores.filter(x => x.id !== id);
+  if (p) await removeProveedorRecurring(p);
   renderProveedoresList(); renderProveedoresMetrics();
-  showToast('Proveedor eliminado 🦏');
+  showToast('Proveedor y gasto fijo eliminados 🦏');
 }
 
 async function generarFacturasProv() {
@@ -10761,6 +10765,57 @@ async function pagarFacturaProv(facturaId) {
   showToast(`✅ Factura de ${f.proveedor_nombre} pagada 🦏`);
 }
 
+// ── SYNC PROVEEDOR ↔ GASTO FIJO ──────────────────────
+async function syncProveedorRecurring(p) {
+  if (p.estado !== 'activo' || !p.precio) { await removeProveedorRecurring(p); return; }
+  const desc = p.nombre;
+  const existing = _recurring.find(r => r.description === desc || r.partner === p.nombre);
+  const payload = { description: desc, category: 'Proveedores', partner: p.nombre,
+    type: 'gasto', amount: +p.precio, currency: p.moneda || 'ARS', day: +p.dia_factura || 1 };
+  if (existing) {
+    await sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(existing.id)}`, 'PATCH', payload).catch(() => {});
+    _recurring = _recurring.map(r => r.id === existing.id ? { ...r, ...payload } : r);
+  } else {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    const row = { id, ...payload, last_applied: null };
+    await sbFetch('rhinos_recurring_txs', 'POST', row).catch(() => {});
+    _recurring = [..._recurring, row];
+  }
+  renderRecurring();
+}
+
+async function removeProveedorRecurring(p) {
+  const rec = _recurring.find(r => r.description === p.nombre || r.partner === p.nombre);
+  if (!rec) return;
+  sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(rec.id)}`, 'DELETE').catch(() => {});
+  _recurring = _recurring.filter(r => r.id !== rec.id);
+  renderRecurring();
+}
+
+// Importar gastos fijos como proveedores
+document.getElementById('btn-import-gastos-fijos')?.addEventListener('click', async function() {
+  // Asegurar que _recurring está cargado
+  if (!_recurring.length) await syncRecurringTxsFromSupabase();
+  const gastos = _recurring.filter(r => r.type === 'gasto');
+  if (!gastos.length) { showToast('No hay gastos fijos configurados'); return; }
+  const yaImportados = new Set(_proveedores.map(p => p.nombre));
+  const nuevos = gastos.filter(r => !yaImportados.has(r.description));
+  if (!nuevos.length) { showToast('Todos los gastos fijos ya están importados como proveedores'); return; }
+  if (!confirm(`¿Importar ${nuevos.length} gasto${nuevos.length !== 1 ? 's' : ''} fijo${nuevos.length !== 1 ? 's' : ''} como proveedores?\n\n${nuevos.map(r => `• ${r.description} (${r.currency || 'ARS'} ${r.amount})`).join('\n')}`)) return;
+  let creados = 0;
+  for (const r of nuevos) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    const row = { id, nombre: r.description, servicio: r.category || 'Servicios',
+      email: '', phone: '', precio: r.amount, moneda: r.currency || 'ARS',
+      dia_factura: +r.day || 1, frecuencia_pago: 'mensual', estado: 'activo',
+      notas: 'Importado desde Gastos Fijos', created_at: new Date().toISOString() };
+    await sbFetch('rhinos_proveedores', 'POST', row).catch(() => {});
+    _proveedores = [..._proveedores, row]; creados++;
+  }
+  renderProveedoresList(); renderProveedoresMetrics();
+  showToast(`✅ ${creados} proveedor${creados !== 1 ? 'es' : ''} importado${creados !== 1 ? 's' : ''} 🦏`);
+});
+
 // Formulario handlers
 document.getElementById('btn-nuevo-prov')?.addEventListener('click', () => {
   const form = document.getElementById('prov-form');
@@ -10787,13 +10842,16 @@ document.getElementById('btn-prov-save')?.addEventListener('click', async functi
   if (_provEditId) {
     await sbFetch(`rhinos_proveedores?id=eq.${encodeURIComponent(_provEditId)}`, 'PATCH', data).catch(() => {});
     _proveedores = _proveedores.map(p => p.id === _provEditId ? { ...p, ...data } : p);
-    showToast('Proveedor actualizado 🦏');
+    const updated = _proveedores.find(p => p.id === _provEditId);
+    await syncProveedorRecurring(updated);
+    showToast('Proveedor actualizado y gasto fijo sincronizado 🦏');
   } else {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
     const row = { id, ...data, created_at: new Date().toISOString() };
     await sbFetch('rhinos_proveedores', 'POST', row).catch(() => {});
     _proveedores = [..._proveedores, row];
-    showToast('Proveedor agregado 🦏');
+    await syncProveedorRecurring(row);
+    showToast('Proveedor agregado y gasto fijo creado 🦏');
   }
   document.getElementById('prov-form').style.display = 'none'; _provEditId = null; this.disabled = false;
   renderProveedoresList(); renderProveedoresMetrics();
