@@ -504,6 +504,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <button class="nav-btn" data-sec="finanzas"><span class="nav-icon">💰</span>Finanzas</button>
     <button class="nav-btn" data-sec="balance"><span class="nav-icon">⚖️</span>Balance</button>
     <button class="nav-btn" data-sec="reportes"><span class="nav-icon">📊</span>Reportes</button>
+    <button class="nav-btn" data-sec="proveedores"><span class="nav-icon">🏭</span>Proveedores</button>
 
     <div class="nav-group-label">Gmail</div>
     <button class="nav-btn" data-sec="gmail"><span class="nav-icon">📧</span>Gmail</button>
@@ -1695,6 +1696,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-ftab="transacciones">Transacciones</button>
       <button class="tab-btn" data-ftab="socios">Socios</button>
       <button class="tab-btn" data-ftab="proyecciones">Proyecciones</button>
+      <button class="tab-btn" data-ftab="cashflow">💸 Cash Flow</button>
       <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').setAttribute('style','display:block');renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
       <button class="tab-btn" data-ftab="empleados">👥 Empleados</button>
     </div>
@@ -1962,6 +1964,25 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div id="proy-table"></div>
       </div>
     </div>
+    <!-- CASH FLOW TAB -->
+    <div class="ftab-content" id="ftab-cashflow" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <div style="font-family:var(--display);font-size:13px;font-weight:800;letter-spacing:.04em">Proyección real — próximos 3 meses</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">Basado en clientes activos, gastos fijos y sueldos configurados</div>
+        </div>
+        <button class="btn btn-sm" id="btn-cf-refresh" style="color:var(--text2)">↻ Recalcular</button>
+      </div>
+      <div class="metrics-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+        <div class="metric-card"><div class="m-label">Ingreso mensual esperado</div><div class="m-val green" id="cf-ingresos">—</div><div class="m-sub">promedio 3 meses</div></div>
+        <div class="metric-card"><div class="m-label">Gasto mensual comprometido</div><div class="m-val" id="cf-gastos" style="color:var(--red)">—</div><div class="m-sub">sueldos + fijos</div></div>
+        <div class="metric-card"><div class="m-label">Saldo proyectado</div><div class="m-val" id="cf-balance">—</div><div class="m-sub">promedio mensual</div></div>
+      </div>
+      <div id="cf-months" style="display:flex;flex-direction:column;gap:10px">
+        <div class="empty">Hacé click en ↻ Recalcular para ver la proyección.</div>
+      </div>
+    </div>
+
     <!-- COBROS TAB -->
     <div class="ftab-content" id="ftab-cobros" style="display:none">
 
@@ -2751,6 +2772,90 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="card">
           <div class="card-title">Costo nómina vs ingresos</div>
           <div id="rep-nomina-ratio"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ -->
+  <!-- PROVEEDORES                                        -->
+  <!-- ══════════════════════════════════════════════════ -->
+  <div class="section" id="s-proveedores">
+    <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end">
+      <div>
+        <div class="page-title">PROVEE<span>DORES</span></div>
+        <div class="page-sub">Gestión de proveedores y facturas a pagar.</div>
+      </div>
+      <button class="btn btn-sm" id="btn-prov-refresh" style="color:var(--text2)">↻ Actualizar</button>
+    </div>
+
+    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="metric-card"><div class="m-label">Proveedores activos</div><div class="m-val cyan" id="prov-total">—</div><div class="m-sub">en nómina</div></div>
+      <div class="metric-card"><div class="m-label">Gasto mensual ARS</div><div class="m-val" id="prov-masa-ars" style="color:var(--red)">—</div><div class="m-sub">estimado</div></div>
+      <div class="metric-card"><div class="m-label">Gasto mensual USD</div><div class="m-val" id="prov-masa-usd" style="color:var(--amber)">—</div><div class="m-sub">estimado</div></div>
+      <div class="metric-card"><div class="m-label">Facturas pendientes</div><div class="m-val" id="prov-pend" style="color:var(--amber)">—</div><div class="m-sub">este período</div></div>
+    </div>
+
+    <div class="grid2" style="align-items:start">
+      <!-- Lista + Formulario -->
+      <div>
+        <div class="card" style="padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:13px;font-weight:600">Proveedores</span>
+            <button class="btn btn-sm btn-green" id="btn-nuevo-prov">+ Nuevo</button>
+          </div>
+          <!-- Formulario -->
+          <div id="prov-form" style="display:none;background:var(--surface3);border-radius:var(--r);padding:12px;margin-bottom:12px;border:1px solid rgba(0,229,204,0.2)">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px" id="prov-form-titulo">Nuevo proveedor</div>
+            <div class="grid2">
+              <div class="field" style="margin:0 0 8px"><label>Nombre / Razón social</label><input id="pv-nombre" placeholder="TechSoft SA"/></div>
+              <div class="field" style="margin:0 0 8px"><label>Servicio</label><input id="pv-servicio" placeholder="Hosting, Desarrollo, Marketing..."/></div>
+              <div class="field" style="margin:0 0 8px"><label>Email</label><input id="pv-email" type="email" placeholder="proveedor@empresa.com"/></div>
+              <div class="field" style="margin:0 0 8px"><label>Teléfono</label><input id="pv-phone" placeholder="+54 9 11..."/></div>
+            </div>
+            <div class="grid2">
+              <div class="field" style="margin:0 0 8px">
+                <label>Monto mensual</label>
+                <div style="display:flex;gap:6px">
+                  <input id="pv-precio" type="number" placeholder="0" style="flex:1"/>
+                  <select id="pv-moneda" style="width:74px"><option value="ARS">ARS</option><option value="USD">USD</option></select>
+                </div>
+              </div>
+              <div class="field" style="margin:0 0 8px"><label>Día de factura (1–31)</label><input id="pv-dia" type="number" min="1" max="31" value="10"/></div>
+            </div>
+            <div class="grid2">
+              <div class="field" style="margin:0 0 8px">
+                <label>Frecuencia</label>
+                <select id="pv-frecuencia"><option value="mensual">Mensual</option><option value="bimestral">Bimestral</option><option value="trimestral">Trimestral</option><option value="semestral">Semestral</option><option value="anual">Anual</option></select>
+              </div>
+              <div class="field" style="margin:0 0 8px">
+                <label>Estado</label>
+                <select id="pv-estado"><option value="activo">Activo</option><option value="pausado">Pausado</option><option value="inactivo">Inactivo</option></select>
+              </div>
+            </div>
+            <div class="field" style="margin-bottom:10px"><label>Notas</label><input id="pv-notas" placeholder="Condiciones, contacto, contrato..."/></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn btn-sm" id="btn-prov-cancel">Cancelar</button>
+              <button class="btn btn-sm btn-green" id="btn-prov-save">Guardar proveedor</button>
+            </div>
+          </div>
+          <div id="prov-list"><div class="empty">Sin proveedores registrados.</div></div>
+        </div>
+      </div>
+
+      <!-- Facturas del período -->
+      <div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-family:var(--display);font-size:12px;font-weight:800;letter-spacing:.04em">FACTURAS DEL PERÍODO</span>
+              <button id="btn-fprov-prev" class="btn btn-sm" style="padding:2px 8px">‹</button>
+              <span id="fprov-period-label" style="font-size:13px;font-weight:600;color:var(--cyan);min-width:90px;text-align:center">—</span>
+              <button id="btn-fprov-next" class="btn btn-sm" style="padding:2px 8px">›</button>
+            </div>
+            <button class="btn btn-sm btn-green" id="btn-generar-fprov" style="font-size:12px">↻ Generar facturas</button>
+          </div>
+          <div id="fprov-list"><div class="empty" style="font-size:12px">Generá las facturas del mes para ver el estado.</div></div>
         </div>
       </div>
     </div>
@@ -5606,6 +5711,19 @@ async function openLead(lead) {
             <div style="font-size:12px;color:var(--text);line-height:1.5">${i.note}</div>
           </div>`).join('') : '<div class="empty" style="padding:1rem">Sin interacciones aún</div>'}
       </div>
+    </div>
+    <div class="card" style="border-color:rgba(99,102,241,0.2)">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        💬 Notas del equipo
+        <span id="team-notes-badge-lead" style="font-size:10px;color:var(--text3);font-weight:400"></span>
+      </div>
+      <div id="team-notes-lead" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:10px">
+        <div class="empty" style="font-size:12px">Cargando...</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <input id="team-note-input-lead" placeholder="Escribí una nota interna..." style="flex:1;font-size:12px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font)"/>
+        <button class="btn btn-sm" id="btn-add-team-note-lead" style="color:#818cf8;border-color:rgba(99,102,241,0.3)">+ Agregar</button>
+      </div>
     </div>`;
 
   let pendingStatus = null;
@@ -5693,6 +5811,17 @@ async function openLead(lead) {
       document.querySelector('.nav-btn[data-sec="finanzas"]').click();
     });
   }
+
+  // Notas del equipo — lead
+  loadTeamNotes('lead', lead.id);
+  document.getElementById('btn-add-team-note-lead')?.addEventListener('click', () => {
+    const inp = document.getElementById('team-note-input-lead');
+    addTeamNote('lead', lead.id, inp.value.trim());
+    inp.value = '';
+  });
+  document.getElementById('team-note-input-lead')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { const inp = e.target; addTeamNote('lead', lead.id, inp.value.trim()); inp.value = ''; }
+  });
 
   document.getElementById('btn-add-int').addEventListener('click', async function() {
     const type = document.getElementById('int-type').value;
@@ -9727,6 +9856,31 @@ function renderDashboardAlertas() {
       </div>`);
   });
 
+  // Leads fríos — sin actividad hace más de 7 días y sin followup futuro
+  const hoy7 = new Date(); hoy7.setDate(hoy7.getDate() - 7);
+  const cutoff = hoy7.toISOString().slice(0, 10);
+  const frios = (leadsData || []).filter(l => {
+    if (['cliente','perdido','imposible'].includes(l.status)) return false;
+    const lastAct = (l.updated_at || l.created_at || '').slice(0, 10);
+    const hasFutureFollowup = l.next_followup && l.next_followup > hoyStr;
+    return lastAct < cutoff && !hasFutureFollowup;
+  }).slice(0, 5);
+
+  frios.forEach(l => {
+    const wa = formatWhatsApp(l.phone);
+    const dias = Math.round((new Date(hoyStr) - new Date((l.updated_at || l.created_at || '').slice(0,10))) / 86400000);
+    alertas.push(`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:var(--r)">
+        <span style="font-size:16px;flex-shrink:0">❄️</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${l.name}</div>
+          <div style="font-size:11px;color:#818cf8">Lead frío · ${dias} días sin actividad · ${l.company || ''}</div>
+        </div>
+        ${wa ? `<a href="https://wa.me/${wa}?text=${encodeURIComponent('Hola ' + l.name.split(' ')[0] + '! ¿Cómo estás? Te escribo para ver si pudiste evaluar la propuesta de RhinosApp. Quedamos a disposición para cualquier consulta.')}" target="_blank" class="btn btn-sm" style="color:var(--green);border-color:rgba(34,197,94,0.3);flex-shrink:0;font-size:11px">💬 Reactivar WA</a>` : ''}
+        <button class="btn btn-sm" style="color:#818cf8;border-color:rgba(99,102,241,0.3);font-size:11px;flex-shrink:0" onclick="document.querySelector('.nav-btn[data-sec=\\'leads\\']').click();setTimeout(()=>{const l=leadsData.find(x=>x.id===${l.id});if(l)openLead(l);},400)">Ver →</button>
+      </div>`);
+  });
+
   if (alertas.length) {
     card.style.display = 'block';
     list.innerHTML = alertas.join('');
@@ -10284,6 +10438,377 @@ function runGlobalSearch(query) {
 // Re-bind listeners using the new function
 document.getElementById('global-search-input')?.removeEventListener('input', _origRunGlobalSearch);
 document.getElementById('global-search-input')?.addEventListener('input', function(){ runGlobalSearch(this.value.trim()); });
+
+// ══════════════════════════════════════════════════
+// CASH FLOW — PROYECCIÓN REAL 3 MESES
+// ══════════════════════════════════════════════════
+function renderCashFlow() {
+  const months = [];
+  const now = new Date();
+  for (let i = 0; i <= 2; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    months.push(d.toISOString().slice(0, 7));
+  }
+  const tc = getTcOficial() || 1;
+  const clients  = (typeof getClients  === 'function' ? getClients()  : []).filter(c => c.estado === 'activo');
+  const empls    = (typeof getEmpleados === 'function' ? getEmpleados() : []).filter(e => e.estado !== 'baja');
+  const fixedExp = (typeof getRecurring === 'function' ? getRecurring() : []).filter(r => r.type === 'gasto' && r.category !== 'Sueldos');
+  // proveedores activos como gasto fijo mensual
+  const provActivos = _proveedores.filter(p => p.estado === 'activo');
+
+  let totalIng = 0, totalGas = 0;
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  const cards = months.map(periodo => {
+    const [y, m] = periodo.split('-');
+    const label = meses[+m - 1] + ' ' + y;
+
+    // Ingresos: clientes que pagan este mes
+    const ingresos = clients.reduce((s, c) => {
+      if (typeof isPaymentMonth === 'function' && !isPaymentMonth(c, periodo)) return s;
+      return s + (c.moneda === 'USD' ? +c.precio * tc : +c.precio);
+    }, 0);
+
+    // Salarios
+    const salarios = empls.reduce((s, e) => s + (e.moneda === 'USD' ? +e.salario * tc : +e.salario), 0);
+
+    // Gastos fijos recurrentes
+    const fijos = fixedExp.reduce((s, r) => s + (r.currency === 'USD' ? +r.amount * tc : +r.amount), 0);
+
+    // Proveedores
+    const provGasto = provActivos.reduce((s, p) => {
+      const meses2 = FREQ_MESES ? (FREQ_MESES[p.frecuencia_pago || 'mensual'] || 1) : 1;
+      const inicio = (p.created_at || '').slice(0, 7) || periodo;
+      const [sy, sm] = inicio.split('-').map(Number);
+      const [py, pm] = periodo.split('-').map(Number);
+      const diff = (py - sy) * 12 + (pm - sm);
+      if (diff >= 0 && diff % meses2 === 0) {
+        return s + (p.moneda === 'USD' ? +p.precio * tc : +p.precio);
+      }
+      return s;
+    }, 0);
+
+    const gastos = salarios + fijos + provGasto;
+    const balance = ingresos - gastos;
+    totalIng += ingresos; totalGas += gastos;
+
+    const balColor = balance >= 0 ? 'var(--green)' : 'var(--red)';
+    const pct = (ingresos + gastos) > 0 ? Math.min(100, Math.round(ingresos / (ingresos + gastos) * 100)) : 0;
+
+    return `<div class="card" style="padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:700;font-size:14px">${label}</span>
+        <span style="font-size:16px;font-weight:800;color:${balColor}">${balance >= 0 ? '+' : ''}${fmtARS2(Math.round(balance))}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:10px">
+        <div style="background:rgba(34,197,94,0.07);border-radius:var(--r);padding:8px 10px">
+          <div style="color:var(--text3);margin-bottom:2px">↑ Ingresos esperados</div>
+          <div style="font-weight:600;color:var(--green)">${fmtARS2(Math.round(ingresos))}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">${clients.filter(c => typeof isPaymentMonth !== 'function' || isPaymentMonth(c, periodo)).length} clientes</div>
+        </div>
+        <div style="background:rgba(239,68,68,0.07);border-radius:var(--r);padding:8px 10px">
+          <div style="color:var(--text3);margin-bottom:2px">↓ Gastos comprometidos</div>
+          <div style="font-weight:600;color:var(--red)">${fmtARS2(Math.round(gastos))}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">Sueldos ${fmtARS2(Math.round(salarios))} · Fijos ${fmtARS2(Math.round(fijos))} · Proveedores ${fmtARS2(Math.round(provGasto))}</div>
+        </div>
+      </div>
+      <div style="height:7px;background:var(--surface3);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${balColor};border-radius:4px;transition:width 0.5s"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">${pct}% de cobertura de gastos — ${balance >= 0 ? 'Saldo positivo ✓' : 'Déficit proyectado ⚠'}</div>
+    </div>`;
+  }).join('');
+
+  const avg = n => n ? fmtARS2(Math.round(n / 3)) : '—';
+  const cfI = document.getElementById('cf-ingresos'); if (cfI) cfI.textContent = avg(totalIng);
+  const cfG = document.getElementById('cf-gastos');   if (cfG) cfG.textContent = avg(totalGas);
+  const cfB = document.getElementById('cf-balance');
+  if (cfB) { cfB.textContent = avg(totalIng - totalGas); cfB.style.color = totalIng >= totalGas ? 'var(--green)' : 'var(--red)'; }
+  const cfM = document.getElementById('cf-months'); if (cfM) cfM.innerHTML = cards;
+}
+
+document.querySelector('.tab-btn[data-ftab="cashflow"]')?.addEventListener('click', async () => {
+  if (!_clients.length) await syncClientsSupabase();
+  await syncEmpleadosFromSupabase();
+  renderCashFlow();
+});
+document.getElementById('btn-cf-refresh')?.addEventListener('click', renderCashFlow);
+
+// ══════════════════════════════════════════════════
+// NOTAS DEL EQUIPO — por lead/cliente
+// ══════════════════════════════════════════════════
+let _teamNotes = {}; // { 'lead_ID': [...], 'cliente_ID': [...] }
+
+async function loadTeamNotes(type, entityId) {
+  const key = `${type}_${entityId}`;
+  const containerId = `team-notes-${type === 'lead' ? 'lead' : 'cli'}`;
+  const badgeId = `team-notes-badge-${type === 'lead' ? 'lead' : 'cli'}`;
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  try {
+    const rows = await sbFetch(`rhinos_notas?entity_type=eq.${type}&entity_id=eq.${encodeURIComponent(entityId)}&order=created_at.asc`);
+    _teamNotes[key] = Array.isArray(rows) ? rows : [];
+  } catch(e) {
+    _teamNotes[key] = [];
+  }
+  renderTeamNotes(type, entityId);
+}
+
+function renderTeamNotes(type, entityId) {
+  const key = `${type}_${entityId}`;
+  const notes = _teamNotes[key] || [];
+  const containerId = `team-notes-${type === 'lead' ? 'lead' : 'cli'}`;
+  const badgeId = `team-notes-badge-${type === 'lead' ? 'lead' : 'cli'}`;
+  const container = document.getElementById(containerId);
+  const badge = document.getElementById(badgeId);
+  if (!container) return;
+  if (badge) badge.textContent = notes.length ? `${notes.length} nota${notes.length !== 1 ? 's' : ''}` : '';
+
+  if (!notes.length) {
+    container.innerHTML = '<div class="empty" style="font-size:12px">Sin notas aún. Agregá la primera.</div>';
+    return;
+  }
+  container.innerHTML = notes.map(n => {
+    const autor = (n.autor || 'anónimo').split('@')[0];
+    const initials = autor.slice(0, 2).toUpperCase();
+    const fecha = n.created_at ? new Date(n.created_at).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+    return `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#818cf8;flex-shrink:0">${initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+          <span style="font-size:11px;font-weight:600;color:#818cf8">${autor}</span>
+          <span style="font-size:10px;color:var(--text3)">${fecha}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text);line-height:1.5">${n.contenido}</div>
+      </div>
+    </div>`;
+  }).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+async function addTeamNote(type, entityId, text) {
+  if (!text) return;
+  const key = `${type}_${entityId}`;
+  const autor = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : 'equipo';
+  const note = { id: Date.now().toString(36) + Math.random().toString(36).slice(2), entity_type: type, entity_id: String(entityId), autor, contenido: text, created_at: new Date().toISOString() };
+  await sbFetch('rhinos_notas', 'POST', note).catch(e => console.warn('Nota:', e.message));
+  if (!_teamNotes[key]) _teamNotes[key] = [];
+  _teamNotes[key].push(note);
+  renderTeamNotes(type, entityId);
+}
+
+// ══════════════════════════════════════════════════
+// PROVEEDORES
+// ══════════════════════════════════════════════════
+let _proveedores = [];
+let _facturasProv = [];
+let _fprovPeriod = new Date().toISOString().slice(0, 7);
+let _provEditId = null;
+
+async function syncProveedoresFromSupabase() {
+  try { _proveedores = (await sbFetch('rhinos_proveedores?order=nombre.asc')) || []; } catch(e) { console.warn('Proveedores:', e.message); }
+}
+async function syncFacturasProvFromSupabase() {
+  try { _facturasProv = (await sbFetch('rhinos_facturas_prov?order=periodo.desc')) || []; } catch(e) { console.warn('FacturasProv:', e.message); }
+}
+
+function renderProveedoresMetrics() {
+  const activos = _proveedores.filter(p => p.estado === 'activo');
+  document.getElementById('prov-total').textContent = activos.length;
+  const tc = getTcOficial() || 1;
+  let ars = 0, usd = 0;
+  activos.forEach(p => { if (p.moneda === 'USD') { usd += +p.precio; ars += +p.precio * tc; } else ars += +p.precio; });
+  document.getElementById('prov-masa-ars').textContent = ars ? '$' + fmtNum(Math.round(ars)) : '—';
+  document.getElementById('prov-masa-usd').textContent = usd ? 'USD ' + fmtNum(Math.round(usd)) : '—';
+  const pend = _facturasProv.filter(f => f.periodo === _fprovPeriod && f.status === 'pendiente').length;
+  document.getElementById('prov-pend').textContent = pend || '0';
+}
+
+function renderProveedoresList() {
+  const el = document.getElementById('prov-list');
+  if (!_proveedores.length) { el.innerHTML = '<div class="empty">Sin proveedores. Agregá el primero.</div>'; return; }
+  el.innerHTML = _proveedores.map(p => {
+    const initials = p.nombre.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
+    const montoFmt = p.moneda === 'USD' ? `USD ${fmtNum(+p.precio)}` : `$${fmtNum(+p.precio)} ARS`;
+    const estadoColor = p.estado === 'activo' ? 'var(--green)' : 'var(--text3)';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);${p.estado !== 'activo' ? 'opacity:0.5' : ''}">
+      <div style="width:36px;height:36px;border-radius:50%;background:rgba(245,158,11,0.12);border:2px solid rgba(245,158,11,0.3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--amber);flex-shrink:0">${initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${p.nombre}</div>
+        <div style="font-size:11px;color:var(--text3)">${p.servicio || '—'} · ${montoFmt} · día ${p.dia_factura}</div>
+      </div>
+      <span style="font-size:10px;padding:2px 8px;border-radius:8px;border:1px solid ${estadoColor}33;color:${estadoColor}">${p.estado}</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.25);padding:3px 8px" data-prov-edit="${p.id}">✏</button>
+        <button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-prov-del="${p.id}">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('[data-prov-edit]').forEach(btn => btn.addEventListener('click', () => openProvForm(_proveedores.find(p => p.id === btn.dataset.provEdit))));
+  el.querySelectorAll('[data-prov-del]').forEach(btn => btn.addEventListener('click', () => deleteProveedor(btn.dataset.provDel)));
+}
+
+function renderFacturasProv() {
+  document.getElementById('fprov-period-label').textContent = fmtPeriodLabel(_fprovPeriod);
+  const facturas = _facturasProv.filter(f => f.periodo === _fprovPeriod);
+  const el = document.getElementById('fprov-list');
+  if (!facturas.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin facturas para este período. Hacé click en "Generar facturas".</div>'; renderProveedoresMetrics(); return; }
+
+  const tc = getTcOficial() || 1;
+  el.innerHTML = facturas.map(f => {
+    const isPagado = f.status === 'pagado';
+    const montoARS = f.moneda === 'USD' ? +f.monto * tc : +f.monto;
+    const montoFmt = f.moneda === 'USD' ? `USD ${fmtNum(+f.monto)} (≈${fmtARS2(Math.round(montoARS))})` : fmtARS2(+f.monto);
+    const initials = (f.proveedor_nombre || '?').split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid ${isPagado ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.25)'};border-radius:var(--r);margin-bottom:6px">
+      <div style="width:34px;height:34px;border-radius:50%;background:rgba(245,158,11,0.1);border:2px solid rgba(245,158,11,0.25);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--amber);flex-shrink:0">${initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${f.proveedor_nombre}</div>
+        <div style="font-size:11px;color:var(--text3)">${montoFmt} · ${_fprovPeriod}</div>
+      </div>
+      ${isPagado
+        ? `<span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3)">✓ Pagado${f.fecha_pago ? ' ' + new Date(f.fecha_pago+'T12:00').toLocaleDateString('es-AR') : ''}</span>`
+        : `<div style="display:flex;gap:6px">
+             <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.3);align-self:center">⏳ Pendiente</span>
+             <button class="btn btn-sm btn-green" data-fprov-pagar="${f.id}" style="font-size:12px;padding:4px 12px">Pagar</button>
+           </div>`
+      }
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('[data-fprov-pagar]').forEach(btn => btn.addEventListener('click', () => pagarFacturaProv(btn.dataset.fprovPagar)));
+  renderProveedoresMetrics();
+}
+
+function openProvForm(p = null) {
+  _provEditId = p?.id || null;
+  document.getElementById('prov-form-titulo').textContent = p ? '✏ Editando: ' + p.nombre : 'Nuevo proveedor';
+  document.getElementById('pv-nombre').value  = p?.nombre  || '';
+  document.getElementById('pv-servicio').value = p?.servicio || '';
+  document.getElementById('pv-email').value   = p?.email   || '';
+  document.getElementById('pv-phone').value   = p?.phone   || '';
+  document.getElementById('pv-precio').value  = p?.precio  || '';
+  document.getElementById('pv-moneda').value  = p?.moneda  || 'ARS';
+  document.getElementById('pv-dia').value     = p?.dia_factura || 10;
+  document.getElementById('pv-frecuencia').value = p?.frecuencia_pago || 'mensual';
+  document.getElementById('pv-estado').value  = p?.estado  || 'activo';
+  document.getElementById('pv-notas').value   = p?.notas   || '';
+  document.getElementById('prov-form').style.display = 'block';
+  document.getElementById('pv-nombre').focus();
+}
+
+async function deleteProveedor(id) {
+  const p = _proveedores.find(x => x.id === id);
+  if (!confirm(`¿Eliminar proveedor "${p?.nombre}"?`)) return;
+  sbFetch(`rhinos_proveedores?id=eq.${encodeURIComponent(id)}`, 'DELETE').catch(() => {});
+  _proveedores = _proveedores.filter(x => x.id !== id);
+  renderProveedoresList(); renderProveedoresMetrics();
+  showToast('Proveedor eliminado 🦏');
+}
+
+async function generarFacturasProv() {
+  const activos = _proveedores.filter(p => p.estado === 'activo');
+  if (!activos.length) { showToast('No hay proveedores activos'); return; }
+  let creados = 0;
+  for (const p of activos) {
+    if (_facturasProv.find(f => f.proveedor_id === p.id && f.periodo === _fprovPeriod)) continue;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    const row = { id, proveedor_id: p.id, proveedor_nombre: p.nombre, periodo: _fprovPeriod, monto: p.precio, moneda: p.moneda || 'ARS', status: 'pendiente', fecha_pago: null };
+    await sbFetch('rhinos_facturas_prov', 'POST', row).catch(e => console.warn('Factura prov:', e.message));
+    _facturasProv = [..._facturasProv, row]; creados++;
+  }
+  if (!creados) showToast('Ya existen facturas para todos los proveedores este mes');
+  else showToast(`↻ ${creados} factura${creados !== 1 ? 's' : ''} generada${creados !== 1 ? 's' : ''} como pendiente 🦏`);
+  renderFacturasProv();
+}
+
+async function pagarFacturaProv(facturaId) {
+  const f = _facturasProv.find(x => x.id === facturaId);
+  if (!f) return;
+  const tc = getTcOficial() || 1;
+  const montoARS = f.moneda === 'USD' ? +f.monto * tc : +f.monto;
+  if (!confirm(`¿Registrar pago a ${f.proveedor_nombre} — ${f.moneda === 'USD' ? 'USD ' + f.monto : fmtARS2(+f.monto)}?`)) return;
+  const hoy = new Date().toISOString().slice(0, 10);
+  try {
+    const [tx] = await sbFetch('rhinos_transactions', 'POST', {
+      type: 'gasto', amount: Math.round(montoARS), date: hoy,
+      description: `Factura — ${f.proveedor_nombre}`, category: 'Proveedores',
+      partner: f.proveedor_nombre, notes: `Período ${f.periodo}`, currency: 'ARS',
+      currency_original: f.moneda, amount_original: +f.monto,
+      tc_dia: f.moneda === 'USD' ? tc : null
+    });
+    if (tx) finTx.unshift(tx);
+  } catch(e) { console.warn('Tx prov:', e.message); }
+  await sbFetch(`rhinos_facturas_prov?id=eq.${encodeURIComponent(facturaId)}`, 'PATCH', { status: 'pagado', fecha_pago: hoy }).catch(() => {});
+  _facturasProv = _facturasProv.map(x => x.id === facturaId ? { ...x, status: 'pagado', fecha_pago: hoy } : x);
+  renderFacturasProv();
+  renderResumen();
+  showToast(`✅ Factura de ${f.proveedor_nombre} pagada 🦏`);
+}
+
+// Formulario handlers
+document.getElementById('btn-nuevo-prov')?.addEventListener('click', () => {
+  const form = document.getElementById('prov-form');
+  if (form.style.display === 'block' && !_provEditId) { form.style.display = 'none'; return; }
+  openProvForm();
+});
+document.getElementById('btn-prov-cancel')?.addEventListener('click', () => { document.getElementById('prov-form').style.display = 'none'; _provEditId = null; });
+
+document.getElementById('btn-prov-save')?.addEventListener('click', async function() {
+  const nombre = document.getElementById('pv-nombre').value.trim();
+  if (!nombre) { showToast('El nombre es obligatorio'); return; }
+  this.disabled = true;
+  const data = {
+    nombre, servicio: document.getElementById('pv-servicio').value.trim(),
+    email: document.getElementById('pv-email').value.trim(),
+    phone: document.getElementById('pv-phone').value.trim(),
+    precio: +document.getElementById('pv-precio').value || 0,
+    moneda: document.getElementById('pv-moneda').value,
+    dia_factura: +document.getElementById('pv-dia').value || 10,
+    frecuencia_pago: document.getElementById('pv-frecuencia').value,
+    estado: document.getElementById('pv-estado').value,
+    notas: document.getElementById('pv-notas').value.trim()
+  };
+  if (_provEditId) {
+    await sbFetch(`rhinos_proveedores?id=eq.${encodeURIComponent(_provEditId)}`, 'PATCH', data).catch(() => {});
+    _proveedores = _proveedores.map(p => p.id === _provEditId ? { ...p, ...data } : p);
+    showToast('Proveedor actualizado 🦏');
+  } else {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    const row = { id, ...data, created_at: new Date().toISOString() };
+    await sbFetch('rhinos_proveedores', 'POST', row).catch(() => {});
+    _proveedores = [..._proveedores, row];
+    showToast('Proveedor agregado 🦏');
+  }
+  document.getElementById('prov-form').style.display = 'none'; _provEditId = null; this.disabled = false;
+  renderProveedoresList(); renderProveedoresMetrics();
+});
+
+// Navegación período
+document.getElementById('btn-fprov-prev')?.addEventListener('click', () => {
+  const [y, m] = _fprovPeriod.split('-').map(Number);
+  _fprovPeriod = m === 1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+  renderFacturasProv();
+});
+document.getElementById('btn-fprov-next')?.addEventListener('click', () => {
+  const [y, m] = _fprovPeriod.split('-').map(Number);
+  _fprovPeriod = m === 12 ? `${y+1}-01` : `${y}-${String(m+1).padStart(2,'0')}`;
+  renderFacturasProv();
+});
+document.getElementById('btn-generar-fprov')?.addEventListener('click', generarFacturasProv);
+document.getElementById('btn-prov-refresh')?.addEventListener('click', async () => {
+  await Promise.all([syncProveedoresFromSupabase(), syncFacturasProvFromSupabase()]);
+  renderProveedoresList(); renderFacturasProv();
+});
+
+// Nav listener
+document.querySelector('.nav-btn[data-sec="proveedores"]')?.addEventListener('click', async () => {
+  await Promise.all([syncProveedoresFromSupabase(), syncFacturasProvFromSupabase()]);
+  renderProveedoresList();
+  renderFacturasProv();
+});
 
 // ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
@@ -12526,6 +13051,19 @@ function openClienteComercial(c) {
       <div class="card-title">Historial de actividad</div>
       ${renderClientTimeline(c)}
     </div>
+    <div class="card" style="border-color:rgba(99,102,241,0.2)">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        💬 Notas del equipo
+        <span id="team-notes-badge-cli" style="font-size:10px;color:var(--text3);font-weight:400"></span>
+      </div>
+      <div id="team-notes-cli" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;margin-bottom:10px">
+        <div class="empty" style="font-size:12px">Cargando...</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <input id="team-note-input-cli" placeholder="Escribí una nota interna..." style="flex:1;font-size:12px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font)"/>
+        <button class="btn btn-sm" id="btn-add-team-note-cli" style="color:#818cf8;border-color:rgba(99,102,241,0.3)">+ Agregar</button>
+      </div>
+    </div>
     ${isAdmin() ? `<div class="card" style="border-color:rgba(0,229,204,0.1)">
       <div class="card-title">Asignar vendedor</div>
       <div style="display:flex;gap:8px">
@@ -12548,6 +13086,17 @@ function openClienteComercial(c) {
       showToast('Vendedor asignado');
     });
   }
+
+  // Notas del equipo — cliente
+  loadTeamNotes('cliente', c.id);
+  detail.querySelector('#btn-add-team-note-cli')?.addEventListener('click', () => {
+    const inp = detail.querySelector('#team-note-input-cli');
+    addTeamNote('cliente', c.id, inp.value.trim());
+    inp.value = '';
+  });
+  detail.querySelector('#team-note-input-cli')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { addTeamNote('cliente', c.id, e.target.value.trim()); e.target.value = ''; }
+  });
 }
 
 document.getElementById('cc-search')?.addEventListener('input', renderClientesComercialList);
