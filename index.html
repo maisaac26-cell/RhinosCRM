@@ -2151,6 +2151,21 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <!-- Lista de empleados -->
       <div id="emp-list"><div class="empty">Cargando...</div></div>
 
+      <!-- ── SUELDOS DEL PERÍODO ─────────────────────────── -->
+      <div style="margin-top:28px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:var(--display);font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--text)">SUELDOS DEL PERÍODO</span>
+            <button id="btn-sued-prev" class="btn btn-sm" style="padding:2px 8px">‹</button>
+            <span id="sued-period-label" style="font-size:13px;font-weight:600;color:var(--cyan);min-width:90px;text-align:center">—</span>
+            <button id="btn-sued-next" class="btn btn-sm" style="padding:2px 8px">›</button>
+          </div>
+          <button class="btn btn-green" id="btn-sued-generar" style="font-size:12px">↻ Generar sueldos del mes</button>
+        </div>
+        <div id="sued-metrics" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px"></div>
+        <div id="sued-list"><div class="empty" style="font-size:12px">Hacé click en "Generar sueldos del mes" para crear los registros pendientes.</div></div>
+      </div>
+
     </div><!-- /ftab-empleados -->
 
   </div>
@@ -6802,6 +6817,7 @@ async function applyRecurring() {
   let applied = 0;
 
   for (const r of list) {
+    if (r.category === 'Sueldos') continue; // sueldos se pagan manualmente desde tab Empleados
     if (r.last_applied === currentMonth) continue;
     if (today < +r.day) continue;
     const txDate = `${currentMonth}-${String(r.day).padStart(2, '0')}`;
@@ -9348,9 +9364,163 @@ document.getElementById('btn-emp-save').addEventListener('click', async function
 
 // Cargar al abrir el tab
 document.querySelector('.tab-btn[data-ftab="empleados"]').addEventListener('click', async () => {
-  await syncEmpleadosFromSupabase();
+  await Promise.all([syncEmpleadosFromSupabase(), syncSueldosFromSupabase()]);
   renderEmpleados();
+  renderSueldosPeriodo();
 });
+
+// ══════════════════════════════════════════════════
+// SUELDOS — SEGUIMIENTO MENSUAL DE PAGOS
+// ══════════════════════════════════════════════════
+let _sueldos = [];
+let _sueldosPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+async function syncSueldosFromSupabase() {
+  try {
+    const rows = await sbFetch('rhinos_sueldos?order=periodo.desc');
+    _sueldos = Array.isArray(rows) ? rows : [];
+  } catch(e) { console.warn('Load sueldos:', e.message); }
+}
+
+function fmtPeriodLabel(ym) {
+  const [y, m] = ym.split('-');
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return meses[+m - 1] + ' ' + y;
+}
+
+function renderSueldosPeriodo() {
+  document.getElementById('sued-period-label').textContent = fmtPeriodLabel(_sueldosPeriod);
+
+  const periodSueldos = _sueldos.filter(s => s.periodo === _sueldosPeriod);
+  const metrics = document.getElementById('sued-metrics');
+  const list = document.getElementById('sued-list');
+
+  // Métricas del período
+  const pendientes = periodSueldos.filter(s => s.status === 'pendiente');
+  const pagados = periodSueldos.filter(s => s.status === 'pagado');
+  const tc = getTcOficial() || 1;
+  const totalPend = pendientes.reduce((s, x) => s + (x.moneda === 'USD' ? +x.monto * tc : +x.monto), 0);
+  const totalPag = pagados.reduce((s, x) => s + (x.moneda === 'USD' ? +x.monto * tc : +x.monto), 0);
+
+  metrics.innerHTML = `
+    <div style="background:var(--surface2);border:1px solid rgba(245,158,11,0.3);border-radius:var(--r);padding:10px 16px;display:flex;gap:12px;align-items:center">
+      <span style="font-size:18px">⏳</span>
+      <div><div style="font-size:11px;color:var(--text3)">Pendiente</div><div style="font-size:15px;font-weight:700;color:var(--amber)">${pendientes.length ? '$' + fmtNum(Math.round(totalPend)) : '—'}</div></div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid rgba(34,197,94,0.3);border-radius:var(--r);padding:10px 16px;display:flex;gap:12px;align-items:center">
+      <span style="font-size:18px">✅</span>
+      <div><div style="font-size:11px;color:var(--text3)">Pagado</div><div style="font-size:15px;font-weight:700;color:var(--green)">${pagados.length ? '$' + fmtNum(Math.round(totalPag)) : '—'}</div></div>
+    </div>`;
+
+  if (!periodSueldos.length) {
+    list.innerHTML = '<div class="empty" style="font-size:12px">Sin registros para este período. Hacé click en "Generar sueldos del mes".</div>';
+    return;
+  }
+
+  list.innerHTML = periodSueldos.map(s => {
+    const isPagado = s.status === 'pagado';
+    const initials = (s.empleado_nombre || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    const salFmt = s.moneda === 'USD'
+      ? `USD ${(+s.monto).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}`
+      : `$ ${fmtNum(+s.monto)} ARS`;
+    const fechaPagoFmt = s.fecha_pago ? new Date(s.fecha_pago + 'T12:00').toLocaleDateString('es-AR') : '';
+
+    return `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid ${isPagado ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.25)'};border-radius:var(--r);margin-bottom:8px">
+      <div style="width:38px;height:38px;border-radius:50%;background:rgba(0,229,204,0.1);border:2px solid rgba(0,229,204,0.25);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--cyan);flex-shrink:0">${initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${s.empleado_nombre}</div>
+        <div style="font-size:12px;color:var(--text3)">${salFmt} · sueldo ${_sueldosPeriod}</div>
+      </div>
+      ${isPagado
+        ? `<div style="text-align:right">
+             <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3)">✓ Pagado</span>
+             ${fechaPagoFmt ? `<div style="font-size:10px;color:var(--text3);margin-top:3px">${fechaPagoFmt}</div>` : ''}
+           </div>`
+        : `<div style="display:flex;gap:6px;flex-shrink:0">
+             <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.3);align-self:center">⏳ Pendiente</span>
+             <button class="btn btn-sm btn-green" data-sued-pagar="${s.id}" style="font-size:12px;padding:4px 12px">Pagar</button>
+           </div>`
+      }
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-sued-pagar]').forEach(btn => {
+    btn.addEventListener('click', () => pagarSueldo(btn.dataset.suedPagar));
+  });
+}
+
+async function generarSueldosMes() {
+  const activos = _empleados.filter(e => e.estado !== 'baja');
+  if (!activos.length) { showToast('No hay empleados activos'); return; }
+
+  let creados = 0;
+  for (const emp of activos) {
+    const existente = _sueldos.find(s => s.empleado_id === emp.id && s.periodo === _sueldosPeriod);
+    if (existente) continue;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    const row = {
+      id, empleado_id: emp.id, empleado_nombre: emp.nombre,
+      periodo: _sueldosPeriod, monto: emp.salario, moneda: emp.moneda || 'ARS',
+      status: 'pendiente', fecha_pago: null
+    };
+    await sbFetch('rhinos_sueldos', 'POST', row).catch(e => console.warn('Insert sueldo:', e.message));
+    _sueldos = [..._sueldos, row];
+    creados++;
+  }
+
+  if (creados === 0) showToast('Ya existen registros para todos los empleados este mes');
+  else showToast(`↻ ${creados} sueldo${creados !== 1 ? 's' : ''} generado${creados !== 1 ? 's' : ''} como pendiente 🦏`);
+  renderSueldosPeriodo();
+}
+
+async function pagarSueldo(sueldoId) {
+  const s = _sueldos.find(x => x.id === sueldoId);
+  if (!s) return;
+  if (!confirm(`¿Registrar pago de sueldo a ${s.empleado_nombre} — ${s.moneda === 'USD' ? 'USD ' + s.monto : '$ ' + fmtNum(+s.monto) + ' ARS'}?`)) return;
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  const tc = getTcOficial() || 1;
+  const montoARS = s.moneda === 'USD' ? +s.monto * tc : +s.monto;
+
+  // Crear transacción de gasto en Finanzas
+  try {
+    const [newTx] = await sbFetch('rhinos_transactions', 'POST', {
+      type: 'gasto', amount: montoARS, date: hoy,
+      description: `Sueldo — ${s.empleado_nombre}`,
+      category: 'Sueldos', partner: s.empleado_nombre,
+      notes: `Período ${s.periodo}`, currency: 'ARS',
+      currency_original: s.moneda,
+      amount_original: +s.monto,
+      tc_dia: s.moneda === 'USD' ? tc : null
+    });
+    if (newTx) finTx.unshift(newTx);
+  } catch(e) { console.warn('Tx sueldo:', e.message); }
+
+  // Marcar como pagado en rhinos_sueldos
+  await sbFetch(`rhinos_sueldos?id=eq.${encodeURIComponent(sueldoId)}`, 'PATCH', {
+    status: 'pagado', fecha_pago: hoy
+  }).catch(e => console.warn('Update sueldo:', e.message));
+
+  _sueldos = _sueldos.map(x => x.id === sueldoId ? { ...x, status: 'pagado', fecha_pago: hoy } : x);
+  renderSueldosPeriodo();
+  renderResumen();
+  renderTransacciones();
+  showToast(`✅ Sueldo de ${s.empleado_nombre} registrado como pagado 🦏`);
+}
+
+// Navegación de período
+document.getElementById('btn-sued-prev').addEventListener('click', () => {
+  const [y, m] = _sueldosPeriod.split('-').map(Number);
+  _sueldosPeriod = m === 1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+  renderSueldosPeriodo();
+});
+document.getElementById('btn-sued-next').addEventListener('click', () => {
+  const [y, m] = _sueldosPeriod.split('-').map(Number);
+  _sueldosPeriod = m === 12 ? `${y+1}-01` : `${y}-${String(m+1).padStart(2,'0')}`;
+  renderSueldosPeriodo();
+});
+document.getElementById('btn-sued-generar').addEventListener('click', generarSueldosMes);
 
 // ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
