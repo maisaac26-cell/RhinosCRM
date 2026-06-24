@@ -1666,6 +1666,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-ftab="socios">Socios</button>
       <button class="tab-btn" data-ftab="proyecciones">Proyecciones</button>
       <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').setAttribute('style','display:block');renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
+      <button class="tab-btn" data-ftab="empleados">👥 Empleados</button>
     </div>
 
     <!-- RESUMEN -->
@@ -2098,6 +2099,60 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
 
     </div>
+
+    <!-- EMPLEADOS TAB -->
+    <div class="ftab-content" id="ftab-empleados" style="display:none">
+
+      <!-- Metrics -->
+      <div class="metrics-row">
+        <div class="metric-card"><div class="m-label">Empleados activos</div><div class="m-val" id="emp-total">—</div><div class="m-sub">en nómina</div></div>
+        <div class="metric-card"><div class="m-label">Masa salarial ARS</div><div class="m-val green" id="emp-masa-ars">—</div><div class="m-sub">mensual estimado</div></div>
+        <div class="metric-card"><div class="m-label">Masa salarial USD</div><div class="m-val" id="emp-masa-usd" style="color:var(--amber)">—</div><div class="m-sub">mensual estimado</div></div>
+        <div class="metric-card"><div class="m-label">Próximo pago</div><div class="m-val" id="emp-proximo" style="color:var(--cyan)">—</div><div class="m-sub" id="emp-proximo-sub">días para el próximo salario</div></div>
+      </div>
+
+      <!-- Formulario alta/edición -->
+      <div class="card" id="emp-form-card" style="display:none;border-color:rgba(0,229,204,0.25)">
+        <div class="card-title" id="emp-form-title">+ Nuevo Empleado</div>
+        <div class="grid2">
+          <div class="field"><label>Nombre completo</label><input id="emp-nombre" type="text" placeholder="Ej: Juan Pérez"/></div>
+          <div class="field"><label>Cargo / Rol</label><input id="emp-cargo" type="text" placeholder="Ej: Desarrollador Backend"/></div>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label>Salario mensual</label>
+            <div style="display:flex;gap:8px">
+              <input id="emp-salario" type="number" placeholder="0" step="100" style="flex:1"/>
+              <select id="emp-moneda" style="width:80px"><option value="ARS">ARS</option><option value="USD">USD</option></select>
+            </div>
+          </div>
+          <div class="field"><label>Día de pago (1–31)</label><input id="emp-dia-pago" type="number" min="1" max="31" placeholder="25" value="25"/></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Fecha de ingreso</label><input id="emp-inicio" type="date"/></div>
+          <div class="field"><label>Estado</label><select id="emp-estado"><option value="activo">Activo</option><option value="baja">Baja</option></select></div>
+        </div>
+        <div class="field"><label>Notas</label><textarea id="emp-notas" rows="2" placeholder="Beneficios, observaciones, forma de pago..."></textarea></div>
+        <div style="background:rgba(0,229,204,0.05);border:1px solid rgba(0,229,204,0.15);border-radius:var(--r);padding:10px 14px;margin-top:4px;font-size:12px;color:var(--text3)">
+          ↻ Al guardar, se creará automáticamente un <strong style="color:var(--cyan)">gasto fijo recurrente</strong> en la categoría <em>Sueldos</em> que se aplicará el día indicado cada mes.
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button class="btn" id="btn-emp-cancel">Cancelar</button>
+          <button class="btn btn-green" id="btn-emp-save">Guardar empleado</button>
+        </div>
+      </div>
+
+      <!-- Header lista -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text3)" id="emp-count-label"></div>
+        <button class="btn btn-green" id="btn-emp-new" style="font-size:13px">+ Nuevo empleado</button>
+      </div>
+
+      <!-- Lista de empleados -->
+      <div id="emp-list"><div class="empty">Cargando...</div></div>
+
+    </div><!-- /ftab-empleados -->
+
   </div>
 
   <!-- TAREAS -->
@@ -9072,6 +9127,230 @@ document.querySelector('.tab-btn[data-ftab="cobros"]').addEventListener('click',
 });
 
 // syncClientsSupabase definida más arriba como: async () => { _clients = await sbFetch(...) }
+
+// ══════════════════════════════════════════════════
+// EMPLEADOS — NÓMINA Y SALARIOS RECURRENTES
+// ══════════════════════════════════════════════════
+let _empleados = [];
+function getEmpleados() { return _empleados; }
+
+async function syncEmpleadosFromSupabase() {
+  try {
+    const rows = await sbFetch('rhinos_empleados?order=nombre.asc');
+    _empleados = Array.isArray(rows) ? rows : [];
+  } catch(e) { console.warn('Load empleados:', e.message); }
+}
+
+function renderEmpleadosMetrics() {
+  const activos = _empleados.filter(e => e.estado !== 'baja');
+  document.getElementById('emp-total').textContent = activos.length;
+
+  const tc = getTcOficial() || 1;
+  let masaARS = 0, masaUSD = 0;
+  activos.forEach(e => {
+    if (e.moneda === 'USD') { masaUSD += +e.salario; masaARS += +e.salario * tc; }
+    else masaARS += +e.salario;
+  });
+  document.getElementById('emp-masa-ars').textContent = masaARS ? '$' + fmtNum(Math.round(masaARS)) : '—';
+  document.getElementById('emp-masa-usd').textContent = masaUSD ? 'USD ' + fmtNum(Math.round(masaUSD)) : '—';
+
+  if (!activos.length) {
+    document.getElementById('emp-proximo').textContent = '—';
+    document.getElementById('emp-proximo-sub').textContent = 'sin empleados';
+    return;
+  }
+  const todayDay = new Date().getDate();
+  let minDias = 999, nextNombres = [];
+  activos.forEach(e => {
+    let diff = +e.dia_pago - todayDay;
+    if (diff < 0) diff += 30;
+    if (diff < minDias) { minDias = diff; nextNombres = [e.nombre.split(' ')[0]]; }
+    else if (diff === minDias) nextNombres.push(e.nombre.split(' ')[0]);
+  });
+  document.getElementById('emp-proximo').textContent = minDias === 0 ? 'HOY' : minDias + 'd';
+  document.getElementById('emp-proximo-sub').textContent = minDias === 0
+    ? nextNombres.join(', ') + ' — ¡toca pagar hoy!'
+    : 'día ' + (new Date().getDate() + minDias) + ' · ' + nextNombres.join(', ');
+}
+
+function renderEmpleados() {
+  renderEmpleadosMetrics();
+  const list = document.getElementById('emp-list');
+  const label = document.getElementById('emp-count-label');
+  if (!_empleados.length) {
+    list.innerHTML = '<div class="empty">Sin empleados registrados. Hacé click en "+ Nuevo empleado" para comenzar.</div>';
+    label.textContent = '';
+    return;
+  }
+  const activos = _empleados.filter(e => e.estado !== 'baja').length;
+  const bajas = _empleados.filter(e => e.estado === 'baja').length;
+  label.textContent = `${activos} activo${activos !== 1 ? 's' : ''}${bajas ? ' · ' + bajas + ' baja' + (bajas !== 1 ? 's' : '') : ''}`;
+
+  const todayDay = new Date().getDate();
+  list.innerHTML = _empleados.map(e => {
+    const isActivo = e.estado !== 'baja';
+    const initials = e.nombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    const salFmt = e.moneda === 'USD'
+      ? `USD ${(+e.salario).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}`
+      : `$ ${fmtNum(+e.salario)} ARS`;
+    let diff = +e.dia_pago - todayDay;
+    if (diff < 0) diff += 30;
+    const pagoLabel = diff === 0 ? '🟡 HOY' : diff <= 5 ? `⚠ en ${diff}d` : `día ${e.dia_pago} de cada mes`;
+    const monedaBadge = e.moneda === 'USD'
+      ? `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.3)">USD</span>`
+      : `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">ARS</span>`;
+    return `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px;${isActivo ? '' : 'opacity:0.5'}">
+      <div style="width:42px;height:42px;border-radius:50%;background:rgba(0,229,204,0.12);border:2px solid rgba(0,229,204,0.3);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--cyan);flex-shrink:0">${initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text)">${e.nombre}</div>
+        <div style="font-size:12px;color:var(--text3)">${e.cargo || '—'}</div>
+      </div>
+      <div style="text-align:right;min-width:120px">
+        <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+          <span style="font-size:13px;font-weight:700;color:${isActivo ? 'var(--green)' : 'var(--text3)'}">${salFmt}</span>
+          ${monedaBadge}
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">↻ ${pagoLabel}</div>
+      </div>
+      <span style="font-size:10px;padding:3px 9px;border-radius:10px;border:1px solid ${isActivo ? 'rgba(34,197,94,0.35)' : 'var(--border)'};color:${isActivo ? 'var(--green)' : 'var(--text3)'};">${isActivo ? 'Activo' : 'Baja'}</span>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.25);padding:3px 8px" data-emp-edit="${e.id}" title="Editar">✏</button>
+        <button class="btn btn-sm" style="color:var(--red);padding:3px 8px" data-emp-del="${e.id}" title="Eliminar">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-emp-edit]').forEach(btn => {
+    btn.addEventListener('click', () => openEmpleadoEdit(btn.dataset.empEdit));
+  });
+  list.querySelectorAll('[data-emp-del]').forEach(btn => {
+    btn.addEventListener('click', () => deleteEmpleado(btn.dataset.empDel));
+  });
+}
+
+let _empEditId = null;
+
+function openEmpleadoForm(emp = null) {
+  _empEditId = emp?.id || null;
+  document.getElementById('emp-form-title').textContent = emp ? '✏ Editando: ' + emp.nombre : '+ Nuevo Empleado';
+  document.getElementById('emp-nombre').value = emp?.nombre || '';
+  document.getElementById('emp-cargo').value = emp?.cargo || '';
+  document.getElementById('emp-salario').value = emp?.salario || '';
+  document.getElementById('emp-moneda').value = emp?.moneda || 'ARS';
+  document.getElementById('emp-dia-pago').value = emp?.dia_pago ?? 25;
+  document.getElementById('emp-inicio').value = emp?.inicio || new Date().toISOString().slice(0, 10);
+  document.getElementById('emp-estado').value = emp?.estado || 'activo';
+  document.getElementById('emp-notas').value = emp?.notas || '';
+  document.getElementById('emp-form-card').style.display = 'block';
+  document.getElementById('emp-nombre').focus();
+  document.getElementById('emp-form-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function openEmpleadoEdit(id) {
+  const emp = _empleados.find(e => e.id === id);
+  if (emp) openEmpleadoForm(emp);
+}
+
+async function syncEmpleadoRecurring(emp) {
+  const desc = `Sueldo — ${emp.nombre}`;
+  const existing = _recurring.find(r => r.description === desc);
+  const payload = {
+    description: desc, category: 'Sueldos', partner: emp.nombre,
+    type: 'gasto', amount: +emp.salario, currency: emp.moneda || 'ARS', day: +emp.dia_pago
+  };
+  if (existing) {
+    await sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(existing.id)}`, 'PATCH', payload).catch(() => {});
+    _recurring = _recurring.map(r => r.id === existing.id ? { ...r, ...payload } : r);
+  } else {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    const row = { id, ...payload, last_applied: null };
+    await sbFetch('rhinos_recurring_txs', 'POST', row).catch(() => {});
+    _recurring = [..._recurring, row];
+  }
+  renderRecurring();
+}
+
+async function removeEmpleadoRecurring(nombre) {
+  const desc = `Sueldo — ${nombre}`;
+  const rec = _recurring.find(r => r.description === desc);
+  if (!rec) return;
+  sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(rec.id)}`, 'DELETE').catch(() => {});
+  _recurring = _recurring.filter(r => r.id !== rec.id);
+  renderRecurring();
+}
+
+async function deleteEmpleado(id) {
+  const emp = _empleados.find(e => e.id === id);
+  if (!confirm(`¿Eliminar a ${emp?.nombre || 'este empleado'}? Se eliminará su gasto fijo de salario. Las transacciones ya generadas no se borran.`)) return;
+  if (emp) await removeEmpleadoRecurring(emp.nombre);
+  sbFetch(`rhinos_empleados?id=eq.${encodeURIComponent(id)}`, 'DELETE').catch(() => {});
+  _empleados = _empleados.filter(e => e.id !== id);
+  renderEmpleados();
+  showToast('Empleado eliminado 🦏');
+}
+
+document.getElementById('btn-emp-new').addEventListener('click', () => {
+  const card = document.getElementById('emp-form-card');
+  if (card.style.display === 'block' && !_empEditId) { card.style.display = 'none'; return; }
+  openEmpleadoForm();
+});
+
+document.getElementById('btn-emp-cancel').addEventListener('click', () => {
+  document.getElementById('emp-form-card').style.display = 'none';
+  _empEditId = null;
+});
+
+document.getElementById('btn-emp-save').addEventListener('click', async function() {
+  const nombre = document.getElementById('emp-nombre').value.trim();
+  const cargo = document.getElementById('emp-cargo').value.trim();
+  const salario = parseFloat(document.getElementById('emp-salario').value);
+  const moneda = document.getElementById('emp-moneda').value;
+  const diaPago = parseInt(document.getElementById('emp-dia-pago').value);
+  const inicio = document.getElementById('emp-inicio').value;
+  const estado = document.getElementById('emp-estado').value;
+  const notas = document.getElementById('emp-notas').value.trim();
+
+  if (!nombre) { showToast('El nombre es obligatorio'); return; }
+  if (!salario || salario <= 0) { showToast('El salario debe ser mayor a 0'); return; }
+  if (!diaPago || diaPago < 1 || diaPago > 31) { showToast('El día de pago debe estar entre 1 y 31'); return; }
+
+  this.disabled = true;
+  const data = { nombre, cargo, salario, moneda, dia_pago: diaPago, inicio, estado, notas };
+
+  try {
+    if (_empEditId) {
+      const prev = _empleados.find(e => e.id === _empEditId);
+      await sbFetch(`rhinos_empleados?id=eq.${encodeURIComponent(_empEditId)}`, 'PATCH', data);
+      // Si cambió el nombre, eliminar el recurrente viejo y crear uno nuevo
+      if (prev && prev.nombre !== nombre) await removeEmpleadoRecurring(prev.nombre);
+      _empleados = _empleados.map(e => e.id === _empEditId ? { ...e, ...data } : e);
+      if (estado !== 'baja') await syncEmpleadoRecurring({ id: _empEditId, ...data });
+      else await removeEmpleadoRecurring(nombre);
+      showToast('Empleado actualizado 🦏');
+    } else {
+      const newId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      const newEmp = { id: newId, ...data, created_at: new Date().toISOString() };
+      await sbFetch('rhinos_empleados', 'POST', newEmp);
+      _empleados = [..._empleados, newEmp];
+      if (estado !== 'baja') await syncEmpleadoRecurring(newEmp);
+      showToast('Empleado agregado y salario recurrente configurado 🦏');
+    }
+  } catch(e) {
+    showToast('Error guardando empleado: ' + e.message);
+  }
+
+  document.getElementById('emp-form-card').style.display = 'none';
+  _empEditId = null;
+  this.disabled = false;
+  renderEmpleados();
+});
+
+// Cargar al abrir el tab
+document.querySelector('.tab-btn[data-ftab="empleados"]').addEventListener('click', async () => {
+  await syncEmpleadosFromSupabase();
+  renderEmpleados();
+});
 
 // ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
