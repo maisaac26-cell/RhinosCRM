@@ -7051,8 +7051,16 @@ document.getElementById('btn-save-recurring-edit').addEventListener('click', asy
       notes:       document.getElementById('rec-edit-notes').value.trim(),
     };
 
-    // Actualizar en Supabase
-    await sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(_recurringEditId)}`, 'PATCH', updated);
+    // Actualizar en Supabase — si currency falla (columna no existe), reintentar sin ella
+    try {
+      await sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(_recurringEditId)}`, 'PATCH', updated);
+    } catch(e) {
+      if (e.message.includes('currency') || e.message.includes('column')) {
+        const { currency: _c, ...withoutCurrency } = updated;
+        await sbFetch(`rhinos_recurring_txs?id=eq.${encodeURIComponent(_recurringEditId)}`, 'PATCH', withoutCurrency);
+        showToast('⚠ Moneda guardada solo en memoria — corré el SQL de migración para persistirla');
+      } else throw e;
+    }
 
     // Actualizar en memoria
     _recurring = _recurring.map(r => r.id === _recurringEditId ? { ...r, ...updated } : r);
