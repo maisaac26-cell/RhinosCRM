@@ -1695,7 +1695,6 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn active" data-ftab="resumen">Resumen</button>
       <button class="tab-btn" data-ftab="transacciones">Transacciones</button>
       <button class="tab-btn" data-ftab="socios">Socios</button>
-      <button class="tab-btn" data-ftab="proyecciones">Proyecciones</button>
       <button class="tab-btn" data-ftab="cashflow">💸 Cash Flow</button>
       <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').setAttribute('style','display:block');renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
       <button class="tab-btn" data-ftab="empleados">👥 Empleados</button>
@@ -1940,30 +1939,6 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="socios-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem"></div>
     </div>
 
-    <!-- PROYECCIONES -->
-    <div class="ftab-content" id="ftab-proyecciones" style="display:none">
-      <div class="card">
-        <div class="card-title">Configurar proyección</div>
-        <div class="grid2">
-          <div class="field"><label>Períodos a proyectar</label>
-            <input type="number" id="proy-periodos" value="12" min="1" max="60"/>
-          </div>
-          <div class="field"><label>Tipo de período</label>
-            <select id="proy-tipo"><option value="meses">Meses</option><option value="años">Años</option></select>
-          </div>
-        </div>
-        <button class="btn btn-cyan" id="btn-calc-proy">Calcular proyección</button>
-      </div>
-      <div class="metrics-row" style="grid-template-columns:repeat(3,minmax(0,1fr))">
-        <div class="metric-card"><div class="m-label">Ingresos proyectados</div><div class="m-val green" id="proy-ingresos">$0</div></div>
-        <div class="metric-card"><div class="m-label">Gastos proyectados</div><div class="m-val" id="proy-gastos" style="color:var(--red)">$0</div></div>
-        <div class="metric-card"><div class="m-label">Balance proyectado</div><div class="m-val" id="proy-balance">$0</div></div>
-      </div>
-      <div class="card" id="proy-detalle" style="display:none">
-        <div class="card-title">Detalle por período</div>
-        <div id="proy-table"></div>
-      </div>
-    </div>
     <!-- CASH FLOW TAB -->
     <div class="ftab-content" id="ftab-cashflow" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -5927,7 +5902,7 @@ async function openLead(lead) {
       if (pendingStatus === 'cliente') {
         const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
         if (!existing) {
-          insertClientDB({
+          await insertClientDB({
             nombre: lead.name,
             empresa: lead.company || lead.name,
             email: lead.email || '',
@@ -5939,7 +5914,7 @@ async function openLead(lead) {
             dias_plazo: 10,
             notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido automáticamente desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
           });
-          showToast('✅ Lead convertido a cliente en Finanzas 🦏');
+          showToast('✅ Lead convertido a cliente — aparece en Finanzas y Clientes 🦏');
         } else {
           showToast('Estado actualizado — ya existía cliente en Finanzas 🦏');
         }
@@ -5957,7 +5932,8 @@ async function openLead(lead) {
     btnToClient.addEventListener('click', async function() {
       const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
       if (existing) { showToast('Ya existe un cliente con ese nombre/email en Finanzas'); return; }
-      insertClientDB({
+      this.disabled = true;
+      await insertClientDB({
         nombre: lead.name,
         empresa: lead.company || lead.name,
         email: lead.email || '',
@@ -5969,7 +5945,8 @@ async function openLead(lead) {
         dias_plazo: 10,
         notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
       });
-      showToast('✅ Cliente registrado en Finanzas 🦏');
+      this.disabled = false;
+      showToast('✅ Cliente registrado — aparece en Finanzas y Clientes 🦏');
       document.querySelector('.nav-btn[data-sec="finanzas"]').click();
     });
   }
@@ -7510,44 +7487,6 @@ function renderSocios() {
   }).join('');
 }
 
-document.getElementById('btn-calc-proy').addEventListener('click', () => {
-  const periodos = +document.getElementById('proy-periodos').value || 12;
-  const ingresos = finTx.filter(t=>t.type==='ingreso').reduce((a,t)=>a+(+t.amount),0);
-  const gastos = finTx.filter(t=>t.type==='gasto').reduce((a,t)=>a+(+t.amount),0);
-  const mesesConDatos = [...new Set(finTx.map(t=>t.date?.slice(0,7)))].length || 1;
-  const ingMensual = ingresos / mesesConDatos;
-  const gastMensual = gastos / mesesConDatos;
-  const ingTotal = ingMensual * periodos;
-  const gastTotal = gastMensual * periodos;
-  const balTotal = ingTotal - gastTotal;
-
-  document.getElementById('proy-ingresos').textContent = fmtUSD(ingTotal);
-  document.getElementById('proy-gastos').textContent = fmtUSD(gastTotal);
-  const balEl = document.getElementById('proy-balance');
-  balEl.textContent = fmtUSD(balTotal);
-  balEl.style.color = balTotal >= 0 ? 'var(--green)' : 'var(--red)';
-
-  const tabla = document.getElementById('proy-table');
-  let rows = '';
-  for (let i = 1; i <= Math.min(periodos, 24); i++) {
-    const ing = ingMensual * i;
-    const gast = gastMensual * i;
-    const bal = ing - gast;
-    rows += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <span style="color:var(--text2)">Período ${i}</span>
-      <span style="color:var(--green)">${fmtUSD(ing)}</span>
-      <span style="color:var(--red)">${fmtUSD(gast)}</span>
-      <span style="color:${bal>=0?'var(--green)':'var(--red)'}">${fmtUSD(bal)}</span>
-    </div>`;
-  }
-  tabla.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:6px 0;margin-bottom:4px">
-    <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em">Período</span>
-    <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em">Ingresos</span>
-    <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em">Gastos</span>
-    <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em">Balance</span>
-  </div>${rows}`;
-  document.getElementById('proy-detalle').style.display = 'block';
-});
 
 // Finanzas tabs
 document.querySelectorAll('.tab-btn[data-ftab]').forEach(btn => {
@@ -8920,17 +8859,53 @@ function saveClients(arr) {
   return sbUpsert('rhinos_clients', arr.map(stripOptionalCliCols));
 }
 
-// Inserta un cliente nuevo directamente en Supabase con sbFetch POST (no batch),
-// actualiza _clients/_ccClients en memoria inmediatamente.
-function insertClientDB(data) {
+// Inserta un cliente nuevo en Supabase con doble intento (POST → upsert),
+// actualiza _clients/_ccClients en memoria inmediatamente y fuerza re-render.
+async function insertClientDB(data) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
   const created_at = new Date().toISOString();
   const newClient = { frecuencia_pago: 'mensual', ...data, id, created_at };
+
+  // Agregar a memoria de inmediato para que la UI responda sin esperar Supabase
   _clients = [..._clients, newClient];
-  _ccClients = [..._clients];
-  // Insertar solo el nuevo cliente con campos core — usa POST (no upsert batch)
-  sbFetch('rhinos_clients', 'POST', stripOptionalCliCols(newClient))
-    .catch(e => console.warn('Insert client:', e.message));
+  if (typeof _ccClients !== 'undefined') _ccClients = [..._clients];
+
+  const payload = stripOptionalCliCols(newClient);
+  let persisted = false;
+  let lastError = '';
+
+  // Intento 1: POST directo — retorna el row guardado
+  try {
+    const res = await sbFetch('rhinos_clients', 'POST', payload);
+    if (Array.isArray(res) && res[0]) {
+      persisted = true;
+      const saved = { frecuencia_pago: 'mensual', ...res[0] };
+      _clients = _clients.map(c => c.id === id ? saved : c);
+      if (typeof _ccClients !== 'undefined') _ccClients = [..._clients];
+    }
+  } catch(e1) {
+    lastError = e1.message;
+    // Intento 2: upsert con resolution=merge-duplicates (más resiliente)
+    try {
+      const r2 = await callAPI('supabase_upsert', { table: 'rhinos_clients', rows: [payload] });
+      if (r2 && (r2.ok || r2.status === 201 || r2.status === 200)) persisted = true;
+      else lastError = `upsert status ${r2?.status}`;
+    } catch(e2) { lastError = e2.message; }
+  }
+
+  if (!persisted) {
+    showToast(`⚠ El cliente quedó en sesión pero no se guardó en Supabase: ${lastError.slice(0,80)}. Revisá la consola.`);
+    console.error('[insertClientDB] No se pudo persistir:', lastError, payload);
+  }
+
+  // Forzar re-render de todas las vistas de clientes que estén visibles
+  if (typeof renderClientes === 'function') renderClientes();
+  if (typeof renderClientesComercialList === 'function') {
+    if (typeof _ccClients !== 'undefined') _ccClients = [..._clients];
+    renderClientesComercialList();
+    if (typeof renderClientesComercialMetrics === 'function') renderClientesComercialMetrics();
+  }
+
   return newClient;
 }
 async function syncClientsSupabase() {
