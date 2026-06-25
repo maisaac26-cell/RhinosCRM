@@ -12,6 +12,7 @@
   ],
   "rewrites": [
     { "source": "/auth/callback", "destination": "/index.html" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/soporte.html",  "destination": "/soporte.html" },
+    { "source": "/((?!api/|soporte\\.html$).*)", "destination": "/index.html" }
   ]
 }
