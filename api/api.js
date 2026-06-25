@@ -1649,6 +1649,39 @@ La respuesta debe:
       }
     }
 
+    // ── MERCADO PAGO — crear link de pago Checkout Pro ──────────────────
+    else if (action === 'mp_create_link') {
+      const MP_TOKEN = process.env.MP_ACCESS_TOKEN;
+      if (!MP_TOKEN) { result = { error: 'MP_ACCESS_TOKEN no configurado en Vercel' }; }
+      else {
+        const { clienteNombre, clienteEmail, monto, moneda = 'ARS', cobroId, periodo } = body;
+        const title = `Suscripción RhinosApp${clienteNombre ? ' — ' + clienteNombre : ''}${periodo ? ' (' + periodo + ')' : ''}`;
+        const pref = JSON.stringify({
+          items: [{ title, quantity: 1, unit_price: +monto || 1, currency_id: moneda }],
+          payer: { email: clienteEmail || 'cliente@rhinosapp.com' },
+          external_reference: cobroId || '',
+          back_urls: {
+            success: 'https://rhinos-crm.vercel.app/pago-exitoso.html',
+            failure: 'https://rhinos-crm.vercel.app/pago-fallido.html',
+            pending: 'https://rhinos-crm.vercel.app/pago-pendiente.html'
+          },
+          auto_return: 'approved',
+          notification_url: 'https://rhinos-crm.vercel.app/api/webhook-mp',
+          statement_descriptor: 'RHINOSAPP'
+        });
+        const mpRes = await new Promise((resolve, reject) => {
+          const req = https.request({
+            hostname: 'api.mercadopago.com', path: '/checkout/preferences', method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + MP_TOKEN, 'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(pref) }
+          }, res => { let r=''; res.on('data',c=>r+=c); res.on('end',()=>{ try{resolve(JSON.parse(r));}catch(e){resolve({raw:r});} }); });
+          req.on('error', reject); req.write(pref); req.end();
+        });
+        if (mpRes.init_point) result = { ok: true, init_point: mpRes.init_point, id: mpRes.id };
+        else result = { error: mpRes.message || mpRes.raw || 'Error MP', detail: mpRes };
+      }
+    }
+
     // ── SOPORTE AL CLIENTE — crear ticket + Jira issue ──────────────────
     else if (action === 'create_ticket') {
       const { nombre, email, empresa, asunto, descripcion, prioridad = 'media', categoria = 'bug' } = body;

@@ -4,6 +4,14 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Rhinos CRM — Marketing</title>
+<link rel="manifest" href="/manifest.json"/>
+<meta name="theme-color" content="#00e5cc"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="RhinosCRM"/>
+<link rel="apple-touch-icon" href="/icon.svg"/>
+<link rel="icon" href="/icon.svg"/>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
@@ -40,6 +48,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 
 /* LAYOUT — contenido desplazado a la derecha del sidebar */
 .wrap{max-width:none;margin-left:220px;padding:1.5rem 1.5rem 5rem}
+/* ── MODO PRESENTACIÓN ─────────────────────────────────────────── */
+body.pres-mode nav{display:none!important}
+body.pres-mode .wrap{margin-left:0;padding:2rem}
+body.pres-mode .section-header .btn,.pres-mode .section-header button:not(#btn-exit-pres){display:none!important}
+body.pres-mode .page-sub,.pres-mode .card-title,.pres-mode .perf-table,.pres-mode #fin-cat-gastos,.pres-mode #db-pipeline,.pres-mode #db-vendedores-perf,.pres-mode #db-clientes-recientes{display:none!important}
+body.pres-mode .metrics-row{gap:16px}
+body.pres-mode .metric-card{padding:2rem;border-radius:16px}
+body.pres-mode .m-val{font-size:48px}
+body.pres-mode .m-label{font-size:13px;letter-spacing:.12em}
+body.pres-mode .db-goals-card{display:none!important}
+#pres-overlay{display:none;position:fixed;bottom:20px;right:20px;z-index:9000;background:rgba(0,229,204,0.1);border:1px solid rgba(0,229,204,0.3);backdrop-filter:blur(8px);border-radius:12px;padding:10px 18px;color:var(--cyan);font-size:13px;font-weight:600;display:none;align-items:center;gap:12px}
+#pres-clock{font-family:var(--display);font-size:28px;font-weight:800;letter-spacing:.04em}
 .section{display:none}.section.active{display:block}
 .page-title{font-family:var(--display);font-size:40px;font-weight:800;letter-spacing:0.02em;line-height:1;text-transform:uppercase;margin-bottom:4px}
 .page-title span{color:var(--cyan)}
@@ -581,6 +601,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
         <button class="btn btn-sm" id="btn-db-refresh" style="color:var(--text2)">↻ Actualizar</button>
+        <button id="btn-enter-pres" class="btn btn-sm" style="color:#818cf8;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08)" title="Modo presentación">🖥 Presentar</button>
         <button onclick="startModuleGuide('dashboard')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
       </div>
     </div>
@@ -3151,6 +3172,57 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 </div>
 
 <div id="toast"></div>
+
+<!-- PRESENTACIÓN OVERLAY -->
+<div id="pres-overlay" style="display:none;position:fixed;bottom:20px;right:20px;z-index:9000;background:rgba(10,10,15,0.85);border:1px solid rgba(0,229,204,0.4);backdrop-filter:blur(8px);border-radius:12px;padding:10px 18px;align-items:center;gap:12px">
+  <div id="pres-clock" style="font-family:var(--display);font-size:28px;font-weight:800;letter-spacing:.04em;color:var(--cyan)">00:00</div>
+  <div style="font-size:11px;color:var(--text3);line-height:1.4">RHINOS<br>APP</div>
+  <button id="btn-exit-pres" onclick="exitPresMode()" style="background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:var(--font)">✕ Salir</button>
+</div>
+
+<!-- MODAL CONTRATO PDF -->
+<div id="modal-contrato" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;overflow-y:auto;backdrop-filter:blur(4px)">
+  <div style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px">
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--rl);width:100%;max-width:1000px;padding:24px;box-shadow:0 32px 80px rgba(0,0,0,0.6)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div style="font-family:var(--display);font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">📝 Contrato de Servicio</div>
+        <button onclick="document.getElementById('modal-contrato').style.display='none'" style="background:var(--surface2);border:1px solid var(--border2);border-radius:50%;width:32px;height:32px;color:var(--text2);font-size:16px;cursor:pointer">✕</button>
+      </div>
+      <div class="grid2" style="gap:24px;align-items:start">
+        <!-- Formulario editable -->
+        <div>
+          <div style="font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Datos del contrato</div>
+          <div class="field"><label style="font-size:10px">N° Contrato</label><input id="ct-numero" placeholder="001-2026"/></div>
+          <div class="field"><label style="font-size:10px">Fecha</label><input id="ct-fecha" type="date"/></div>
+          <div class="field"><label style="font-size:10px">Cliente / Responsable</label><input id="ct-cliente" placeholder="Juan García"/></div>
+          <div class="field"><label style="font-size:10px">Empresa</label><input id="ct-empresa" placeholder="Distribuidora El Sol SRL"/></div>
+          <div class="field"><label style="font-size:10px">CUIT / CUIL</label><input id="ct-cuit" placeholder="20-12345678-3"/></div>
+          <div class="field"><label style="font-size:10px">Domicilio</label><input id="ct-domicilio" placeholder="Av. Corrientes 1234, CABA"/></div>
+          <div class="field"><label style="font-size:10px">Descripción del servicio</label><textarea id="ct-servicio" rows="3" placeholder="CRM Marketing — acceso completo a RhinosApp, módulos comerciales, finanzas y soporte."></textarea></div>
+          <div class="grid2">
+            <div class="field"><label style="font-size:10px">Precio</label><input id="ct-precio" type="number" placeholder="0"/></div>
+            <div class="field"><label style="font-size:10px">Moneda</label><select id="ct-moneda"><option value="ARS">$ ARS</option><option value="USD">USD</option></select></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label style="font-size:10px">Frecuencia</label><select id="ct-frecuencia"><option value="mensual">Mensual</option><option value="bimestral">Bimestral</option><option value="trimestral">Trimestral</option><option value="semestral">Semestral</option><option value="anual">Anual</option></select></div>
+            <div class="field"><label style="font-size:10px">Inicio</label><input id="ct-inicio" type="date"/></div>
+          </div>
+          <div class="field"><label style="font-size:10px">Duración</label><input id="ct-duracion" placeholder="12 meses"/></div>
+          <div class="field"><label style="font-size:10px">Cláusulas adicionales</label><textarea id="ct-clausulas" rows="3" placeholder="Cualquier condición adicional..."></textarea></div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button class="btn btn-green" id="btn-ct-print">🖨 Imprimir / Guardar PDF</button>
+            <button class="btn" id="btn-ct-firmado" style="color:var(--green);border-color:rgba(34,197,94,0.3)">✅ Marcar como firmado</button>
+          </div>
+        </div>
+        <!-- Preview -->
+        <div>
+          <div style="font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Vista previa</div>
+          <div id="ct-preview" style="background:#fff;color:#1a1a1a;border-radius:8px;padding:32px;font-size:12px;line-height:1.8;font-family:'Georgia',serif;min-height:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3)"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 const API = '/api/api';
@@ -9325,6 +9397,7 @@ function renderCobrosPeriodo() {
         <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${s.bg};color:${s.color}">${s.label}</span>
         <div style="display:flex;gap:5px">
           ${payMonth && cobro.status !== 'pagado' ? `<button class="btn btn-sm" data-pagar="${c.id}" data-monto="${cobro.monto||c.precio}" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);font-size:11px">✓ Pagado</button>` : ''}
+          ${payMonth && cobro.status !== 'pagado' ? `<button class="btn btn-sm" data-mp-link="${c.id}" data-mp-monto="${cobro.monto||c.precio}" data-mp-cobro="${cobro.id||''}" style="background:rgba(0,159,227,0.12);color:#009fe3;border-color:rgba(0,159,227,0.3);font-size:11px" title="Enviar link de pago Mercado Pago">💳 MP</button>` : ''}
           ${payMonth && cobro.status === 'pagado' ? `<button class="btn btn-sm" data-factura="${c.id}" data-periodo="${cobCurrentPeriod}" style="color:var(--cyan);border-color:rgba(0,229,204,0.25);font-size:11px" title="Generar factura/recibo">📄</button>` : ''}
           ${payMonth && cobro.status === 'pendiente' ? `<button class="btn btn-sm" data-vencer="${c.id}" style="background:rgba(239,68,68,0.1);color:var(--red);border-color:rgba(239,68,68,0.2);font-size:11px">Vencido</button>` : ''}
           ${payMonth ? `<button class="btn btn-sm" data-email-cli="${c.id}" style="font-size:11px">📧</button>` : ''}
@@ -9394,6 +9467,31 @@ function renderCobrosPeriodo() {
       document.getElementById('email-destinatario').value = 'uno';
       document.getElementById('email-destinatario').dispatchEvent(new Event('change'));
       document.getElementById('email-cli-sel').value = c.id;
+    });
+  });
+
+  list.querySelectorAll('[data-mp-link]').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const clientId = this.dataset.mpLink;
+      const monto = +this.dataset.mpMonto || 0;
+      const cobroId = this.dataset.mpCobro;
+      const c = getClients().find(x => x.id === clientId);
+      if (!c) return;
+      this.disabled = true; this.textContent = '⏳';
+      try {
+        const res = await callAPI('mp_create_link', {
+          clienteNombre: c.nombre, clienteEmail: c.email || '',
+          monto, moneda: c.moneda || 'ARS', cobroId, periodo: cobCurrentPeriod
+        });
+        if (res.init_point) {
+          await navigator.clipboard.writeText(res.init_point).catch(() => {});
+          showToast(`✅ Link de pago generado y copiado. Abriendo MP...`);
+          window.open(res.init_point, '_blank');
+        } else {
+          showToast('⚠ ' + (res.error || 'Error generando link. Verificá MP_ACCESS_TOKEN en Vercel.'));
+        }
+      } catch(e) { showToast('Error: ' + e.message); }
+      this.disabled = false; this.textContent = '💳 MP';
     });
   });
 
@@ -11820,6 +11918,173 @@ document.getElementById('btn-soporte-refresh')?.addEventListener('click', async 
 });
 
 // ══════════════════════════════════════════════════
+// MODO PRESENTACIÓN
+// ══════════════════════════════════════════════════
+let _presTimer = null, _presClockTimer = null;
+
+function enterPresMode() {
+  document.body.classList.add('pres-mode');
+  document.getElementById('pres-overlay').style.display = 'flex';
+  updatePressClock();
+  _presClockTimer = setInterval(updatePressClock, 1000);
+  _presTimer = setInterval(loadCommercialDashboard, 30000);
+  document.addEventListener('keydown', handlePresKey);
+}
+function exitPresMode() {
+  document.body.classList.remove('pres-mode');
+  document.getElementById('pres-overlay').style.display = 'none';
+  clearInterval(_presTimer); clearInterval(_presClockTimer);
+  document.removeEventListener('keydown', handlePresKey);
+}
+function updatePressClock() {
+  const n = new Date();
+  document.getElementById('pres-clock').textContent =
+    String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+}
+function handlePresKey(e) { if (e.key === 'Escape') exitPresMode(); }
+
+document.getElementById('btn-enter-pres')?.addEventListener('click', () => {
+  document.querySelector('.nav-btn[data-sec="dashboard"]').click();
+  setTimeout(enterPresMode, 300);
+});
+
+// ══════════════════════════════════════════════════
+// PWA — SERVICE WORKER + INSTALL PROMPT + NOTIFICACIONES
+// ══════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      console.log('SW registered:', reg.scope);
+    }).catch(e => console.warn('SW error:', e));
+  });
+}
+
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  // Mostrar botón de instalar en sidebar si no está instalado
+  const installBtn = document.getElementById('btn-install-pwa');
+  if (installBtn) installBtn.style.display = 'flex';
+});
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return showToast('Tu navegador no soporta notificaciones');
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') showToast('✅ Notificaciones activadas 🦏');
+  else showToast('Notificaciones bloqueadas — activarlas desde la configuración del navegador');
+}
+
+function showLocalNotif(title, body, url) {
+  if (Notification.permission !== 'granted') return;
+  const n = new Notification(title, { body, icon: '/icon.svg', data: { url } });
+  n.onclick = () => { window.focus(); if (url) window.location.href = url; n.close(); };
+}
+
+// ══════════════════════════════════════════════════
+// CONTRATOS PDF
+// ══════════════════════════════════════════════════
+let _contratoClienteId = null;
+
+function abrirContrato(c) {
+  _contratoClienteId = c.id;
+  const hoy = localDateStr();
+  const num = c.contrato_numero || ('CONT-' + String(Date.now()).slice(-6));
+  document.getElementById('ct-numero').value = num;
+  document.getElementById('ct-fecha').value = hoy;
+  document.getElementById('ct-cliente').value = c.nombre || '';
+  document.getElementById('ct-empresa').value = c.empresa || '';
+  document.getElementById('ct-cuit').value = c.contrato_cuit || '';
+  document.getElementById('ct-domicilio').value = c.contrato_domicilio || '';
+  document.getElementById('ct-servicio').value = 'CRM Marketing — acceso completo a RhinosApp con módulos comerciales, finanzas, soporte y reportes.';
+  document.getElementById('ct-precio').value = c.precio || 0;
+  document.getElementById('ct-moneda').value = c.moneda || 'ARS';
+  document.getElementById('ct-frecuencia').value = c.frecuencia_pago || 'mensual';
+  document.getElementById('ct-inicio').value = c.inicio || hoy;
+  document.getElementById('ct-duracion').value = '12 meses';
+  document.getElementById('ct-clausulas').value = '';
+  document.getElementById('modal-contrato').style.display = 'block';
+  renderContratoPreview();
+}
+
+function renderContratoPreview() {
+  const get = id => document.getElementById(id)?.value || '';
+  const precio = get('ct-precio'), moneda = get('ct-moneda'), freq = get('ct-frecuencia');
+  const montoFmt = moneda === 'USD'
+    ? `USD ${(+precio).toLocaleString('en-US',{minimumFractionDigits:2})}`
+    : `$ ${(+precio).toLocaleString('es-AR',{minimumFractionDigits:2})} ARS`;
+
+  document.getElementById('ct-preview').innerHTML = `
+    <div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1a1a1a;padding-bottom:16px">
+      <div style="font-size:22px;font-weight:900;letter-spacing:-0.02em">RHINOSAPP</div>
+      <div style="font-size:11px;color:#666;margin-top:4px">CRM Marketing · rhinos-crm.vercel.app</div>
+    </div>
+    <div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:20px;text-transform:uppercase;letter-spacing:0.1em">
+      Contrato de Prestación de Servicios
+    </div>
+    <div style="margin-bottom:16px"><strong>N°:</strong> ${get('ct-numero')} &nbsp;&nbsp; <strong>Fecha:</strong> ${get('ct-fecha')}</div>
+    <div style="background:#f8f9fa;border-radius:6px;padding:12px;margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px">DATOS DEL CLIENTE</div>
+      <div><strong>Nombre:</strong> ${get('ct-cliente')}</div>
+      <div><strong>Empresa:</strong> ${get('ct-empresa')}</div>
+      ${get('ct-cuit') ? `<div><strong>CUIT/CUIL:</strong> ${get('ct-cuit')}</div>` : ''}
+      ${get('ct-domicilio') ? `<div><strong>Domicilio:</strong> ${get('ct-domicilio')}</div>` : ''}
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px">OBJETO DEL CONTRATO</div>
+      <div style="white-space:pre-wrap">${get('ct-servicio')}</div>
+    </div>
+    <div style="background:#f8f9fa;border-radius:6px;padding:12px;margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px">CONDICIONES ECONÓMICAS</div>
+      <div><strong>Precio:</strong> ${montoFmt} — ${freq}</div>
+      <div><strong>Inicio:</strong> ${get('ct-inicio')}</div>
+      <div><strong>Duración:</strong> ${get('ct-duracion')}</div>
+    </div>
+    ${get('ct-clausulas') ? `<div style="margin-bottom:16px"><div style="font-weight:700;margin-bottom:8px">CLÁUSULAS ADICIONALES</div><div style="white-space:pre-wrap">${get('ct-clausulas')}</div></div>` : ''}
+    <div style="margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px;text-align:center">
+      <div><div style="border-top:1px solid #1a1a1a;padding-top:8px;font-size:11px"><strong>RhinosApp</strong><br>El Prestador</div></div>
+      <div><div style="border-top:1px solid #1a1a1a;padding-top:8px;font-size:11px"><strong>${get('ct-cliente')}</strong><br>El Cliente</div></div>
+    </div>`;
+}
+
+// Live preview al editar
+['ct-numero','ct-fecha','ct-cliente','ct-empresa','ct-cuit','ct-domicilio',
+ 'ct-servicio','ct-precio','ct-moneda','ct-frecuencia','ct-inicio','ct-duracion','ct-clausulas'
+].forEach(id => document.getElementById(id)?.addEventListener('input', renderContratoPreview));
+
+document.getElementById('btn-ct-print')?.addEventListener('click', () => {
+  renderContratoPreview();
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Contrato ${document.getElementById('ct-numero').value}</title>
+    <style>body{font-family:Georgia,serif;max-width:680px;margin:0 auto;padding:40px;color:#1a1a1a;font-size:13px;line-height:1.8}@media print{.no-print{display:none}}</style>
+    </head><body>
+    ${document.getElementById('ct-preview').innerHTML}
+    <div class="no-print" style="margin-top:32px;text-align:center">
+      <button onclick="window.print()" style="background:#1a1a1a;color:#fff;border:none;border-radius:6px;padding:12px 28px;font-size:14px;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
+    </div></body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
+});
+
+document.getElementById('btn-ct-firmado')?.addEventListener('click', async () => {
+  if (!_contratoClienteId) return;
+  const hoy = localDateStr();
+  const num = document.getElementById('ct-numero').value;
+  const cuit = document.getElementById('ct-cuit').value;
+  const dom = document.getElementById('ct-domicilio').value;
+  await patchClientDB(_contratoClienteId, {
+    contrato_firmado: true, contrato_fecha_firma: hoy,
+    contrato_numero: num, contrato_cuit: cuit, contrato_domicilio: dom
+  }).catch(() => {});
+  _clients = _clients.map(c => c.id === _contratoClienteId
+    ? { ...c, contrato_firmado: true, contrato_fecha_firma: hoy, contrato_numero: num }
+    : c);
+  document.getElementById('modal-contrato').style.display = 'none';
+  showToast('✅ Contrato marcado como firmado 🦏');
+  if (typeof renderClientes === 'function') renderClientes();
+});
+
+// ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
 // Plan de Cuentas PCGAr — RT FACPCE
 // ══════════════════════════════════════════════════
@@ -14050,6 +14315,10 @@ function openClienteComercial(c) {
         ${c.created_at?`<span>📅 Cliente desde: ${c.created_at.slice(0,10)}</span>`:''}
       </div>
       ${c.notes?`<div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:var(--r);padding:8px 12px;line-height:1.6">${c.notes}</div>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button onclick="abrirContrato(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="btn btn-sm" style="color:#818cf8;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08)">📝 ${c.contrato_firmado ? '✅ Contrato firmado' : 'Generar contrato'}</button>
+        ${c.contrato_firmado && c.contrato_fecha_firma ? `<span style="font-size:11px;color:var(--green);align-self:center">Firmado el ${c.contrato_fecha_firma}</span>` : ''}
+      </div>
       ${c.contrato_fin ? `<div style="margin-top:10px;padding:8px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:var(--r);font-size:12px">
         <span style="color:var(--amber);font-weight:600">📋 Contrato:</span> vence ${c.contrato_fin}
         ${(()=>{const diff=Math.round((new Date(c.contrato_fin+'T12:00')-new Date())/86400000);return diff<=30?` <span style="color:${diff<=7?'var(--red)':'var(--amber)'}">— en ${diff} días</span>`:''})()}
