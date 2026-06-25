@@ -8846,8 +8846,9 @@ function isPaymentMonth(c, periodo) {
 let _clients = [];
 function getClients() { return _clients; }
 // Columnas opcionales que pueden no existir aún en Supabase — se stripean del payload
-// created_at y createdAt no existen en la tabla — se generan automáticamente o no aplican
-const _OPTIONAL_CLI_COLS = ['frecuencia_pago', 'contrato_fin', 'contrato_notas', 'tags', 'created_at', 'createdAt'];
+// Solo se stripea created_at (snake_case) que NO existe en rhinos_clients.
+// Todas las demás columnas (frecuencia_pago, contrato_fin, contrato_notas, tags, createdAt) SÍ existen.
+const _OPTIONAL_CLI_COLS = ['created_at'];
 function stripOptionalCliCols(obj) {
   const r = { ...obj };
   _OPTIONAL_CLI_COLS.forEach(k => delete r[k]);
@@ -8857,15 +8858,30 @@ function stripOptionalCliCols(obj) {
 function saveClients(arr) {
   _clients = arr;
   if (!arr.length) return Promise.resolve();
-  return sbUpsert('rhinos_clients', arr.map(stripOptionalCliCols));
+  // vendedor_id debe ser null (no string vacío) para evitar error de tipo UUID
+  const rows = arr.map(c => {
+    const r = stripOptionalCliCols(c);
+    if (!r.vendedor_id) r.vendedor_id = null;
+    return r;
+  });
+  return sbUpsert('rhinos_clients', rows);
+}
+
+// PATCH de un solo cliente — más confiable que upsert batch para ediciones
+async function patchClientDB(id, data) {
+  const payload = stripOptionalCliCols({ ...data });
+  if (!payload.vendedor_id) payload.vendedor_id = null;
+  try {
+    await sbFetch(`rhinos_clients?id=eq.${encodeURIComponent(id)}`, 'PATCH', payload);
+  } catch(e) { showToast('Error guardando: ' + e.message); throw e; }
 }
 
 // Inserta un cliente nuevo en Supabase con doble intento (POST → upsert),
 // actualiza _clients/_ccClients en memoria inmediatamente y fuerza re-render.
 async function insertClientDB(data) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-  const created_at = new Date().toISOString();
-  const newClient = { frecuencia_pago: 'mensual', ...data, id, created_at };
+  // createdAt (camelCase) SÍ existe en rhinos_clients; created_at (snake) NO existe y se stripea
+  const newClient = { frecuencia_pago: 'mensual', ...data, id, createdAt: localDateStr() };
 
   // Agregar a memoria de inmediato para que la UI responda sin esperar Supabase
   _clients = [..._clients, newClient];
@@ -9057,10 +9073,21 @@ function renderClientes() {
     });
   });
   list.querySelectorAll('[data-del-cli]').forEach(btn => {
-    btn.addEventListener('click', function() {
-      if (!confirm('¿Eliminar este cliente?')) return;
-      saveClients(getClients().filter(c => c.id !== this.dataset.delCli));
+    btn.addEventListener('click', async function() {
+      const cid = this.dataset.delCli;
+      const cli = getClients().find(c => c.id === cid);
+      if (!confirm(`¿Eliminar a ${cli?.nombre || 'este cliente'}? Se eliminarán también sus cobros.`)) return;
+      // DELETE directo en Supabase — saveClients solo hace upsert, nunca borra
+      await sbFetch(`rhinos_clients?id=eq.${encodeURIComponent(cid)}`, 'DELETE').catch(e => showToast('Error: ' + e.message));
+      // Eliminar cobros asociados
+      const cobrosRestantes = getCobros().filter(c => c.clientId !== cid);
+      saveCobros(cobrosRestantes);
+      // Actualizar memoria
+      _clients = _clients.filter(c => c.id !== cid);
+      _ccClients = _ccClients.filter(c => c.id !== cid);
       renderClientes();
+      renderClientStats();
+      showToast('Cliente eliminado 🦏');
     });
   });
   renderClientStats();
@@ -9420,12 +9447,12 @@ document.getElementById('btn-nuevo-cliente').addEventListener('click', () => {
   document.getElementById('form-cliente').style.display = 'block';
 });
 
-document.getElementById('btn-guardar-cliente').addEventListener('click', () => {
+document.getElementById('btn-guardar-cliente').addEventListener('click', async function() {
   const nombre = document.getElementById('cli-nombre').value.trim();
   const email = document.getElementById('cli-email').value.trim();
   const precio = document.getElementById('cli-precio').value;
   if (!nombre || !email) { showToast('Nombre y email son obligatorios'); return; }
-  const clients = getClients();
+  this.disabled = true;
   const moneda = document.getElementById('cli-moneda').value || 'ARS';
   const emailsCC = document.getElementById('cli-emails-cc').value.trim();
   const diasPlazo = +document.getElementById('cli-dias-plazo').value || 10;
@@ -9434,18 +9461,32 @@ document.getElementById('btn-guardar-cliente').addEventListener('click', () => {
   const contrato_notas = document.getElementById('cli-contrato-notas').value.trim() || null;
   const tags = document.getElementById('cli-tags').value.trim() || null;
   const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, emails_cc: emailsCC, precio: +precio||0, moneda, frecuencia_pago, dias_plazo: diasPlazo, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim(), contrato_fin, contrato_notas, tags };
-  const wasNew = !clientEditId;
+
   if (clientEditId) {
-    const idx = clients.findIndex(c => c.id === clientEditId);
-    if (idx >= 0) clients[idx] = {...clients[idx], ...data};
+    // Edición: PATCH directo solo este cliente
+    const idx = _clients.findIndex(c => c.id === clientEditId);
+    if (idx >= 0) _clients[idx] = { ..._clients[idx], ...data };
+    _ccClients = [..._clients];
+    try {
+      await patchClientDB(clientEditId, data);
+    } catch(e) { /* toast ya se muestra en patchClientDB */ }
+    showToast('Cliente actualizado 🦏');
   } else {
-    clients.push({...data, id: Date.now().toString(36)+Math.random().toString(36).slice(2), createdAt: new Date().toISOString().slice(0,10)});
+    // Alta: insertClientDB (POST + memoria)
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    const newC = { ...data, id, createdAt: localDateStr() };
+    _clients = [..._clients, newC];
+    _ccClients = [..._clients];
+    await sbFetch('rhinos_clients', 'POST', stripOptionalCliCols(newC)).catch(e => showToast('Error Supabase: ' + e.message));
+    showToast('Cliente agregado 🦏');
   }
-  saveClients(clients);
+
   clientEditId = null;
   document.getElementById('form-cliente').style.display = 'none';
   renderClientes();
-  showToast(wasNew ? 'Cliente agregado 🦏' : 'Cliente actualizado 🦏');
+  renderClientStats();
+  if (typeof renderClientesComercialList === 'function') { _ccClients = [..._clients]; renderClientesComercialList(); renderClientesComercialMetrics(); }
+  this.disabled = false;
 });
 
 // Emails tab
