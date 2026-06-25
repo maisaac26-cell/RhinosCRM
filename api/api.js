@@ -1689,7 +1689,11 @@ La respuesta debe:
       const prioMap = { baja: 'Low', media: 'Medium', alta: 'High', crítica: 'Highest', critica: 'Highest' };
       const typeMap = { bug: 'Bug', mejora: 'Story', consulta: 'Task', otro: 'Task' };
 
-      if (JIRA_EMAIL && JIRA_TOKEN) {
+      let jiraDebug = { email_set: !!JIRA_EMAIL, token_set: !!JIRA_TOKEN };
+
+      if (!JIRA_EMAIL || !JIRA_TOKEN) {
+        jiraDebug.skip_reason = !JIRA_EMAIL ? 'JIRA_EMAIL env var missing' : 'JIRA_API_TOKEN env var missing';
+      } else {
         try {
           const jiraBody = JSON.stringify({
             fields: {
@@ -1712,13 +1716,17 @@ La respuesta debe:
               hostname: JIRA_HOST, path: '/rest/api/3/issue', method: 'POST',
               headers: { 'Authorization': 'Basic ' + auth, 'Content-Type': 'application/json',
                 'Accept': 'application/json', 'Content-Length': Buffer.byteLength(jiraBody) }
-            }, (res) => { let raw = ''; res.on('data', c => raw += c); res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { resolve(null); } }); });
+            }, (res) => {
+              let raw = ''; res.on('data', c => raw += c);
+              res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(raw) }); } catch(e) { resolve({ status: res.statusCode, raw }); } });
+            });
             req.on('error', reject); req.write(jiraBody); req.end();
           });
-          if (jiraRes && jiraRes.key) {
-            jiraKey = jiraRes.key;
+          jiraDebug.http_status = jiraRes.status;
+          if (jiraRes.body && jiraRes.body.key) {
+            jiraKey = jiraRes.body.key;
             jiraUrl = `https://${JIRA_HOST}/browse/${jiraKey}`;
-            // Actualizar ticket con la key de Jira
+            jiraDebug.success = true;
             if (ticketRow) {
               const patch = JSON.stringify({ jira_key: jiraKey, jira_url: jiraUrl });
               await new Promise((resolve) => {
@@ -1733,11 +1741,13 @@ La respuesta debe:
                 req.on('error', resolve); req.write(patch); req.end();
               });
             }
+          } else {
+            jiraDebug.error = jiraRes.body?.errorMessages || jiraRes.body?.errors || jiraRes.raw || 'No key returned';
           }
-        } catch(e) { console.error('Jira error:', e.message); }
+        } catch(e) { jiraDebug.exception = e.message; }
       }
 
-      result = { ok: true, ticket_id: ticketRow?.id, ticket_numero: ticketRow?.numero, jira_key: jiraKey, jira_url: jiraUrl };
+      result = { ok: true, ticket_id: ticketRow?.id, ticket_numero: ticketRow?.numero, jira_key: jiraKey, jira_url: jiraUrl, jira_debug: jiraDebug };
     }
 
     else {
