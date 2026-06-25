@@ -3184,9 +3184,19 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 <div id="modal-contrato" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;overflow-y:auto;backdrop-filter:blur(4px)">
   <div style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px">
     <div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--rl);width:100%;max-width:1000px;padding:24px;box-shadow:0 32px 80px rgba(0,0,0,0.6)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div style="font-family:var(--display);font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">📝 Contrato de Servicio</div>
-        <button onclick="document.getElementById('modal-contrato').style.display='none'" style="background:var(--surface2);border:1px solid var(--border2);border-radius:50%;width:32px;height:32px;color:var(--text2);font-size:16px;cursor:pointer">✕</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span id="ct-draft-status" style="font-size:11px;color:var(--text3)"></span>
+          <button id="btn-ct-nuevo" class="btn btn-sm" style="color:var(--amber);border-color:rgba(245,158,11,0.3)">+ Nuevo</button>
+          <button id="btn-ct-borrador" class="btn btn-sm" style="color:#818cf8;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08)">💾 Guardar borrador</button>
+          <button onclick="document.getElementById('modal-contrato').style.display='none'" style="background:var(--surface2);border:1px solid var(--border2);border-radius:50%;width:32px;height:32px;color:var(--text2);font-size:16px;cursor:pointer">✕</button>
+        </div>
+      </div>
+      <!-- Borradores guardados -->
+      <div id="ct-borradores-panel" style="margin-bottom:16px;display:none">
+        <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Borradores guardados</div>
+        <div id="ct-borradores-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
       </div>
       <div class="grid2" style="gap:24px;align-items:start">
         <!-- Formulario editable -->
@@ -12003,8 +12013,11 @@ function abrirContrato(c) {
   document.getElementById('ct-inicio').value = c.inicio || hoy;
   document.getElementById('ct-duracion').value = '12 meses';
   document.getElementById('ct-clausulas').value = '';
+  _contratoId = null;
+  document.getElementById('ct-draft-status').textContent = '';
   document.getElementById('modal-contrato').style.display = 'block';
   renderContratoPreview();
+  loadBorradores();
 }
 
 function renderContratoPreview() {
@@ -12052,6 +12065,101 @@ function renderContratoPreview() {
  'ct-servicio','ct-precio','ct-moneda','ct-frecuencia','ct-inicio','ct-duracion','ct-clausulas'
 ].forEach(id => document.getElementById(id)?.addEventListener('input', renderContratoPreview));
 
+// ── BORRADORES ────────────────────────────────────
+let _contratoId = null;
+
+function getContratoData() {
+  const get = id => document.getElementById(id)?.value || '';
+  return { numero:get('ct-numero'), fecha:get('ct-fecha'), cliente:get('ct-cliente'),
+    empresa:get('ct-empresa'), cuit:get('ct-cuit'), domicilio:get('ct-domicilio'),
+    servicio:get('ct-servicio'), precio:get('ct-precio'), moneda:get('ct-moneda'),
+    frecuencia:get('ct-frecuencia'), inicio:get('ct-inicio'), duracion:get('ct-duracion'),
+    clausulas:get('ct-clausulas') };
+}
+
+function setContratoData(d) {
+  if (!d) return;
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
+  set('ct-numero',d.numero); set('ct-fecha',d.fecha); set('ct-cliente',d.cliente);
+  set('ct-empresa',d.empresa); set('ct-cuit',d.cuit); set('ct-domicilio',d.domicilio);
+  set('ct-servicio',d.servicio); set('ct-precio',d.precio); set('ct-moneda',d.moneda);
+  set('ct-frecuencia',d.frecuencia); set('ct-inicio',d.inicio); set('ct-duracion',d.duracion);
+  set('ct-clausulas',d.clausulas);
+  renderContratoPreview();
+}
+
+async function loadBorradores() {
+  try {
+    const rows = await sbFetch(`rhinos_contratos?cliente_id=eq.${encodeURIComponent(_contratoClienteId)}&order=updated_at.desc`);
+    const panel = document.getElementById('ct-borradores-panel');
+    const list  = document.getElementById('ct-borradores-list');
+    if (!panel||!list) return;
+    if (!rows?.length) { panel.style.display='none'; return; }
+    panel.style.display = 'block';
+    list.innerHTML = rows.map(r => {
+      const fecha = r.updated_at ? new Date(r.updated_at).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+      const isCurrent = r.id === _contratoId;
+      const estadoBadge = r.estado==='firmado' ? ' ✅' : ' 📝';
+      return `<div style="display:flex;align-items:center;gap:4px;padding:5px 8px;border-radius:6px;border:1px solid ${isCurrent?'rgba(99,102,241,0.5)':'var(--border)'};background:${isCurrent?'rgba(99,102,241,0.1)':'var(--surface2)'};cursor:pointer" data-borrador-id="${r.id}">
+        <span style="font-size:11px;font-weight:600;color:${isCurrent?'#818cf8':'var(--text2)'}">${r.nombre||'Borrador'}${estadoBadge}</span>
+        <span style="font-size:10px;color:var(--text3);margin-left:4px">${fecha}</span>
+        <span data-del-borrador="${r.id}" style="margin-left:6px;color:var(--red);font-size:12px;padding:0 3px" title="Eliminar">✕</span>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('[data-borrador-id]').forEach(el => {
+      el.addEventListener('click', e => {
+        if (e.target.dataset.delBorrador) return;
+        const r = rows.find(x => x.id === el.dataset.borradorId);
+        if (!r) return;
+        _contratoId = r.id;
+        setContratoData(r.datos||{});
+        const f = new Date(r.updated_at).toLocaleDateString('es-AR');
+        document.getElementById('ct-draft-status').textContent = `"${r.nombre||'Borrador'}" · ${f}`;
+        loadBorradores();
+        showToast(`Borrador "${r.nombre||'Borrador'}" cargado`);
+      });
+    });
+    list.querySelectorAll('[data-del-borrador]').forEach(span => {
+      span.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm('¿Eliminar este borrador?')) return;
+        const bid = span.dataset.delBorrador;
+        await sbFetch(`rhinos_contratos?id=eq.${encodeURIComponent(bid)}`, 'DELETE').catch(()=>{});
+        if (_contratoId===bid) { _contratoId=null; document.getElementById('ct-draft-status').textContent=''; }
+        await loadBorradores();
+        showToast('Borrador eliminado');
+      });
+    });
+  } catch(e) { console.warn('loadBorradores:', e.message); }
+}
+
+document.getElementById('btn-ct-borrador')?.addEventListener('click', async function() {
+  this.disabled=true; this.textContent='⏳ Guardando...';
+  const datos = getContratoData();
+  const nombre = datos.numero || ('Borrador ' + localDateStr());
+  const now = new Date().toISOString();
+  if (_contratoId) {
+    await sbFetch(`rhinos_contratos?id=eq.${encodeURIComponent(_contratoId)}`, 'PATCH',
+      { nombre, datos, estado:'borrador', updated_at: now }).catch(()=>{});
+  } else {
+    const res = await sbFetch('rhinos_contratos', 'POST',
+      { cliente_id:_contratoClienteId, nombre, datos, estado:'borrador', updated_at:now }).catch(()=>null);
+    if (Array.isArray(res) && res[0]) _contratoId = res[0].id;
+  }
+  document.getElementById('ct-draft-status').textContent =
+    `💾 Guardado · ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`;
+  await loadBorradores();
+  this.disabled=false; this.textContent='💾 Guardar borrador';
+  showToast('Borrador guardado 🦏');
+});
+
+document.getElementById('btn-ct-nuevo')?.addEventListener('click', () => {
+  _contratoId = null;
+  document.getElementById('ct-draft-status').textContent = '';
+  const c = getClients().find(x => x.id === _contratoClienteId) || {};
+  abrirContrato(c);
+});
+
 document.getElementById('btn-ct-print')?.addEventListener('click', () => {
   renderContratoPreview();
   const win = window.open('', '_blank');
@@ -12079,6 +12187,11 @@ document.getElementById('btn-ct-firmado')?.addEventListener('click', async () =>
   _clients = _clients.map(c => c.id === _contratoClienteId
     ? { ...c, contrato_firmado: true, contrato_fecha_firma: hoy, contrato_numero: num }
     : c);
+  // Si hay borrador activo, marcarlo como firmado también
+  if (_contratoId) {
+    await sbFetch(`rhinos_contratos?id=eq.${encodeURIComponent(_contratoId)}`, 'PATCH',
+      { estado: 'firmado', datos: getContratoData(), updated_at: new Date().toISOString() }).catch(()=>{});
+  }
   document.getElementById('modal-contrato').style.display = 'none';
   showToast('✅ Contrato marcado como firmado 🦏');
   if (typeof renderClientes === 'function') renderClientes();
