@@ -11719,8 +11719,9 @@ function openTicket(t) {
         <div style="font-size:10px;color:var(--text3);margin-bottom:4px">${cat} ${t.categoria?.toUpperCase() || ''} · #${t.numero || t.id?.slice(0,8)} · ${fecha}</div>
         <div style="font-size:18px;font-weight:700">${t.asunto}</div>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         ${jiraLink}
+        <button id="btn-sp-delete" style="background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.3);border-radius:var(--r);padding:4px 10px;font-size:12px;cursor:pointer;font-family:var(--font)">🗑 Eliminar</button>
       </div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
@@ -11782,6 +11783,16 @@ function openTicket(t) {
     t.notas_internas = notas;
     _tickets = _tickets.map(x => x.id === t.id ? { ...x, notas_internas: notas } : x);
     showToast('Notas guardadas 🦏');
+  });
+
+  // Eliminar ticket
+  el.querySelector('#btn-sp-delete')?.addEventListener('click', async () => {
+    if (!confirm(`¿Eliminar el ticket #${t.numero || t.id?.slice(0,8)} "${t.asunto}"? Esta acción no se puede deshacer.`)) return;
+    await sbFetch(`rhinos_tickets?id=eq.${encodeURIComponent(t.id)}`, 'DELETE').catch(e => showToast('Error: ' + e.message));
+    _tickets = _tickets.filter(x => x.id !== t.id);
+    el.innerHTML = '<div class="empty" style="padding:3rem">Seleccioná un ticket para ver el detalle</div>';
+    renderSoporteList();
+    showToast('Ticket eliminado 🦏');
   });
 }
 
