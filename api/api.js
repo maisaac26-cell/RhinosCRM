@@ -1649,6 +1649,97 @@ La respuesta debe:
       }
     }
 
+    // ── SOPORTE AL CLIENTE — crear ticket + Jira issue ──────────────────
+    else if (action === 'create_ticket') {
+      const { nombre, email, empresa, asunto, descripcion, prioridad = 'media', categoria = 'bug' } = body;
+      if (!asunto || !descripcion || !email) {
+        return res.status(400).json({ error: 'Faltan campos obligatorios: email, asunto, descripcion' });
+      }
+
+      const SB_URL_T = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
+      const SB_KEY_T = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
+
+      const ticketPayload = { nombre, email, empresa: empresa || null, asunto, descripcion, prioridad, categoria, estado: 'abierto' };
+
+      // 1. Guardar en Supabase
+      let ticketRow = null;
+      try {
+        const sbRes = await new Promise((resolve, reject) => {
+          const data = JSON.stringify(ticketPayload);
+          const req = https.request({
+            hostname: new URL(SB_URL_T).hostname,
+            path: '/rest/v1/rhinos_tickets',
+            method: 'POST',
+            headers: { 'apikey': SB_KEY_T, 'Authorization': 'Bearer ' + SB_KEY_T,
+              'Content-Type': 'application/json', 'Prefer': 'return=representation',
+              'Content-Length': Buffer.byteLength(data) }
+          }, (res) => { let raw = ''; res.on('data', c => raw += c); res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { resolve(null); } }); });
+          req.on('error', reject); req.write(data); req.end();
+        });
+        if (Array.isArray(sbRes) && sbRes[0]) ticketRow = sbRes[0];
+      } catch(e) { console.error('Ticket Supabase error:', e.message); }
+
+      // 2. Crear issue en Jira
+      const JIRA_EMAIL = process.env.JIRA_EMAIL;
+      const JIRA_TOKEN = process.env.JIRA_API_TOKEN;
+      const JIRA_HOST = 'rhinoerp.atlassian.net';
+      const JIRA_PROJECT = 'RHI';
+      let jiraKey = null, jiraUrl = null;
+
+      const prioMap = { baja: 'Low', media: 'Medium', alta: 'High', crítica: 'Highest', critica: 'Highest' };
+      const typeMap = { bug: 'Bug', mejora: 'Story', consulta: 'Task', otro: 'Task' };
+
+      if (JIRA_EMAIL && JIRA_TOKEN) {
+        try {
+          const jiraBody = JSON.stringify({
+            fields: {
+              project: { key: JIRA_PROJECT },
+              summary: `[${categoria.toUpperCase()}] ${asunto}`,
+              description: {
+                type: 'doc', version: 1,
+                content: [{ type: 'paragraph', content: [{ type: 'text',
+                  text: `${descripcion}\n\n---\nReportado por: ${nombre || 'Anónimo'} <${email}>${empresa ? '\nEmpresa: ' + empresa : ''}`
+                }] }]
+              },
+              issuetype: { name: typeMap[categoria] || 'Task' },
+              priority: { name: prioMap[prioridad] || 'Medium' },
+              labels: ['soporte-crm', categoria]
+            }
+          });
+          const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_TOKEN}`).toString('base64');
+          const jiraRes = await new Promise((resolve, reject) => {
+            const req = https.request({
+              hostname: JIRA_HOST, path: '/rest/api/3/issue', method: 'POST',
+              headers: { 'Authorization': 'Basic ' + auth, 'Content-Type': 'application/json',
+                'Accept': 'application/json', 'Content-Length': Buffer.byteLength(jiraBody) }
+            }, (res) => { let raw = ''; res.on('data', c => raw += c); res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { resolve(null); } }); });
+            req.on('error', reject); req.write(jiraBody); req.end();
+          });
+          if (jiraRes && jiraRes.key) {
+            jiraKey = jiraRes.key;
+            jiraUrl = `https://${JIRA_HOST}/browse/${jiraKey}`;
+            // Actualizar ticket con la key de Jira
+            if (ticketRow) {
+              const patch = JSON.stringify({ jira_key: jiraKey, jira_url: jiraUrl });
+              await new Promise((resolve) => {
+                const req = https.request({
+                  hostname: new URL(SB_URL_T).hostname,
+                  path: `/rest/v1/rhinos_tickets?id=eq.${encodeURIComponent(ticketRow.id)}`,
+                  method: 'PATCH',
+                  headers: { 'apikey': SB_KEY_T, 'Authorization': 'Bearer ' + SB_KEY_T,
+                    'Content-Type': 'application/json', 'Prefer': 'return=minimal',
+                    'Content-Length': Buffer.byteLength(patch) }
+                }, (res) => { res.on('data', ()=>{}); res.on('end', resolve); });
+                req.on('error', resolve); req.write(patch); req.end();
+              });
+            }
+          }
+        } catch(e) { console.error('Jira error:', e.message); }
+      }
+
+      result = { ok: true, ticket_id: ticketRow?.id, ticket_numero: ticketRow?.numero, jira_key: jiraKey, jira_url: jiraUrl };
+    }
+
     else {
       return res.status(400).json({ error: 'Unknown action: ' + action });
     }

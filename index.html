@@ -513,6 +513,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="nav-group-label">Operaciones</div>
     <button class="nav-btn" data-sec="tareas"><span class="nav-icon">📋</span>Tareas</button>
     <button class="nav-btn" data-sec="agente"><span class="nav-icon">🤖</span>Agente IA</button>
+    <button class="nav-btn" data-sec="soporte" id="nav-soporte-btn"><span class="nav-icon">🎫</span>Soporte<span id="nav-soporte-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;line-height:1.4"></span></button>
 
     <div class="nav-group-label">Analytics</div>
     <button class="nav-btn" data-sec="analytics"><span class="nav-icon">📈</span>Analytics Web</button>
@@ -2338,6 +2339,62 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <!-- KANBAN / LISTA -->
     <div id="tasks-board"></div>
     </div><!-- /ttab-tareas -->
+  </div>
+
+  <!-- SOPORTE AL CLIENTE -->
+  <div class="section" id="s-soporte">
+    <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">SOPOR<span>TE</span></div>
+        <div class="page-sub">Tickets de clientes · sincronizado con Jira (proyecto RHI)</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <a href="/soporte.html" target="_blank" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);text-decoration:none">🔗 Formulario público</a>
+        <button class="btn btn-sm" id="btn-soporte-refresh" style="color:var(--text2)">↻ Actualizar</button>
+      </div>
+    </div>
+
+    <div class="metrics-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="metric-card"><div class="m-label">Abiertos</div><div class="m-val" id="sp-abiertos" style="color:var(--amber)">—</div><div class="m-sub">sin resolver</div></div>
+      <div class="metric-card"><div class="m-label">En progreso</div><div class="m-val" id="sp-en-progreso" style="color:var(--cyan)">—</div><div class="m-sub">siendo atendidos</div></div>
+      <div class="metric-card"><div class="m-label">Cerrados hoy</div><div class="m-val green" id="sp-cerrados">—</div><div class="m-sub">resueltos</div></div>
+      <div class="metric-card"><div class="m-label">Críticos</div><div class="m-val" id="sp-criticos" style="color:var(--red)">—</div><div class="m-sub">alta prioridad</div></div>
+    </div>
+
+    <!-- Filtros -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+      <button class="tab-btn active" data-spfilter="todos" style="font-size:12px;padding:6px 14px">Todos</button>
+      <button class="tab-btn" data-spfilter="abierto" style="font-size:12px;padding:6px 14px">Abiertos</button>
+      <button class="tab-btn" data-spfilter="en_progreso" style="font-size:12px;padding:6px 14px">En progreso</button>
+      <button class="tab-btn" data-spfilter="cerrado" style="font-size:12px;padding:6px 14px">Cerrados</button>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <select id="sp-filter-cat" style="font-size:12px;padding:5px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text)">
+          <option value="">Todas las categorías</option>
+          <option value="bug">🐛 Bug</option>
+          <option value="mejora">✨ Mejora</option>
+          <option value="consulta">❓ Consulta</option>
+          <option value="otro">📌 Otro</option>
+        </select>
+        <select id="sp-filter-prio" style="font-size:12px;padding:5px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text)">
+          <option value="">Todas las prioridades</option>
+          <option value="crítica">🔴 Crítica</option>
+          <option value="alta">🟠 Alta</option>
+          <option value="media">🟡 Media</option>
+          <option value="baja">🟢 Baja</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid2" style="align-items:start">
+      <!-- Lista de tickets -->
+      <div>
+        <div id="sp-list"><div class="empty">Cargando tickets...</div></div>
+      </div>
+      <!-- Detalle del ticket -->
+      <div id="sp-detail">
+        <div class="empty" style="padding:3rem">Seleccioná un ticket para ver el detalle</div>
+      </div>
+    </div>
   </div>
 
   <!-- AGENTE -->
@@ -11566,6 +11623,190 @@ async function generarExcelMensual() {
 }
 
 document.getElementById('btn-generar-excel')?.addEventListener('click', generarExcelMensual);
+
+// ══════════════════════════════════════════════════
+// SOPORTE AL CLIENTE — TICKETS
+// ══════════════════════════════════════════════════
+let _tickets = [];
+let _spFilter = 'todos';
+let _spCat = '';
+let _spPrio = '';
+
+const SP_ESTADO = {
+  abierto:     { color: 'var(--amber)',  bg: 'rgba(245,158,11,0.12)', label: '⏳ Abierto' },
+  en_progreso: { color: 'var(--cyan)',   bg: 'rgba(0,229,204,0.10)', label: '🔄 En progreso' },
+  cerrado:     { color: 'var(--green)',  bg: 'rgba(34,197,94,0.10)', label: '✅ Cerrado' },
+  cancelado:   { color: 'var(--text3)', bg: 'rgba(75,85,99,0.15)',  label: '✕ Cancelado' },
+};
+const SP_PRIO = {
+  baja:    { color: 'var(--green)', icon: '🟢' },
+  media:   { color: 'var(--amber)', icon: '🟡' },
+  alta:    { color: '#f97316',      icon: '🟠' },
+  crítica: { color: 'var(--red)',   icon: '🔴' },
+  critica: { color: 'var(--red)',   icon: '🔴' },
+};
+const SP_CAT = { bug: '🐛', mejora: '✨', consulta: '❓', otro: '📌' };
+
+async function syncTicketsFromSupabase() {
+  try {
+    const rows = await sbFetch('rhinos_tickets?order=created_at.desc');
+    _tickets = Array.isArray(rows) ? rows : [];
+  } catch(e) { console.warn('Tickets:', e.message); }
+}
+
+function renderSoporteMetrics() {
+  const today = localDateStr();
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('sp-abiertos',    _tickets.filter(t => t.estado === 'abierto').length);
+  set('sp-en-progreso', _tickets.filter(t => t.estado === 'en_progreso').length);
+  set('sp-cerrados',    _tickets.filter(t => t.estado === 'cerrado' && (t.updated_at || '').startsWith(today)).length);
+  set('sp-criticos',    _tickets.filter(t => ['crítica','critica','alta'].includes(t.prioridad) && t.estado !== 'cerrado').length);
+  // Badge en nav
+  const abiertos = _tickets.filter(t => t.estado === 'abierto' || t.estado === 'en_progreso').length;
+  const badge = document.getElementById('nav-soporte-badge');
+  if (badge) { badge.textContent = abiertos || ''; badge.style.display = abiertos ? 'inline' : 'none'; }
+}
+
+function renderSoporteList() {
+  renderSoporteMetrics();
+  const el = document.getElementById('sp-list');
+  if (!el) return;
+  let list = _tickets;
+  if (_spFilter !== 'todos') list = list.filter(t => t.estado === _spFilter);
+  if (_spCat)  list = list.filter(t => t.categoria === _spCat);
+  if (_spPrio) list = list.filter(t => t.prioridad === _spPrio || (t.prioridad === 'critica' && _spPrio === 'crítica'));
+  if (!list.length) { el.innerHTML = '<div class="empty">Sin tickets para este filtro.</div>'; return; }
+
+  el.innerHTML = list.map(t => {
+    const est = SP_ESTADO[t.estado] || SP_ESTADO.abierto;
+    const prio = SP_PRIO[t.prioridad] || SP_PRIO.media;
+    const cat = SP_CAT[t.categoria] || '📌';
+    const fecha = t.created_at ? new Date(t.created_at).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    const jiraBadge = t.jira_key ? `<span style="font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(0,82,204,0.2);color:#579dff;border:1px solid rgba(0,82,204,0.3)">${t.jira_key}</span>` : '';
+    return `<div class="card" style="padding:12px;margin-bottom:8px;cursor:pointer;border-left:3px solid ${prio.color}" data-ticket-id="${t.id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:600;color:var(--text);flex:1">${cat} ${t.asunto}</div>
+        <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${est.bg};color:${est.color};flex-shrink:0">${est.label}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+        <span style="font-size:11px;color:var(--text3)">${t.nombre || 'Anónimo'} · ${t.email || ''}</span>
+        ${jiraBadge}
+        <span style="font-size:10px;color:var(--text3);margin-left:auto">${fecha}</span>
+      </div>
+      ${t.numero ? `<div style="font-size:10px;color:var(--text3);margin-top:4px">#${t.numero} ${prio.icon} ${t.prioridad}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('[data-ticket-id]').forEach(card => {
+    card.addEventListener('click', () => openTicket(_tickets.find(t => t.id === card.dataset.ticketId)));
+  });
+}
+
+function openTicket(t) {
+  if (!t) return;
+  const el = document.getElementById('sp-detail');
+  if (!el) return;
+  const est = SP_ESTADO[t.estado] || SP_ESTADO.abierto;
+  const prio = SP_PRIO[t.prioridad] || SP_PRIO.media;
+  const cat = SP_CAT[t.categoria] || '📌';
+  const fecha = t.created_at ? new Date(t.created_at).toLocaleString('es-AR') : '';
+  const jiraLink = t.jira_url ? `<a href="${t.jira_url}" target="_blank" style="color:#579dff;text-decoration:none;font-size:12px;padding:4px 10px;border:1px solid rgba(0,82,204,0.4);border-radius:6px;background:rgba(0,82,204,0.1)">🔗 Ver en Jira (${t.jira_key})</a>` : '<span style="font-size:11px;color:var(--text3)">Sin issue Jira (credenciales no configuradas)</span>';
+
+  el.innerHTML = `
+  <div class="card" style="border-color:${prio.color}33">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">${cat} ${t.categoria?.toUpperCase() || ''} · #${t.numero || t.id?.slice(0,8)} · ${fecha}</div>
+        <div style="font-size:18px;font-weight:700">${t.asunto}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${jiraLink}
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+      <span style="font-size:11px;padding:3px 10px;border-radius:8px;background:${est.bg};color:${est.color}">${est.label}</span>
+      <span style="font-size:11px;padding:3px 10px;border-radius:8px;background:${prio.color}22;color:${prio.color}">${prio.icon} ${t.prioridad}</span>
+    </div>
+    <div style="background:var(--surface2);border-radius:var(--r);padding:12px;margin-bottom:14px;font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap">${t.descripcion || ''}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--text3);margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      ${t.nombre ? `<span>👤 ${t.nombre}</span>` : ''}
+      ${t.email ? `<span>📧 ${t.email}</span>` : ''}
+      ${t.empresa ? `<span>🏢 ${t.empresa}</span>` : ''}
+    </div>
+    <!-- Cambiar estado -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Estado</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${Object.entries(SP_ESTADO).map(([key,val])=>`<button class="btn btn-sm" data-sp-estado="${key}" style="font-size:11px;${t.estado===key?`background:${val.bg};color:${val.color};border-color:${val.color}55`:''}">${val.label}</button>`).join('')}
+      </div>
+    </div>
+    <!-- Asignado a -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input id="sp-asignado" placeholder="Asignado a..." value="${t.asignado_a || ''}" style="flex:1;font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font)"/>
+      <button class="btn btn-sm" id="btn-sp-asignar" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">Guardar</button>
+    </div>
+    <!-- Notas internas -->
+    <div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px">Notas internas</div>
+      <textarea id="sp-notas" rows="3" placeholder="Notas del equipo (no visibles al cliente)..." style="width:100%;font-size:12px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font);resize:vertical">${t.notas_internas || ''}</textarea>
+      <button class="btn btn-sm btn-green" id="btn-sp-notas" style="margin-top:6px">💾 Guardar notas</button>
+    </div>
+  </div>`;
+
+  // Cambiar estado
+  el.querySelectorAll('[data-sp-estado]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const nuevoEstado = btn.dataset.spEstado;
+      await sbFetch(`rhinos_tickets?id=eq.${encodeURIComponent(t.id)}`, 'PATCH', { estado: nuevoEstado, updated_at: new Date().toISOString() }).catch(e => showToast('Error: '+e.message));
+      t.estado = nuevoEstado;
+      _tickets = _tickets.map(x => x.id === t.id ? { ...x, estado: nuevoEstado } : x);
+      renderSoporteList();
+      openTicket(t);
+      showToast('Estado actualizado 🦏');
+    });
+  });
+
+  // Asignar
+  el.querySelector('#btn-sp-asignar')?.addEventListener('click', async () => {
+    const val = el.querySelector('#sp-asignado').value.trim();
+    await sbFetch(`rhinos_tickets?id=eq.${encodeURIComponent(t.id)}`, 'PATCH', { asignado_a: val || null }).catch(() => {});
+    t.asignado_a = val;
+    _tickets = _tickets.map(x => x.id === t.id ? { ...x, asignado_a: val } : x);
+    showToast('Asignación guardada 🦏');
+  });
+
+  // Notas internas
+  el.querySelector('#btn-sp-notas')?.addEventListener('click', async () => {
+    const notas = el.querySelector('#sp-notas').value.trim();
+    await sbFetch(`rhinos_tickets?id=eq.${encodeURIComponent(t.id)}`, 'PATCH', { notas_internas: notas || null }).catch(() => {});
+    t.notas_internas = notas;
+    _tickets = _tickets.map(x => x.id === t.id ? { ...x, notas_internas: notas } : x);
+    showToast('Notas guardadas 🦏');
+  });
+}
+
+// Filtros
+document.querySelectorAll('[data-spfilter]').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('[data-spfilter]').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    _spFilter = this.dataset.spfilter;
+    renderSoporteList();
+  });
+});
+document.getElementById('sp-filter-cat')?.addEventListener('change', function() { _spCat = this.value; renderSoporteList(); });
+document.getElementById('sp-filter-prio')?.addEventListener('change', function() { _spPrio = this.value; renderSoporteList(); });
+
+// Nav listener
+document.querySelector('.nav-btn[data-sec="soporte"]')?.addEventListener('click', async () => {
+  await syncTicketsFromSupabase();
+  renderSoporteList();
+});
+document.getElementById('btn-soporte-refresh')?.addEventListener('click', async () => {
+  await syncTicketsFromSupabase();
+  renderSoporteList();
+  showToast('Tickets actualizados 🦏');
+});
 
 // ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA

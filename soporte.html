@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Soporte — RhinosApp</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--green:#22c55e;--cyan:#00e5cc;--red:#ef4444;--amber:#f59e0b;--bg:#0a0a0f;--surface:#13131a;--surface2:#1a1a24;--border:rgba(255,255,255,0.08);--text:#f1f5f9;--text2:#94a3b8;--text3:#64748b;--r:8px;--rl:12px;--font:'Inter',system-ui,sans-serif}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:40px 16px}
+  .logo{display:flex;align-items:center;gap:10px;margin-bottom:32px}
+  .logo-icon{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#1a1a24,#0a0a0f);border:1px solid rgba(0,229,204,0.3);display:flex;align-items:center;justify-content:center;font-size:22px}
+  .logo-text{font-size:20px;font-weight:900;letter-spacing:-0.03em}.logo-text span{color:var(--cyan)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:32px;width:100%;max-width:560px;box-shadow:0 24px 48px rgba(0,0,0,0.4)}
+  h1{font-size:22px;font-weight:800;margin-bottom:6px}
+  .sub{font-size:13px;color:var(--text2);margin-bottom:28px;line-height:1.6}
+  .field{margin-bottom:16px}
+  label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:6px}
+  input,textarea,select{width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color .15s}
+  input:focus,textarea:focus,select:focus{border-color:rgba(0,229,204,0.5)}
+  textarea{resize:vertical;min-height:120px;line-height:1.6}
+  select option{background:var(--surface)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .btn{width:100%;padding:13px;background:var(--cyan);color:#0a0a0f;border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;transition:opacity .15s;margin-top:8px;font-family:var(--font)}
+  .btn:hover{opacity:.9}.btn:disabled{opacity:.5;cursor:not-allowed}
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  .badge-red{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3)}
+  .badge-amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3)}
+  .badge-green{background:rgba(34,197,94,0.15);color:var(--green);border:1px solid rgba(34,197,94,0.3)}
+  #success{display:none;text-align:center;padding:24px 0}
+  #success .icon{font-size:56px;margin-bottom:16px}
+  #success h2{font-size:20px;font-weight:800;margin-bottom:8px;color:var(--green)}
+  #success p{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:6px}
+  #success .ticket-ref{font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:8px 14px;display:inline-block;margin-top:12px;color:var(--cyan);font-family:monospace}
+  #error-msg{display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px}
+  .required{color:var(--red);margin-left:2px}
+  .footer{font-size:11px;color:var(--text3);text-align:center;margin-top:24px}
+  @media(max-width:480px){.row2{grid-template-columns:1fr}.card{padding:24px}}
+</style>
+</head>
+<body>
+
+<div class="logo">
+  <div class="logo-icon">🦏</div>
+  <div class="logo-text">RHINOS<span>APP</span></div>
+</div>
+
+<div class="card">
+  <div id="form-wrap">
+    <h1>🎫 Centro de soporte</h1>
+    <p class="sub">Reportá un bug, pedí una mejora o hacé una consulta. Nuestro equipo lo recibe automáticamente y te respondemos lo antes posible.</p>
+
+    <div id="error-msg"></div>
+
+    <div class="row2">
+      <div class="field">
+        <label>Nombre<span class="required">*</span></label>
+        <input id="f-nombre" type="text" placeholder="Juan García" autocomplete="name"/>
+      </div>
+      <div class="field">
+        <label>Email<span class="required">*</span></label>
+        <input id="f-email" type="email" placeholder="juan@empresa.com" autocomplete="email"/>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Empresa / Organización</label>
+      <input id="f-empresa" type="text" placeholder="Distribuidora El Sol SRL"/>
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label>Categoría<span class="required">*</span></label>
+        <select id="f-categoria">
+          <option value="bug">🐛 Bug / Error</option>
+          <option value="mejora">✨ Mejora / Feature</option>
+          <option value="consulta">❓ Consulta</option>
+          <option value="otro">📌 Otro</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Prioridad</label>
+        <select id="f-prioridad">
+          <option value="baja">🟢 Baja</option>
+          <option value="media" selected>🟡 Media</option>
+          <option value="alta">🟠 Alta</option>
+          <option value="crítica">🔴 Crítica — no puedo trabajar</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Asunto<span class="required">*</span></label>
+      <input id="f-asunto" type="text" placeholder="Descripción corta del problema"/>
+    </div>
+
+    <div class="field">
+      <label>Descripción detallada<span class="required">*</span></label>
+      <textarea id="f-desc" placeholder="¿Qué pasó? ¿Qué esperabas que pasara? ¿Cuándo ocurrió? Cuanto más detalle, más rápido lo resolvemos."></textarea>
+    </div>
+
+    <button class="btn" id="btn-submit">Enviar ticket →</button>
+  </div>
+
+  <div id="success">
+    <div class="icon">✅</div>
+    <h2>¡Ticket enviado!</h2>
+    <p>Tu reporte fue recibido. Nuestro equipo lo está revisando y te contactaremos a <strong id="s-email"></strong>.</p>
+    <p style="margin-top:8px">También creamos un issue en Jira para el seguimiento interno.</p>
+    <div class="ticket-ref" id="s-ref">Cargando referencia...</div>
+    <button class="btn" style="margin-top:24px;max-width:220px" onclick="location.reload()">Enviar otro ticket</button>
+  </div>
+</div>
+
+<p class="footer">RhinosApp · Sistema de soporte interno · rhinos-crm.vercel.app</p>
+
+<script>
+document.getElementById('btn-submit').addEventListener('click', async function() {
+  const nombre   = document.getElementById('f-nombre').value.trim();
+  const email    = document.getElementById('f-email').value.trim();
+  const empresa  = document.getElementById('f-empresa').value.trim();
+  const categoria= document.getElementById('f-categoria').value;
+  const prioridad= document.getElementById('f-prioridad').value;
+  const asunto   = document.getElementById('f-asunto').value.trim();
+  const desc     = document.getElementById('f-desc').value.trim();
+  const errEl    = document.getElementById('error-msg');
+
+  errEl.style.display = 'none';
+
+  if (!nombre) { errEl.textContent = 'El nombre es obligatorio.'; errEl.style.display='block'; return; }
+  if (!email || !email.includes('@')) { errEl.textContent = 'Email inválido.'; errEl.style.display='block'; return; }
+  if (!asunto) { errEl.textContent = 'El asunto es obligatorio.'; errEl.style.display='block'; return; }
+  if (!desc) { errEl.textContent = 'La descripción es obligatoria.'; errEl.style.display='block'; return; }
+
+  this.disabled = true;
+  this.textContent = '⏳ Enviando...';
+
+  try {
+    const res = await fetch('/api/api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create_ticket', nombre, email, empresa, asunto, descripcion: desc, prioridad, categoria })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Error del servidor');
+
+    document.getElementById('form-wrap').style.display = 'none';
+    document.getElementById('success').style.display = 'block';
+    document.getElementById('s-email').textContent = email;
+    const ref = data.ticket_numero ? `Ticket #${data.ticket_numero}` : `ID: ${data.ticket_id?.slice(0,8)}`;
+    const jira = data.jira_key ? ` · Jira: ${data.jira_key}` : '';
+    document.getElementById('s-ref').textContent = ref + jira;
+  } catch(e) {
+    errEl.textContent = 'Error enviando el ticket: ' + e.message;
+    errEl.style.display = 'block';
+    this.disabled = false;
+    this.textContent = 'Enviar ticket →';
+  }
+});
+</script>
+</body>
+</html>
