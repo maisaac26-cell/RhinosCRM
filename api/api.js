@@ -1750,6 +1750,39 @@ La respuesta debe:
       result = { ok: true, ticket_id: ticketRow?.id, ticket_numero: ticketRow?.numero, jira_key: jiraKey, jira_url: jiraUrl, jira_debug: jiraDebug };
     }
 
+    // ── DIAGNÓSTICO JIRA ─────────────────────────────────────────────────
+    else if (action === 'check_jira') {
+      const JIRA_EMAIL = process.env.JIRA_EMAIL;
+      const JIRA_TOKEN = process.env.JIRA_API_TOKEN;
+      const JIRA_HOST = 'rhinoerp.atlassian.net';
+      if (!JIRA_EMAIL || !JIRA_TOKEN) {
+        result = { ok: false, error: 'Env vars missing', email_set: !!JIRA_EMAIL, token_set: !!JIRA_TOKEN };
+      } else {
+        const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_TOKEN}`).toString('base64');
+        // Test 1: myself (quién soy)
+        const me = await new Promise((resolve) => {
+          const req = https.request({ hostname: JIRA_HOST, path: '/rest/api/3/myself', method: 'GET',
+            headers: { 'Authorization': 'Basic ' + auth, 'Accept': 'application/json' }
+          }, (res) => { let r=''; res.on('data',c=>r+=c); res.on('end',()=>{ try{resolve({status:res.statusCode,body:JSON.parse(r)});}catch(e){resolve({status:res.statusCode,raw:r});} }); });
+          req.on('error', (e) => resolve({ error: e.message })); req.end();
+        });
+        // Test 2: proyecto RHI específico
+        const proj = await new Promise((resolve) => {
+          const req = https.request({ hostname: JIRA_HOST, path: '/rest/api/3/project/RHI', method: 'GET',
+            headers: { 'Authorization': 'Basic ' + auth, 'Accept': 'application/json' }
+          }, (res) => { let r=''; res.on('data',c=>r+=c); res.on('end',()=>{ try{resolve({status:res.statusCode,body:JSON.parse(r)});}catch(e){resolve({status:res.statusCode,raw:r});} }); });
+          req.on('error', (e) => resolve({ error: e.message })); req.end();
+        });
+        result = {
+          authenticated_as: me.body?.displayName || me.body?.emailAddress || me.body,
+          me_status: me.status,
+          project_RHI_status: proj.status,
+          project_name: proj.body?.name,
+          project_error: proj.body?.errorMessages || proj.body?.message
+        };
+      }
+    }
+
     else {
       return res.status(400).json({ error: 'Unknown action: ' + action });
     }
