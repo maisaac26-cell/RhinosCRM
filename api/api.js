@@ -1687,7 +1687,8 @@ La respuesta debe:
       let jiraKey = null, jiraUrl = null;
 
       const prioMap = { baja: 'Low', media: 'Medium', alta: 'High', crítica: 'Highest', critica: 'Highest' };
-      const typeMap = { bug: 'Bug', mejora: 'Story', consulta: 'Task', otro: 'Task' };
+      // "Task" es el único tipo universalmente disponible en todos los proyectos Jira
+      const typeMap = { bug: 'Task', mejora: 'Task', consulta: 'Task', otro: 'Task' };
 
       let jiraDebug = { email_set: !!JIRA_EMAIL, token_set: !!JIRA_TOKEN };
 
@@ -1695,6 +1696,7 @@ La respuesta debe:
         jiraDebug.skip_reason = !JIRA_EMAIL ? 'JIRA_EMAIL env var missing' : 'JIRA_API_TOKEN env var missing';
       } else {
         try {
+          // Payload mínimo para máxima compatibilidad con configuraciones Jira
           const jiraBody = JSON.stringify({
             fields: {
               project: { key: JIRA_PROJECT },
@@ -1702,12 +1704,10 @@ La respuesta debe:
               description: {
                 type: 'doc', version: 1,
                 content: [{ type: 'paragraph', content: [{ type: 'text',
-                  text: `${descripcion}\n\n---\nReportado por: ${nombre || 'Anónimo'} <${email}>${empresa ? '\nEmpresa: ' + empresa : ''}`
+                  text: `${descripcion}\n\n---\nReportado por: ${nombre || 'Anónimo'} <${email}>${empresa ? '\nEmpresa: ' + empresa : ''}\nPrioridad: ${prioridad}`
                 }] }]
               },
-              issuetype: { name: typeMap[categoria] || 'Task' },
-              priority: { name: prioMap[prioridad] || 'Medium' },
-              labels: ['soporte-crm', categoria]
+              issuetype: { name: 'Task' }
             }
           });
           const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_TOKEN}`).toString('base64');
