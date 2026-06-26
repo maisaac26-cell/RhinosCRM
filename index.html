@@ -10,8 +10,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="RhinosCRM"/>
-<link rel="apple-touch-icon" href="/icon.svg"/>
-<link rel="icon" href="/icon.svg"/>
+<link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png"/>
+<link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
@@ -12106,7 +12107,7 @@ async function togglePushSubscription() {
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     });
     const res = await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'subscribe', subscription: sub }) }).then(r=>r.json()).catch(()=>({}));
+      body: JSON.stringify({ action:'subscribe', subscription: sub, user_email: currentSession?.user?.email || '' }) }).then(r=>r.json()).catch(()=>({}));
     if (res.ok) showToast('✅ Notificaciones activadas 🦏');
     else showToast('Error activando notificaciones: ' + (res.error||'desconocido'));
   }
@@ -12397,49 +12398,127 @@ async function loadNotifModule() {
 function renderNotifRules() {
   const el = document.getElementById('notif-rules-list');
   if (!el) return;
+  const vends = vendedoresData.filter(v => v.activo);
+
   el.innerHTML = Object.entries(NOTIF_RULES_META).map(([tipo, meta]) => {
-    const rule = _notifRules[tipo] || { tipo, activo: false };
+    const rule = _notifRules[tipo] || { tipo, activo: false, hora_envio:'12:00', frecuencia:'diaria', destinatarios:'todos', vendedor_ids:'' };
     const isActive = rule.activo;
-    const tipoBadge = meta.tipo === 'evento'
-      ? `<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(0,229,204,0.1);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">tiempo real</span>`
-      : `<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2)">diaria</span>`;
-    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:20px;flex-shrink:0">${meta.icon}</span>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-          <span style="font-size:13px;font-weight:600;color:var(--text)">${meta.label}</span>
-          ${tipoBadge}
+    const esEvento = meta.tipo === 'evento';
+    const tipoBadge = esEvento
+      ? `<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(0,229,204,0.1);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">⚡ tiempo real</span>`
+      : `<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2)">📅 ${rule.frecuencia||'diaria'} ${!esEvento?'· '+((rule.hora_envio||'12:00').slice(0,5))+' hs':''}</span>`;
+    const destLabel = rule.destinatarios === 'vendedores' && rule.vendedor_ids
+      ? `→ ${(rule.vendedor_ids||'').split(',').map(id=>vends.find(v=>v.id===id.trim())?.nombre||id.trim()).join(', ')}`
+      : '→ Todos';
+
+    return `<div style="border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0">
+        <span style="font-size:20px;flex-shrink:0">${meta.icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:600;color:var(--text)">${meta.label}</span>
+            ${tipoBadge}
+            <span style="font-size:10px;color:var(--text3)">${destLabel}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3)">${meta.desc}</div>
         </div>
-        <div style="font-size:11px;color:var(--text3)">${meta.desc}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <button class="btn btn-sm notif-config-btn" data-tipo="${tipo}" style="font-size:11px;color:var(--text3);padding:3px 8px" title="Configurar">⚙</button>
+          <div class="notif-toggle" data-tipo="${tipo}" data-active="${isActive}" style="
+            width:40px;height:22px;border-radius:11px;
+            background:${isActive?'var(--green)':'rgba(255,255,255,0.1)'};
+            position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;
+            border:1px solid ${isActive?'rgba(34,197,94,0.5)':'var(--border2)'}">
+            <div style="position:absolute;top:2px;left:${isActive?'19':'2'}px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>
+          </div>
+        </div>
       </div>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-shrink:0">
-        <span style="font-size:11px;color:${isActive?'var(--green)':'var(--text3)'}">${isActive?'Activa':'Inactiva'}</span>
-        <div class="notif-toggle" data-tipo="${tipo}" data-active="${isActive}" style="
-          width:40px;height:22px;border-radius:11px;
-          background:${isActive?'var(--green)':'rgba(255,255,255,0.1)'};
-          position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;
-          border:1px solid ${isActive?'rgba(34,197,94,0.5)':'var(--border2)'}">
-          <div style="position:absolute;top:2px;left:${isActive?'19':'2'}px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>
+      <!-- Panel de config (oculto por defecto) -->
+      <div class="notif-config-panel" id="cfg-${tipo}" style="display:none;background:var(--surface2);border-radius:var(--r);padding:12px;margin-bottom:10px;border:1px solid var(--border2)">
+        ${!esEvento ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <div class="field" style="margin:0;min-width:140px">
+            <label style="font-size:10px">Frecuencia</label>
+            <select class="cfg-frecuencia" data-tipo="${tipo}" style="font-size:12px">
+              <option value="diaria" ${rule.frecuencia==='diaria'?'selected':''}>Diaria</option>
+              <option value="semanal" ${rule.frecuencia==='semanal'?'selected':''}>Semanal (lunes)</option>
+              <option value="mensual" ${rule.frecuencia==='mensual'?'selected':''}>Mensual (día 1)</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;min-width:100px">
+            <label style="font-size:10px">Hora de envío</label>
+            <input type="time" class="cfg-hora" data-tipo="${tipo}" value="${rule.hora_envio||'12:00'}" style="font-size:12px"/>
+          </div>
+        </div>` : ''}
+        <div style="margin-bottom:10px">
+          <label style="font-size:10px;display:block;margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Destinatarios</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:5px 10px;border-radius:20px;border:1px solid ${rule.destinatarios==='todos'?'var(--cyan)':'var(--border2)'};background:${rule.destinatarios==='todos'?'rgba(0,229,204,0.1)':'transparent'}">
+              <input type="radio" class="cfg-dest" name="dest-${tipo}" value="todos" ${rule.destinatarios==='todos'?'checked':''} style="width:auto"/> Todos
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:5px 10px;border-radius:20px;border:1px solid ${rule.destinatarios==='vendedores'?'#818cf8':'var(--border2)'};background:${rule.destinatarios==='vendedores'?'rgba(99,102,241,0.1)':'transparent'}">
+              <input type="radio" class="cfg-dest" name="dest-${tipo}" value="vendedores" ${rule.destinatarios==='vendedores'?'checked':''} style="width:auto"/> Solo vendedores
+            </label>
+          </div>
+          <div class="cfg-vendedores-sel" style="margin-top:8px;${rule.destinatarios!=='vendedores'?'display:none':''}">
+            <label style="font-size:10px;color:var(--text3)">Seleccioná los vendedores:</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+              ${vends.map(v=>`<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+                <input type="checkbox" class="cfg-vend-check" value="${v.id}" ${(rule.vendedor_ids||'').includes(v.id)?'checked':''} style="width:auto"/>
+                ${v.nombre}
+              </label>`).join('')}
+            </div>
+          </div>
         </div>
-      </label>
+        <button class="btn btn-sm btn-green cfg-save" data-tipo="${tipo}" style="font-size:12px">Guardar configuración</button>
+      </div>
     </div>`;
   }).join('');
 
+  // Toggle on/off
   el.querySelectorAll('.notif-toggle').forEach(toggle => {
     toggle.addEventListener('click', async () => {
       const tipo = toggle.dataset.tipo;
-      const wasActive = toggle.dataset.active === 'true';
-      const newActive = !wasActive;
-      // Upsert en Supabase
-      const existing = _notifRules[tipo];
-      if (existing) {
-        await sbFetch(`rhinos_notif_rules?tipo=eq.${tipo}`, 'PATCH', { activo: newActive }).catch(() => {});
-      } else {
-        await sbFetch('rhinos_notif_rules', 'POST', { tipo, activo: newActive }).catch(() => {});
-      }
+      const newActive = toggle.dataset.active !== 'true';
+      await sbFetch(`rhinos_notif_rules?tipo=eq.${tipo}`, 'PATCH', { activo: newActive }).catch(() => {});
+      if (!_notifRules[tipo]) await sbFetch('rhinos_notif_rules', 'POST', { tipo, activo: newActive }).catch(() => {});
       _notifRules[tipo] = { ...(_notifRules[tipo]||{tipo}), activo: newActive };
       renderNotifRules();
-      showToast(`${NOTIF_RULES_META[tipo]?.label} ${newActive?'activada':'desactivada'} 🦏`);
+      showToast(`${NOTIF_RULES_META[tipo]?.label} ${newActive?'activada ✅':'desactivada'} 🦏`);
+    });
+  });
+
+  // Abrir/cerrar panel config
+  el.querySelectorAll('.notif-config-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = document.getElementById('cfg-' + btn.dataset.tipo);
+      if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+
+  // Mostrar/ocultar selector de vendedores
+  el.querySelectorAll('.cfg-dest').forEach(radio => {
+    radio.addEventListener('change', function() {
+      const panel = this.closest('.notif-config-panel');
+      const selDiv = panel?.querySelector('.cfg-vendedores-sel');
+      if (selDiv) selDiv.style.display = this.value === 'vendedores' ? 'block' : 'none';
+    });
+  });
+
+  // Guardar configuración
+  el.querySelectorAll('.cfg-save').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const tipo = this.dataset.tipo;
+      const panel = document.getElementById('cfg-' + tipo);
+      const frecuencia = panel.querySelector('.cfg-frecuencia')?.value || 'diaria';
+      const hora_envio = panel.querySelector('.cfg-hora')?.value || '12:00';
+      const destRadio = [...panel.querySelectorAll('.cfg-dest')].find(r => r.checked);
+      const destinatarios = destRadio?.value || 'todos';
+      const vendIds = [...panel.querySelectorAll('.cfg-vend-check:checked')].map(c => c.value).join(',');
+      const patch = { frecuencia, hora_envio, destinatarios, vendedor_ids: vendIds };
+      await sbFetch(`rhinos_notif_rules?tipo=eq.${tipo}`, 'PATCH', patch).catch(() => {});
+      _notifRules[tipo] = { ...(_notifRules[tipo]||{tipo}), ...patch };
+      renderNotifRules();
+      showToast('Configuración guardada 🦏');
     });
   });
 }
@@ -12537,9 +12616,17 @@ async function triggerAutoNotif(tipo, title, body, url) {
   try {
     const rule = _notifRules[tipo] || (await sbFetch(`rhinos_notif_rules?tipo=eq.${tipo}`).then(r=>r?.[0]));
     if (!rule?.activo) return;
+    // Resolver target_emails si el destinatario es 'vendedores'
+    let target_emails;
+    if (rule.destinatarios === 'vendedores' && rule.vendedor_ids) {
+      const ids = rule.vendedor_ids.split(',').map(s => s.trim()).filter(Boolean);
+      target_emails = (vendedoresData||[]).filter(v => ids.includes(v.id)).map(v => v.login_email || v.email).filter(Boolean);
+    }
+    const payload = { action:'send', title, body, url, tag: tipo };
+    if (target_emails?.length) payload.target_emails = target_emails;
     const res = await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'send', title, body, url, tag: tipo }) }).then(r=>r.json()).catch(()=>({}));
-    if (res.sent > 0) {
+      body: JSON.stringify(payload) }).then(r=>r.json()).catch(()=>({}));
+    if ((res.sent||0) > 0) {
       await sbFetch('rhinos_notif_log', 'POST', { tipo, titulo:title, mensaje:body, enviado_a:res.sent }).catch(()=>{});
     }
   } catch(e) { console.warn('triggerAutoNotif:', e.message); }

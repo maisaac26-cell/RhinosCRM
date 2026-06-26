@@ -50,15 +50,15 @@ module.exports = async function handler(req, res) {
   if (action === 'subscribe') {
     if (!subscription) return res.status(400).json({ error: 'Falta subscription' });
     const endpoint = subscription.endpoint;
-    // Upsert por endpoint para no duplicar
+    const user_email = req.body.user_email || null;
     const existing = await sbReq(`rhinos_push_subs?endpoint=eq.${encodeURIComponent(endpoint)}`);
     if (Array.isArray(existing) && existing.length) {
       await sbReq(`rhinos_push_subs?endpoint=eq.${encodeURIComponent(endpoint)}`, 'PATCH', {
-        sub_data: subscription, updated_at: new Date().toISOString()
+        sub_data: subscription, user_email, updated_at: new Date().toISOString()
       });
     } else {
       await sbReq('rhinos_push_subs', 'POST', {
-        endpoint, sub_data: subscription, created_at: new Date().toISOString()
+        endpoint, sub_data: subscription, user_email, created_at: new Date().toISOString()
       });
     }
     return res.json({ ok: true });
@@ -71,12 +71,18 @@ module.exports = async function handler(req, res) {
     return res.json({ ok: true });
   }
 
-  // ── Enviar push a todos los suscriptores
+  // ── Enviar push (con soporte de filtro por emails de vendedores)
   if (action === 'send') {
     if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
       return res.status(500).json({ error: 'VAPID keys no configuradas. Agregá VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY en Vercel.' });
     }
-    const subs = await sbReq('rhinos_push_subs?select=sub_data');
+    // target_emails: array de emails → filtra subs por user_email
+    const { target_emails } = req.body;
+    let subsQuery = 'rhinos_push_subs?select=sub_data,user_email';
+    if (target_emails?.length) {
+      subsQuery += '&user_email=in.(' + target_emails.map(e => encodeURIComponent(e)).join(',') + ')';
+    }
+    const subs = await sbReq(subsQuery);
     if (!Array.isArray(subs) || !subs.length) {
       return res.json({ ok: true, sent: 0, message: 'Sin suscriptores aún' });
     }
