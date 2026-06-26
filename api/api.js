@@ -1477,7 +1477,7 @@ Respondé SOLO con JSON válido, sin markdown:
     }
 
     else if (action === 'gmail_send') {
-      const { access_token, to, subject, body: emailBody, thread_id, in_reply_to, references } = body;
+      const { access_token, to, subject, body: emailBody, thread_id, in_reply_to, references, from: fromOverride } = body;
 
       // Obtener email del usuario para el header From (necesario para guardar en Enviados)
       let senderEmail = '';
@@ -1495,9 +1495,13 @@ Respondé SOLO con JSON válido, sin markdown:
         senderEmail = profile.emailAddress || '';
       } catch(e) {}
 
+      // fromOverride permite usar un alias "Enviar como" configurado en Gmail
+      // (ej: cobranzas@rhinosapp.com si está verificado en Gmail Settings > Cuentas)
+      const effectiveFrom = fromOverride || senderEmail;
+
       const encodedSubject = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
       let rawEmail = `MIME-Version: 1.0\r\n`;
-      if (senderEmail) rawEmail += `From: ${senderEmail}\r\n`;
+      if (effectiveFrom) rawEmail += `From: ${effectiveFrom}\r\n`;
       rawEmail += `To: ${to}\r\nSubject: ${encodedSubject}\r\nContent-Type: text/plain; charset=utf-8\r\n`;
       if (thread_id) rawEmail += `In-Reply-To: ${in_reply_to || ''}\r\nReferences: ${references || ''}\r\n`;
       rawEmail += `\r\n${emailBody}`;

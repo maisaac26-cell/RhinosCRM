@@ -9837,7 +9837,7 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
     }
     try {
       for (const emailDest of emailsDestino) {
-        await callAPI('gmail_send', { access_token: tokens.access_token, to: emailDest, subject, body });
+        await callAPI('gmail_send', { access_token: tokens.access_token, to: emailDest, subject, body, from: 'Cobranzas RhinosApp <cobranzas@rhinosapp.com>' });
       }
       sent++;
     } catch(e){}
