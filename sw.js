@@ -1,4 +1,5 @@
-const CACHE = 'rhinos-crm-v2';
+const CACHE = 'rhinos-crm-v3';
+const VAPID_PUBLIC_KEY = 'BDvoAlfKmD2fRxvvSH8-IHswdOmwRnnrvjpo3hWpMliFU4XiBq25X_P4fsOX3m-j58LKgECgTenKlcya5tv3l6s';
 const STATIC = ['/'];
 
 self.addEventListener('install', e => {

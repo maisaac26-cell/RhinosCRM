@@ -551,6 +551,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   <!-- Footer del sidebar -->
   <div class="sidebar-footer" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px">
     <div id="crm-user" style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    <!-- Botón notificaciones push -->
+    <button id="btn-notif-push" onclick="togglePushSubscription()" style="width:100%;font-size:11px;padding:5px 8px;border-radius:var(--r);border:1px solid rgba(99,102,241,0.3);background:rgba(99,102,241,0.08);color:#818cf8;cursor:pointer;font-family:var(--font);display:none">
+      🔔 Activar notificaciones
+    </button>
     <div style="display:flex;gap:6px;align-items:center">
       <button id="btn-crm-logout-sidebar" style="flex:1;font-size:11px;color:var(--red);border:1px solid rgba(239,68,68,0.25);border-radius:var(--r);padding:5px 8px;background:rgba(239,68,68,0.06);cursor:pointer;font-family:var(--font);font-weight:500;display:none">
         ↩ Cerrar sesión
@@ -11959,36 +11963,90 @@ document.getElementById('btn-enter-pres')?.addEventListener('click', () => {
 });
 
 // ══════════════════════════════════════════════════
-// PWA — SERVICE WORKER + INSTALL PROMPT + NOTIFICACIONES
 // ══════════════════════════════════════════════════
+// PWA — SERVICE WORKER + PUSH NOTIFICATIONS
+// ══════════════════════════════════════════════════
+const VAPID_PUBLIC_KEY = 'BDvoAlfKmD2fRxvvSH8-IHswdOmwRnnrvjpo3hWpMliFU4XiBq25X_P4fsOX3m-j58LKgECgTenKlcya5tv3l6s';
+
+let _swReg = null;
+
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(reg => {
-      console.log('SW registered:', reg.scope);
-    }).catch(e => console.warn('SW error:', e));
+  window.addEventListener('load', async () => {
+    try {
+      _swReg = await navigator.serviceWorker.register('/sw.js');
+      updatePushButton();
+    } catch(e) { console.warn('SW error:', e); }
   });
 }
 
-let _deferredInstallPrompt = null;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  _deferredInstallPrompt = e;
-  // Mostrar botón de instalar en sidebar si no está instalado
-  const installBtn = document.getElementById('btn-install-pwa');
-  if (installBtn) installBtn.style.display = 'flex';
-});
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
 
-async function requestNotificationPermission() {
-  if (!('Notification' in window)) return showToast('Tu navegador no soporta notificaciones');
-  const perm = await Notification.requestPermission();
-  if (perm === 'granted') showToast('✅ Notificaciones activadas 🦏');
-  else showToast('Notificaciones bloqueadas — activarlas desde la configuración del navegador');
+async function updatePushButton() {
+  const btn = document.getElementById('btn-notif-push');
+  if (!btn || !('PushManager' in window)) return;
+  btn.style.display = 'block';
+  if (Notification.permission === 'denied') {
+    btn.textContent = '🔕 Notificaciones bloqueadas';
+    btn.style.color = 'var(--text3)';
+    btn.style.borderColor = 'var(--border)';
+    return;
+  }
+  const reg = _swReg || await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    btn.textContent = '🔔 Notificaciones activas ✓';
+    btn.style.color = 'var(--green)';
+    btn.style.borderColor = 'rgba(34,197,94,0.3)';
+    btn.style.background = 'rgba(34,197,94,0.08)';
+  } else {
+    btn.textContent = '🔔 Activar notificaciones';
+    btn.style.color = '#818cf8';
+    btn.style.borderColor = 'rgba(99,102,241,0.3)';
+    btn.style.background = 'rgba(99,102,241,0.08)';
+  }
+}
+
+async function togglePushSubscription() {
+  if (!('PushManager' in window)) return showToast('Tu navegador no soporta push notifications');
+  const reg = _swReg || await navigator.serviceWorker.ready;
+  const existing = await reg.pushManager.getSubscription();
+  if (existing) {
+    // Desuscribir
+    await existing.unsubscribe();
+    await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'unsubscribe', subscription: existing }) }).catch(()=>{});
+    showToast('Notificaciones desactivadas');
+  } else {
+    // Suscribir
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return showToast('Permiso denegado — activá las notificaciones en la configuración del navegador');
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    const res = await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'subscribe', subscription: sub }) }).then(r=>r.json()).catch(()=>({}));
+    if (res.ok) showToast('✅ Notificaciones activadas 🦏');
+    else showToast('Error activando notificaciones: ' + (res.error||'desconocido'));
+  }
+  updatePushButton();
+}
+
+// Enviar push a todos los suscriptores — llamar desde cualquier parte del CRM
+async function sendPushToAll(title, body, url, tag) {
+  return fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action:'send', title, body, url, tag }) }).then(r=>r.json()).catch(e=>({error:e.message}));
 }
 
 function showLocalNotif(title, body, url) {
   if (Notification.permission !== 'granted') return;
-  const n = new Notification(title, { body, icon: '/icon.svg', data: { url } });
-  n.onclick = () => { window.focus(); if (url) window.location.href = url; n.close(); };
+  const n = new Notification(title, { body, icon: '/icon.svg' });
+  n.onclick = () => { window.focus(); if(url) window.location.href=url; n.close(); };
 }
 
 // ══════════════════════════════════════════════════
