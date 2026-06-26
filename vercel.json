@@ -5,12 +5,14 @@
     "api/webhook-mp.js": { "maxDuration": 15 },
     "api/weekly-report.js": { "maxDuration": 30 },
     "api/auto-emails.js": { "maxDuration": 30 },
-    "api/keepalive.js": { "maxDuration": 15 }
+    "api/keepalive.js": { "maxDuration": 15 },
+    "api/auto-notif.js": { "maxDuration": 30 }
   },
   "crons": [
     { "path": "/api/weekly-report", "schedule": "0 13 * * 1" },
     { "path": "/api/auto-emails",   "schedule": "0 12 * * *" },
-    { "path": "/api/keepalive",     "schedule": "0 12 * * *" }
+    { "path": "/api/keepalive",     "schedule": "0 12 * * *" },
+    { "path": "/api/auto-notif",    "schedule": "0 12 * * *" }
   ],
   "rewrites": [
     { "source": "/auth/callback", "destination": "/index.html" },

@@ -533,6 +533,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="nav-group-label">Operaciones</div>
     <button class="nav-btn" data-sec="tareas"><span class="nav-icon">📋</span>Tareas</button>
     <button class="nav-btn" data-sec="agente"><span class="nav-icon">🤖</span>Agente IA</button>
+    <button class="nav-btn" data-sec="notificaciones"><span class="nav-icon">📢</span>Notificaciones</button>
     <button class="nav-btn" data-sec="soporte" id="nav-soporte-btn"><span class="nav-icon">🎫</span>Soporte<span id="nav-soporte-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;line-height:1.4"></span></button>
 
     <div class="nav-group-label">Analytics</div>
@@ -2364,6 +2365,77 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <!-- KANBAN / LISTA -->
     <div id="tasks-board"></div>
     </div><!-- /ttab-tareas -->
+  </div>
+
+  <!-- NOTIFICACIONES PUSH -->
+  <div class="section" id="s-notificaciones">
+    <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end">
+      <div>
+        <div class="page-title">NOTIFICA<span>CIONES</span></div>
+        <div class="page-sub">Push notifications a todos los dispositivos suscritos.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="notif-subs-count" style="font-size:12px;color:var(--text3)"></span>
+        <button class="btn btn-sm" id="btn-notif-refresh" style="color:var(--text2)">↻ Actualizar</button>
+      </div>
+    </div>
+
+    <div class="tab-row" id="notif-tabs">
+      <button class="tab-btn active" data-ntab="manual">📣 Enviar ahora</button>
+      <button class="tab-btn" data-ntab="automaticas">⚙️ Automáticas</button>
+      <button class="tab-btn" data-ntab="historial">📋 Historial</button>
+    </div>
+
+    <!-- MANUAL -->
+    <div class="ntab-content" id="ntab-manual">
+      <div class="card" style="max-width:560px;border-color:rgba(99,102,241,0.25)">
+        <div class="card-title">Crear y enviar notificación</div>
+        <div class="field"><label>Título</label><input id="notif-title" placeholder="🦏 RhinosCRM — Novedad importante" maxlength="60"/></div>
+        <div class="field"><label>Mensaje</label><textarea id="notif-body" rows="3" placeholder="Escribí el contenido de la notificación..." maxlength="200"></textarea></div>
+        <div class="field"><label>URL al hacer click <span style="color:var(--text3);font-weight:400">(opcional)</span></label><input id="notif-url" placeholder="/" /></div>
+        <div class="field"><label>Tag <span style="color:var(--text3);font-weight:400">(agrupa y reemplaza notifs con el mismo tag)</span></label><input id="notif-tag" placeholder="ej: alerta-cobros"/></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+          <span style="font-size:11px;color:var(--text3)" id="notif-char-count">0 / 200 caracteres</span>
+          <button class="btn btn-green" id="btn-notif-send" style="padding:10px 24px;font-size:14px;font-weight:700">📣 Enviar push</button>
+        </div>
+        <div id="notif-send-result" style="display:none;margin-top:12px;padding:10px 14px;border-radius:var(--r);font-size:12px"></div>
+      </div>
+      <!-- Templates rápidas -->
+      <div class="card" style="max-width:560px">
+        <div class="card-title">Templates rápidos</div>
+        <div style="display:flex;flex-direction:column;gap:8px" id="notif-templates">
+          <button class="btn btn-sm" data-tpl="cobros" style="text-align:left;justify-content:flex-start;padding:10px 14px">
+            💳 <strong>Cobros vencidos</strong> — recordatorio de pagos pendientes
+          </button>
+          <button class="btn btn-sm" data-tpl="reunion" style="text-align:left;justify-content:flex-start;padding:10px 14px">
+            📅 <strong>Reunión de equipo</strong> — convocatoria interna
+          </button>
+          <button class="btn btn-sm" data-tpl="lead" style="text-align:left;justify-content:flex-start;padding:10px 14px">
+            🎯 <strong>Nuevo lead caliente</strong> — prioridad de seguimiento
+          </button>
+          <button class="btn btn-sm" data-tpl="custom" style="text-align:left;justify-content:flex-start;padding:10px 14px">
+            ✏️ <strong>Vaciar</strong> — empezar desde cero
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUTOMÁTICAS -->
+    <div class="ntab-content" id="ntab-automaticas" style="display:none">
+      <div class="card" style="max-width:640px">
+        <div class="card-title">Notificaciones automáticas</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:16px">El cron corre todos los días a las 9:00 AM. Los eventos en tiempo real se envían al instante.</div>
+        <div id="notif-rules-list"><div class="empty">Cargando reglas...</div></div>
+      </div>
+    </div>
+
+    <!-- HISTORIAL -->
+    <div class="ntab-content" id="ntab-historial" style="display:none">
+      <div class="card">
+        <div class="card-title">Últimas notificaciones enviadas</div>
+        <div id="notif-log-list"><div class="empty">Sin historial.</div></div>
+      </div>
+    </div>
   </div>
 
   <!-- SOPORTE AL CLIENTE -->
@@ -12292,6 +12364,188 @@ document.getElementById('btn-ct-firmado')?.addEventListener('click', async () =>
 });
 
 // ══════════════════════════════════════════════════
+// MÓDULO NOTIFICACIONES PUSH
+// ══════════════════════════════════════════════════
+const NOTIF_RULES_META = {
+  cobros_vencidos:    { icon:'💳', label:'Cobros vencidos',      desc:'Push diario si hay cobros con estado vencido en el período actual.', tipo:'diaria' },
+  followups_vencidos: { icon:'📅', label:'Follow-ups vencidos',  desc:'Push diario si hay leads con follow-up pasado sin atender.', tipo:'diaria' },
+  nuevo_ticket:       { icon:'🎫', label:'Nuevo ticket soporte', desc:'Push inmediato cuando un cliente envía un ticket desde el formulario.', tipo:'evento' },
+  sueldo_pendiente:   { icon:'👥', label:'Sueldos pendientes',   desc:'Push diario si hay sueldos del mes en estado pendiente.', tipo:'diaria' },
+  contrato_vence:     { icon:'📋', label:'Contrato por vencer',  desc:'Push cuando un contrato de cliente vence en los próximos 7 días.', tipo:'diaria' },
+  nuevo_lead_web:     { icon:'🌐', label:'Nuevo lead web',       desc:'Push inmediato cuando llega un lead desde la calculadora web.', tipo:'evento' },
+};
+
+let _notifRules = {};
+
+async function loadNotifModule() {
+  // Contar suscriptores
+  const subs = await sbFetch('rhinos_push_subs?select=endpoint').catch(()=>[]);
+  const countEl = document.getElementById('notif-subs-count');
+  if (countEl) countEl.textContent = `${subs?.length||0} dispositivo${subs?.length!==1?'s':''} suscripto${subs?.length!==1?'s':''}`;
+
+  // Cargar reglas
+  const rules = await sbFetch('rhinos_notif_rules').catch(()=>[]);
+  _notifRules = {};
+  (rules||[]).forEach(r => _notifRules[r.tipo] = r);
+  renderNotifRules();
+
+  // Cargar historial
+  const log = await sbFetch('rhinos_notif_log?order=created_at.desc&limit=20').catch(()=>[]);
+  renderNotifLog(log||[]);
+}
+
+function renderNotifRules() {
+  const el = document.getElementById('notif-rules-list');
+  if (!el) return;
+  el.innerHTML = Object.entries(NOTIF_RULES_META).map(([tipo, meta]) => {
+    const rule = _notifRules[tipo] || { tipo, activo: false };
+    const isActive = rule.activo;
+    const tipoBadge = meta.tipo === 'evento'
+      ? `<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(0,229,204,0.1);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">tiempo real</span>`
+      : `<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2)">diaria</span>`;
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:20px;flex-shrink:0">${meta.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <span style="font-size:13px;font-weight:600;color:var(--text)">${meta.label}</span>
+          ${tipoBadge}
+        </div>
+        <div style="font-size:11px;color:var(--text3)">${meta.desc}</div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-shrink:0">
+        <span style="font-size:11px;color:${isActive?'var(--green)':'var(--text3)'}">${isActive?'Activa':'Inactiva'}</span>
+        <div class="notif-toggle" data-tipo="${tipo}" data-active="${isActive}" style="
+          width:40px;height:22px;border-radius:11px;
+          background:${isActive?'var(--green)':'rgba(255,255,255,0.1)'};
+          position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;
+          border:1px solid ${isActive?'rgba(34,197,94,0.5)':'var(--border2)'}">
+          <div style="position:absolute;top:2px;left:${isActive?'19':'2'}px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>
+        </div>
+      </label>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.notif-toggle').forEach(toggle => {
+    toggle.addEventListener('click', async () => {
+      const tipo = toggle.dataset.tipo;
+      const wasActive = toggle.dataset.active === 'true';
+      const newActive = !wasActive;
+      // Upsert en Supabase
+      const existing = _notifRules[tipo];
+      if (existing) {
+        await sbFetch(`rhinos_notif_rules?tipo=eq.${tipo}`, 'PATCH', { activo: newActive }).catch(() => {});
+      } else {
+        await sbFetch('rhinos_notif_rules', 'POST', { tipo, activo: newActive }).catch(() => {});
+      }
+      _notifRules[tipo] = { ...(_notifRules[tipo]||{tipo}), activo: newActive };
+      renderNotifRules();
+      showToast(`${NOTIF_RULES_META[tipo]?.label} ${newActive?'activada':'desactivada'} 🦏`);
+    });
+  });
+}
+
+function renderNotifLog(log) {
+  const el = document.getElementById('notif-log-list');
+  if (!el) return;
+  if (!log.length) { el.innerHTML = '<div class="empty">Sin historial de notificaciones.</div>'; return; }
+  el.innerHTML = log.map(n => {
+    const fecha = n.created_at ? new Date(n.created_at).toLocaleString('es-AR') : '';
+    const meta = NOTIF_RULES_META[n.tipo];
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:18px;flex-shrink:0">${meta?.icon||'📣'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${n.titulo||''}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${n.mensaje||''}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px">${fecha} · ${n.enviado_a||0} dispositivo${n.enviado_a!==1?'s':''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Tab switcher notificaciones
+document.querySelectorAll('.tab-btn[data-ntab]').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn[data-ntab]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.ntab-content').forEach(t => t.style.display = 'none');
+    this.classList.add('active');
+    document.getElementById('ntab-' + this.dataset.ntab).style.display = 'block';
+  });
+});
+
+// Char counter
+document.getElementById('notif-body')?.addEventListener('input', function() {
+  document.getElementById('notif-char-count').textContent = `${this.value.length} / 200 caracteres`;
+});
+
+// Templates rápidos
+const NOTIF_TPLS = {
+  cobros:  { title:'💳 Cobros pendientes', body:'Revisá los cobros vencidos del período actual en el módulo de Finanzas.', url:'/'},
+  reunion: { title:'📅 Reunión de equipo', body:'Hay una reunión programada. Revisá el calendario en el CRM.', url:'/'},
+  lead:    { title:'🎯 Lead caliente nuevo', body:'Entraron leads nuevos. Revisá el pipeline y asignalos al equipo.', url:'/'},
+  custom:  { title:'', body:'', url:'/'},
+};
+document.getElementById('notif-templates')?.querySelectorAll('[data-tpl]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tpl = NOTIF_TPLS[btn.dataset.tpl];
+    if (!tpl) return;
+    document.getElementById('notif-title').value = tpl.title;
+    document.getElementById('notif-body').value = tpl.body;
+    document.getElementById('notif-url').value = tpl.url;
+    document.getElementById('notif-char-count').textContent = `${tpl.body.length} / 200 caracteres`;
+  });
+});
+
+// Enviar push manual
+document.getElementById('btn-notif-send')?.addEventListener('click', async function() {
+  const title = document.getElementById('notif-title').value.trim();
+  const body  = document.getElementById('notif-body').value.trim();
+  const url   = document.getElementById('notif-url').value.trim() || '/';
+  const tag   = document.getElementById('notif-tag').value.trim() || undefined;
+  if (!title || !body) return showToast('Completá el título y el mensaje');
+  this.disabled = true; this.textContent = '⏳ Enviando...';
+  const resEl = document.getElementById('notif-send-result');
+  try {
+    const res = await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'send', title, body, url, tag }) }).then(r=>r.json());
+    resEl.style.display = 'block';
+    if (res.ok) {
+      resEl.style.background = 'rgba(34,197,94,0.08)';
+      resEl.style.border = '1px solid rgba(34,197,94,0.3)';
+      resEl.style.color = 'var(--green)';
+      resEl.textContent = `✅ Enviado a ${res.sent} dispositivo${res.sent!==1?'s':''}.${res.errors?' ('+res.errors+' fallidos)':''}`;
+      // Guardar en log
+      await sbFetch('rhinos_notif_log', 'POST', { tipo:'manual', titulo:title, mensaje:body, enviado_a:res.sent }).catch(()=>{});
+      showToast(`✅ Push enviado a ${res.sent} dispositivo${res.sent!==1?'s':''} 🦏`);
+    } else {
+      resEl.style.background = 'rgba(239,68,68,0.08)';
+      resEl.style.border = '1px solid rgba(239,68,68,0.3)';
+      resEl.style.color = 'var(--red)';
+      resEl.textContent = '⚠ ' + (res.error || 'Error enviando push');
+    }
+  } catch(e) {
+    resEl.style.display = 'block'; resEl.textContent = 'Error: ' + e.message;
+  }
+  this.disabled = false; this.textContent = '📣 Enviar push';
+});
+
+// Nav listener
+document.querySelector('.nav-btn[data-sec="notificaciones"]')?.addEventListener('click', loadNotifModule);
+document.getElementById('btn-notif-refresh')?.addEventListener('click', loadNotifModule);
+
+// Función global para triggers automáticos desde otros módulos
+async function triggerAutoNotif(tipo, title, body, url) {
+  try {
+    const rule = _notifRules[tipo] || (await sbFetch(`rhinos_notif_rules?tipo=eq.${tipo}`).then(r=>r?.[0]));
+    if (!rule?.activo) return;
+    const res = await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'send', title, body, url, tag: tipo }) }).then(r=>r.json()).catch(()=>({}));
+    if (res.sent > 0) {
+      await sbFetch('rhinos_notif_log', 'POST', { tipo, titulo:title, mensaje:body, enviado_a:res.sent }).catch(()=>{});
+    }
+  } catch(e) { console.warn('triggerAutoNotif:', e.message); }
+}
+
+// ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
 // Plan de Cuentas PCGAr — RT FACPCE
 // ══════════════════════════════════════════════════
@@ -14835,7 +15089,11 @@ async function _wlPollCheck(isBaseline) {
     localStorage.setItem('rhinos_wl_last_id', maxId);
 
     if (isBaseline) return;
-    newLeads.forEach(lead => showLeadNotif(lead));
+    newLeads.forEach(lead => {
+      showLeadNotif(lead);
+      triggerAutoNotif('nuevo_lead_web', `🌐 Nuevo lead web: ${lead.name}`,
+        `${lead.plan||''} · ${lead.phone||lead.email||''}`, '/');
+    });
   } catch(e) { /* polling nunca debe romper la UI */ }
 }
 

@@ -1780,6 +1780,31 @@ La respuesta debe:
         } catch(e) { jiraDebug.exception = e.message; }
       }
 
+      // Push notification — nuevo ticket de soporte (si la regla está activa)
+      try {
+        const ruleRows = await new Promise((resolve) => {
+          const req = https.request({
+            hostname: new URL(SB_URL_T).hostname,
+            path: '/rest/v1/rhinos_notif_rules?tipo=eq.nuevo_ticket&select=activo',
+            method: 'GET',
+            headers: { 'apikey': SB_KEY_T, 'Authorization': 'Bearer ' + SB_KEY_T }
+          }, (res) => { let r=''; res.on('data',c=>r+=c); res.on('end',()=>{ try{resolve(JSON.parse(r));}catch(e){resolve([]);} }); });
+          req.on('error',()=>resolve([])); req.end();
+        });
+        if (ruleRows[0]?.activo) {
+          const catIcon = { bug:'🐛', mejora:'✨', consulta:'❓', otro:'📌' }[categoria]||'🎫';
+          await fetch('https://rhinos-crm.vercel.app/api/push', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'send',
+              title: `${catIcon} Nuevo ticket #${ticketRow?.numero||'?'} — ${categoria}`,
+              body: `${nombre||'Anónimo'}: ${asunto}`,
+              url: '/', tag: 'nuevo_ticket'
+            })
+          }).catch(() => {});
+        }
+      } catch(e) { /* push no crítico */ }
+
       result = { ok: true, ticket_id: ticketRow?.id, ticket_numero: ticketRow?.numero, jira_key: jiraKey, jira_url: jiraUrl, jira_debug: jiraDebug };
     }
 
