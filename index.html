@@ -12379,12 +12379,13 @@ document.getElementById('btn-ct-firmado')?.addEventListener('click', async () =>
 // MÓDULO NOTIFICACIONES PUSH
 // ══════════════════════════════════════════════════
 const NOTIF_RULES_META = {
-  cobros_vencidos:    { icon:'💳', label:'Cobros vencidos',      desc:'Push diario si hay cobros con estado vencido en el período actual.', tipo:'diaria' },
-  followups_vencidos: { icon:'📅', label:'Follow-ups vencidos',  desc:'Push diario si hay leads con follow-up pasado sin atender.', tipo:'diaria' },
-  nuevo_ticket:       { icon:'🎫', label:'Nuevo ticket soporte', desc:'Push inmediato cuando un cliente envía un ticket desde el formulario.', tipo:'evento' },
-  sueldo_pendiente:   { icon:'👥', label:'Sueldos pendientes',   desc:'Push diario si hay sueldos del mes en estado pendiente.', tipo:'diaria' },
-  contrato_vence:     { icon:'📋', label:'Contrato por vencer',  desc:'Push cuando un contrato de cliente vence en los próximos 7 días.', tipo:'diaria' },
-  nuevo_lead_web:     { icon:'🌐', label:'Nuevo lead web',       desc:'Push inmediato cuando llega un lead desde la calculadora web.', tipo:'evento' },
+  cobros_vencidos:    { icon:'💳', label:'Cobros vencidos',        desc:'Push diario si hay cobros con estado vencido en el período actual.', tipo:'diaria' },
+  followups_vencidos: { icon:'📅', label:'Follow-ups vencidos',    desc:'Push diario si hay leads con follow-up pasado sin atender.', tipo:'diaria' },
+  leads_inactivos:    { icon:'❄️', label:'Leads inactivos',        desc:'Push diario si hay leads en pipeline sin actividad hace más de X días. Configurable.', tipo:'diaria', hasConfig: true },
+  nuevo_ticket:       { icon:'🎫', label:'Nuevo ticket soporte',   desc:'Push inmediato cuando un cliente envía un ticket desde el formulario.', tipo:'evento' },
+  sueldo_pendiente:   { icon:'👥', label:'Sueldos pendientes',     desc:'Push diario si hay sueldos del mes en estado pendiente.', tipo:'diaria' },
+  contrato_vence:     { icon:'📋', label:'Contrato por vencer',    desc:'Push cuando un contrato de cliente vence en los próximos 7 días.', tipo:'diaria' },
+  nuevo_lead_web:     { icon:'🌐', label:'Nuevo lead web',         desc:'Push inmediato cuando llega un lead desde la calculadora web.', tipo:'evento' },
 };
 
 let _notifRules = {};
@@ -12460,6 +12461,13 @@ function renderNotifRules() {
             <input type="time" class="cfg-hora" data-tipo="${tipo}" value="${rule.hora_envio||'12:00'}" style="font-size:12px"/>
           </div>
         </div>` : ''}
+        ${meta.hasConfig ? `<div style="margin-bottom:10px">
+          <label style="font-size:10px;display:block;margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Días de inactividad</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" class="cfg-dias-inactividad" data-tipo="${tipo}" min="1" max="90" value="${rule.config?.dias_inactividad||7}" style="width:70px;font-size:13px;padding:6px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);color:var(--text)"/>
+            <span style="font-size:12px;color:var(--text3)">días sin cambio de estado ni interacción → push al equipo</span>
+          </div>
+        </div>` : ''}
         <div style="margin-bottom:10px">
           <label style="font-size:10px;display:block;margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Destinatarios</label>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -12525,7 +12533,9 @@ function renderNotifRules() {
       const destRadio = [...panel.querySelectorAll('.cfg-dest')].find(r => r.checked);
       const destinatarios = destRadio?.value || 'todos';
       const vendIds = [...panel.querySelectorAll('.cfg-vend-check:checked')].map(c => c.value).join(',');
-      const patch = { frecuencia, hora_envio, destinatarios, vendedor_ids: vendIds };
+      const diasInac = panel.querySelector('.cfg-dias-inactividad')?.value;
+      const configExtra = diasInac ? { dias_inactividad: +diasInac } : {};
+      const patch = { frecuencia, hora_envio, destinatarios, vendedor_ids: vendIds, config: configExtra };
       await sbFetch(`rhinos_notif_rules?tipo=eq.${tipo}`, 'PATCH', patch).catch(() => {});
       _notifRules[tipo] = { ...(_notifRules[tipo]||{tipo}), ...patch };
       renderNotifRules();

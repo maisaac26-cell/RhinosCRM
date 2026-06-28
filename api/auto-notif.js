@@ -40,9 +40,11 @@ module.exports = async function handler(req, res) {
   const localMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
   const localDate  = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
-  // Cargar reglas activas
+  // Cargar reglas activas con su config
   const rules = await sbGet('rhinos_notif_rules?activo=eq.true');
   const active = new Set((rules||[]).map(r => r.tipo));
+  const ruleConfig = {};
+  (rules||[]).forEach(r => ruleConfig[r.tipo] = r.config || {});
 
   // ── 1. COBROS VENCIDOS ────────────────────────────────────────────────
   if (active.has('cobros_vencidos')) {
@@ -92,6 +94,38 @@ module.exports = async function handler(req, res) {
         'contrato_vence');
       await sbPost('rhinos_notif_log', { tipo:'contrato_vence', titulo:`📋 Contratos por vencer`, mensaje:nombres, enviado_a: r.sent||0 });
       results.push({ tipo:'contrato_vence', sent: r.sent });
+    }
+  }
+
+  // ── 5. LEADS INACTIVOS ───────────────────────────────────────────────────
+  if (active.has('leads_inactivos')) {
+    const dias = ruleConfig['leads_inactivos']?.dias_inactividad || 7;
+    const cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() - dias);
+    const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,'0')}-${String(cutoff.getDate()).padStart(2,'0')}`;
+
+    // Leads activos (no cliente/perdido/imposible) cuyo updated_at es anterior al cutoff
+    // y que no tienen follow-up futuro agendado
+    const leads = await sbGet(
+      `rhinos_leads?status=not.in.(cliente,perdido,imposible)&updated_at=lt.${cutoffStr}T00:00:00Z&select=id,name,company,status,next_followup,vendedor_id`
+    );
+    // Filtrar los que no tienen follow-up futuro
+    const frios = (leads||[]).filter(l => !l.next_followup || l.next_followup <= localDate);
+
+    if (frios.length) {
+      const ejemplos = frios.slice(0, 3).map(l => l.name).join(', ');
+      const r = await sendPush(
+        `❄️ ${frios.length} lead${frios.length>1?'s':''} inactivo${frios.length>1?'s':''} (${dias}+ días)`,
+        `${ejemplos}${frios.length>3?` y ${frios.length-3} más`:''} sin actividad. Revisá el pipeline y reactivá el contacto.`,
+        'leads_inactivos'
+      );
+      await sbPost('rhinos_notif_log', {
+        tipo: 'leads_inactivos',
+        titulo: `❄️ Leads inactivos (+${dias}d)`,
+        mensaje: `${frios.length} leads sin actividad: ${ejemplos}`,
+        enviado_a: r.sent||0
+      });
+      results.push({ tipo: 'leads_inactivos', count: frios.length, sent: r.sent });
     }
   }
 
