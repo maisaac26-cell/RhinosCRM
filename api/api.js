@@ -1477,7 +1477,7 @@ Respondé SOLO con JSON válido, sin markdown:
     }
 
     else if (action === 'gmail_send') {
-      const { access_token, to, subject, body: emailBody, thread_id, in_reply_to, references, from: fromOverride } = body;
+      const { access_token, to, subject, body: emailBody, thread_id, in_reply_to, references, from: fromOverride, is_html } = body;
 
       // Obtener email del usuario para el header From (necesario para guardar en Enviados)
       let senderEmail = '';
@@ -1495,14 +1495,21 @@ Respondé SOLO con JSON válido, sin markdown:
         senderEmail = profile.emailAddress || '';
       } catch(e) {}
 
-      // fromOverride permite usar un alias "Enviar como" configurado en Gmail
-      // (ej: cobranzas@rhinosapp.com si está verificado en Gmail Settings > Cuentas)
+      // Codificar el display name del From (RFC 2047) para evitar caracteres corruptos
       const effectiveFrom = fromOverride || senderEmail;
+      function encodeFromHeader(fromStr) {
+        const match = fromStr.match(/^(.+?)\s*<(.+)>$/);
+        if (!match) return fromStr;
+        const name = match[1].trim(), addr = match[2].trim();
+        const encodedName = '=?UTF-8?B?' + Buffer.from(name).toString('base64') + '?=';
+        return `${encodedName} <${addr}>`;
+      }
 
       const encodedSubject = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
+      const contentType = is_html ? 'text/html' : 'text/plain';
       let rawEmail = `MIME-Version: 1.0\r\n`;
-      if (effectiveFrom) rawEmail += `From: ${effectiveFrom}\r\n`;
-      rawEmail += `To: ${to}\r\nSubject: ${encodedSubject}\r\nContent-Type: text/plain; charset=utf-8\r\n`;
+      if (effectiveFrom) rawEmail += `From: ${encodeFromHeader(effectiveFrom)}\r\n`;
+      rawEmail += `To: ${to}\r\nSubject: ${encodedSubject}\r\nContent-Type: ${contentType}; charset=utf-8\r\n`;
       if (thread_id) rawEmail += `In-Reply-To: ${in_reply_to || ''}\r\nReferences: ${references || ''}\r\n`;
       rawEmail += `\r\n${emailBody}`;
       const encoded = Buffer.from(rawEmail).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
