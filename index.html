@@ -9837,7 +9837,13 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
       .replace(/\[periodo\]/g, periodo)
       .replace(/\[fecha_vencimiento\]/g, fechaVenc)
       .replace(/\[dias_plazo\]/g, String(c.dias_plazo||10));
-    const subject = asunto.replace(/\[nombre\]/g, c.nombre).replace(/\[empresa\]/g, c.empresa||c.nombre).replace(/\[periodo\]/g, periodo).replace(/\[monto\]/g, montoFormateado);
+    const subject = asunto
+      .replace(/\[nombre\]/g, c.nombre)
+      .replace(/\[empresa\]/g, c.empresa||c.nombre)
+      .replace(/\[periodo\]/g, periodo)
+      .replace(/\[monto\]/g, montoFormateado)
+      .replace(/\[fecha_vencimiento\]/g, fechaVenc)
+      .replace(/\[dias_plazo\]/g, String(c.dias_plazo||10));
     // Enviar al email principal
     const emailsDestino = [c.email];
     // Agregar emails CC si existen
