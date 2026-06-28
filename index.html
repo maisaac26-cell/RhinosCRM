@@ -2129,7 +2129,16 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                 <button class="email-tipo-btn" data-tipo="confirmacion" style="text-align:left;padding:10px 14px;border:1px solid var(--border2);border-radius:var(--r);background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font)">✅ Confirmación de pago</button>
                 <button class="email-tipo-btn" data-tipo="reembolso" style="text-align:left;padding:10px 14px;border:1px solid var(--border2);border-radius:var(--r);background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font)">↩ Reembolso / Crédito</button>
               </div>
-              <div class="field" style="margin-top:12px"><label>Destinatario</label>
+              <div class="field" style="margin-top:12px"><label>Remitente</label>
+                <select id="email-remitente" style="font-size:12px">
+                  <option value="cobranzas@rhinosapp.com">💳 cobranzas@rhinosapp.com</option>
+                  <option value="comercial@rhinosapp.com">🤝 comercial@rhinosapp.com</option>
+                  <option value="administracion@rhinosapp.com">⚙️ administracion@rhinosapp.com</option>
+                  <option value="ventas@rhinosapp.com">🎯 ventas@rhinosapp.com</option>
+                  <option value="info@rhinosapp.com">ℹ️ info@rhinosapp.com</option>
+                </select>
+              </div>
+              <div class="field"><label>Destinatario</label>
                 <select id="email-destinatario">
                   <option value="todos">Todos los clientes activos</option>
                   <option value="pendientes">Solo con pago pendiente</option>
@@ -9837,7 +9846,9 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
     }
     try {
       for (const emailDest of emailsDestino) {
-        await callAPI('gmail_send', { access_token: tokens.access_token, to: emailDest, subject, body, from: 'Cobranzas RhinosApp <cobranzas@rhinosapp.com>' });
+        const remitenteAlias = document.getElementById('email-remitente')?.value || 'cobranzas@rhinosapp.com';
+        const remitenteNombre = { 'cobranzas@rhinosapp.com':'Cobranzas RhinosApp', 'comercial@rhinosapp.com':'Comercial RhinosApp', 'administracion@rhinosapp.com':'Administración RhinosApp', 'ventas@rhinosapp.com':'Ventas RhinosApp', 'info@rhinosapp.com':'Info RhinosApp' }[remitenteAlias] || 'RhinosApp';
+        await callAPI('gmail_send', { access_token: tokens.access_token, to: emailDest, subject, body, from: `${remitenteNombre} <${remitenteAlias}>` });
       }
       sent++;
     } catch(e){}
