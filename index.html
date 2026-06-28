@@ -2860,7 +2860,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-title">REPO<span>RTES</span></div>
         <div class="page-sub">Dashboard ejecutivo · analytics completos del negocio</div>
       </div>
-      <button class="btn btn-sm" id="btn-rep-refresh" style="color:var(--text2)">↻ Actualizar todo</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" id="btn-enviar-reporte" style="color:#818cf8;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08)">📧 Enviar reporte</button>
+        <button class="btn btn-sm" id="btn-rep-refresh" style="color:var(--text2)">↻ Actualizar todo</button>
+      </div>
     </div>
 
     <div class="tab-row" id="rep-tabs" style="flex-wrap:wrap;gap:4px">
@@ -2869,6 +2872,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-rtab="ventas">🎯 Ventas</button>
       <button class="tab-btn" data-rtab="clientes">🏢 Clientes</button>
       <button class="tab-btn" data-rtab="costos">💸 Costos</button>
+      <button class="tab-btn" data-rtab="constructor" style="background:rgba(245,158,11,0.08);color:var(--amber);border:1px solid rgba(245,158,11,0.2)">🔧 Constructor BI</button>
       <button class="tab-btn" data-rtab="exportar" style="background:rgba(34,197,94,0.08);color:var(--green);border:1px solid rgba(34,197,94,0.2)">📋 Exportar Excel</button>
     </div>
 
@@ -3016,6 +3020,37 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="card">
           <div class="card-title">Ratio costos / ingresos mensual</div>
           <div id="rep-nomina-ratio"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSTRUCTOR BI TAB -->
+    <div class="rtab-content" id="rtab-constructor" style="display:none">
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:200px">
+          <input id="bi-nombre" placeholder="Nombre del reporte..." style="flex:1;font-size:13px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font)"/>
+          <select id="bi-mis-reportes" style="font-size:12px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text)">
+            <option value="">— Mis reportes guardados —</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" id="btn-bi-save" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">💾 Guardar</button>
+          <button class="btn btn-sm" id="btn-bi-clear" style="color:var(--text3)">🗑 Limpiar</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start">
+        <!-- Panel de widgets disponibles -->
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Arrastrá al canvas →</div>
+          <div id="bi-catalog" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <!-- Canvas -->
+        <div id="bi-canvas" style="min-height:400px;border:2px dashed var(--border2);border-radius:var(--rl);padding:16px;background:var(--surface2);transition:border-color .2s">
+          <div id="bi-canvas-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="bi-drop-hint" style="grid-column:1/-1;text-align:center;padding:48px 20px;color:var(--text3);font-size:13px">
+              ← Arrastrá los widgets desde el panel izquierdo para armar tu reporte
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -3301,6 +3336,56 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <button class="btn btn-green" id="btn-bv-enviar" style="padding:10px 24px;font-size:14px;font-weight:700">Enviar bienvenida →</button>
       </div>
       <div id="bv-result" style="display:none;margin-top:10px;padding:8px 12px;border-radius:var(--r);font-size:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENVIAR REPORTE -->
+<div id="modal-enviar-reporte" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;overflow-y:auto;backdrop-filter:blur(4px)">
+  <div style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px">
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--rl);width:100%;max-width:560px;padding:24px;box-shadow:0 32px 80px rgba(0,0,0,0.6)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div style="font-family:var(--display);font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">📧 Enviar reporte</div>
+        <button onclick="document.getElementById('modal-enviar-reporte').style.display='none'" style="background:var(--surface2);border:1px solid var(--border2);border-radius:50%;width:32px;height:32px;color:var(--text2);font-size:16px;cursor:pointer">✕</button>
+      </div>
+      <div class="field">
+        <label>Remitente</label>
+        <select id="rep-email-from">
+          <option value="administracion@rhinosapp.com">⚙️ administracion@rhinosapp.com</option>
+          <option value="comercial@rhinosapp.com">🤝 comercial@rhinosapp.com</option>
+          <option value="info@rhinosapp.com">ℹ️ info@rhinosapp.com</option>
+          <option value="rh@rhinosapp.com">👥 rh@rhinosapp.com</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Destinatarios <span style="font-weight:400;color:var(--text3)">(separados por coma)</span></label>
+        <input id="rep-email-to" placeholder="juan@empresa.com, maria@otro.com" type="text"/>
+      </div>
+      <div class="field">
+        <label>Asunto</label>
+        <input id="rep-email-asunto" placeholder="Reporte RhinosApp — Junio 2026"/>
+      </div>
+      <div class="field">
+        <label>Mensaje introductorio <span style="font-weight:400;color:var(--text3)">(opcional)</span></label>
+        <textarea id="rep-email-mensaje" rows="3" placeholder="Compartimos el reporte ejecutivo del período..."></textarea>
+      </div>
+      <div class="field">
+        <label style="margin-bottom:8px;display:block">Secciones a incluir</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" class="rep-seccion" value="finanzas" checked style="width:auto"/> 💰 Finanzas (P&L)</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" class="rep-seccion" value="ventas" checked style="width:auto"/> 🎯 Ventas & Leads</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" class="rep-seccion" value="clientes" checked style="width:auto"/> 🏢 Clientes & Cobros</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" class="rep-seccion" value="costos" checked style="width:auto"/> 💸 Costos & Nómina</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" class="rep-seccion" value="objetivos" checked style="width:auto"/> 🎯 Objetivos del mes</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" class="rep-seccion" value="alertas" style="width:auto"/> ⚠ Alertas activas</label>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+        <button class="btn" onclick="document.getElementById('modal-enviar-reporte').style.display='none'">Cancelar</button>
+        <button class="btn" id="btn-rep-preview-email" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">👁 Vista previa</button>
+        <button class="btn btn-green" id="btn-rep-enviar-email" style="font-weight:700">📧 Enviar</button>
+      </div>
+      <div id="rep-email-result" style="display:none;margin-top:10px;padding:8px 12px;border-radius:var(--r);font-size:12px"></div>
     </div>
   </div>
 </div>
@@ -12851,6 +12936,435 @@ async function triggerAutoNotif(tipo, title, body, url) {
     }
   } catch(e) { console.warn('triggerAutoNotif:', e.message); }
 }
+
+// ══════════════════════════════════════════════════
+// CONSTRUCTOR BI — REPORTES PERSONALIZADOS
+// ══════════════════════════════════════════════════
+
+const BI_WIDGETS = [
+  { type:'kpi',       icon:'📊', label:'KPI — Métrica',      desc:'Número grande con una métrica clave', cols:1 },
+  { type:'bar',       icon:'📈', label:'Gráfico de barras',   desc:'Ingresos vs Gastos, Leads, etc.', cols:2 },
+  { type:'hbar',      icon:'📉', label:'Ranking horizontal',  desc:'Top categorías, clientes por MRR', cols:1 },
+  { type:'funnel',    icon:'🔽', label:'Funnel de ventas',    desc:'Pipeline de leads por etapa', cols:2 },
+  { type:'table',     icon:'📋', label:'Tabla de datos',      desc:'Lista de clientes, cobros, leads', cols:2 },
+  { type:'donut',     icon:'🍩', label:'Distribución',        desc:'Frecuencias de pago, estados', cols:1 },
+  { type:'title',     icon:'🔤', label:'Título / Separador',  desc:'Texto libre para organizar', cols:2 },
+];
+
+const BI_KPI_OPTIONS = {
+  mrr:            'MRR mensual',
+  clientes:       'Clientes activos',
+  leads_activos:  'Leads en pipeline',
+  win_rate:       'Win rate',
+  ingresos_mes:   'Ingresos del mes',
+  gastos_mes:     'Gastos del mes',
+  balance_mes:    'Balance del mes',
+  cobros_pend:    'Cobros pendientes',
+  sueldos_pend:   'Sueldos pendientes',
+  tickets_abiertos:'Tickets abiertos',
+};
+
+const BI_DATA_OPTIONS = {
+  ing_gas_6m:     'Ingresos vs Gastos (6M)',
+  leads_conv_6m:  'Leads vs Conversiones (6M)',
+  top_categorias: 'Top categorías de gasto',
+  top_clientes:   'Top clientes por MRR',
+  pipeline:       'Funnel de ventas',
+  dist_frecuencia:'Distribución frecuencia pago',
+  clientes_table: 'Tabla de clientes activos',
+  cobros_table:   'Estado de cobros del mes',
+  leads_table:    'Leads activos en pipeline',
+};
+
+let _biWidgets = []; // [{id, type, config, cols}]
+let _biReporteId = null;
+let _biMisReportes = [];
+
+function biGetKpiValue(metric) {
+  const clients = getClients().filter(c => c.estado === 'activo');
+  const tc = getTcOficial() || 1;
+  const now = localMonthStr();
+  switch(metric) {
+    case 'mrr': return { val: '$' + fmtK(Math.round(clients.reduce((s,c) => s+clientMRR(c),0))), sub: 'mensual recurrente' };
+    case 'clientes': return { val: clients.length, sub: 'activos' };
+    case 'leads_activos': return { val: (leadsData||[]).filter(l=>!['cliente','perdido','imposible'].includes(l.status)).length, sub: 'en pipeline' };
+    case 'win_rate': { const t=(leadsData||[]).length; const c=(leadsData||[]).filter(l=>l.status==='cliente').length; return { val: t?Math.round(c/t*100)+'%':'—', sub: 'leads convertidos' }; }
+    case 'ingresos_mes': { const v=(finTx||[]).filter(t=>t.type==='ingreso'&&(t.date||'').startsWith(now)).reduce((s,t)=>s+txToARS(t),0); return { val: '$'+fmtK(Math.round(v)), sub: now }; }
+    case 'gastos_mes': { const v=(finTx||[]).filter(t=>t.type==='gasto'&&(t.date||'').startsWith(now)).reduce((s,t)=>s+txToARS(t),0); return { val: '$'+fmtK(Math.round(v)), sub: now }; }
+    case 'balance_mes': { const i=(finTx||[]).filter(t=>t.type==='ingreso'&&(t.date||'').startsWith(now)).reduce((s,t)=>s+txToARS(t),0); const g=(finTx||[]).filter(t=>t.type==='gasto'&&(t.date||'').startsWith(now)).reduce((s,t)=>s+txToARS(t),0); const b=i-g; return { val: (b>=0?'+':'')+'$'+fmtK(Math.round(b)), sub: 'ingresos − gastos', color: b>=0?'var(--green)':'var(--red)' }; }
+    case 'cobros_pend': return { val: (getCobros()||[]).filter(c=>c.periodo===now&&c.status==='pendiente').length, sub: 'este período', color: 'var(--amber)' };
+    case 'sueldos_pend': return { val: (_sueldos||[]).filter(s=>s.periodo===now&&s.status==='pendiente').length, sub: 'sueldos sin pagar', color: 'var(--amber)' };
+    case 'tickets_abiertos': return { val: (_tickets||[]).filter(t=>t.estado==='abierto').length, sub: 'sin resolver', color: 'var(--red)' };
+    default: return { val: '—', sub: '' };
+  }
+}
+
+function biRenderWidget(w) {
+  const months = lastNMonths(6);
+  switch(w.type) {
+    case 'kpi': {
+      const { val, sub, color='var(--cyan)' } = biGetKpiValue(w.config?.metric || 'mrr');
+      const label = BI_KPI_OPTIONS[w.config?.metric] || 'Métrica';
+      return `<div style="text-align:center;padding:8px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-weight:700;margin-bottom:6px">${label}</div>
+        <div style="font-family:var(--display);font-size:36px;font-weight:800;color:${color};line-height:1">${val}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">${sub}</div>
+      </div>`;
+    }
+    case 'bar': {
+      const dataKey = w.config?.data || 'ing_gas_6m';
+      if (dataKey === 'ing_gas_6m') {
+        const {ingByM,gasM} = repGetMonthData(months);
+        return svgGroupedBar(months,[{name:'Ingresos',color:'#22c55e',values:months.map(m=>ingByM[m]||0)},{name:'Gastos',color:'#ef4444',values:months.map(m=>gasM[m]||0)}],160);
+      }
+      if (dataKey === 'leads_conv_6m') {
+        const lbm={},cbm={};months.forEach(m=>{lbm[m]=0;cbm[m]=0;});
+        (leadsData||[]).forEach(l=>{const mc=(l.created_at||'').slice(0,7);if(months.includes(mc))lbm[mc]=(lbm[mc]||0)+1;if(l.status==='cliente'){const mu=(l.updated_at||'').slice(0,7);if(months.includes(mu))cbm[mu]=(cbm[mu]||0)+1;}});
+        return svgGroupedBar(months,[{name:'Leads',color:'#818cf8',values:months.map(m=>lbm[m]||0)},{name:'Conv.',color:'#22c55e',values:months.map(m=>cbm[m]||0)}],160);
+      }
+      return `<div class="empty">Sin datos</div>`;
+    }
+    case 'hbar': {
+      const dataKey = w.config?.data || 'top_categorias';
+      const catColors=['#00e5cc','#818cf8','#f59e0b','#22c55e','#ec4899','#3b82f6'];
+      if (dataKey === 'top_categorias') {
+        const cats={};(finTx||[]).filter(t=>t.type==='gasto').forEach(t=>{cats[t.category||'Otros']=(cats[t.category||'Otros']||0)+txToARS(t);});
+        const items=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([l,v],i)=>({label:l,value:v,color:catColors[i%catColors.length]}));
+        return items.length?svgHorizBars(items):'<div class="empty">Sin datos</div>';
+      }
+      if (dataKey === 'top_clientes') {
+        const items=getClients().filter(c=>c.estado==='activo').map(c=>({label:c.nombre.split(' ')[0],value:clientMRR(c),color:'#00e5cc'})).sort((a,b)=>b.value-a.value).slice(0,8);
+        return items.length?svgHorizBars(items):'<div class="empty">Sin clientes</div>';
+      }
+      return `<div class="empty">Sin datos</div>`;
+    }
+    case 'funnel': {
+      const stages=[{label:'Nuevo',key:'nuevo',color:'#00e5cc'},{label:'Contactado',key:'contactado',color:'#818cf8'},{label:'Demo',key:'demo',color:'#f59e0b'},{label:'Cliente',key:'cliente',color:'#22c55e'}].map(s=>({...s,count:(leadsData||[]).filter(l=>l.status===s.key).length}));
+      return svgFunnel(stages);
+    }
+    case 'table': {
+      const dataKey = w.config?.data || 'clientes_table';
+      if (dataKey === 'clientes_table') {
+        const rows = getClients().filter(c=>c.estado==='activo').slice(0,8);
+        return `<div style="overflow-x:auto"><table class="perf-table"><thead><tr><th>Cliente</th><th>Empresa</th><th>MRR</th><th>Estado</th></tr></thead><tbody>${rows.map(c=>`<tr><td>${c.nombre}</td><td style="color:var(--text3)">${c.empresa||'—'}</td><td style="color:var(--green)">$${fmtK(Math.round(clientMRR(c)))}</td><td>${c.estado}</td></tr>`).join('')}</tbody></table></div>`;
+      }
+      if (dataKey === 'leads_table') {
+        const rows = (leadsData||[]).filter(l=>!['cliente','perdido','imposible'].includes(l.status)).slice(0,8);
+        return `<div style="overflow-x:auto"><table class="perf-table"><thead><tr><th>Lead</th><th>Empresa</th><th>Estado</th><th>Follow-up</th></tr></thead><tbody>${rows.map(l=>`<tr><td>${l.name}</td><td style="color:var(--text3)">${l.company||'—'}</td><td>${l.status}</td><td style="color:var(--amber)">${l.next_followup||'—'}</td></tr>`).join('')}</tbody></table></div>`;
+      }
+      if (dataKey === 'cobros_table') {
+        const now=localMonthStr(); const cobros=(getCobros()||[]).filter(c=>c.periodo===now); const clients=getClients();
+        return `<div style="overflow-x:auto"><table class="perf-table"><thead><tr><th>Cliente</th><th>Monto</th><th>Estado</th></tr></thead><tbody>${cobros.map(co=>{const c=clients.find(x=>x.id===co.clientId);return`<tr><td>${c?.nombre||co.clientId}</td><td>$${fmtK(co.monto||0)}</td><td style="color:${co.status==='pagado'?'var(--green)':co.status==='vencido'?'var(--red)':'var(--amber)'}">${co.status}</td></tr>`;}).join('')}</tbody></table></div>`;
+      }
+      return '<div class="empty">Sin datos</div>';
+    }
+    case 'donut': { // distribución como horizontal bars con %
+      const items = getClients().filter(c=>c.estado==='activo');
+      const freq={};items.forEach(c=>{const f=c.frecuencia_pago||'mensual';freq[f]=(freq[f]||0)+1;});
+      const colors={mensual:'#00e5cc',bimestral:'#818cf8',trimestral:'#f59e0b',semestral:'#a78bfa',anual:'#22c55e'};
+      const data=Object.entries(freq).map(([l,v])=>({label:l,value:v,color:colors[l]||'#9ca3af'}));
+      return data.length?svgHorizBars(data,true):'<div class="empty">Sin clientes</div>';
+    }
+    case 'title':
+      return `<div style="font-family:var(--display);font-size:16px;font-weight:800;color:var(--text);padding:4px 0;border-bottom:2px solid var(--cyan);letter-spacing:.04em">${w.config?.text||'Título'}</div>`;
+    default: return '<div class="empty">Widget desconocido</div>';
+  }
+}
+
+function biRenderCanvas() {
+  const grid = document.getElementById('bi-canvas-grid');
+  if (!grid) return;
+  if (!_biWidgets.length) {
+    grid.innerHTML = `<div class="bi-drop-hint" style="grid-column:1/-1;text-align:center;padding:48px 20px;color:var(--text3);font-size:13px">← Arrastrá los widgets desde el panel izquierdo para armar tu reporte</div>`;
+    return;
+  }
+  grid.innerHTML = _biWidgets.map((w,i) => {
+    const wdef = BI_WIDGETS.find(x => x.type === w.type) || {};
+    const colSpan = w.cols === 2 || wdef.cols === 2 ? 'grid-column:1/-1' : '';
+    // Config controls
+    let configHtml = '';
+    if (w.type === 'kpi') {
+      configHtml = `<select class="bi-cfg-select" data-wi="${i}" data-cfg="metric" style="font-size:10px;padding:2px 4px;background:var(--surface);border:1px solid var(--border2);border-radius:4px;color:var(--text2)">${Object.entries(BI_KPI_OPTIONS).map(([k,v])=>`<option value="${k}" ${w.config?.metric===k?'selected':''}>${v}</option>`).join('')}</select>`;
+    } else if (w.type === 'bar' || w.type === 'hbar' || w.type === 'table') {
+      const opts = ['bar','hbar'].includes(w.type) ? {ing_gas_6m:'Ingresos vs Gastos',leads_conv_6m:'Leads vs Conv.',top_categorias:'Top categorías',top_clientes:'Top clientes MRR'} : {clientes_table:'Clientes activos',leads_table:'Leads pipeline',cobros_table:'Cobros del mes'};
+      configHtml = `<select class="bi-cfg-select" data-wi="${i}" data-cfg="data" style="font-size:10px;padding:2px 4px;background:var(--surface);border:1px solid var(--border2);border-radius:4px;color:var(--text2)">${Object.entries(opts).map(([k,v])=>`<option value="${k}" ${w.config?.data===k?'selected':''}>${v}</option>`).join('')}</select>`;
+    } else if (w.type === 'title') {
+      configHtml = `<input class="bi-cfg-text" data-wi="${i}" value="${w.config?.text||'Título'}" style="font-size:10px;padding:2px 6px;background:var(--surface);border:1px solid var(--border2);border-radius:4px;color:var(--text);width:120px"/>`;
+    }
+    return `<div class="bi-widget-card" draggable="true" data-bi-idx="${i}" style="${colSpan};background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:14px;cursor:grab">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px">${wdef.icon||'📊'}</span>
+          <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em">${wdef.label||w.type}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${configHtml}
+          <button class="bi-del-btn" data-wi="${i}" style="background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer">✕</button>
+        </div>
+      </div>
+      <div class="bi-widget-body">${biRenderWidget(w)}</div>
+    </div>`;
+  }).join('');
+
+  // Delete
+  grid.querySelectorAll('.bi-del-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); _biWidgets.splice(+btn.dataset.wi, 1); biRenderCanvas(); });
+  });
+  // Config change — re-render widget
+  grid.querySelectorAll('.bi-cfg-select').forEach(sel => {
+    sel.addEventListener('change', function() {
+      const wi = +this.dataset.wi; const cfg = this.dataset.cfg;
+      _biWidgets[wi].config = { ..._biWidgets[wi].config, [cfg]: this.value };
+      const card = this.closest('.bi-widget-card');
+      if (card) card.querySelector('.bi-widget-body').innerHTML = biRenderWidget(_biWidgets[wi]);
+    });
+  });
+  grid.querySelectorAll('.bi-cfg-text').forEach(inp => {
+    inp.addEventListener('input', function() {
+      const wi = +this.dataset.wi;
+      _biWidgets[wi].config = { ..._biWidgets[wi].config, text: this.value };
+      const card = this.closest('.bi-widget-card');
+      if (card) card.querySelector('.bi-widget-body').innerHTML = biRenderWidget(_biWidgets[wi]);
+    });
+  });
+  // Drag reorder entre widgets del canvas
+  grid.querySelectorAll('.bi-widget-card').forEach(card => {
+    card.addEventListener('dragstart', e => { e.dataTransfer.setData('bi-reorder', card.dataset.biIdx); });
+    card.addEventListener('dragover', e => e.preventDefault());
+    card.addEventListener('drop', e => {
+      const fromIdx = e.dataTransfer.getData('bi-reorder');
+      if (fromIdx === '' || fromIdx === undefined) return; // viene del catalog
+      const toIdx = +card.dataset.biIdx;
+      const fi = +fromIdx;
+      if (fi === toIdx) return;
+      const moved = _biWidgets.splice(fi, 1)[0];
+      _biWidgets.splice(toIdx, 0, moved);
+      biRenderCanvas();
+    });
+  });
+}
+
+function biInitCatalog() {
+  const el = document.getElementById('bi-catalog');
+  if (!el) return;
+  el.innerHTML = BI_WIDGETS.map(w => `
+    <div draggable="true" data-bi-type="${w.type}" class="btn btn-sm" style="text-align:left;padding:8px 12px;cursor:grab;justify-content:flex-start;gap:8px;border:1px solid var(--border)">
+      <span>${w.icon}</span>
+      <div style="min-width:0">
+        <div style="font-size:12px;font-weight:600;color:var(--text)">${w.label}</div>
+        <div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${w.desc}</div>
+      </div>
+    </div>`).join('');
+
+  el.querySelectorAll('[data-bi-type]').forEach(card => {
+    card.addEventListener('dragstart', e => { e.dataTransfer.setData('bi-new-type', card.dataset.biType); });
+  });
+}
+
+// Canvas drop zone
+document.addEventListener('DOMContentLoaded', () => {
+  const canvas = document.getElementById('bi-canvas');
+  if (!canvas) return;
+  canvas.addEventListener('dragover', e => { e.preventDefault(); canvas.style.borderColor = 'var(--cyan)'; });
+  canvas.addEventListener('dragleave', () => { canvas.style.borderColor = 'var(--border2)'; });
+  canvas.addEventListener('drop', e => {
+    e.preventDefault(); canvas.style.borderColor = 'var(--border2)';
+    const newType = e.dataTransfer.getData('bi-new-type');
+    if (!newType) return;
+    const wdef = BI_WIDGETS.find(w => w.type === newType);
+    const id = Date.now().toString(36);
+    const defaults = { kpi:{metric:'mrr'}, bar:{data:'ing_gas_6m'}, hbar:{data:'top_categorias'}, table:{data:'clientes_table'}, title:{text:'Mi sección'} };
+    _biWidgets.push({ id, type: newType, config: defaults[newType] || {}, cols: wdef?.cols || 1 });
+    biRenderCanvas();
+    document.querySelector('.bi-drop-hint')?.remove();
+  });
+});
+
+// Guardar reporte
+document.getElementById('btn-bi-save')?.addEventListener('click', async function() {
+  const nombre = document.getElementById('bi-nombre').value.trim() || 'Mi reporte';
+  const payload = { nombre, widgets: _biWidgets, updated_at: new Date().toISOString() };
+  if (_biReporteId) {
+    await sbFetch(`rhinos_reportes_custom?id=eq.${_biReporteId}`, 'PATCH', payload).catch(() => {});
+  } else {
+    const res = await sbFetch('rhinos_reportes_custom', 'POST', payload).catch(() => null);
+    if (Array.isArray(res) && res[0]) _biReporteId = res[0].id;
+  }
+  showToast('✅ Reporte guardado 🦏');
+  await biLoadMisReportes();
+});
+
+document.getElementById('btn-bi-clear')?.addEventListener('click', () => {
+  _biWidgets = []; _biReporteId = null;
+  document.getElementById('bi-nombre').value = '';
+  biRenderCanvas();
+});
+
+async function biLoadMisReportes() {
+  const rows = await sbFetch('rhinos_reportes_custom?order=updated_at.desc').catch(() => []);
+  _biMisReportes = rows || [];
+  const sel = document.getElementById('bi-mis-reportes');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Mis reportes guardados —</option>' +
+    _biMisReportes.map(r => `<option value="${r.id}">${r.nombre}</option>`).join('');
+}
+
+document.getElementById('bi-mis-reportes')?.addEventListener('change', function() {
+  const r = _biMisReportes.find(x => x.id === this.value);
+  if (!r) return;
+  _biReporteId = r.id;
+  _biWidgets = r.widgets || [];
+  document.getElementById('bi-nombre').value = r.nombre;
+  biRenderCanvas();
+  showToast(`Reporte "${r.nombre}" cargado`);
+});
+
+document.querySelector('.tab-btn[data-rtab="constructor"]')?.addEventListener('click', async () => {
+  biInitCatalog();
+  biRenderCanvas();
+  await biLoadMisReportes();
+});
+
+// ══════════════════════════════════════════════════
+// ENVIAR REPORTE POR EMAIL
+// ══════════════════════════════════════════════════
+
+function generarHtmlReporte(secciones) {
+  const now = localMonthStr();
+  const tc = getTcOficial() || 1;
+  const clients = getClients().filter(c => c.estado === 'activo');
+  const mrr = clients.reduce((s,c) => s+clientMRR(c), 0);
+  const leads = leadsData || [];
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const [y,m] = now.split('-');
+  const periodo = meses[+m-1] + ' ' + y;
+
+  const ing = (finTx||[]).filter(t=>t.type==='ingreso'&&(t.date||'').startsWith(now)).reduce((s,t)=>s+txToARS(t),0);
+  const gas = (finTx||[]).filter(t=>t.type==='gasto'&&(t.date||'').startsWith(now)).reduce((s,t)=>s+txToARS(t),0);
+  const bal = ing - gas;
+  const cobros = (getCobros()||[]).filter(c => c.periodo === now);
+  const activos = leads.filter(l => !['cliente','perdido','imposible'].includes(l.status));
+  const convertidos = leads.filter(l => l.status==='cliente').length;
+  const goals = loadGoals ? loadGoals() : {};
+
+  const style = `font-family:'Segoe UI',Arial,sans-serif;color:#1a1a1a`;
+  const tdStyle = `padding:8px 12px;border-bottom:1px solid #eee;font-size:13px`;
+  const thStyle = `${tdStyle};background:#f8f9fa;font-weight:700;text-align:left`;
+  const h2Style = `font-size:15px;font-weight:800;margin:24px 0 10px;color:#0a2e2e;border-left:3px solid #00e5cc;padding-left:10px`;
+
+  const secFinanzas = !secciones.includes('finanzas') ? '' : `
+    <h2 style="${h2Style}">💰 Finanzas</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #eee;border-radius:8px;overflow:hidden">
+      <tr><td style="${thStyle}">MRR</td><td style="${tdStyle};color:#166534;font-weight:700">$ ${Math.round(mrr).toLocaleString('es-AR')}</td></tr>
+      <tr><td style="${thStyle}">Ingresos del mes</td><td style="${tdStyle};color:#166534">$ ${Math.round(ing).toLocaleString('es-AR')}</td></tr>
+      <tr><td style="${thStyle}">Gastos del mes</td><td style="${tdStyle};color:#991B1B">$ ${Math.round(gas).toLocaleString('es-AR')}</td></tr>
+      <tr><td style="${thStyle}">Balance</td><td style="${tdStyle};color:${bal>=0?'#166534':'#991B1B'};font-weight:700">${bal>=0?'+':''}$ ${Math.round(bal).toLocaleString('es-AR')}</td></tr>
+    </table>`;
+
+  const secVentas = !secciones.includes('ventas') ? '' : `
+    <h2 style="${h2Style}">🎯 Ventas & Leads</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #eee">
+      <tr><td style="${thStyle}">Total leads</td><td style="${tdStyle}">${leads.length}</td></tr>
+      <tr><td style="${thStyle}">Leads activos en pipeline</td><td style="${tdStyle}">${activos.length}</td></tr>
+      <tr><td style="${thStyle}">Convertidos a cliente</td><td style="${tdStyle};color:#166534">${convertidos}</td></tr>
+      <tr><td style="${thStyle}">Win rate</td><td style="${tdStyle}">${leads.length?Math.round(convertidos/leads.length*100):0}%</td></tr>
+    </table>`;
+
+  const secClientes = !secciones.includes('clientes') ? '' : `
+    <h2 style="${h2Style}">🏢 Clientes & Cobros</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #eee">
+      <tr><td style="${thStyle}">Clientes activos</td><td style="${tdStyle}">${clients.length}</td></tr>
+      <tr><td style="${thStyle}">Cobros pagados (${periodo})</td><td style="${tdStyle};color:#166534">${cobros.filter(c=>c.status==='pagado').length}</td></tr>
+      <tr><td style="${thStyle}">Cobros pendientes</td><td style="${tdStyle};color:#92400E">${cobros.filter(c=>c.status==='pendiente').length}</td></tr>
+      <tr><td style="${thStyle}">Cobros vencidos</td><td style="${tdStyle};color:#991B1B">${cobros.filter(c=>c.status==='vencido').length}</td></tr>
+    </table>`;
+
+  const masaSal = (_empleados||[]).filter(e=>e.estado!=='baja').reduce((s,e)=>s+(e.moneda==='USD'?+e.salario*tc:+e.salario),0);
+  const secCostos = !secciones.includes('costos') ? '' : `
+    <h2 style="${h2Style}">💸 Costos & Nómina</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #eee">
+      <tr><td style="${thStyle}">Empleados activos</td><td style="${tdStyle}">${(_empleados||[]).filter(e=>e.estado!=='baja').length}</td></tr>
+      <tr><td style="${thStyle}">Masa salarial mensual</td><td style="${tdStyle}">$ ${Math.round(masaSal).toLocaleString('es-AR')}</td></tr>
+      <tr><td style="${thStyle}">Sueldos pendientes (${periodo})</td><td style="${tdStyle};color:#92400E">${(_sueldos||[]).filter(s=>s.periodo===now&&s.status==='pendiente').length}</td></tr>
+    </table>`;
+
+  const goalsRows = goals.mrr||goals.clientes||goals.deals ? `
+    <h2 style="${h2Style}">🎯 Objetivos del mes</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #eee">
+      ${goals.mrr?`<tr><td style="${thStyle}">MRR objetivo</td><td style="${tdStyle}">$ ${(+goals.mrr).toLocaleString('es-AR')} → Actual: $ ${Math.round(mrr).toLocaleString('es-AR')} (${mrr>0&&goals.mrr>0?Math.round(mrr/goals.mrr*100):0}%)</td></tr>`:''}
+      ${goals.clientes?`<tr><td style="${thStyle}">Clientes nuevos objetivo</td><td style="${tdStyle}">${goals.clientes} → Actual: ${clients.filter(c=>(c.created_at||'').startsWith(now)).length}</td></tr>`:''}
+      ${goals.deals?`<tr><td style="${thStyle}">Deals cerrados objetivo</td><td style="${tdStyle}">${goals.deals} → Actual: ${leads.filter(l=>l.status==='cliente'&&(l.updated_at||'').startsWith(now)).length}</td></tr>`:''}
+    </table>` : '';
+  const secObjetivos = secciones.includes('objetivos') ? goalsRows : '';
+
+  const alertas = [];
+  (getCobros()||[]).filter(c=>c.status==='vencido'&&c.periodo===now).forEach(co=>{const cl=clients.find(x=>x.id===co.clientId);if(cl)alertas.push(`💳 Cobro vencido: ${cl.nombre}`);});
+  clients.filter(c=>c.contrato_fin).forEach(c=>{const d=Math.round((new Date(c.contrato_fin+'T12:00')-new Date())/86400000);if(d>=0&&d<=30)alertas.push(`📋 Contrato por vencer: ${c.nombre} (${d}d)`);});
+  const secAlertas = secciones.includes('alertas') && alertas.length ? `
+    <h2 style="${h2Style}">⚠ Alertas</h2>
+    <ul style="margin:0;padding-left:20px">${alertas.map(a=>`<li style="margin-bottom:6px;font-size:13px">${a}</li>`).join('')}</ul>` : '';
+
+  return `<div style="${style};max-width:600px">
+    <div style="background:#0a2e2e;color:#fff;padding:20px 24px;border-radius:8px 8px 0 0">
+      <div style="font-size:22px;font-weight:900;letter-spacing:-0.02em">RHINOS<span style="color:#00e5cc">APP</span></div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-top:4px">Reporte ejecutivo — ${periodo}</div>
+    </div>
+    <div style="padding:20px 24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
+      ${secFinanzas}${secVentas}${secClientes}${secCostos}${secObjetivos}${secAlertas}
+      <div style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;font-size:11px;color:#9ca3af;text-align:center">
+        RhinosApp CRM · Generado el ${new Date().toLocaleDateString('es-AR')} · rhinos-crm.vercel.app
+      </div>
+    </div>
+  </div>`;
+}
+
+document.getElementById('btn-enviar-reporte')?.addEventListener('click', () => {
+  const now = localMonthStr();
+  const [y,m] = now.split('-');
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('rep-email-asunto').value = `📊 Reporte RhinosApp — ${meses[+m-1]} ${y}`;
+  document.getElementById('modal-enviar-reporte').style.display = 'block';
+});
+
+document.getElementById('btn-rep-preview-email')?.addEventListener('click', () => {
+  const secciones = [...document.querySelectorAll('.rep-seccion:checked')].map(c => c.value);
+  const mensaje = document.getElementById('rep-email-mensaje').value.trim();
+  const html = (mensaje ? `<p style="font-size:13px;color:#374151;margin-bottom:20px">${mensaje}</p>` : '') + generarHtmlReporte(secciones);
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vista previa reporte</title></head><body style="padding:20px;background:#f3f4f6">${html}</body></html>`);
+  win.document.close();
+});
+
+document.getElementById('btn-rep-enviar-email')?.addEventListener('click', async function() {
+  const tokens = (() => { try { return JSON.parse(localStorage.getItem('rhinos_gmail_tokens')); } catch(e){ return null; } })();
+  if (!tokens?.access_token) return showToast('Conectá Gmail primero');
+  const toRaw = document.getElementById('rep-email-to').value.trim();
+  if (!toRaw) return showToast('Ingresá al menos un destinatario');
+  const dests = toRaw.split(',').map(e=>e.trim()).filter(Boolean);
+  const from = document.getElementById('rep-email-from').value;
+  const asunto = document.getElementById('rep-email-asunto').value.trim() || 'Reporte RhinosApp';
+  const mensaje = document.getElementById('rep-email-mensaje').value.trim();
+  const secciones = [...document.querySelectorAll('.rep-seccion:checked')].map(c => c.value);
+  const htmlBody = (mensaje ? `${mensaje}\n\n---\n\n` : '') + generarHtmlReporte(secciones);
+  const fromNom = { 'administracion@rhinosapp.com':'Administración RhinosApp', 'comercial@rhinosapp.com':'RhinosApp', 'info@rhinosapp.com':'Info RhinosApp', 'rh@rhinosapp.com':'RH RhinosApp' };
+
+  this.disabled = true; this.textContent = '⏳ Enviando...';
+  const resEl = document.getElementById('rep-email-result');
+  let sent = 0;
+  try {
+    for (const dest of dests) {
+      await callAPI('gmail_send', { access_token: tokens.access_token, to: dest, subject: asunto, body: htmlBody, from: `${fromNom[from]||'RhinosApp'} <${from}>` });
+      sent++;
+    }
+    resEl.style.cssText = 'display:block;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);color:var(--green);padding:8px 12px;border-radius:var(--r);font-size:12px;margin-top:8px';
+    resEl.textContent = `✅ Reporte enviado a ${sent} destinatario${sent!==1?'s':''}`;
+    showToast(`📧 Reporte enviado a ${sent} persona${sent!==1?'s':''} 🦏`);
+  } catch(e) {
+    resEl.style.cssText = 'display:block;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);color:var(--red);padding:8px 12px;border-radius:var(--r);font-size:12px;margin-top:8px';
+    resEl.textContent = 'Error: ' + e.message;
+  }
+  this.disabled = false; this.textContent = '📧 Enviar';
+});
 
 // ══════════════════════════════════════════════════
 // BALANCE GENERAL SRL — CONTABILIDAD ARGENTINA
