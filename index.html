@@ -3266,6 +3266,45 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   <button id="btn-exit-pres" onclick="exitPresMode()" style="background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:var(--font)">✕ Salir</button>
 </div>
 
+<!-- MODAL EMAIL BIENVENIDA -->
+<div id="modal-bienvenida" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;overflow-y:auto;backdrop-filter:blur(4px)">
+  <div style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px">
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--rl);width:100%;max-width:680px;padding:24px;box-shadow:0 32px 80px rgba(0,0,0,0.6)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-family:var(--display);font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">🎉 Email de bienvenida</div>
+        <button onclick="document.getElementById('modal-bienvenida').style.display='none'" style="background:var(--surface2);border:1px solid var(--border2);border-radius:50%;width:32px;height:32px;color:var(--text2);font-size:16px;cursor:pointer">✕</button>
+      </div>
+      <!-- Remitente -->
+      <div class="field">
+        <label style="font-size:10px">Remitente</label>
+        <select id="bv-remitente" style="font-size:13px">
+          <option value="administracion@rhinosapp.com">⚙️ administracion@rhinosapp.com</option>
+          <option value="comercial@rhinosapp.com">🤝 comercial@rhinosapp.com</option>
+          <option value="info@rhinosapp.com">ℹ️ info@rhinosapp.com</option>
+        </select>
+      </div>
+      <!-- Asunto -->
+      <div class="field">
+        <label style="font-size:10px">Asunto</label>
+        <input id="bv-asunto" placeholder="Asunto del email de bienvenida"/>
+      </div>
+      <!-- Cuerpo -->
+      <div class="field">
+        <label style="font-size:10px">Cuerpo <span style="color:var(--text3);font-weight:400">— variables: [nombre] [empresa] [email]</span></label>
+        <textarea id="bv-cuerpo" rows="12" style="font-size:13px;line-height:1.7"></textarea>
+      </div>
+      <!-- Acciones -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <button class="btn" id="btn-bv-ia" style="background:rgba(99,102,241,0.12);color:#818cf8;border-color:rgba(99,102,241,0.3)">🦏 Generar con IA</button>
+        <button class="btn btn-sm" id="btn-bv-guardar-tpl" style="color:var(--text2)">💾 Guardar plantilla</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-green" id="btn-bv-enviar" style="padding:10px 24px;font-size:14px;font-weight:700">Enviar bienvenida →</button>
+      </div>
+      <div id="bv-result" style="display:none;margin-top:10px;padding:8px 12px;border-radius:var(--r);font-size:12px"></div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CONTRATO PDF -->
 <div id="modal-contrato" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;overflow-y:auto;backdrop-filter:blur(4px)">
   <div style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px">
@@ -9044,6 +9083,10 @@ const DEFAULT_TEMPLATES = {
   reembolso: {
     asunto: '↩ Reembolso procesado — RhinosApp',
     cuerpo: `Hola [nombre],\n\nTe informamos que procesamos un reembolso / crédito de [monto] a tu cuenta.\n\nEste ajuste se verá reflejado en los próximos días según el medio de pago utilizado.\n\nEquipo RhinosApp 🦏`
+  },
+  bienvenida: {
+    asunto: '🎉 ¡Bienvenido a RhinosApp, [empresa]!',
+    cuerpo: `Hola [nombre],\n\n¡Te damos la bienvenida a RhinosApp! Estamos muy contentos de tenerte como parte de nuestra comunidad.\n\nA partir de hoy tenés acceso a tu CRM personalizado. En las próximas horas vamos a contactarte para coordinar la configuración inicial y capacitación del equipo.\n\nSi tenés cualquier pregunta antes, respondé este email o escribinos directamente.\n\n¡Gracias por confiar en nosotros!\nEquipo RhinosApp 🦏\ncomercial@rhinosapp.com`
   }
 };
 
@@ -12176,6 +12219,73 @@ function showLocalNotif(title, body, url) {
 }
 
 // ══════════════════════════════════════════════════
+// EMAIL DE BIENVENIDA
+// ══════════════════════════════════════════════════
+let _bvCliente = null;
+
+function abrirEmailBienvenida(c) {
+  _bvCliente = c;
+  const tpl = (getTemplates && getTemplates()?.bienvenida) || DEFAULT_TEMPLATES.bienvenida;
+  const repl = s => (s||'').replace(/\[nombre\]/g, c.nombre||'').replace(/\[empresa\]/g, c.empresa||c.nombre||'').replace(/\[email\]/g, c.email||'');
+  document.getElementById('bv-asunto').value = repl(tpl.asunto);
+  document.getElementById('bv-cuerpo').value = repl(tpl.cuerpo);
+  document.getElementById('bv-result').style.display = 'none';
+  document.getElementById('modal-bienvenida').style.display = 'block';
+}
+
+document.getElementById('btn-bv-ia')?.addEventListener('click', async function() {
+  if (!_bvCliente) return;
+  this.disabled = true; this.textContent = '⏳ Generando...';
+  try {
+    const ctx = `Cliente: ${_bvCliente.nombre}. Empresa: ${_bvCliente.empresa||_bvCliente.nombre}. Servicio: CRM Marketing RhinosApp. Precio: ${_bvCliente.precio} ${_bvCliente.moneda||'ARS'}/${_bvCliente.frecuencia_pago||'mes'}.`;
+    const res = await callAPI('openai_complete', {
+      prompt: `Escribí un email de bienvenida profesional y cálido a un cliente nuevo de RhinosApp. ${ctx} Tono amigable pero profesional. Mencioná que el equipo los va a contactar para la configuración inicial. Firmá como "Equipo RhinosApp 🦏 | administracion@rhinosapp.com". Solo texto plano, sin markdown.`,
+      max_tokens: 500
+    });
+    if (res?.text) document.getElementById('bv-cuerpo').value = res.text.trim();
+    else showToast('IA: ' + (res?.error || 'Sin respuesta'));
+  } catch(e) { showToast('Error IA: ' + e.message); }
+  this.disabled = false; this.textContent = '🦏 Generar con IA';
+});
+
+document.getElementById('btn-bv-guardar-tpl')?.addEventListener('click', async () => {
+  const asunto = document.getElementById('bv-asunto').value.trim();
+  const cuerpo = document.getElementById('bv-cuerpo').value.trim();
+  if (!asunto || !cuerpo) return showToast('Completá asunto y cuerpo antes de guardar');
+  if (!_templates) _templates = { ...DEFAULT_TEMPLATES };
+  _templates.bienvenida = { asunto, cuerpo };
+  await sbFetch('rhinos_email_templates?type=eq.bienvenida', 'DELETE').catch(() => {});
+  await sbFetch('rhinos_email_templates', 'POST', { type: 'bienvenida', asunto, cuerpo }).catch(() => {});
+  showToast('✅ Plantilla de bienvenida guardada 🦏');
+});
+
+document.getElementById('btn-bv-enviar')?.addEventListener('click', async function() {
+  if (!_bvCliente) return;
+  const tokens = (() => { try { return JSON.parse(localStorage.getItem('rhinos_gmail_tokens')); } catch(e){ return null; } })();
+  if (!tokens?.access_token) return showToast('Conectá Gmail primero');
+  const asunto = document.getElementById('bv-asunto').value.trim();
+  const cuerpo = document.getElementById('bv-cuerpo').value.trim();
+  if (!asunto || !cuerpo) return showToast('Completá asunto y cuerpo');
+  const rem = document.getElementById('bv-remitente').value;
+  const remNom = { 'administracion@rhinosapp.com':'Administración RhinosApp', 'comercial@rhinosapp.com':'RhinosApp', 'info@rhinosapp.com':'Info RhinosApp' };
+  this.disabled = true; this.textContent = '⏳ Enviando...';
+  const resEl = document.getElementById('bv-result');
+  try {
+    const dests = [_bvCliente.email, ...(_bvCliente.emails_cc||'').split(',').map(e=>e.trim())].filter(Boolean);
+    for (const dest of dests) {
+      await callAPI('gmail_send', { access_token: tokens.access_token, to: dest, subject: asunto, body: cuerpo, from: `${remNom[rem]||'RhinosApp'} <${rem}>` });
+    }
+    resEl.style.cssText = 'display:block;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);color:var(--green);padding:8px 12px;border-radius:var(--r);font-size:12px';
+    resEl.textContent = `✅ Email de bienvenida enviado a ${_bvCliente.email}`;
+    showToast('🎉 Bienvenida enviada 🦏');
+  } catch(e) {
+    resEl.style.cssText = 'display:block;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);color:var(--red);padding:8px 12px;border-radius:var(--r);font-size:12px';
+    resEl.textContent = 'Error: ' + e.message;
+  }
+  this.disabled = false; this.textContent = 'Enviar bienvenida →';
+});
+
+// ══════════════════════════════════════════════════
 // CONTRATOS PDF
 // ══════════════════════════════════════════════════
 let _contratoClienteId = null;
@@ -14892,6 +15002,7 @@ function openClienteComercial(c) {
       ${c.notes?`<div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:var(--r);padding:8px 12px;line-height:1.6">${c.notes}</div>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
         <button onclick="abrirContrato(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="btn btn-sm" style="color:#818cf8;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08)">📝 ${c.contrato_firmado ? '✅ Contrato firmado' : 'Generar contrato'}</button>
+        <button onclick="abrirEmailBienvenida(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="btn btn-sm" style="color:var(--green);border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.08)">🎉 Email bienvenida</button>
         ${c.contrato_firmado && c.contrato_fecha_firma ? `<span style="font-size:11px;color:var(--green);align-self:center">Firmado el ${c.contrato_fecha_firma}</span>` : ''}
       </div>
       ${c.contrato_fin ? `<div style="margin-top:10px;padding:8px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:var(--r);font-size:12px">
