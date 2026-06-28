@@ -4819,7 +4819,7 @@ Organizá por semanas. Variá entre: dolor del distribuidor, módulos del sistem
 document.getElementById('btn-cal-auth').addEventListener('click', async () => {
   localStorage.removeItem('rhinos_gmail_tokens');
   const r = await callAPI('gmail_get_client_id', {});
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${r.client_id}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT)}&response_type=code&scope=${encodeURIComponent(GMAIL_SCOPES)}&access_type=offline&prompt=consent&state=crm_login`;
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${r.client_id}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT)}&response_type=code&scope=${encodeURIComponent(GMAIL_SCOPES)}&access_type=offline&prompt=select_account&state=crm_login`;
   window.location.href = authUrl;
 });
 
@@ -5531,7 +5531,7 @@ async function initCRMAuth() {
       initGmail();
       if (vendedorPermisos !== null) onVendedorLogin();
       // Pedir/activar push notifications justo después del login (user gesture válido)
-      setTimeout(requestPushAfterLogin, 2000);
+      setTimeout(requestPushAfterLogin, 10000);
     } catch(e) {
       document.getElementById('login-screen').style.display = 'flex';
       const errEl = document.getElementById('login-error');
@@ -5548,8 +5548,14 @@ document.getElementById('btn-crm-login').addEventListener('click', async () => {
   const r = await callAPI('gmail_get_client_id', {});
   const clientId = r.client_id;
   const redirectUri = window.location.origin + '/auth/callback';
-  const scopes = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/calendar';
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent&state=crm_login`;
+  // Todos los scopes juntos en un solo auth — evita múltiples pantallas de consentimiento
+  const scopes = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/analytics.readonly';
+  // Recuperar email previo para pre-seleccionar cuenta (evita el selector de cuenta)
+  const prevSession = (() => { try { return JSON.parse(localStorage.getItem(CRM_SESSION_KEY)); } catch(e) { return null; } })();
+  const hint = prevSession?.email ? `&login_hint=${encodeURIComponent(prevSession.email)}` : '';
+  // prompt=select_account solo muestra el selector la primera vez o si hay duda de cuenta
+  // NO usar prompt=consent: forzaría aceptar todo desde cero en cada login
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=select_account${hint}&state=crm_login`;
   window.location.href = authUrl;
 });
 
@@ -5762,7 +5768,7 @@ async function startGmailAuth() {
     const r = await callAPI('gmail_get_client_id', {});
     GMAIL_CLIENT_ID = r.client_id;
   }
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GMAIL_CLIENT_ID}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT)}&response_type=code&scope=${encodeURIComponent(GMAIL_SCOPES)}&access_type=offline&prompt=consent&state=gmail_auth`;
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GMAIL_CLIENT_ID}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT)}&response_type=code&scope=${encodeURIComponent(GMAIL_SCOPES)}&access_type=offline&prompt=select_account&state=gmail_auth`;
   window.location.href = authUrl;
 }
 
