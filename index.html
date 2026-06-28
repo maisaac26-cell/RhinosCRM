@@ -12149,29 +12149,98 @@ async function updatePushButton() {
 }
 
 async function togglePushSubscription() {
-  if (!('PushManager' in window)) return showToast('Tu navegador no soporta push notifications');
-  const reg = _swReg || await navigator.serviceWorker.ready;
-  const existing = await reg.pushManager.getSubscription();
-  if (existing) {
-    // Desuscribir
-    await existing.unsubscribe();
-    await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'unsubscribe', subscription: existing }) }).catch(()=>{});
-    showToast('Notificaciones desactivadas');
-  } else {
-    // Suscribir
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') return showToast('Permiso denegado — activá las notificaciones en la configuración del navegador');
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
-    const res = await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'subscribe', subscription: sub, user_email: currentSession?.user?.email || '' }) }).then(r=>r.json()).catch(()=>({}));
-    if (res.ok) showToast('✅ Notificaciones activadas 🦏');
-    else showToast('Error activando notificaciones: ' + (res.error||'desconocido'));
+  const btn = document.getElementById('btn-notif-push');
+  const origText = btn?.textContent || '🔔 Activar notificaciones';
+
+  // Feedback visual inmediato
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Procesando...'; }
+
+  try {
+    if (!('PushManager' in window)) {
+      showToast('⚠ Tu navegador no soporta push. En iPhone: usá Safari y agregá la app a pantalla de inicio primero.');
+      return;
+    }
+    if (!('serviceWorker' in navigator)) {
+      showToast('⚠ Service Worker no soportado en este navegador');
+      return;
+    }
+
+    // Esperar SW con timeout explícito (iOS puede ser lento)
+    let reg;
+    try {
+      reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('SW timeout (10s)')), 10000))
+      ]);
+    } catch(e) {
+      showToast('⚠ Error SW: ' + e.message + '. Recargá la página.');
+      return;
+    }
+
+    const existing = await reg.pushManager.getSubscription().catch(() => null);
+
+    if (existing) {
+      // Desuscribir
+      if (btn) btn.textContent = '⏳ Desactivando...';
+      await existing.unsubscribe().catch(() => {});
+      await fetch('/api/push', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'unsubscribe', subscription: existing }) }).catch(() => {});
+      showToast('Notificaciones desactivadas');
+    } else {
+      // Suscribir — pedir permiso
+      if (btn) btn.textContent = '⏳ Esperando permiso...';
+      let perm;
+      try {
+        perm = await Notification.requestPermission();
+      } catch(e) {
+        showToast('⚠ Error pidiendo permiso: ' + e.message);
+        return;
+      }
+      if (perm !== 'granted') {
+        showToast('❌ Permiso denegado. En iPhone: Ajustes → Rhinos CRM → Notificaciones → activar.');
+        return;
+      }
+
+      // Suscribir al push service
+      if (btn) btn.textContent = '⏳ Suscribiendo...';
+      let sub;
+      try {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+      } catch(e) {
+        const msg = e.message || String(e);
+        if (msg.includes('permission') || msg.includes('denied')) {
+          showToast('❌ Permiso de notificaciones denegado por el sistema.');
+        } else if (msg.includes('not supported') || msg.includes('AbortError')) {
+          showToast('⚠ Push no soportado en este contexto. Asegurate de abrir la app desde el ícono en pantalla de inicio (no desde Safari).');
+        } else {
+          showToast('⚠ Error suscripción: ' + msg);
+        }
+        return;
+      }
+
+      // Guardar en Supabase
+      if (btn) btn.textContent = '⏳ Guardando...';
+      const userEmail = (typeof currentSession !== 'undefined' && currentSession?.user?.email) || '';
+      const res = await fetch('/api/push', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'subscribe', subscription: sub, user_email: userEmail })
+      }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+
+      if (res.ok !== false) {
+        showToast('✅ Notificaciones activadas 🦏');
+      } else {
+        showToast('⚠ Suscripto localmente pero error al guardar: ' + (res.error || 'desconocido'));
+      }
+    }
+  } catch(e) {
+    showToast('❌ Error inesperado: ' + (e.message || String(e)));
+  } finally {
+    if (btn) btn.disabled = false;
+    await updatePushButton();
   }
-  updatePushButton();
 }
 
 // Enviar push a todos los suscriptores — llamar desde cualquier parte del CRM
@@ -12660,22 +12729,36 @@ function renderNotifRules() {
   });
 }
 
+let _notifLog = [];
+
 function renderNotifLog(log) {
+  _notifLog = log;
   const el = document.getElementById('notif-log-list');
   if (!el) return;
   if (!log.length) { el.innerHTML = '<div class="empty">Sin historial de notificaciones.</div>'; return; }
   el.innerHTML = log.map(n => {
     const fecha = n.created_at ? new Date(n.created_at).toLocaleString('es-AR') : '';
     const meta = NOTIF_RULES_META[n.tipo];
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)" data-log-id="${n.id}">
       <span style="font-size:18px;flex-shrink:0">${meta?.icon||'📣'}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--text)">${n.titulo||''}</div>
         <div style="font-size:12px;color:var(--text2);margin-top:2px">${n.mensaje||''}</div>
         <div style="font-size:10px;color:var(--text3);margin-top:4px">${fecha} · ${n.enviado_a||0} dispositivo${n.enviado_a!==1?'s':''}</div>
       </div>
+      <button class="btn btn-sm del-log-btn" data-id="${n.id}" style="color:var(--red);border-color:rgba(239,68,68,0.2);padding:3px 8px;flex-shrink:0;font-size:11px" title="Eliminar">✕</button>
     </div>`;
   }).join('');
+
+  el.querySelectorAll('.del-log-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const id = this.dataset.id;
+      await sbFetch(`rhinos_notif_log?id=eq.${encodeURIComponent(id)}`, 'DELETE').catch(() => {});
+      _notifLog = _notifLog.filter(n => n.id !== id);
+      renderNotifLog(_notifLog);
+      showToast('Entrada eliminada');
+    });
+  });
 }
 
 // Tab switcher notificaciones
