@@ -5230,32 +5230,53 @@ const CRM_ADMIN_EMAIL = 'comercial@rhinosapp.com';
 const CRM_SESSION_KEY = 'rhinos_crm_session';
 
 const MODULES_PERMISOS = [
-  { key: 'dashboard',          label: 'Dashboard',      group: 'General' },
-  { key: 'leads',              label: 'Leads',          group: 'Comercial' },
-  { key: 'clientes-comercial', label: 'Clientes',       group: 'Comercial' },
-  { key: 'prospectos',         label: 'Prospectos',     group: 'Comercial' },
-  { key: 'presupuestos',       label: 'Presupuestos',   group: 'Comercial' },
-  { key: 'vendedores',         label: 'Vendedores',     group: 'Comercial' },
-  { key: 'finanzas',           label: 'Finanzas',       group: 'Finanzas' },
-  { key: 'balance',            label: 'Balance',        group: 'Finanzas' },
-  { key: 'gmail',              label: 'Gmail',          group: 'Gmail' },
-  { key: 'calendario',         label: 'Calendario',     group: 'Gmail' },
-  { key: 'tareas',             label: 'Tareas',         group: 'Operaciones' },
-  { key: 'agente',             label: 'Agente IA',      group: 'Operaciones' },
-  { key: 'analytics',          label: 'Analytics Web',  group: 'Analytics' },
-  { key: 'posts',              label: 'Instagram',      group: 'Instagram' },
-  { key: 'dms',                label: 'DMs',            group: 'Instagram' },
-  { key: 'contenido',          label: 'Contenido',      group: 'Instagram' },
-  { key: 'webcontent',         label: 'Blog y Web',     group: 'Web' },
+  // General
+  { key: 'dashboard',          label: 'Dashboard',        group: 'General' },
+  // Comercial
+  { key: 'leads',              label: 'Leads',            group: 'Comercial' },
+  { key: 'clientes-comercial', label: 'Clientes',         group: 'Comercial' },
+  { key: 'prospectos',         label: 'Prospectos',       group: 'Comercial' },
+  { key: 'presupuestos',       label: 'Presupuestos',     group: 'Comercial' },
+  { key: 'vendedores',         label: 'Vendedores',       group: 'Comercial' },
+  // Finanzas
+  { key: 'finanzas',           label: 'Finanzas',         group: 'Finanzas' },
+  { key: 'balance',            label: 'Balance',          group: 'Finanzas' },
+  { key: 'reportes',           label: 'Reportes',         group: 'Finanzas' },
+  { key: 'proveedores',        label: 'Proveedores',      group: 'Finanzas' },
+  // Gmail
+  { key: 'gmail',              label: 'Gmail',            group: 'Gmail' },
+  { key: 'calendario',         label: 'Calendario',       group: 'Gmail' },
+  // Operaciones
+  { key: 'tareas',             label: 'Tareas',           group: 'Operaciones' },
+  { key: 'agente',             label: 'Agente IA',        group: 'Operaciones' },
+  { key: 'notificaciones',     label: 'Notificaciones',   group: 'Operaciones' },
+  { key: 'soporte',            label: 'Soporte (tickets)', group: 'Operaciones' },
+  // Analytics / Web
+  { key: 'analytics',          label: 'Analytics Web',   group: 'Analytics' },
+  { key: 'posts',              label: 'Instagram',        group: 'Instagram' },
+  { key: 'dms',                label: 'DMs',              group: 'Instagram' },
+  { key: 'contenido',          label: 'Contenido',        group: 'Instagram' },
+  { key: 'webcontent',         label: 'Blog y Web',       group: 'Web' },
+];
+
+// Permisos de VISIBILIDAD DE DATOS (no son módulos nav, controlan qué datos ve)
+const DATA_PERMISOS = [
+  { key: 'leads_propios',    label: 'Solo ver sus propios leads (asignados a él)' },
+  { key: 'clientes_propios', label: 'Solo ver clientes de sus leads' },
 ];
 
 const DEFAULT_VENDEDOR_PERMISOS = {
+  // Módulos visibles
   dashboard: true, leads: true, 'clientes-comercial': true,
   prospectos: true, presupuestos: true, calendario: true,
-  tareas: true, agente: true,
-  vendedores: false, finanzas: false, balance: false,
+  tareas: true, agente: true, soporte: true,
+  vendedores: false, finanzas: false, balance: false, reportes: false,
+  proveedores: false, notificaciones: false,
   gmail: false, analytics: false, posts: false,
   dms: false, contenido: false, webcontent: false,
+  // Visibilidad de datos
+  leads_propios: true,    // por defecto: cada vendedor solo ve sus leads
+  clientes_propios: true, // por defecto: cada vendedor solo ve sus clientes
 };
 
 let _currentVendedor = null; // set when a vendedor (non-admin) logs in
@@ -5265,8 +5286,12 @@ function isAdmin() {
   return s && s.email === CRM_ADMIN_EMAIL;
 }
 
+// Permisos efectivos del vendedor activo (se populan al login)
+let _vendedorPermisosEfectivos = null;
+
 function applyVendedorPermisos(permisos) {
   const effective = { ...DEFAULT_VENDEDOR_PERMISOS, ...permisos };
+  _vendedorPermisosEfectivos = effective; // guardar para filtros de datos
   MODULES_PERMISOS.forEach(({ key }) => {
     const btn = document.querySelector(`.nav-btn[data-sec="${key}"]`);
     if (btn) btn.style.display = effective[key] ? '' : 'none';
@@ -5286,8 +5311,29 @@ function applyVendedorPermisos(permisos) {
   });
 }
 
+// Filtra leadsData según permisos del vendedor logueado
+function filtrarLeadsPorPermisos(leads) {
+  if (isAdmin() || !_vendedorPermisosEfectivos?.leads_propios || !_currentVendedor) return leads;
+  return leads.filter(l => l.vendedor_id === _currentVendedor.id);
+}
+
+// Filtra clientes según permisos del vendedor logueado
+function filtrarClientesPorPermisos(clients) {
+  if (isAdmin() || !_vendedorPermisosEfectivos?.clientes_propios || !_currentVendedor) return clients;
+  // Solo clientes que tienen un lead asignado al vendedor
+  const misLeadIds = new Set(leadsData.filter(l => l.vendedor_id === _currentVendedor.id).map(l => l.id));
+  // Un cliente es "propio" si su email o nombre coincide con algún lead del vendedor
+  const misEmails = new Set(leadsData.filter(l => l.vendedor_id === _currentVendedor.id && l.email).map(l => l.email));
+  const misNombres = new Set(leadsData.filter(l => l.vendedor_id === _currentVendedor.id).map(l => l.name));
+  return clients.filter(c => misEmails.has(c.email) || misNombres.has(c.nombre) || c.vendedor_id === _currentVendedor.id);
+}
+
 async function onVendedorLogin() {
   await loadLeads();
+  // Aplicar filtro de leads propios en leadsData
+  if (_vendedorPermisosEfectivos?.leads_propios && _currentVendedor) {
+    leadsData = filtrarLeadsPorPermisos(leadsData);
+  }
   document.querySelector('.nav-btn[data-sec="mi-dia"]')?.click();
 }
 
@@ -15262,7 +15308,21 @@ function renderPermisosPanel(v) {
   MODULES_PERMISOS.forEach(m => { if (!groups[m.group]) groups[m.group] = []; groups[m.group].push(m); });
 
   const grid = document.getElementById('permisos-grid');
-  grid.innerHTML = Object.entries(groups).map(([grp, mods]) => `
+
+  // Sección especial: visibilidad de datos (qué ve, no qué módulo)
+  const dataSection = `
+    <div style="grid-column:1/-1;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.25);border-radius:var(--r);padding:10px 12px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">👁 Visibilidad de datos</div>
+      ${DATA_PERMISOS.map(m => `
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);margin-bottom:6px">
+          <input type="checkbox" data-perm="${m.key}" style="width:auto;cursor:pointer;accent-color:var(--amber)" ${permisos[m.key]?'checked':''}/>
+          <span>${m.label}</span>
+        </label>`).join('')}
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">Si activás estas opciones, el vendedor solo verá lo que tiene asignado a su nombre.</div>
+    </div>`;
+
+  // Sección módulos por grupo
+  const modulesSection = Object.entries(groups).map(([grp, mods]) => `
     <div style="grid-column:1/-1;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-top:8px">${grp}</div>
     ${mods.map(m => `
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);text-transform:none;letter-spacing:0;margin-bottom:4px">
@@ -15270,6 +15330,8 @@ function renderPermisosPanel(v) {
         ${m.label}
       </label>`).join('')}
   `).join('');
+
+  grid.innerHTML = dataSection + modulesSection;
 }
 
 function openVendedor(v) {
@@ -15533,7 +15595,11 @@ async function loadClientesComercial() {
     // Preservar clientes locales recién agregados que aún no llegaron a Supabase
     const remoteIds = new Set(remote.map(c => c.id));
     const localOnly = _clients.filter(c => c.id && !remoteIds.has(c.id));
-    _ccClients = [...remote, ...localOnly];
+    const allClients = [...remote, ...localOnly];
+    // Aplicar filtro de clientes propios si el vendedor tiene ese permiso
+    _ccClients = filtrarClientesPorPermisos(allClients);
+    // Sincronizar _clients también con el filtro
+    _clients = _ccClients;
     renderClientesComercialMetrics();
     renderClientesComercialList();
   } catch(e) { showToast('Error cargando clientes: ' + e.message); }
