@@ -1660,6 +1660,53 @@ La respuesta debe:
       }
     }
 
+    // ── EMAIL DE BIENVENIDA AL POTENCIAL CLIENTE (web calculator) ────────
+    else if (action === 'webhook_welcome_lead') {
+      const { lead } = body;
+      if (!lead?.email) { result = { ok: false, reason: 'no email' }; }
+      else {
+        const configRows = await new Promise((resolve) => {
+          const req = https.request({
+            hostname: new URL(SB_URL_CONF).hostname,
+            path: '/rest/v1/rhinos_config?key=in.(gmail_access_token)',
+            method: 'GET',
+            headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF }
+          }, (r) => { let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>{ try{resolve(JSON.parse(raw));}catch(e){resolve([]);} }); });
+          req.on('error',()=>resolve([])); req.end();
+        });
+        const cfg = {};
+        if (Array.isArray(configRows)) configRows.forEach(r => { cfg[r.key] = r.value; });
+        if (!cfg.gmail_access_token) { result = { ok: false, reason: 'no gmail token' }; }
+        else {
+          try {
+            const fmtARS = n => `$${Number(n||0).toLocaleString('es-AR')}`;
+            const nombre = lead.name ? lead.name.split(' ')[0] : 'Hola';
+            const emailText = `¡Hola ${nombre}!\n\nGracias por usar la calculadora de RhinosApp 🦏\n\n` +
+              `Calculamos que con ${lead.users || '?'} usuarios, ` +
+              `tu solución con Rhinosapp costaría ${fmtARS(lead.rhinosCost)}/mes, ` +
+              `ahorrando ${fmtARS(lead.savings)}/mes vs tu sistema actual.\n\n` +
+              `Nuestro equipo se va a poner en contacto con vos en breve para mostrarte cómo funciona en una demo de 15 minutos.\n\n` +
+              `Si querés agendar vos mismo, podés hacerlo en:\n` +
+              `📅 https://calendly.com/comercial-rhinosapp\n\n` +
+              `¡Cualquier pregunta respondé este email!\n\n` +
+              `Equipo RhinosApp 🦏\ncomercial@rhinosapp.com | WhatsApp: +54 9 11 6822-3306`;
+            const subj = '=?UTF-8?B?' + Buffer.from(`Tu análisis con RhinosApp — ${fmtARS(lead.savings)}/mes de ahorro`).toString('base64') + '?=';
+            const rawEmail = `MIME-Version: 1.0\r\nFrom: comercial@rhinosapp.com\r\nTo: ${lead.email}\r\nSubject: ${subj}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${emailText}`;
+            const encoded = Buffer.from(rawEmail).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+            const gmailPayload = JSON.stringify({ raw: encoded });
+            await new Promise((resolve, reject) => {
+              const req = https.request({
+                hostname:'gmail.googleapis.com', path:'/gmail/v1/users/me/messages/send', method:'POST',
+                headers:{'Authorization':'Bearer '+cfg.gmail_access_token,'Content-Type':'application/json','Content-Length':Buffer.byteLength(gmailPayload)}
+              }, (res) => { let raw=''; res.on('data',c=>raw+=c); res.on('end',()=>resolve(JSON.parse(raw||'{}')));});
+              req.on('error', reject); req.write(gmailPayload); req.end();
+            });
+            result = { ok: true, sent_to: lead.email };
+          } catch(e) { result = { ok: false, reason: e.message }; }
+        }
+      }
+    }
+
     // ── MERCADO PAGO — crear link de pago Checkout Pro ──────────────────
     else if (action === 'mp_create_link') {
       const MP_TOKEN = process.env.MP_ACCESS_TOKEN;

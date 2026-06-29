@@ -175,7 +175,11 @@ async function readInvoiceWithAI(imageBase64, mimeType) {
 }
 
 module.exports = async function handler(req, res) {
+  // CORS — necesario para que el browser pueda llamar desde rhinosapp.vercel.app
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.setHeader('Access-Control-Max-Age', '86400');
   res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -237,15 +241,24 @@ module.exports = async function handler(req, res) {
       }
       result = { ok: true, lead: newLead };
 
-      // Fire-and-forget notification to admin via api.js webhook
-      try {
-        const apiHost = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://rhinos-crm.vercel.app';
+      // Fire-and-forget: notificación a admin + email de bienvenida al visitante
+      const apiHost = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://rhinos-crm.vercel.app';
+
+      // 1. Notificación interna a comercial@
+      fetch(`${apiHost}/api/api`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'webhook_new_lead', lead: newLead })
+      }).catch(() => {});
+
+      // 2. Email de bienvenida al potencial cliente (si dejó email)
+      if (newLead.email) {
         fetch(`${apiHost}/api/api`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'webhook_new_lead', lead: newLead })
-        }).catch(() => {}); // fire-and-forget
-      } catch(e) { /* notification failure doesn't block lead save */ }
+          body: JSON.stringify({ action: 'webhook_welcome_lead', lead: newLead })
+        }).catch(() => {});
+      }
     }
 
     else if (action === 'wc_get_leads') {
