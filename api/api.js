@@ -1681,16 +1681,15 @@ La respuesta debe:
           try {
             const fmtARS = n => `$${Number(n||0).toLocaleString('es-AR')}`;
             const nombre = lead.name ? lead.name.split(' ')[0] : 'Hola';
-            const emailText = `¡Hola ${nombre}!\n\nGracias por usar la calculadora de RhinosApp 🦏\n\n` +
-              `Calculamos que con ${lead.users || '?'} usuarios, ` +
-              `tu solución con Rhinosapp costaría ${fmtARS(lead.rhinosCost)}/mes, ` +
-              `ahorrando ${fmtARS(lead.savings)}/mes vs tu sistema actual.\n\n` +
-              `Nuestro equipo se va a poner en contacto con vos en breve para mostrarte cómo funciona en una demo de 15 minutos.\n\n` +
-              `Si querés agendar vos mismo, podés hacerlo en:\n` +
-              `📅 https://calendly.com/comercial-rhinosapp\n\n` +
-              `¡Cualquier pregunta respondé este email!\n\n` +
-              `Equipo RhinosApp 🦏\ncomercial@rhinosapp.com | WhatsApp: +54 9 11 6822-3306`;
-            const subj = '=?UTF-8?B?' + Buffer.from(`Tu análisis con RhinosApp — ${fmtARS(lead.savings)}/mes de ahorro`).toString('base64') + '?=';
+            const emailText = `Hola ${nombre},\n\nTe escribo desde el equipo de Rhinosapp.\n\n` +
+              `Vi que usaste nuestra calculadora de costos. Con ${lead.users || '?'} usuarios, ` +
+              `tu plan quedaría en ${fmtARS(lead.rhinosCost)}/mes.\n\n` +
+              `¿Tenés 15 minutos esta semana para que te muestre cómo funciona en vivo?\n\n` +
+              `Podés elegir el horario que mejor te quede acá:\n` +
+              `https://calendly.com/comercial-rhinosapp\n\n` +
+              `O si preferís respondeme directamente con tus dudas.\n\n` +
+              `Saludos,\nEquipo Rhinosapp\ncomercial@rhinosapp.com | +54 9 11 6822-3306`;
+            const subj = '=?UTF-8?B?' + Buffer.from(`Rhinosapp — tu consulta`).toString('base64') + '?=';
             const rawEmail = `MIME-Version: 1.0\r\nFrom: comercial@rhinosapp.com\r\nTo: ${lead.email}\r\nSubject: ${subj}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${emailText}`;
             const encoded = Buffer.from(rawEmail).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
             const gmailPayload = JSON.stringify({ raw: encoded });
