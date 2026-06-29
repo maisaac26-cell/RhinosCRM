@@ -239,26 +239,23 @@ module.exports = async function handler(req, res) {
           body: JSON.stringify({ message: `[CRM] Crear leads.json`, content: Buffer.from(JSON.stringify(existingLeads, null, 2) + '\n', 'utf-8').toString('base64'), branch }),
         });
       }
-      result = { ok: true, lead: newLead };
-
-      // Fire-and-forget: notificación a admin + email de bienvenida al visitante
-      const apiHost = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://rhinos-crm.vercel.app';
-
-      // 1. Notificación interna a comercial@
-      fetch(`${apiHost}/api/api`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'webhook_new_lead', lead: newLead })
-      }).catch(() => {});
-
-      // 2. Email de bienvenida al potencial cliente (si dejó email)
-      if (newLead.email) {
-        fetch(`${apiHost}/api/api`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+      // Enviar notificaciones antes de responder — await para que Vercel no corte
+      const apiHost = 'https://rhinos-crm.vercel.app';
+      const webhookCalls = [
+        // 1. Notificación interna a comercial@
+        fetch(apiHost + '/api/api', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'webhook_new_lead', lead: newLead })
+        }),
+        // 2. Email de bienvenida al potencial cliente (si dejó email)
+        ...(newLead.email ? [fetch(apiHost + '/api/api', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'webhook_welcome_lead', lead: newLead })
-        }).catch(() => {});
-      }
+        })] : [])
+      ];
+      await Promise.allSettled(webhookCalls);
+
+      result = { ok: true, lead: newLead };
     }
 
     else if (action === 'wc_get_leads') {
