@@ -269,6 +269,17 @@ module.exports = async function handler(req, res) {
       result = { ok: true };
     }
 
+    else if (action === 'wc_delete_lead') {
+      const { id } = body;
+      if (!id) throw new Error('Falta id');
+      const { content, sha } = await githubGetFile(LEADS_PATH);
+      const leads = JSON.parse(content);
+      const filtered = leads.filter(l => l.id !== id);
+      if (filtered.length === leads.length) throw new Error('Lead no encontrado');
+      await githubPutFile(LEADS_PATH, JSON.stringify(filtered, null, 2) + '\n', sha, `[CRM] Eliminar lead ${id}`);
+      result = { ok: true };
+    }
+
     else if (action === 'wc_generate_blog_post') {
       const { topic } = body;
       const post = await generateBlogPostWithAI(topic);

@@ -15063,6 +15063,7 @@ function wlRenderList() {
           <div style="display:flex;gap:4px">
             ${lead.email ? `<a href="mailto:${lead.email}?subject=Tu análisis con Rhinosapp&body=${emailBody}" class="btn btn-sm" style="font-size:11px;color:var(--cyan)">✉ Email</a>` : ''}
             ${lead.phone ? `<a href="https://wa.me/${lead.phone.replace(/\D/g,'')}?text=${waMsg}" target="_blank" class="btn btn-sm" style="font-size:11px;color:#22c55e">💬 WhatsApp</a>` : ''}
+            <button class="btn btn-sm wl-del-btn" data-wl-id="${lead.id}" data-wl-name="${lead.name||'este lead'}" style="font-size:11px;color:var(--red);border-color:rgba(239,68,68,0.3);padding:3px 8px" title="Eliminar lead">✕</button>
           </div>
         </div>
       </div>
@@ -15076,6 +15077,25 @@ function wlRenderList() {
         const lead = wlLeads.find(l => l.id === this.dataset.wlId);
         if (lead) { lead.status = this.value; wlRenderSummary(); }
       } catch (e) { alert('Error: ' + e.message); }
+    });
+  });
+
+  el.querySelectorAll('.wl-del-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const id = this.dataset.wlId;
+      const name = this.dataset.wlName;
+      if (!confirm(`¿Eliminar a "${name}" de la calculadora web? Esta acción no se puede deshacer.`)) return;
+      this.disabled = true; this.textContent = '⏳';
+      try {
+        await callWcAPI('wc_delete_lead', { id });
+        wlLeads = wlLeads.filter(l => l.id !== id);
+        wlRenderSummary();
+        wlRenderList();
+        showToast('Lead eliminado 🦏');
+      } catch(e) {
+        showToast('Error: ' + e.message);
+        this.disabled = false; this.textContent = '✕';
+      }
     });
   });
 }
