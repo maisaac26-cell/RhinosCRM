@@ -6303,14 +6303,21 @@ async function openLead(lead) {
 
       // Auto-conversión: si el nuevo estado es "cliente", crear en Finanzas automáticamente
       if (pendingStatus === 'cliente') {
-        const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
+        // Sincronizar desde Supabase para tener datos frescos antes de chequear duplicados
+        await syncClientsSupabase();
+        const emailLead = (lead.email || '').toLowerCase().trim();
+        const nombreLead = (lead.name || '').toLowerCase().trim();
+        const existing = getClients().find(c =>
+          (emailLead && c.email && c.email.toLowerCase().trim() === emailLead) ||
+          (nombreLead && c.nombre && c.nombre.toLowerCase().trim() === nombreLead)
+        );
         if (!existing) {
           await insertClientDB({
             nombre: lead.name,
             empresa: lead.company || lead.name,
             email: lead.email || '',
-            precio: lead.deal_value || 0,
-            inicio: new Date().toISOString().slice(0, 10),
+            precio: +(lead.deal_value) || 0,
+            inicio: localDateStr(),
             estado: 'activo',
             moneda: 'ARS',
             emails_cc: '',
@@ -6319,7 +6326,7 @@ async function openLead(lead) {
           });
           showToast('✅ Lead convertido a cliente — aparece en Finanzas y Clientes 🦏');
         } else {
-          showToast('Estado actualizado — ya existía cliente en Finanzas 🦏');
+          showToast(`Cliente ya existía en Finanzas: ${existing.nombre} 🦏`);
         }
       }
 
@@ -6333,15 +6340,29 @@ async function openLead(lead) {
   const btnToClient = document.getElementById('btn-lead-to-client');
   if (btnToClient) {
     btnToClient.addEventListener('click', async function() {
-      const existing = getClients().find(c => (lead.email && c.email === lead.email) || c.nombre === lead.name);
-      if (existing) { showToast('Ya existe un cliente con ese nombre/email en Finanzas'); return; }
       this.disabled = true;
+      this.textContent = 'Verificando...';
+      // Sync fresco para evitar falsos positivos con datos stale
+      await syncClientsSupabase();
+      const emailLead = (lead.email || '').toLowerCase().trim();
+      const nombreLead = (lead.name || '').toLowerCase().trim();
+      const existing = getClients().find(c =>
+        (emailLead && c.email && c.email.toLowerCase().trim() === emailLead) ||
+        (nombreLead && c.nombre && c.nombre.toLowerCase().trim() === nombreLead)
+      );
+      if (existing) {
+        showToast(`Ya existe como cliente: ${existing.nombre}`);
+        this.disabled = false;
+        this.textContent = '📋 Registrar como cliente en Finanzas →';
+        return;
+      }
+      this.textContent = 'Guardando...';
       await insertClientDB({
         nombre: lead.name,
         empresa: lead.company || lead.name,
         email: lead.email || '',
-        precio: lead.deal_value || 0,
-        inicio: new Date().toISOString().slice(0, 10),
+        precio: +(lead.deal_value) || 0,
+        inicio: localDateStr(),
         estado: 'activo',
         moneda: 'ARS',
         emails_cc: '',
@@ -6349,8 +6370,10 @@ async function openLead(lead) {
         notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
       });
       this.disabled = false;
+      this.textContent = '✅ Registrado';
       showToast('✅ Cliente registrado — aparece en Finanzas y Clientes 🦏');
       document.querySelector('.nav-btn[data-sec="finanzas"]').click();
+      setTimeout(() => document.querySelector('.tab-btn[data-ftab="cobros"]')?.click(), 400);
     });
   }
 
@@ -9283,47 +9306,34 @@ async function patchClientDB(id, data) {
   } catch(e) { showToast('Error guardando: ' + e.message); throw e; }
 }
 
-// Inserta un cliente nuevo en Supabase con doble intento (POST → upsert),
+// Inserta un cliente nuevo en Supabase vía upsert (idempotente),
 // actualiza _clients/_ccClients en memoria inmediatamente y fuerza re-render.
 async function insertClientDB(data) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-  // createdAt (camelCase) SÍ existe en rhinos_clients; created_at (snake) NO existe y se stripea
   const newClient = { frecuencia_pago: 'mensual', ...data, id, createdAt: localDateStr() };
+  if (!newClient.vendedor_id) newClient.vendedor_id = null;
 
   // Agregar a memoria de inmediato para que la UI responda sin esperar Supabase
   _clients = [..._clients, newClient];
   if (typeof _ccClients !== 'undefined') _ccClients = [..._clients];
 
-  const payload = stripOptionalCliCols(newClient);
-  let persisted = false;
-  let lastError = '';
+  const payload = stripOptionalCliCols({ ...newClient });
+  if (!payload.vendedor_id) payload.vendedor_id = null;
 
-  // Intento 1: POST directo — retorna el row guardado
   try {
-    const res = await sbFetch('rhinos_clients', 'POST', payload);
-    if (Array.isArray(res) && res[0]) {
-      persisted = true;
-      const saved = { frecuencia_pago: 'mensual', ...res[0] };
-      _clients = _clients.map(c => c.id === id ? saved : c);
-      if (typeof _ccClients !== 'undefined') _ccClients = [..._clients];
+    const r = await callAPI('supabase_upsert', { table: 'rhinos_clients', rows: [payload] });
+    if (!r?.ok) {
+      showToast(`⚠ No se guardó en Supabase (status ${r?.status}). Revisá la consola.`);
+      console.error('[insertClientDB] upsert falló:', r, payload);
     }
-  } catch(e1) {
-    lastError = e1.message;
-    // Intento 2: upsert con resolution=merge-duplicates (más resiliente)
-    try {
-      const r2 = await callAPI('supabase_upsert', { table: 'rhinos_clients', rows: [payload] });
-      if (r2 && (r2.ok || r2.status === 201 || r2.status === 200)) persisted = true;
-      else lastError = `upsert status ${r2?.status}`;
-    } catch(e2) { lastError = e2.message; }
+  } catch(e) {
+    showToast('⚠ Error guardando cliente: ' + e.message.slice(0, 60));
+    console.error('[insertClientDB]', e, payload);
   }
 
-  if (!persisted) {
-    showToast(`⚠ El cliente quedó en sesión pero no se guardó en Supabase: ${lastError.slice(0,80)}. Revisá la consola.`);
-    console.error('[insertClientDB] No se pudo persistir:', lastError, payload);
-  }
-
-  // Forzar re-render de todas las vistas de clientes que estén visibles
+  // Forzar re-render de todas las vistas de clientes
   if (typeof renderClientes === 'function') renderClientes();
+  if (typeof renderClientStats === 'function') renderClientStats();
   if (typeof renderClientesComercialList === 'function') {
     if (typeof _ccClients !== 'undefined') _ccClients = [..._clients];
     renderClientesComercialList();
@@ -15690,6 +15700,7 @@ function openClienteComercial(c) {
       </div>
       ${c.notes?`<div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:var(--r);padding:8px 12px;line-height:1.6">${c.notes}</div>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn btn-sm" id="btn-editar-cliente-cc" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);background:rgba(0,229,204,0.08)">✏ Editar cliente</button>
         <button onclick="abrirContrato(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="btn btn-sm" style="color:#818cf8;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08)">📝 ${c.contrato_firmado ? '✅ Contrato firmado' : 'Generar contrato'}</button>
         <button onclick="abrirEmailBienvenida(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="btn btn-sm" style="color:var(--green);border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.08)">🎉 Email bienvenida</button>
         ${c.contrato_firmado && c.contrato_fecha_firma ? `<span style="font-size:11px;color:var(--green);align-self:center">Firmado el ${c.contrato_fecha_firma}</span>` : ''}
@@ -15740,6 +15751,8 @@ function openClienteComercial(c) {
     });
   }
 
+  detail.querySelector('#btn-editar-cliente-cc')?.addEventListener('click', () => openEditClienteModal(c));
+
   // Notas del equipo — cliente
   loadTeamNotes('cliente', c.id);
   detail.querySelector('#btn-add-team-note-cli')?.addEventListener('click', () => {
@@ -15749,6 +15762,100 @@ function openClienteComercial(c) {
   });
   detail.querySelector('#team-note-input-cli')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') { addTeamNote('cliente', c.id, e.target.value.trim()); e.target.value = ''; }
+  });
+}
+
+function openEditClienteModal(c) {
+  const existing = document.getElementById('modal-edit-cliente');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modal-edit-cliente';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid rgba(0,229,204,0.3);border-radius:16px;padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-family:var(--display);font-size:18px;font-weight:800;color:var(--text)">Editar cliente</div>
+        <button onclick="document.getElementById('modal-edit-cliente').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:4px">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field" style="margin:0;grid-column:1/-1"><label>Nombre</label><input id="ece-nombre" value="${(c.nombre||'').replace(/"/g,'&quot;')}"/></div>
+        <div class="field" style="margin:0"><label>Empresa</label><input id="ece-empresa" value="${(c.empresa||'').replace(/"/g,'&quot;')}"/></div>
+        <div class="field" style="margin:0"><label>Email</label><input id="ece-email" type="email" value="${(c.email||'').replace(/"/g,'&quot;')}"/></div>
+        <div class="field" style="margin:0"><label>Precio</label><input id="ece-precio" type="number" step="0.01" value="${c.precio||0}"/></div>
+        <div class="field" style="margin:0"><label>Moneda</label>
+          <select id="ece-moneda">
+            <option value="ARS" ${(c.moneda||'ARS')==='ARS'?'selected':''}>ARS</option>
+            <option value="USD" ${c.moneda==='USD'?'selected':''}>USD</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label>Frecuencia de pago</label>
+          <select id="ece-frecuencia">
+            <option value="mensual" ${(c.frecuencia_pago||'mensual')==='mensual'?'selected':''}>Mensual</option>
+            <option value="bimestral" ${c.frecuencia_pago==='bimestral'?'selected':''}>Bimestral</option>
+            <option value="trimestral" ${c.frecuencia_pago==='trimestral'?'selected':''}>Trimestral</option>
+            <option value="semestral" ${c.frecuencia_pago==='semestral'?'selected':''}>Semestral</option>
+            <option value="anual" ${c.frecuencia_pago==='anual'?'selected':''}>Anual</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label>Estado</label>
+          <select id="ece-estado">
+            <option value="activo" ${(c.estado||'activo')==='activo'?'selected':''}>Activo</option>
+            <option value="pausado" ${c.estado==='pausado'?'selected':''}>Pausado</option>
+            <option value="inactivo" ${c.estado==='inactivo'?'selected':''}>Inactivo</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label>Días plazo cobro</label><input id="ece-dias" type="number" value="${c.dias_plazo||10}"/></div>
+        <div class="field" style="margin:0"><label>Inicio contrato</label><input id="ece-inicio" type="date" value="${c.inicio||''}"/></div>
+        <div class="field" style="margin:0"><label>Vencimiento contrato</label><input id="ece-contrato-fin" type="date" value="${c.contrato_fin||''}"/></div>
+        <div class="field" style="margin:0;grid-column:1/-1"><label>Tags <span style="color:var(--text3);font-weight:400">(separados por coma)</span></label><input id="ece-tags" value="${(c.tags||'').replace(/"/g,'&quot;')}"/></div>
+        <div class="field" style="margin:0;grid-column:1/-1"><label>Notas internas</label><textarea id="ece-notas" rows="3" style="width:100%;resize:vertical">${c.notas||''}</textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-green" id="btn-ece-guardar" style="flex:1">Guardar cambios</button>
+        <button class="btn" onclick="document.getElementById('modal-edit-cliente').remove()">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+  modal.querySelector('#btn-ece-guardar').addEventListener('click', async function() {
+    const nombre = modal.querySelector('#ece-nombre').value.trim();
+    const email = modal.querySelector('#ece-email').value.trim();
+    if (!nombre || !email) { showToast('Nombre y email son obligatorios'); return; }
+    this.disabled = true;
+    this.textContent = 'Guardando...';
+    const data = {
+      nombre,
+      empresa: modal.querySelector('#ece-empresa').value.trim(),
+      email,
+      precio: +modal.querySelector('#ece-precio').value || 0,
+      moneda: modal.querySelector('#ece-moneda').value,
+      frecuencia_pago: modal.querySelector('#ece-frecuencia').value,
+      estado: modal.querySelector('#ece-estado').value,
+      dias_plazo: +modal.querySelector('#ece-dias').value || 10,
+      inicio: modal.querySelector('#ece-inicio').value || null,
+      contrato_fin: modal.querySelector('#ece-contrato-fin').value || null,
+      tags: modal.querySelector('#ece-tags').value.trim() || null,
+      notas: modal.querySelector('#ece-notas').value.trim() || null,
+    };
+    try {
+      await patchClientDB(c.id, data);
+      // Actualizar memoria en ambos arrays
+      Object.assign(c, data);
+      _clients = _clients.map(x => x.id === c.id ? { ...x, ...data } : x);
+      if (typeof _ccClients !== 'undefined') _ccClients = _clients.map(x => x.id === c.id ? { ...x, ...data } : x);
+      showToast('Cliente actualizado 🦏');
+      modal.remove();
+      // Re-render en todos los módulos
+      if (typeof renderClientes === 'function') renderClientes();
+      if (typeof renderClientStats === 'function') renderClientStats();
+      if (typeof renderClientesComercialList === 'function') renderClientesComercialList();
+      if (typeof renderClientesComercialMetrics === 'function') renderClientesComercialMetrics();
+      // Re-abrir el detalle del cliente con datos actualizados
+      openClienteComercial(c);
+    } catch(e) { showToast('Error: ' + e.message); }
+    this.disabled = false;
+    this.textContent = 'Guardar cambios';
   });
 }
 
