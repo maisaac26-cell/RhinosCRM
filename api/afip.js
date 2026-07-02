@@ -342,7 +342,7 @@ async function generarCSR(razonSocial, cuit) {
   csr.setSubject([
     { name: 'countryName', value: 'AR' },
     { name: 'organizationName', value: razonSocial || 'Mi Empresa' },
-    { shortName: 'serialNumber', value: 'CUIT ' + (cuit || '').replace(/\D/g, '') },
+    { type: '2.5.4.5', value: 'CUIT ' + (cuit || '').replace(/\D/g, '') },
     { name: 'commonName', value: 'rhinoscrm' },
   ]);
   csr.sign(keypair.privateKey, forge.md.sha256.create());
