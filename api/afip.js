@@ -328,6 +328,31 @@ function readBody(req) {
   });
 }
 
+// ── Generar clave privada + CSR ──────────────────────────────────────────────
+
+async function generarCSR(razonSocial, cuit) {
+  const forge = require('node-forge');
+
+  // Generate RSA 2048-bit key pair (synchronous — ~1-2s in Node)
+  const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048, e: 0x10001 });
+
+  // Build CSR
+  const csr = forge.pki.createCertificationRequest();
+  csr.publicKey = keypair.publicKey;
+  csr.setSubject([
+    { name: 'countryName', value: 'AR' },
+    { name: 'organizationName', value: razonSocial || 'Mi Empresa' },
+    { shortName: 'serialNumber', value: 'CUIT ' + (cuit || '').replace(/\D/g, '') },
+    { name: 'commonName', value: 'rhinoscrm' },
+  ]);
+  csr.sign(keypair.privateKey, forge.md.sha256.create());
+
+  return {
+    keyPem: forge.pki.privateKeyToPem(keypair.privateKey),
+    csrPem: forge.pki.certificationRequestToPem(csr),
+  };
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 module.exports = async function handler(req, res) {
@@ -342,6 +367,24 @@ module.exports = async function handler(req, res) {
   const { action } = body;
 
   try {
+    // ── generar_csr ──────────────────────────────────────────────────
+    if (action === 'generar_csr') {
+      const cfg = await getAfipConfig();
+      const razonSocial = body.razon_social || cfg.afip_razon_social || 'Mi Empresa';
+      const cuit = body.cuit || cfg.afip_cuit || '';
+      if (!cuit) throw new Error('Guardá el CUIT en la configuración antes de generar las claves.');
+
+      const { keyPem, csrPem } = await generarCSR(razonSocial, cuit);
+
+      // Save private key to Supabase and invalidate any cached TAM
+      await sbUpsert('rhinos_config', [
+        { key: 'afip_key', value: keyPem },
+        { key: 'afip_tam_exp', value: '' },
+      ]);
+
+      return res.json({ ok: true, csr: csrPem });
+    }
+
     // ── save_config ──────────────────────────────────────────────────
     if (action === 'save_config') {
       const allowed = ['afip_cuit', 'afip_razon_social', 'afip_domicilio', 'afip_condicion_iva',

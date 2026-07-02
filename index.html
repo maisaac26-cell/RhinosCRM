@@ -2308,19 +2308,53 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                   </label>
                 </div>
               </div>
+              <!-- PASO 1: Generar claves automáticamente -->
+              <div style="margin-top:12px;background:rgba(0,229,204,0.05);border:1px solid rgba(0,229,204,0.2);border-radius:8px;padding:12px">
+                <div style="font-size:12px;font-weight:700;color:var(--cyan);margin-bottom:6px">🔑 Paso 1 — Generá las claves desde acá</div>
+                <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.5">
+                  Generamos la <strong style="color:var(--text2)">clave privada</strong> y el <strong style="color:var(--text2)">CSR</strong> directamente en el servidor.<br>
+                  La clave queda guardada automáticamente. El CSR lo subís a ARCA para obtener el certificado.
+                </div>
+                <div style="font-size:11px;color:var(--amber);margin-bottom:10px">⚠ Necesitás guardar primero el CUIT y la Razón Social antes de generar.</div>
+                <button class="btn btn-sm" id="afip-gen-btn" onclick="generarClavesCRM()" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">
+                  ⚙ Generar clave privada + CSR automáticamente
+                </button>
+                <div id="afip-gen-result" style="display:none;margin-top:12px">
+                  <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:8px">✅ Clave privada generada y guardada en el CRM.</div>
+                  <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Ahora copiá este CSR y subilo a <strong>ARCA → Administrador de Certificados → Nueva DN</strong>:</div>
+                  <textarea id="afip-gen-csr" rows="5" readonly style="width:100%;box-sizing:border-box;font-size:9px;font-family:monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text2);padding:8px;resize:vertical"></textarea>
+                  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                    <button class="btn btn-sm" onclick="copiarCSR()" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3)">📋 Copiar CSR</button>
+                    <button class="btn btn-sm" onclick="descargarCSR()" style="color:var(--text2);border-color:var(--border2)">⬇ Descargar pedido.csr</button>
+                  </div>
+                  <div style="margin-top:10px;background:rgba(255,180,0,0.07);border:1px solid rgba(255,180,0,0.2);border-radius:6px;padding:10px">
+                    <div style="font-size:11px;font-weight:600;color:var(--amber);margin-bottom:4px">📋 Qué hacer ahora con el CSR:</div>
+                    <div style="font-size:11px;color:var(--text3);line-height:1.7">
+                      1. Hacé click en <strong style="color:var(--text2)">"Copiar CSR"</strong> arriba<br>
+                      2. Entrá a <strong style="color:var(--text2)">ARCA → Administrador de Certificados Digitales</strong><br>
+                      3. Click en <strong style="color:var(--text2)">"Nueva DN"</strong> → pegás el CSR → generás<br>
+                      4. ARCA te da el <strong style="color:var(--text2)">certificado (.crt)</strong> — lo descargás<br>
+                      5. Lo abrís con Bloc de notas y pegás el contenido abajo en "Certificado digital"
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Certificado (lo pega el usuario después de ARCA) -->
               <div style="margin-top:10px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-                  <label style="font-size:11px;color:var(--text3)">Certificado digital (.crt)</label>
+                  <label style="font-size:11px;color:var(--text3)">Certificado digital (.crt) — lo obtenés de ARCA</label>
                   <span id="afip-cert-status" style="font-size:10px;color:var(--muted)"></span>
                 </div>
                 <textarea id="afip-cert" class="inp" rows="3" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" style="width:100%;box-sizing:border-box;font-size:10px;font-family:monospace;resize:vertical"></textarea>
               </div>
-              <div style="margin-top:10px">
+              <!-- Clave privada (oculta, solo se muestra si no fue generada por el CRM) -->
+              <div style="margin-top:10px" id="afip-key-manual-row">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-                  <label style="font-size:11px;color:var(--text3)">Clave privada (.key)</label>
+                  <label style="font-size:11px;color:var(--text3)">Clave privada (.key) — solo si la generaste manualmente</label>
                   <span id="afip-key-status" style="font-size:10px;color:var(--muted)"></span>
                 </div>
-                <textarea id="afip-key" class="inp" rows="3" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----" style="width:100%;box-sizing:border-box;font-size:10px;font-family:monospace;resize:vertical"></textarea>
+                <textarea id="afip-key" class="inp" rows="2" placeholder="Dejá vacío si usaste el botón de arriba (ya está guardada). Pegá acá solo si la generaste con OpenSSL manualmente." style="width:100%;box-sizing:border-box;font-size:10px;font-family:monospace;resize:vertical"></textarea>
               </div>
               <div style="display:flex;gap:8px;margin-top:12px">
                 <button class="btn btn-sm" onclick="saveAfipConfig()" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3)">💾 Guardar config</button>
@@ -16889,9 +16923,84 @@ function updateAfipMetrics() {
   if (mm) mm.textContent = '$' + monto.toLocaleString('es-AR', { minimumFractionDigits: 2 });
 }
 
+// ── Generar clave privada + CSR desde el CRM ────────────────────────────────
+
+let _afipLastCSR = '';
+
+async function generarClavesCRM() {
+  const btn = document.getElementById('afip-gen-btn');
+  const res = document.getElementById('afip-gen-result');
+  const cuit = (document.getElementById('afip-cuit')?.value || '').trim().replace(/\D/g, '');
+  const razon = (document.getElementById('afip-razon')?.value || '').trim();
+
+  if (!cuit) { showToast('Ingresá y guardá el CUIT primero.'); return; }
+  if (!razon) { showToast('Ingresá la Razón Social primero.'); return; }
+
+  if (!confirm('¿Generar nuevas claves criptográficas?\n\nSi ya tenías una clave guardada en el CRM, será reemplazada y el certificado anterior dejará de funcionar.')) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando claves (puede tardar ~10 seg)...'; }
+  if (res) res.style.display = 'none';
+
+  try {
+    const r = await callAfipAPI('generar_csr', { cuit, razon_social: razon });
+    if (!r?.ok) throw new Error(r?.error || 'Error desconocido');
+
+    _afipLastCSR = r.csr;
+    const csrEl = document.getElementById('afip-gen-csr');
+    if (csrEl) csrEl.value = r.csr;
+    if (res) res.style.display = 'block';
+
+    // Update key status
+    const ks = document.getElementById('afip-key-status');
+    if (ks) { ks.textContent = '✅ generada por el CRM'; ks.style.color = 'var(--green)'; }
+
+    showToast('✅ Clave privada generada y guardada. Ahora subí el CSR a ARCA 🦏');
+    showCrossModuleAlert('Clave privada AFIP generada', [
+      'Clave RSA 2048-bit guardada en configuración del CRM',
+      'Siguiente paso: copiar el CSR y subirlo a ARCA → Administrador de Certificados',
+      'ARCA te dará el certificado .crt — pegalo en el campo de abajo',
+    ]);
+  } catch(e) {
+    showToast('Error: ' + e.message.slice(0, 80));
+    console.error('[afip generar_csr]', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚙ Generar clave privada + CSR automáticamente'; }
+  }
+}
+
+function copiarCSR() {
+  if (!_afipLastCSR) {
+    const el = document.getElementById('afip-gen-csr');
+    _afipLastCSR = el?.value || '';
+  }
+  if (!_afipLastCSR) { showToast('Generá las claves primero.'); return; }
+  navigator.clipboard.writeText(_afipLastCSR)
+    .then(() => showToast('✅ CSR copiado al portapapeles'))
+    .catch(() => {
+      // Fallback for older browsers
+      const el = document.getElementById('afip-gen-csr');
+      if (el) { el.select(); document.execCommand('copy'); showToast('✅ CSR copiado'); }
+    });
+}
+
+function descargarCSR() {
+  const csr = _afipLastCSR || document.getElementById('afip-gen-csr')?.value || '';
+  if (!csr) { showToast('Generá las claves primero.'); return; }
+  const cuit = (document.getElementById('afip-cuit')?.value || 'rhinoscrm').replace(/\D/g, '');
+  const blob = new Blob([csr], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pedido_${cuit}.csr`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('⬇ Descargando pedido.csr');
+}
+
 // ── Click en tab Facturas ────────────────────────────────────────────────────
 
 document.querySelector('.tab-btn[data-ftab="afip"]')?.addEventListener('click', async () => {
+  // Asegurar que _clients esté cargado antes de poblar el select
+  if (!getClients().length) await syncClientsSupabase();
   afipPopulateClienteSelect();
   afipRecalcMontos();
   if (!_afipCfgLoaded) await loadAfipConfig();
