@@ -98,7 +98,11 @@ function firmarCMS(traXml, certPem, keyPem) {
 function createTRA() {
   const now = new Date();
   const exp = new Date(now.getTime() + 10 * 60 * 1000);
-  const fmt = d => d.toISOString().replace(/\.\d+Z$/, '-03:00');
+  // Express as Argentina local time (UTC-3): subtract 3h from UTC, then append -03:00
+  const fmt = d => {
+    const ar = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+    return ar.toISOString().replace(/\.\d+Z$/, '-03:00');
+  };
   const uid = Math.floor(Math.random() * 2147483647);
   return `<?xml version="1.0" encoding="UTF-8"?>\n<loginTicketRequest version="1.0">\n  <header>\n    <uniqueId>${uid}</uniqueId>\n    <generationTime>${fmt(now)}</generationTime>\n    <expirationTime>${fmt(exp)}</expirationTime>\n  </header>\n  <service>wsfe</service>\n</loginTicketRequest>`;
 }
