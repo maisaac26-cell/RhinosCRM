@@ -1,5 +1,6 @@
 'use strict';
-const https = require('https');
+const https   = require('https');
+const crypto  = require('crypto');
 
 const SB_URL = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
@@ -8,6 +9,14 @@ const WSAA_HOMO = 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms';
 const WSAA_PROD = 'https://wsaa.afip.gov.ar/ws/services/LoginCms';
 const WSFE_HOMO = 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx';
 const WSFE_PROD = 'https://servicios1.afip.gov.ar/wsfev1/service.asmx';
+
+// AFIP usa claves DH pequeñas (legacy). Node >=17 las rechaza por defecto.
+// Este agente relaja solo las llamadas a AFIP, no las de Supabase.
+const AFIP_AGENT = new https.Agent({
+  minDHSize: 512,
+  ciphers: 'DEFAULT:@SECLEVEL=0',
+  secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
+});
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 
@@ -117,6 +126,7 @@ function soapCall(url, soapAction, body) {
       hostname: urlObj.hostname,
       path: urlObj.pathname + urlObj.search,
       method: 'POST',
+      agent: AFIP_AGENT,
       headers: {
         'Content-Type': 'text/xml;charset=UTF-8',
         'SOAPAction': soapAction || '""',
