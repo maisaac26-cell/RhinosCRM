@@ -1726,6 +1726,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-ftab="cashflow">💸 Cash Flow</button>
       <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').setAttribute('style','display:block');renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
       <button class="tab-btn" data-ftab="empleados">👥 Empleados</button>
+      <button class="tab-btn" data-ftab="afip">📄 Facturas</button>
     </div>
 
     <!-- RESUMEN -->
@@ -2237,6 +2238,244 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
 
     </div><!-- /ftab-empleados -->
+
+    <!-- FACTURAS AFIP TAB -->
+    <div class="ftab-content" id="ftab-afip" style="display:none">
+
+      <!-- Métricas -->
+      <div class="metrics-row" id="afip-metrics-row">
+        <div class="metric-card"><div class="m-label">Facturas emitidas</div><div class="m-val" id="afip-m-total">—</div><div class="m-sub">total histórico</div></div>
+        <div class="metric-card"><div class="m-label">Total facturado</div><div class="m-val green" id="afip-m-monto">—</div><div class="m-sub" id="afip-m-monto-sub">ARS</div></div>
+        <div class="metric-card"><div class="m-label">Último comprobante</div><div class="m-val" id="afip-m-ultimo" style="color:var(--cyan)">—</div><div class="m-sub" id="afip-m-ultimo-sub">pto. venta / tipo</div></div>
+        <div class="metric-card"><div class="m-label">Estado AFIP</div><div class="m-val" id="afip-m-estado" style="color:var(--amber)">⏳</div><div class="m-sub" id="afip-m-estado-sub">sin verificar</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+
+        <!-- COLUMNA IZQUIERDA: Config + Emitir -->
+        <div>
+
+          <!-- Config card -->
+          <div class="card" style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:4px" onclick="toggleAfipSection('afip-cfg-body','afip-cfg-arrow')">
+              <div style="font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)">⚙ Configuración AFIP</div>
+              <span id="afip-cfg-arrow" style="color:var(--muted);font-size:11px">▲</span>
+            </div>
+            <div id="afip-cfg-body">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">CUIT (sin guiones)</label>
+                  <input id="afip-cuit" class="inp" type="text" maxlength="11" placeholder="20123456789" style="width:100%;box-sizing:border-box">
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Razón Social</label>
+                  <input id="afip-razon" class="inp" type="text" placeholder="Mi Empresa S.A." style="width:100%;box-sizing:border-box">
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Domicilio fiscal</label>
+                  <input id="afip-domicilio" class="inp" type="text" placeholder="Av. Corrientes 1234" style="width:100%;box-sizing:border-box">
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Condición IVA</label>
+                  <select id="afip-condicion" class="inp" style="width:100%;box-sizing:border-box">
+                    <option value="RI">Responsable Inscripto</option>
+                    <option value="MO">Monotributista</option>
+                    <option value="CF">Consumidor Final</option>
+                    <option value="EX">Exento</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Punto de Venta</label>
+                  <input id="afip-pto-venta" class="inp" type="number" min="1" max="9999" value="1" style="width:100%;box-sizing:border-box">
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Tipo de comprobante</label>
+                  <select id="afip-tipo-cbte" class="inp" style="width:100%;box-sizing:border-box">
+                    <option value="1">Factura A</option>
+                    <option value="6" selected>Factura B</option>
+                    <option value="11">Factura C</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-top:10px">
+                <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Ambiente</label>
+                <div style="display:flex;gap:10px">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+                    <input type="radio" name="afip-ambiente" value="homologacion" checked> Homologación (prueba)
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+                    <input type="radio" name="afip-ambiente" value="produccion"> Producción
+                  </label>
+                </div>
+              </div>
+              <div style="margin-top:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                  <label style="font-size:11px;color:var(--text3)">Certificado digital (.crt)</label>
+                  <span id="afip-cert-status" style="font-size:10px;color:var(--muted)"></span>
+                </div>
+                <textarea id="afip-cert" class="inp" rows="3" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" style="width:100%;box-sizing:border-box;font-size:10px;font-family:monospace;resize:vertical"></textarea>
+              </div>
+              <div style="margin-top:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                  <label style="font-size:11px;color:var(--text3)">Clave privada (.key)</label>
+                  <span id="afip-key-status" style="font-size:10px;color:var(--muted)"></span>
+                </div>
+                <textarea id="afip-key" class="inp" rows="3" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----" style="width:100%;box-sizing:border-box;font-size:10px;font-family:monospace;resize:vertical"></textarea>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px">
+                <button class="btn btn-sm" onclick="saveAfipConfig()" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3)">💾 Guardar config</button>
+                <button class="btn btn-sm" id="afip-test-btn" onclick="testAfipAuth()" style="color:var(--text2);border-color:var(--border2)">🔌 Probar conexión AFIP</button>
+              </div>
+              <div id="afip-test-result" style="margin-top:8px;font-size:12px;display:none"></div>
+            </div>
+          </div>
+
+          <!-- Emitir factura card -->
+          <div class="card" id="afip-emit-card">
+            <div style="font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);margin-bottom:14px">📤 Emitir factura</div>
+            <div id="afip-emit-body">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div style="grid-column:span 2">
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Cliente</label>
+                  <select id="afip-emit-cliente" class="inp" style="width:100%;box-sizing:border-box" onchange="afipAutoFillCliente()">
+                    <option value="">— seleccionar cliente —</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Tipo doc. receptor</label>
+                  <select id="afip-emit-doctipo" class="inp" style="width:100%;box-sizing:border-box">
+                    <option value="80">CUIT</option>
+                    <option value="96">DNI</option>
+                    <option value="99">Consumidor Final</option>
+                    <option value="94">Pasaporte</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Nro. documento receptor</label>
+                  <input id="afip-emit-docnro" class="inp" type="text" placeholder="20123456789" style="width:100%;box-sizing:border-box">
+                </div>
+                <div style="grid-column:span 2">
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Descripción del servicio / producto</label>
+                  <input id="afip-emit-desc" class="inp" type="text" placeholder="Servicios de desarrollo web — Enero 2025" style="width:100%;box-sizing:border-box">
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Período desde</label>
+                  <input id="afip-emit-desde" class="inp" type="date" style="width:100%;box-sizing:border-box">
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Período hasta</label>
+                  <input id="afip-emit-hasta" class="inp" type="date" style="width:100%;box-sizing:border-box">
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Alícuota IVA</label>
+                  <select id="afip-emit-iva" class="inp" style="width:100%;box-sizing:border-box" onchange="afipRecalcMontos()">
+                    <option value="5">21%</option>
+                    <option value="4">10.5%</option>
+                    <option value="3">0% (exento)</option>
+                    <option value="6">27%</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Moneda</label>
+                  <select id="afip-emit-moneda" class="inp" style="width:100%;box-sizing:border-box">
+                    <option value="PES">Pesos (ARS)</option>
+                    <option value="DOL">Dólar</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px" id="afip-emit-neto-label">Importe neto (sin IVA)</label>
+                  <input id="afip-emit-neto" class="inp" type="number" step="0.01" min="0" placeholder="0.00" style="width:100%;box-sizing:border-box" oninput="afipRecalcMontos()">
+                </div>
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Importe IVA</label>
+                  <input id="afip-emit-iva-monto" class="inp" type="number" step="0.01" min="0" placeholder="0.00" style="width:100%;box-sizing:border-box;color:var(--text3)" readonly>
+                </div>
+                <div style="grid-column:span 2">
+                  <div style="background:rgba(0,229,204,0.07);border:1px solid rgba(0,229,204,0.2);border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center">
+                    <span style="font-size:12px;color:var(--text2)">Total a facturar</span>
+                    <span id="afip-emit-total-display" style="font-size:20px;font-weight:700;color:var(--cyan)">$0,00</span>
+                  </div>
+                </div>
+              </div>
+              <button class="btn" id="afip-emit-btn" onclick="emitirFacturaAfip()" style="width:100%;margin-top:14px;background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">
+                📤 Emitir factura → AFIP
+              </button>
+              <div id="afip-emit-result" style="margin-top:10px;display:none"></div>
+            </div>
+          </div>
+
+        </div><!-- /col left -->
+
+        <!-- COLUMNA DERECHA: Guía + Facturas -->
+        <div>
+
+          <!-- Guía paso a paso -->
+          <div class="card" style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:4px" onclick="toggleAfipSection('afip-guide-body','afip-guide-arrow')">
+              <div style="font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)">📋 Guía de configuración</div>
+              <span id="afip-guide-arrow" style="color:var(--muted);font-size:11px">▲</span>
+            </div>
+            <div id="afip-guide-body" style="margin-top:10px">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="border-left:3px solid var(--cyan);padding-left:12px">
+                  <div style="font-size:12px;font-weight:600;color:var(--cyan);margin-bottom:4px">Paso 1 — Certificado digital</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.6">
+                    Ingresá a <strong style="color:var(--text2)">afip.gob.ar → Clave Fiscal</strong> con tu CUIT.<br>
+                    Andá a <strong style="color:var(--text2)">Administrador de Relaciones de Clave Fiscal</strong>.<br>
+                    Creá un nuevo "Punto de Acceso" para el servicio <code style="background:var(--surface2);padding:1px 4px;border-radius:3px">wsfe</code>.<br>
+                    Descargá el <strong style="color:var(--text2)">.crt (certificado)</strong> y <strong style="color:var(--text2)">.key (clave privada)</strong>. Pegalos arriba.
+                  </div>
+                </div>
+                <div style="border-left:3px solid var(--amber);padding-left:12px">
+                  <div style="font-size:12px;font-weight:600;color:var(--amber);margin-bottom:4px">Paso 2 — Punto de venta</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.6">
+                    En AFIP andá a <strong style="color:var(--text2)">Mis Servicios → Comprobantes en línea</strong> o al servicio <code style="background:var(--surface2);padding:1px 4px;border-radius:3px">wsfev1</code>.<br>
+                    Creá un <strong style="color:var(--text2)">Punto de Venta</strong> de tipo <em>Sistema de Facturación de Emisores en Línea</em>.<br>
+                    Anotá el número (ej: 1) y configuralo arriba. <strong style="color:var(--text2)">Tiene que coincidir exactamente.</strong>
+                  </div>
+                </div>
+                <div style="border-left:3px solid #7c6dd8;padding-left:12px">
+                  <div style="font-size:12px;font-weight:600;color:#7c6dd8;margin-bottom:4px">Paso 3 — Homologar primero</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.6">
+                    Dejá el ambiente en <strong style="color:var(--text2)">Homologación</strong> para probar.<br>
+                    Presioná "Probar conexión AFIP" — si dice ✅ Token obtenido, todo está bien.<br>
+                    Podés emitir facturas de prueba sin efectos fiscales.<br>
+                    Cuando estés listo, cambiá a <strong style="color:var(--text2)">Producción</strong> y repetí la prueba.
+                  </div>
+                </div>
+                <div style="border-left:3px solid var(--green);padding-left:12px">
+                  <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px">Paso 4 — Tipo de comprobante</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.6">
+                    <strong style="color:var(--text2)">Factura A</strong> → para clientes Responsables Inscriptos. Discrimina IVA.<br>
+                    <strong style="color:var(--text2)">Factura B</strong> → para consumidores finales o monotributistas. IVA incluido.<br>
+                    <strong style="color:var(--text2)">Factura C</strong> → si vos sos Monotributista. Sin IVA.<br>
+                    El tipo se puede cambiar por factura individual al emitir.
+                  </div>
+                </div>
+                <div style="background:rgba(255,180,0,0.08);border:1px solid rgba(255,180,0,0.2);border-radius:8px;padding:10px">
+                  <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:4px">⚠ Importante sobre el certificado</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.5">El certificado AFIP tiene una vigencia limitada (generalmente 2 años). Cuando venza vas a tener que renovarlo desde AFIP y actualizar acá. Si la conexión falla, verificá la fecha de vencimiento del certificado.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Facturas emitidas -->
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <div style="font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)">📑 Facturas emitidas</div>
+              <button class="btn btn-sm" onclick="loadAfipFacturas()" style="font-size:10px;color:var(--text3);border-color:var(--border2)">↺ Actualizar</button>
+            </div>
+            <div id="afip-facturas-list">
+              <div class="empty" style="font-size:12px">Cargando...</div>
+            </div>
+          </div>
+
+        </div><!-- /col right -->
+
+      </div><!-- /grid -->
+
+    </div><!-- /ftab-afip -->
 
   </div>
 
@@ -16290,6 +16529,388 @@ function goToWebLead(leadId) {
     }, 600);
   }, 250);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// MÓDULO FACTURAS AFIP
+// ═══════════════════════════════════════════════════════════════
+
+let _afipFacturas = [];
+let _afipCfgLoaded = false;
+
+async function callAfipAPI(action, data = {}) {
+  const res = await fetch('/api/afip', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...data }),
+  });
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch(e) { throw new Error(text.slice(0, 200)); }
+}
+
+function toggleAfipSection(bodyId, arrowId) {
+  const body = document.getElementById(bodyId);
+  const arrow = document.getElementById(arrowId);
+  if (!body) return;
+  const visible = body.style.display !== 'none';
+  body.style.display = visible ? 'none' : '';
+  if (arrow) arrow.textContent = visible ? '▼' : '▲';
+}
+
+// ── Cargar configuración ─────────────────────────────────────────────────────
+
+async function loadAfipConfig() {
+  try {
+    const r = await callAfipAPI('get_config');
+    if (!r?.ok) return;
+    const c = r.config;
+    const v = id => document.getElementById(id);
+    if (v('afip-cuit')) v('afip-cuit').value = c.afip_cuit || '';
+    if (v('afip-razon')) v('afip-razon').value = c.afip_razon_social || '';
+    if (v('afip-domicilio')) v('afip-domicilio').value = c.afip_domicilio || '';
+    if (v('afip-condicion')) v('afip-condicion').value = c.afip_condicion_iva || 'RI';
+    if (v('afip-pto-venta')) v('afip-pto-venta').value = c.afip_punto_venta || '1';
+    if (v('afip-tipo-cbte')) v('afip-tipo-cbte').value = c.afip_tipo_cbte || '6';
+    const amb = c.afip_ambiente || 'homologacion';
+    document.querySelectorAll('input[name="afip-ambiente"]').forEach(r => { r.checked = r.value === amb; });
+    // Show cert/key status
+    const cs = v('afip-cert-status');
+    const ks = v('afip-key-status');
+    if (cs) cs.textContent = c.has_cert ? '✅ cargado' : '— no cargado';
+    if (cs) cs.style.color = c.has_cert ? 'var(--green)' : 'var(--text3)';
+    if (ks) ks.textContent = c.has_key ? '✅ cargado' : '— no cargado';
+    if (ks) ks.style.color = c.has_key ? 'var(--green)' : 'var(--text3)';
+    // Estado metric
+    const me = document.getElementById('afip-m-estado');
+    const mes = document.getElementById('afip-m-estado-sub');
+    if (me && c.tam_valid) {
+      me.textContent = '✅'; me.style.color = 'var(--green)';
+      if (mes) mes.textContent = 'token vigente';
+    } else if (me) {
+      me.textContent = c.has_cert ? '⚡' : '⚙';
+      me.style.color = c.has_cert ? 'var(--amber)' : 'var(--muted)';
+      if (mes) mes.textContent = c.has_cert ? 'sin verificar' : 'configura primero';
+    }
+    _afipCfgLoaded = true;
+  } catch(e) {
+    console.error('[afip] loadConfig', e);
+  }
+}
+
+// ── Guardar configuración ────────────────────────────────────────────────────
+
+async function saveAfipConfig() {
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const payload = {
+    afip_cuit: g('afip-cuit').replace(/\D/g, ''),
+    afip_razon_social: g('afip-razon'),
+    afip_domicilio: g('afip-domicilio'),
+    afip_condicion_iva: g('afip-condicion'),
+    afip_punto_venta: g('afip-pto-venta'),
+    afip_tipo_cbte: g('afip-tipo-cbte'),
+    afip_ambiente: document.querySelector('input[name="afip-ambiente"]:checked')?.value || 'homologacion',
+  };
+  const cert = g('afip-cert');
+  const key = g('afip-key');
+  if (cert) payload.afip_cert = cert;
+  if (key) payload.afip_key = key;
+
+  if (!payload.afip_cuit) { showToast('Ingresá el CUIT antes de guardar.'); return; }
+
+  showToast('Guardando configuración AFIP...');
+  try {
+    const r = await callAfipAPI('save_config', payload);
+    if (r?.ok) {
+      showToast('✅ Configuración AFIP guardada 🦏');
+      // Clear textarea after save (stored in Supabase now)
+      if (cert) document.getElementById('afip-cert').value = '';
+      if (key) document.getElementById('afip-key').value = '';
+      await loadAfipConfig();
+    } else {
+      showToast('Error guardando: ' + (r?.error || 'desconocido'));
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message.slice(0, 80));
+  }
+}
+
+// ── Probar conexión ──────────────────────────────────────────────────────────
+
+async function testAfipAuth() {
+  const btn = document.getElementById('afip-test-btn');
+  const res = document.getElementById('afip-test-result');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Conectando...'; }
+  if (res) { res.style.display = 'none'; }
+
+  try {
+    const r = await callAfipAPI('test_auth');
+    const msg = r?.ok ? r.message : ('❌ ' + (r?.error || 'Error desconocido'));
+    const color = r?.ok ? 'var(--green)' : 'var(--red)';
+    if (res) {
+      res.style.display = 'block';
+      res.style.color = color;
+      res.textContent = msg;
+    }
+    showToast(msg.slice(0, 80));
+    if (r?.ok) {
+      const me = document.getElementById('afip-m-estado');
+      const mes = document.getElementById('afip-m-estado-sub');
+      if (me) { me.textContent = '✅'; me.style.color = 'var(--green)'; }
+      if (mes) mes.textContent = 'token vigente';
+    }
+  } catch(e) {
+    if (res) { res.style.display = 'block'; res.style.color = 'var(--red)'; res.textContent = '❌ ' + e.message; }
+    showToast('Error: ' + e.message.slice(0, 80));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔌 Probar conexión AFIP'; }
+  }
+}
+
+// ── Auto-fill cliente ────────────────────────────────────────────────────────
+
+function afipAutoFillCliente() {
+  const sel = document.getElementById('afip-emit-cliente');
+  const cid = sel?.value;
+  if (!cid) return;
+  const client = getClients().find(c => c.id === cid);
+  if (!client) return;
+  // If client has precio, pre-fill importe
+  const netoEl = document.getElementById('afip-emit-neto');
+  if (netoEl && client.precio) {
+    netoEl.value = parseFloat(client.precio) || 0;
+    afipRecalcMontos();
+  }
+  // Pre-fill description
+  const descEl = document.getElementById('afip-emit-desc');
+  if (descEl && !descEl.value) {
+    const mes = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    descEl.value = `Servicios — ${client.nombre || client.empresa || ''} — ${mes}`;
+  }
+}
+
+// ── Recalcular montos ────────────────────────────────────────────────────────
+
+function afipRecalcMontos() {
+  const tipoCbte = parseInt(document.getElementById('afip-tipo-cbte')?.value || '6', 10);
+  const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3;
+  const alicId = parseInt(document.getElementById('afip-emit-iva')?.value || '5', 10);
+  const ALIC = { 3: 0, 4: 0.105, 5: 0.21, 6: 0.27, 8: 0.05, 9: 0.025 };
+  const rate = ALIC[alicId] || 0;
+  const neto = parseFloat(document.getElementById('afip-emit-neto')?.value || 0);
+  const iva = esA ? neto * rate : 0;
+  const total = neto + iva;
+  const ivaMonto = document.getElementById('afip-emit-iva-monto');
+  const totalDisp = document.getElementById('afip-emit-total-display');
+  const netoLabel = document.getElementById('afip-emit-neto-label');
+  if (ivaMonto) ivaMonto.value = iva.toFixed(2);
+  if (totalDisp) totalDisp.textContent = '$' + total.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+  if (netoLabel) netoLabel.textContent = esA ? 'Importe neto (sin IVA)' : 'Importe total (IVA incluido)';
+}
+
+// ── Poblar select de clientes ─────────────────────────────────────────────────
+
+function afipPopulateClienteSelect() {
+  const sel = document.getElementById('afip-emit-cliente');
+  if (!sel) return;
+  const clients = getClients();
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— seleccionar cliente —</option>' +
+    clients.map(c => `<option value="${c.id}">${c.nombre || c.empresa || c.id}</option>`).join('');
+  if (current) sel.value = current;
+}
+
+// ── Emitir factura ───────────────────────────────────────────────────────────
+
+async function emitirFacturaAfip() {
+  const btn = document.getElementById('afip-emit-btn');
+  const res = document.getElementById('afip-emit-result');
+  const g = id => (document.getElementById(id)?.value || '').trim();
+
+  const clienteId = g('afip-emit-cliente');
+  const docTipo = parseInt(g('afip-emit-doctipo') || '80', 10);
+  const docNro = g('afip-emit-docnro');
+  const desc = g('afip-emit-desc');
+  const desde = g('afip-emit-desde');
+  const hasta = g('afip-emit-hasta');
+  const alicuotaId = parseInt(g('afip-emit-iva') || '5', 10);
+  const monedaId = g('afip-emit-moneda') || 'PES';
+  const netoVal = parseFloat(g('afip-emit-neto') || '0');
+
+  if (!desc) { showToast('Ingresá una descripción del servicio.'); return; }
+  if (netoVal <= 0) { showToast('El importe debe ser mayor a 0.'); return; }
+  if (docTipo !== 99 && !docNro) { showToast('Ingresá el número de documento del receptor.'); return; }
+
+  const tipoCbte = parseInt(document.getElementById('afip-tipo-cbte')?.value || '6', 10);
+  const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3;
+  const ALIC = { 3: 0, 4: 0.105, 5: 0.21, 6: 0.27, 8: 0.05, 9: 0.025 };
+  const rate = ALIC[alicuotaId] || 0;
+  const impNeto = netoVal;
+  const impIva = esA ? netoVal * rate : 0;
+  const impTotal = impNeto + impIva;
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  const clienteNombre = document.getElementById('afip-emit-cliente')?.selectedOptions[0]?.text || '';
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Emitiendo...'; }
+  if (res) { res.style.display = 'none'; }
+
+  try {
+    const r = await callAfipAPI('emitir', {
+      cliente_id: clienteId || null,
+      cliente_nombre: clienteNombre !== '— seleccionar cliente —' ? clienteNombre : '',
+      doc_tipo: docTipo,
+      doc_nro: docTipo === 99 ? '0' : docNro,
+      descripcion: desc,
+      periodo_desde: desde || hoy,
+      periodo_hasta: hasta || hoy,
+      fecha: hoy,
+      concepto: 2,
+      tipo_cbte: tipoCbte,
+      alicuota_id: alicuotaId,
+      imp_neto: impNeto,
+      imp_iva: impIva,
+      imp_total: impTotal,
+      moneda_id: monedaId,
+    });
+
+    if (r?.ok) {
+      const isHomo = r.ambiente !== 'produccion';
+      const msg = `${isHomo ? '🧪 [HOMOLOGACIÓN] ' : ''}✅ Factura emitida — CAE: ${r.cae} | Vto: ${r.caeFchVto} | Nro: ${r.numero}`;
+      if (res) {
+        res.style.display = 'block';
+        res.style.cssText = 'display:block;background:rgba(0,200,80,0.08);border:1px solid rgba(0,200,80,0.25);border-radius:8px;padding:12px;font-size:12px;color:var(--green)';
+        res.innerHTML = `<strong>${isHomo ? '🧪 Factura de PRUEBA (homologación)' : '✅ Factura emitida en PRODUCCIÓN'}</strong><br>
+          CAE: <code style="background:var(--surface2);padding:2px 6px;border-radius:3px">${r.cae}</code><br>
+          Vencimiento CAE: ${r.caeFchVto} &nbsp;|&nbsp; Nro: ${r.numero}`;
+      }
+      showToast(msg.slice(0, 100));
+      showCrossModuleAlert(
+        `Factura ${isHomo ? '[HOMO]' : ''} emitida — ${clienteNombre || docNro}`,
+        [
+          `CAE: ${r.cae}`,
+          `Importe total: $${impTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
+          `Nro. comprobante: ${r.numero} — Vto. CAE: ${r.caeFchVto}`,
+          isHomo ? 'Ambiente HOMOLOGACIÓN — no tiene validez fiscal' : '✅ Comprobante con validez fiscal real',
+        ]
+      );
+      // Refresh list and metrics
+      await loadAfipFacturas();
+      // Clear form
+      ['afip-emit-cliente','afip-emit-docnro','afip-emit-desc','afip-emit-desde','afip-emit-hasta','afip-emit-neto','afip-emit-iva-monto'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.tagName !== 'SELECT') el.value = '';
+      });
+      const td = document.getElementById('afip-emit-total-display');
+      if (td) td.textContent = '$0,00';
+    } else {
+      const errMsg = r?.error || 'Error desconocido';
+      if (res) {
+        res.style.display = 'block';
+        res.style.cssText = 'display:block;background:rgba(255,60,60,0.08);border:1px solid rgba(255,60,60,0.25);border-radius:8px;padding:12px;font-size:12px;color:var(--red)';
+        res.textContent = '❌ ' + errMsg;
+      }
+      showToast('Error AFIP: ' + errMsg.slice(0, 80));
+    }
+  } catch(e) {
+    if (res) {
+      res.style.display = 'block';
+      res.style.cssText = 'display:block;background:rgba(255,60,60,0.08);border:1px solid rgba(255,60,60,0.25);border-radius:8px;padding:12px;font-size:12px;color:var(--red)';
+      res.textContent = '❌ ' + e.message;
+    }
+    showToast('Error: ' + e.message.slice(0, 80));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Emitir factura → AFIP'; }
+  }
+}
+
+// ── Cargar y renderizar lista de facturas ────────────────────────────────────
+
+async function loadAfipFacturas() {
+  const el = document.getElementById('afip-facturas-list');
+  if (el) el.innerHTML = '<div class="empty" style="font-size:12px"><div class="loader"></div><br>Cargando facturas...</div>';
+  try {
+    const r = await callAfipAPI('list_facturas');
+    _afipFacturas = r?.facturas || [];
+    renderAfipFacturasList();
+    updateAfipMetrics();
+  } catch(e) {
+    if (el) el.innerHTML = '<div class="empty" style="font-size:12px;color:var(--red)">Error cargando facturas.</div>';
+  }
+}
+
+function renderAfipFacturasList() {
+  const el = document.getElementById('afip-facturas-list');
+  if (!el) return;
+  if (!_afipFacturas.length) {
+    el.innerHTML = '<div class="empty" style="font-size:12px">No hay facturas emitidas todavía.<br>Completá el formulario y presioná "Emitir factura".</div>';
+    return;
+  }
+  const TIPO_LABEL = { 1: 'Fac A', 2: 'ND A', 3: 'NC A', 6: 'Fac B', 7: 'ND B', 8: 'NC B', 11: 'Fac C', 12: 'ND C', 13: 'NC C' };
+  el.innerHTML = `<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead>
+        <tr style="color:var(--text3);border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:6px 4px;font-weight:500">Fecha</th>
+          <th style="text-align:left;padding:6px 4px;font-weight:500">Tipo</th>
+          <th style="text-align:left;padding:6px 4px;font-weight:500">Nro.</th>
+          <th style="text-align:left;padding:6px 4px;font-weight:500">Cliente</th>
+          <th style="text-align:right;padding:6px 4px;font-weight:500">Total</th>
+          <th style="text-align:left;padding:6px 4px;font-weight:500">CAE</th>
+          <th style="text-align:left;padding:6px 4px;font-weight:500">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${_afipFacturas.map(f => {
+          const isHomo = f.estado === 'homologacion';
+          const caeLast = f.cae ? f.cae.slice(-6) : '—';
+          const stColor = isHomo ? 'var(--amber)' : 'var(--green)';
+          const stLabel = isHomo ? '🧪 homo' : '✅ real';
+          return `<tr style="border-bottom:1px solid var(--border);cursor:default" title="CAE: ${f.cae || '—'} | Vto: ${f.cae_fch_vto || '—'}">
+            <td style="padding:7px 4px;color:var(--text2)">${f.fecha_cbte || '—'}</td>
+            <td style="padding:7px 4px;color:var(--cyan)">${TIPO_LABEL[f.tipo_cbte] || f.tipo_cbte}</td>
+            <td style="padding:7px 4px;color:var(--text3)">${String(f.punto_venta || 1).padStart(4,'0')}-${String(f.numero || 0).padStart(8,'0')}</td>
+            <td style="padding:7px 4px;color:var(--text2);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.cliente_nombre || f.cliente_cuit || '—'}</td>
+            <td style="padding:7px 4px;text-align:right;color:var(--text2)">$${(+f.imp_total||0).toLocaleString('es-AR',{minimumFractionDigits:2})}</td>
+            <td style="padding:7px 4px;color:var(--muted);font-family:monospace">${f.cae ? '…' + caeLast : '—'}</td>
+            <td style="padding:7px 4px"><span style="color:${stColor};font-size:10px">${stLabel}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function updateAfipMetrics() {
+  const total = _afipFacturas.length;
+  const monto = _afipFacturas.reduce((s, f) => s + (+f.imp_total || 0), 0);
+  const mt = document.getElementById('afip-m-total');
+  const mm = document.getElementById('afip-m-monto');
+  if (mt) mt.textContent = total;
+  if (mm) mm.textContent = '$' + monto.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+}
+
+// ── Click en tab Facturas ────────────────────────────────────────────────────
+
+document.querySelector('.tab-btn[data-ftab="afip"]')?.addEventListener('click', async () => {
+  afipPopulateClienteSelect();
+  afipRecalcMontos();
+  if (!_afipCfgLoaded) await loadAfipConfig();
+  await loadAfipFacturas();
+  // Set default period to current month
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+  const desdeEl = document.getElementById('afip-emit-desde');
+  const hastaEl = document.getElementById('afip-emit-hasta');
+  if (desdeEl && !desdeEl.value) desdeEl.value = `${y}-${m}-01`;
+  if (hastaEl && !hastaEl.value) hastaEl.value = `${y}-${m}-${String(lastDay).padStart(2,'0')}`;
+});
+
+// ── Listener tipo comprobante → recalcular ───────────────────────────────────
+
+document.getElementById('afip-tipo-cbte')?.addEventListener('change', afipRecalcMontos);
 </script>
 </body>
 </html>
