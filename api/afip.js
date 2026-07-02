@@ -118,20 +118,25 @@ function createTRA() {
 
 // ── SOAP helper ──────────────────────────────────────────────────────────────
 
-function soapCall(url, soapAction, body) {
+function soapCall(url, soapAction, body, soap12 = false) {
   const data = Buffer.from(body, 'utf8');
   const urlObj = new URL(url);
+  // WSAA uses SOAP 1.1 (text/xml + SOAPAction header)
+  // WSFE uses SOAP 1.2 (application/soap+xml, no SOAPAction header)
+  const headers = { 'Content-Length': data.length };
+  if (soap12) {
+    headers['Content-Type'] = 'application/soap+xml;charset=UTF-8';
+  } else {
+    headers['Content-Type'] = 'text/xml;charset=UTF-8';
+    headers['SOAPAction'] = soapAction || '""';
+  }
   return new Promise((resolve, reject) => {
     const req = https.request({
       hostname: urlObj.hostname,
       path: urlObj.pathname + urlObj.search,
       method: 'POST',
       agent: AFIP_AGENT,
-      headers: {
-        'Content-Type': 'text/xml;charset=UTF-8',
-        'SOAPAction': soapAction || '""',
-        'Content-Length': data.length,
-      },
+      headers,
     }, (r) => {
       let raw = '';
       r.on('data', c => raw += c);
@@ -240,7 +245,7 @@ async function wsfeUltimoCbte(cfg, token, sign, ptoVta, tipoCbte) {
     </FECompUltimoAutorizado>
   </soap12:Body>
 </soap12:Envelope>`;
-  const resp = await soapCall(wsfeUrl, '', body);
+  const resp = await soapCall(wsfeUrl, '', body, true);
   const num = xmlVal(resp.body, 'CbteNro');
   if (num === null) {
     const err = xmlVal(resp.body, 'ErrMsg') || xmlVal(resp.body, 'faultstring') || resp.body.slice(0, 200);
@@ -304,7 +309,7 @@ async function wsfeSolicitarCAE(cfg, token, sign, inv) {
   </soap12:Body>
 </soap12:Envelope>`;
 
-  const resp = await soapCall(wsfeUrl, '', body);
+  const resp = await soapCall(wsfeUrl, '', body, true);
   const resultado = xmlVal(resp.body, 'Resultado');
   const cae = xmlVal(resp.body, 'CAE');
   const caeFchVto = xmlVal(resp.body, 'CAEFchVto');
