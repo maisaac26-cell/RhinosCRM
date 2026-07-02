@@ -16625,6 +16625,8 @@ async function loadAfipConfig() {
       me.style.color = c.has_cert ? 'var(--amber)' : 'var(--muted)';
       if (mes) mes.textContent = c.has_cert ? 'sin verificar' : 'configura primero';
     }
+    // Cache config for PDF generation
+    _afipPdfCfg = c;
     _afipCfgLoaded = true;
   } catch(e) {
     console.error('[afip] loadConfig', e);
@@ -16891,6 +16893,7 @@ function renderAfipFacturasList() {
           <th style="text-align:right;padding:6px 4px;font-weight:500">Total</th>
           <th style="text-align:left;padding:6px 4px;font-weight:500">CAE</th>
           <th style="text-align:left;padding:6px 4px;font-weight:500">Estado</th>
+          <th style="padding:6px 4px;font-weight:500"></th>
         </tr>
       </thead>
       <tbody>
@@ -16907,6 +16910,9 @@ function renderAfipFacturasList() {
             <td style="padding:7px 4px;text-align:right;color:var(--text2)">$${(+f.imp_total||0).toLocaleString('es-AR',{minimumFractionDigits:2})}</td>
             <td style="padding:7px 4px;color:var(--muted);font-family:monospace">${f.cae ? '…' + caeLast : '—'}</td>
             <td style="padding:7px 4px"><span style="color:${stColor};font-size:10px">${stLabel}</span></td>
+            <td style="padding:7px 4px">
+              <button onclick="generarComprobantePDF(_afipFacturas.find(x=>x.id==='${f.id}'))" style="font-size:10px;padding:2px 7px;border:1px solid rgba(0,229,204,0.3);border-radius:4px;background:rgba(0,229,204,0.08);color:var(--cyan);cursor:pointer">📄</button>
+            </td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -16994,6 +17000,213 @@ function descargarCSR() {
   a.click();
   URL.revokeObjectURL(a.href);
   showToast('⬇ Descargando pedido.csr');
+}
+
+// ── Generar PDF comprobante AFIP ─────────────────────────────────────────────
+
+let _afipPdfCfg = {};
+
+function fmtCUIT(c) {
+  const s = String(c).replace(/\D/g, '');
+  if (s.length === 11) return `${s.slice(0,2)}-${s.slice(2,10)}-${s.slice(10)}`;
+  return s;
+}
+
+function fmtFecha(iso) {
+  if (!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+async function getLogoDataUrl() {
+  try {
+    const blob = await fetch('/icon-192.png').then(r => r.blob());
+    return await new Promise(res => {
+      const rd = new FileReader();
+      rd.onload = e => res(e.target.result);
+      rd.readAsDataURL(blob);
+    });
+  } catch(e) { return ''; }
+}
+
+async function generarComprobantePDF(factura) {
+  const TIPO_LETRA = { 1:'A', 2:'A', 3:'A', 6:'B', 7:'B', 8:'B', 11:'C', 12:'C', 13:'C' };
+  const TIPO_NOMBRE = { 1:'FACTURA', 2:'NOTA DE DÉBITO', 3:'NOTA DE CRÉDITO', 6:'FACTURA', 7:'NOTA DE DÉBITO', 8:'NOTA DE CRÉDITO', 11:'FACTURA', 12:'NOTA DE DÉBITO', 13:'NOTA DE CRÉDITO' };
+  const ALIC_LABEL = { 3:'0% (Exento)', 4:'10,5%', 5:'21%', 6:'27%', 8:'5%', 9:'2,5%' };
+
+  const cfg   = _afipPdfCfg;
+  const letra = TIPO_LETRA[factura.tipo_cbte] || 'B';
+  const tipo  = TIPO_NOMBRE[factura.tipo_cbte] || 'FACTURA';
+  const esA   = letra === 'A';
+  const ptoVta = String(factura.punto_venta || 1).padStart(4, '0');
+  const nro    = String(factura.numero || 0).padStart(8, '0');
+  const neto   = +factura.imp_neto || 0;
+  const iva    = +factura.imp_iva  || 0;
+  const total  = +factura.imp_total || 0;
+  const alicLabel = ALIC_LABEL[factura.alicuota_id] || '21%';
+  const isHomo = factura.estado === 'homologacion';
+
+  const logoUrl = await getLogoDataUrl();
+  const logoImg = logoUrl ? `<img src="${logoUrl}" style="width:52px;height:52px;border-radius:8px;object-fit:cover;margin-bottom:6px">` : '🦏';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; }
+  .page { padding: 24px; max-width: 780px; margin: 0 auto; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 5px 7px; }
+  .border { border: 1px solid #333; }
+  .bold { font-weight: bold; }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .mono { font-family: monospace; }
+  .homo-badge { background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:4px 10px;font-size:10px;border-radius:4px;margin-bottom:10px;text-align:center; }
+  .header-table td { vertical-align: top; }
+  .letra-box { border: 3px solid #333; width: 64px; height: 64px; font-size: 44px; font-weight: 900; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px; }
+  .items th { background: #f0f0f0; border: 1px solid #ccc; font-size: 10px; }
+  .items td { border: 1px solid #ccc; font-size: 11px; }
+  .totals td { padding: 4px 8px; }
+  .cae-box { border: 2px solid #333; padding: 10px; margin-top: 14px; }
+  .section-label { font-size: 9px; font-weight: bold; text-transform: uppercase; color: #666; letter-spacing: .05em; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  ${isHomo ? `<div class="homo-badge">⚠ COMPROBANTE DE HOMOLOGACIÓN — No tiene validez fiscal</div>` : ''}
+
+  <!-- HEADER -->
+  <table class="header-table" style="border:1px solid #333;margin-bottom:10px">
+    <tr>
+      <!-- Emisor -->
+      <td style="width:38%;border-right:1px solid #333;padding:12px">
+        ${logoImg}
+        <div class="bold" style="font-size:13px;margin-bottom:3px">${cfg.afip_razon_social || 'RHINOSAPP S.R.L.'}</div>
+        <div style="color:#444">${cfg.afip_domicilio || ''}</div>
+        <div style="margin-top:4px"><span class="section-label">Cond. IVA:</span> ${cfg.afip_condicion_iva === 'RI' ? 'Responsable Inscripto' : cfg.afip_condicion_iva || 'Responsable Inscripto'}</div>
+      </td>
+      <!-- Letra + tipo -->
+      <td style="width:24%;text-align:center;border-right:1px solid #333;padding:12px;vertical-align:middle">
+        <div class="letra-box">${letra}</div>
+        <div class="bold" style="font-size:12px;letter-spacing:.08em">${tipo}</div>
+        <div style="margin-top:6px;font-size:10px;color:#444">Pto. Venta: <span class="bold">${ptoVta}</span></div>
+        <div style="font-size:10px;color:#444">Nro.: <span class="bold mono">${nro}</span></div>
+      </td>
+      <!-- CUIT + Fecha -->
+      <td style="width:38%;padding:12px">
+        <div class="section-label">CUIT</div>
+        <div class="bold mono" style="font-size:13px;margin-bottom:6px">${fmtCUIT(cfg.afip_cuit || '')}</div>
+        <div class="section-label">Fecha de emisión</div>
+        <div class="bold" style="margin-bottom:6px">${fmtFecha(factura.fecha_cbte)}</div>
+        <div class="section-label">Ingresos Brutos</div>
+        <div style="margin-bottom:6px">${fmtCUIT(cfg.afip_cuit || '')} (CM)</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- RECEPTOR -->
+  <table style="border:1px solid #333;margin-bottom:10px">
+    <tr>
+      <td style="width:60%;border-right:1px solid #ccc;padding:10px">
+        <div class="section-label">Razón Social / Nombre receptor</div>
+        <div class="bold">${factura.cliente_nombre || '—'}</div>
+      </td>
+      <td style="width:40%;padding:10px">
+        <div class="section-label">CUIT / Documento receptor</div>
+        <div class="bold mono">${fmtCUIT(factura.cliente_cuit || '')}</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="border-right:1px solid #ccc;border-top:1px solid #ccc;padding:10px" colspan="1">
+        <div class="section-label">Período de facturación</div>
+        <div>${fmtFecha(factura.periodo_desde)} — ${fmtFecha(factura.periodo_hasta)}</div>
+      </td>
+      <td style="border-top:1px solid #ccc;padding:10px">
+        <div class="section-label">Condición de pago</div>
+        <div>Contado</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- ITEMS -->
+  <table class="items" style="margin-bottom:14px">
+    <thead>
+      <tr>
+        <th style="width:60%;text-align:left">Descripción</th>
+        ${esA ? `<th style="width:20%;text-align:right">Importe Neto</th><th style="width:20%;text-align:right">% IVA</th>` : `<th style="width:40%;text-align:right">Importe</th>`}
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${factura.descripcion || 'Servicios'}</td>
+        ${esA ? `<td class="right">$${neto.toLocaleString('es-AR',{minimumFractionDigits:2})}</td><td class="center">${alicLabel}</td>` : `<td class="right">$${total.toLocaleString('es-AR',{minimumFractionDigits:2})}</td>`}
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- TOTALES -->
+  <table class="totals" style="margin-left:auto;width:260px;margin-bottom:14px">
+    ${esA ? `
+    <tr><td>Subtotal Neto Gravado:</td><td class="right bold">$${neto.toLocaleString('es-AR',{minimumFractionDigits:2})}</td></tr>
+    <tr><td>IVA ${alicLabel}:</td><td class="right bold">$${iva.toLocaleString('es-AR',{minimumFractionDigits:2})}</td></tr>
+    <tr style="border-top:2px solid #333">
+      <td class="bold" style="font-size:13px">TOTAL:</td>
+      <td class="right bold" style="font-size:16px">$${total.toLocaleString('es-AR',{minimumFractionDigits:2})}</td>
+    </tr>` : `
+    <tr><td>Importe Total:</td><td class="right bold" style="font-size:16px">$${total.toLocaleString('es-AR',{minimumFractionDigits:2})}</td></tr>
+    <tr><td style="font-size:9px;color:#666">IVA incluido (${alicLabel})</td><td></td></tr>
+    `}
+    <tr><td style="font-size:10px;color:#555">Moneda: ${factura.moneda_id === 'PES' ? 'Pesos ARS' : factura.moneda_id}</td><td></td></tr>
+  </table>
+
+  <!-- CAE -->
+  <div class="cae-box">
+    <table style="width:100%">
+      <tr>
+        <td style="width:50%">
+          <div class="section-label">CAE</div>
+          <div class="mono bold" style="font-size:13px;letter-spacing:.04em">${factura.cae || '—'}</div>
+        </td>
+        <td style="width:50%">
+          <div class="section-label">Fecha de vencimiento del CAE</div>
+          <div class="bold">${fmtFecha(factura.cae_fch_vto)}</div>
+        </td>
+      </tr>
+    </table>
+    <div style="margin-top:8px;font-size:9px;color:#666;text-align:center">
+      Comprobante generado con RhinosCRM — ${isHomo ? 'HOMOLOGACIÓN (sin validez fiscal)' : 'Ambiente de producción AFIP/ARCA'}
+    </div>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  const opt = {
+    margin: 0,
+    filename: `factura_${ptoVta}-${nro}_${factura.fecha_cbte || ''}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  };
+
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:780px;background:white';
+  document.body.appendChild(container);
+
+  try {
+    showToast('📄 Generando PDF...');
+    await html2pdf().set(opt).from(container.querySelector('.page')).save();
+    showToast('✅ Comprobante descargado');
+  } finally {
+    document.body.removeChild(container);
+  }
 }
 
 // ── Click en tab Facturas ────────────────────────────────────────────────────
