@@ -6325,6 +6325,12 @@ async function openLead(lead) {
             notas: (lead.notes || '') + (lead.notes ? '\n' : '') + `[Convertido automáticamente desde Leads el ${new Date().toLocaleDateString('es-AR')}]`
           });
           showToast('✅ Lead convertido a cliente — aparece en Finanzas y Clientes 🦏');
+          showCrossModuleAlert(`Lead convertido a cliente — ${lead.name}`, [
+            'Nuevo cliente creado en Finanzas → Clientes & Cobros',
+            'Visible en módulo Clientes (barra lateral)',
+            `Precio configurado: ${fmtMoneda(+(lead.deal_value)||0, 'ARS')} — podés editarlo desde Clientes`,
+            'Hacé click en "↺ Generar cobros del mes" para crear el cobro de este período',
+          ]);
         } else {
           showToast(`Cliente ya existía en Finanzas: ${existing.nombre} 🦏`);
         }
@@ -6372,6 +6378,11 @@ async function openLead(lead) {
       this.disabled = false;
       this.textContent = '✅ Registrado';
       showToast('✅ Cliente registrado — aparece en Finanzas y Clientes 🦏');
+      showCrossModuleAlert(`Cliente registrado — ${lead.name}`, [
+        'Creado en Finanzas → Clientes & Cobros',
+        'Visible en módulo Clientes (barra lateral)',
+        'Hacé click en "↺ Generar cobros del mes" para crear el cobro del período actual',
+      ]);
       document.querySelector('.nav-btn[data-sec="finanzas"]').click();
       setTimeout(() => document.querySelector('.tab-btn[data-ftab="cobros"]')?.click(), 400);
     });
@@ -9109,6 +9120,56 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
 }
+
+// Muestra un cartel de auditoría cuando una acción impacta en otros módulos.
+// title: qué pasó · impacts: array de strings describiendo efectos colaterales
+function showCrossModuleAlert(title, impacts = []) {
+  // Apilar hasta 3 alertas activas
+  const existing = document.querySelectorAll('.cross-mod-alert');
+  if (existing.length >= 3) existing[0].remove();
+
+  const el = document.createElement('div');
+  el.className = 'cross-mod-alert';
+  el.style.cssText = [
+    'position:fixed;top:68px;right:16px;width:310px;z-index:8000',
+    'background:linear-gradient(135deg,#1a1f2e,#1e2436)',
+    'border:1px solid rgba(99,102,241,0.5)',
+    'border-radius:12px;padding:12px 14px',
+    'box-shadow:0 6px 28px rgba(0,0,0,0.5)',
+    'font-family:var(--font)',
+    'animation:slideInAlertRight 0.35s ease',
+    'transition:opacity 0.3s'
+  ].join(';');
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px">
+      <div style="font-size:11px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:0.08em">🔄 Impacto en otros módulos</div>
+      <button onclick="this.closest('.cross-mod-alert').remove()" style="background:none;border:none;color:#555;cursor:pointer;font-size:13px;padding:0;line-height:1;flex-shrink:0;margin-left:6px">✕</button>
+    </div>
+    <div style="font-size:12px;font-weight:600;color:#e0e0f0;margin-bottom:6px">${title}</div>
+    ${impacts.map(i => `<div style="font-size:11px;color:#94a3b8;line-height:1.5">→ ${i}</div>`).join('')}
+  `;
+
+  // Apilar visualmente bajo alertas anteriores
+  const prevAlerts = document.querySelectorAll('.cross-mod-alert');
+  let topOffset = 68;
+  prevAlerts.forEach(a => { topOffset += a.offsetHeight + 8; });
+  el.style.top = topOffset + 'px';
+
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 320); }, 7000);
+}
+
+// Keyframe para el slide
+(function() {
+  if (!document.getElementById('cross-alert-style')) {
+    const s = document.createElement('style');
+    s.id = 'cross-alert-style';
+    s.textContent = '@keyframes slideInAlertRight{from{transform:translateX(340px);opacity:0}to{transform:translateX(0);opacity:1}}';
+    document.head.appendChild(s);
+  }
+})();
+
 // ── MONEDA DE VISUALIZACIÓN GLOBAL ───────────────────
 let displayCurrency = 'ARS'; // 'ARS' o 'USD'
 
@@ -9494,6 +9555,8 @@ function renderClientes() {
       const cid = this.dataset.delCli;
       const cli = getClients().find(c => c.id === cid);
       if (!confirm(`¿Eliminar a ${cli?.nombre || 'este cliente'}? Se eliminarán también sus cobros.`)) return;
+      // Capturar count ANTES de borrar
+      const cobrosEliminados = getCobros().filter(c => c.clientId === cid).length;
       // DELETE directo en Supabase — saveClients solo hace upsert, nunca borra
       await sbFetch(`rhinos_clients?id=eq.${encodeURIComponent(cid)}`, 'DELETE').catch(e => showToast('Error: ' + e.message));
       // Eliminar cobros asociados
@@ -9505,6 +9568,11 @@ function renderClientes() {
       renderClientes();
       renderClientStats();
       showToast('Cliente eliminado 🦏');
+      showCrossModuleAlert(`Cliente eliminado — ${cli?.nombre || 'cliente'}`, [
+        cobrosEliminados ? `${cobrosEliminados} cobro${cobrosEliminados !== 1 ? 's' : ''} asociado${cobrosEliminados !== 1 ? 's' : ''} también eliminado${cobrosEliminados !== 1 ? 's' : ''}` : 'No tenía cobros registrados',
+        'Las transacciones de Finanzas ya generadas NO se eliminaron',
+        'El cliente ya no aparece en módulo Clientes ni en reportes',
+      ]);
     });
   });
   renderClientStats();
@@ -9726,6 +9794,11 @@ function renderCobrosPeriodo() {
       } catch(e) { console.warn('No se pudo registrar en Finanzas:', e.message); }
       renderCobrosPeriodo(); renderClientStats();
       showToast(`Pago de ${client?.nombre} registrado 🦏`);
+      showCrossModuleAlert(`Cobro recibido — ${client?.nombre || clientId}`, [
+        `Ingreso de ${fmtMoneda(monto, client?.moneda||'ARS')} registrado en Finanzas → Resumen`,
+        'Aparece en Finanzas → Transacciones como ingreso categoría "Ventas"',
+        'El estado del cobro cambió a ✓ Pagado en este período',
+      ]);
     });
   });
 
@@ -9858,6 +9931,12 @@ document.getElementById('btn-marcar-todos-pagados').addEventListener('click', as
   saveCobros(cobros);
   renderCobrosPeriodo(); renderClientStats();
   showToast('Todos los cobros marcados como pagados 🦏');
+  const totalPagado = clients.filter(c => isPaymentMonth(c, cobCurrentPeriod)).length;
+  showCrossModuleAlert(`Cobros del mes marcados como pagados`, [
+    `${totalPagado} ingreso${totalPagado !== 1 ? 's' : ''} registrado${totalPagado !== 1 ? 's' : ''} en Finanzas → Transacciones`,
+    'El Resumen financiero fue actualizado con los nuevos ingresos',
+    'Los cobros aparecen como ✓ Pagado en Clientes & Cobros',
+  ]);
 });
 
 document.getElementById('btn-enviar-recordatorio-todos').addEventListener('click', () => {
@@ -10359,13 +10438,17 @@ function renderSueldosPeriodo() {
         <div style="font-size:12px;color:var(--text3)">${salFmt} · sueldo ${_sueldosPeriod}</div>
       </div>
       ${isPagado
-        ? `<div style="text-align:right">
-             <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3)">✓ Pagado</span>
-             ${fechaPagoFmt ? `<div style="font-size:10px;color:var(--text3);margin-top:3px">${fechaPagoFmt}</div>` : ''}
+        ? `<div style="display:flex;align-items:center;gap:6px">
+             <div style="text-align:right">
+               <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3)">✓ Pagado</span>
+               ${fechaPagoFmt ? `<div style="font-size:10px;color:var(--text3);margin-top:3px">${fechaPagoFmt}</div>` : ''}
+             </div>
+             <button class="btn btn-sm" data-sued-del="${s.id}" title="Eliminar este pago" style="color:var(--red);border-color:rgba(239,68,68,0.3);padding:3px 7px;font-size:11px">✕</button>
            </div>`
         : `<div style="display:flex;gap:6px;flex-shrink:0">
              <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.3);align-self:center">⏳ Pendiente</span>
              <button class="btn btn-sm btn-green" data-sued-pagar="${s.id}" style="font-size:12px;padding:4px 12px">Pagar</button>
+             <button class="btn btn-sm" data-sued-del="${s.id}" title="Eliminar este sueldo" style="color:var(--red);border-color:rgba(239,68,68,0.3);padding:3px 7px;font-size:11px">✕</button>
            </div>`
       }
     </div>`;
@@ -10373,6 +10456,9 @@ function renderSueldosPeriodo() {
 
   list.querySelectorAll('[data-sued-pagar]').forEach(btn => {
     btn.addEventListener('click', () => pagarSueldo(btn.dataset.suedPagar));
+  });
+  list.querySelectorAll('[data-sued-del]').forEach(btn => {
+    btn.addEventListener('click', () => eliminarSueldo(btn.dataset.suedDel));
   });
 }
 
@@ -10395,8 +10481,16 @@ async function generarSueldosMes() {
     creados++;
   }
 
-  if (creados === 0) showToast('Ya existen registros para todos los empleados este mes');
-  else showToast(`↻ ${creados} sueldo${creados !== 1 ? 's' : ''} generado${creados !== 1 ? 's' : ''} como pendiente 🦏`);
+  if (creados === 0) {
+    showToast('Ya existen registros para todos los empleados este mes');
+  } else {
+    showToast(`↻ ${creados} sueldo${creados !== 1 ? 's' : ''} generado${creados !== 1 ? 's' : ''} como pendiente 🦏`);
+    showCrossModuleAlert(`${creados} sueldo${creados !== 1 ? 's' : ''} generado${creados !== 1 ? 's' : ''} para ${_sueldosPeriod}`, [
+      'Aparecen como ⏳ Pendiente en Empleados → Nómina del mes',
+      'Hacé click en "Pagar" para registrar cada pago y generar el gasto en Finanzas',
+      'Los sueldos pendientes también aparecen en el Dashboard como alerta',
+    ]);
+  }
   renderSueldosPeriodo();
 }
 
@@ -10433,6 +10527,32 @@ async function pagarSueldo(sueldoId) {
   renderResumen();
   renderTransacciones();
   showToast(`✅ Sueldo de ${s.empleado_nombre} registrado como pagado 🦏`);
+  showCrossModuleAlert(`Sueldo pagado — ${s.empleado_nombre}`, [
+    `Gasto de ${s.moneda === 'USD' ? 'USD ' + s.monto : '$ ' + fmtNum(+s.monto) + ' ARS'} registrado en Finanzas → Resumen`,
+    'Aparece en Finanzas → Transacciones como gasto categoría "Sueldos"',
+    'El balance del mes fue actualizado automáticamente',
+  ]);
+}
+
+async function eliminarSueldo(sueldoId) {
+  const s = _sueldos.find(x => x.id === sueldoId);
+  if (!s) return;
+  const isPagado = s.status === 'pagado';
+  const montoFmt = s.moneda === 'USD' ? `USD ${s.monto}` : `$ ${fmtNum(+s.monto)} ARS`;
+  const msg = isPagado
+    ? `¿Eliminar el registro de pago de ${s.empleado_nombre} (${montoFmt})?\n\nNota: la transacción ya creada en Finanzas NO se elimina automáticamente. Si querés revertirla, eliminala manualmente desde Finanzas → Transacciones.`
+    : `¿Eliminar el sueldo pendiente de ${s.empleado_nombre} (${montoFmt}) para ${s.periodo}?`;
+  if (!confirm(msg)) return;
+  await sbFetch(`rhinos_sueldos?id=eq.${encodeURIComponent(sueldoId)}`, 'DELETE').catch(e => showToast('Error: ' + e.message));
+  _sueldos = _sueldos.filter(x => x.id !== sueldoId);
+  renderSueldosPeriodo();
+  showToast(`Sueldo de ${s.empleado_nombre} eliminado 🦏`);
+  if (isPagado) {
+    showCrossModuleAlert(`Sueldo de ${s.empleado_nombre} eliminado`, [
+      'El registro de nómina fue eliminado de Empleados',
+      'La transacción de Finanzas sigue existiendo — eliminala manualmente si necesitás revertir el gasto',
+    ]);
+  }
 }
 
 // Navegación de período
