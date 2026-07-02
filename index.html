@@ -2389,6 +2389,18 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                   <input id="afip-emit-docnro" class="inp" type="text" placeholder="20123456789" style="width:100%;box-sizing:border-box">
                 </div>
                 <div style="grid-column:span 2">
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Condición IVA del receptor</label>
+                  <select id="afip-emit-cond-iva" class="inp" style="width:100%;box-sizing:border-box">
+                    <option value="1">IVA Responsable Inscripto</option>
+                    <option value="5">Consumidor Final</option>
+                    <option value="6">Responsable Monotributo</option>
+                    <option value="4">IVA Sujeto Exento</option>
+                    <option value="3">IVA no Responsable</option>
+                    <option value="7">Sujeto no Categorizado</option>
+                    <option value="9">Cliente del Exterior</option>
+                  </select>
+                </div>
+                <div style="grid-column:span 2">
                   <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Descripción del servicio / producto</label>
                   <input id="afip-emit-desc" class="inp" type="text" placeholder="Servicios de desarrollo web — Enero 2025" style="width:100%;box-sizing:border-box">
                 </div>
@@ -16797,6 +16809,7 @@ async function emitirFacturaAfip() {
   const hasta = g('afip-emit-hasta');
   const alicuotaId = parseInt(g('afip-emit-iva') || '5', 10);
   const monedaId = g('afip-emit-moneda') || 'PES';
+  const condicionIvaReceptor = parseInt(g('afip-emit-cond-iva') || '1', 10);
   if (!desc) { showToast('Ingresá una descripción del servicio.'); return; }
   if (!(parseFloat(g('afip-emit-total-input') || '0') > 0)) { showToast('El importe debe ser mayor a 0.'); return; }
   if (docTipo !== 99 && !docNro) { showToast('Ingresá el número de documento del receptor.'); return; }
@@ -16839,6 +16852,7 @@ async function emitirFacturaAfip() {
       imp_iva: impIva,
       imp_total: impTotal,
       moneda_id: monedaId,
+      condicion_iva_receptor: condicionIvaReceptor,
     });
 
     if (r?.ok) {

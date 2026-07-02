@@ -301,6 +301,7 @@ async function wsfeSolicitarCAE(cfg, token, sign, inv) {
             ${servicioBlock}
             <MonId>${inv.monedaId}</MonId>
             <MonCotiz>${inv.monedaId === 'PES' ? 1 : inv.monCotiz || 1}</MonCotiz>
+            <CondicionIvaReceptor>${inv.condicionIvaReceptor || 1}</CondicionIvaReceptor>
             ${ivaBlock}
           </FECAEDetRequest>
         </FeDetReq>
@@ -482,6 +483,7 @@ module.exports = async function handler(req, res) {
       const periodoDesde = fmtAfip(body.periodo_desde || body.fecha || new Date().toISOString().slice(0, 10));
       const periodoHasta = fmtAfip(body.periodo_hasta || body.fecha || new Date().toISOString().slice(0, 10));
       const monCotiz = parseFloat(body.mon_cotiz || '1');
+      const condicionIvaReceptor = parseInt(body.condicion_iva_receptor || '1', 10);
 
       // Amounts
       const impTotal = parseFloat(body.imp_total || 0);
@@ -505,6 +507,7 @@ module.exports = async function handler(req, res) {
         ptoVta, tipoCbte, concepto, docTipo, docNro,
         impNeto, impIva, impTotal, alicuotaId,
         monedaId, monCotiz, fecha, periodoDesde, periodoHasta, numero,
+        condicionIvaReceptor,
       });
 
       // Save to rhinos_facturas
