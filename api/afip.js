@@ -159,6 +159,30 @@ function xmlVal(xml, tag) {
     .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
 }
 
+// Extract actual error messages (Err blocks), ignoring Obs (observations)
+function extractAfipError(xml) {
+  // Item-level errors: <Errores><Err><Msg>...</Msg></Err></Errores>
+  const erroresM = xml.match(/<Errores>([\s\S]*?)<\/Errores>/i);
+  if (erroresM) {
+    const msgs = [];
+    const re = /<Err[^>]*>([\s\S]*?)<\/Err>/gi;
+    let m;
+    while ((m = re.exec(erroresM[1])) !== null) {
+      const msg = m[1].match(/<Msg[^>]*>([\s\S]*?)<\/Msg>/i);
+      if (msg) msgs.push(msg[1].trim().replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&'));
+    }
+    if (msgs.length) return msgs.join(' | ');
+  }
+  // Header-level errors: <Errors><Err>...</Err></Errors>
+  const errorsM = xml.match(/<Errors>([\s\S]*?)<\/Errors>/i);
+  if (errorsM) {
+    const msg = errorsM[1].match(/<Msg[^>]*>([\s\S]*?)<\/Msg>/i);
+    if (msg) return msg[1].trim().replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+  }
+  // Fallback: first Msg tag (might be an Obs)
+  return xmlVal(xml, 'Msg') || xmlVal(xml, 'ErrMsg') || xmlVal(xml, 'faultstring') || xml.slice(0, 500);
+}
+
 // ── WSAA auth ────────────────────────────────────────────────────────────────
 
 async function wsaaLogin(certPem, keyPem, ambiente) {
@@ -292,13 +316,13 @@ async function wsfeSolicitarCAE(cfg, token, sign, inv) {
             <CbteDesde>${inv.numero}</CbteDesde>
             <CbteHasta>${inv.numero}</CbteHasta>
             <CbteFch>${inv.fecha}</CbteFch>
+            ${servicioBlock}
             <ImpTotal>${inv.impTotal.toFixed(2)}</ImpTotal>
             <ImpTotConc>0.00</ImpTotConc>
             <ImpNeto>${inv.impNeto.toFixed(2)}</ImpNeto>
             <ImpOpEx>0.00</ImpOpEx>
             <ImpIVA>${inv.impIva.toFixed(2)}</ImpIVA>
             <ImpTrib>0.00</ImpTrib>
-            ${servicioBlock}
             <MonId>${inv.monedaId}</MonId>
             <MonCotiz>${inv.monedaId === 'PES' ? 1 : inv.monCotiz || 1}</MonCotiz>
             <CondicionIvaReceptor>${inv.condicionIvaReceptor || 1}</CondicionIvaReceptor>
@@ -316,7 +340,8 @@ async function wsfeSolicitarCAE(cfg, token, sign, inv) {
   const caeFchVto = xmlVal(resp.body, 'CAEFchVto');
 
   if (resultado !== 'A' || !cae) {
-    const obs = xmlVal(resp.body, 'Msg') || xmlVal(resp.body, 'ErrMsg') || xmlVal(resp.body, 'faultstring') || resp.body.slice(0, 400);
+    console.error('[afip wsfe raw]', resp.body.slice(0, 2000));
+    const obs = extractAfipError(resp.body);
     throw new Error('AFIP rechazó la factura: ' + obs);
   }
   return { cae, caeFchVto };
