@@ -2416,18 +2416,26 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                     <option value="DOL">Dólar</option>
                   </select>
                 </div>
-                <div>
-                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px" id="afip-emit-neto-label">Importe neto (sin IVA)</label>
-                  <input id="afip-emit-neto" class="inp" type="number" step="0.01" min="0" placeholder="0.00" style="width:100%;box-sizing:border-box" oninput="afipRecalcMontos()">
-                </div>
-                <div>
-                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Importe IVA</label>
-                  <input id="afip-emit-iva-monto" class="inp" type="number" step="0.01" min="0" placeholder="0.00" style="width:100%;box-sizing:border-box;color:var(--text3)" readonly>
+                <div style="grid-column:span 2">
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Importe total <span id="afip-emit-iva-hint" style="color:var(--cyan)">(con IVA incluido)</span></label>
+                  <input id="afip-emit-total-input" class="inp" type="number" step="0.01" min="0" placeholder="0.00" style="width:100%;box-sizing:border-box;font-size:16px" oninput="afipRecalcMontos()">
                 </div>
                 <div style="grid-column:span 2">
-                  <div style="background:rgba(0,229,204,0.07);border:1px solid rgba(0,229,204,0.2);border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center">
-                    <span style="font-size:12px;color:var(--text2)">Total a facturar</span>
-                    <span id="afip-emit-total-display" style="font-size:20px;font-weight:700;color:var(--cyan)">$0,00</span>
+                  <div style="background:rgba(0,229,204,0.07);border:1px solid rgba(0,229,204,0.2);border-radius:8px;padding:10px 14px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                      <span style="font-size:12px;color:var(--text2)">Total a facturar</span>
+                      <span id="afip-emit-total-display" style="font-size:20px;font-weight:700;color:var(--cyan)">$0,00</span>
+                    </div>
+                    <div id="afip-emit-desglose" style="display:none;border-top:1px solid rgba(0,229,204,0.15);padding-top:6px;margin-top:2px">
+                      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:2px">
+                        <span>Neto gravado (sin IVA):</span>
+                        <span id="afip-emit-neto-calc" style="color:var(--text2)">$0,00</span>
+                      </div>
+                      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)">
+                        <span id="afip-emit-iva-label-desglose">IVA 21%:</span>
+                        <span id="afip-emit-iva-calc" style="color:var(--text2)">$0,00</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -16710,10 +16718,10 @@ function afipAutoFillCliente() {
   if (!cid) return;
   const client = getClients().find(c => c.id === cid);
   if (!client) return;
-  // If client has precio, pre-fill importe
-  const netoEl = document.getElementById('afip-emit-neto');
-  if (netoEl && client.precio) {
-    netoEl.value = parseFloat(client.precio) || 0;
+  // Pre-fill total with client precio (assumed to be total con IVA)
+  const totalEl = document.getElementById('afip-emit-total-input');
+  if (totalEl && client.precio) {
+    totalEl.value = parseFloat(client.precio) || 0;
     afipRecalcMontos();
   }
   // Pre-fill description
@@ -16731,16 +16739,35 @@ function afipRecalcMontos() {
   const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3;
   const alicId = parseInt(document.getElementById('afip-emit-iva')?.value || '5', 10);
   const ALIC = { 3: 0, 4: 0.105, 5: 0.21, 6: 0.27, 8: 0.05, 9: 0.025 };
+  const ALIC_LABEL = { 3: '0% (Exento)', 4: '10,5%', 5: '21%', 6: '27%', 8: '5%', 9: '2,5%' };
   const rate = ALIC[alicId] || 0;
-  const neto = parseFloat(document.getElementById('afip-emit-neto')?.value || 0);
-  const iva = esA ? neto * rate : 0;
-  const total = neto + iva;
-  const ivaMonto = document.getElementById('afip-emit-iva-monto');
-  const totalDisp = document.getElementById('afip-emit-total-display');
-  const netoLabel = document.getElementById('afip-emit-neto-label');
-  if (ivaMonto) ivaMonto.value = iva.toFixed(2);
-  if (totalDisp) totalDisp.textContent = '$' + total.toLocaleString('es-AR', { minimumFractionDigits: 2 });
-  if (netoLabel) netoLabel.textContent = esA ? 'Importe neto (sin IVA)' : 'Importe total (IVA incluido)';
+
+  const impTotal = parseFloat(document.getElementById('afip-emit-total-input')?.value || 0);
+  let impNeto, impIva;
+  if (esA && rate > 0) {
+    // Desglosar IVA desde el total ingresado
+    impNeto = impTotal / (1 + rate);
+    impIva  = impTotal - impNeto;
+  } else {
+    impNeto = impTotal;
+    impIva  = 0;
+  }
+
+  const totalDisp  = document.getElementById('afip-emit-total-display');
+  const desglose   = document.getElementById('afip-emit-desglose');
+  const netoCalc   = document.getElementById('afip-emit-neto-calc');
+  const ivaCalc    = document.getElementById('afip-emit-iva-calc');
+  const ivaLbl     = document.getElementById('afip-emit-iva-label-desglose');
+  const ivaHint    = document.getElementById('afip-emit-iva-hint');
+
+  if (totalDisp) totalDisp.textContent = '$' + impTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+  if (ivaHint)   ivaHint.textContent   = esA && rate > 0 ? '(IVA incluido — se desglosa abajo)' : '(IVA incluido)';
+
+  // Mostrar desglose solo para Factura A con IVA > 0
+  if (desglose) desglose.style.display = (esA && rate > 0 && impTotal > 0) ? 'block' : 'none';
+  if (netoCalc)  netoCalc.textContent  = '$' + impNeto.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+  if (ivaCalc)   ivaCalc.textContent   = '$' + impIva.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+  if (ivaLbl)    ivaLbl.textContent    = 'IVA ' + (ALIC_LABEL[alicId] || '21%') + ':';
 }
 
 // ── Poblar select de clientes ─────────────────────────────────────────────────
@@ -16770,19 +16797,24 @@ async function emitirFacturaAfip() {
   const hasta = g('afip-emit-hasta');
   const alicuotaId = parseInt(g('afip-emit-iva') || '5', 10);
   const monedaId = g('afip-emit-moneda') || 'PES';
-  const netoVal = parseFloat(g('afip-emit-neto') || '0');
-
   if (!desc) { showToast('Ingresá una descripción del servicio.'); return; }
-  if (netoVal <= 0) { showToast('El importe debe ser mayor a 0.'); return; }
+  if (!(parseFloat(g('afip-emit-total-input') || '0') > 0)) { showToast('El importe debe ser mayor a 0.'); return; }
   if (docTipo !== 99 && !docNro) { showToast('Ingresá el número de documento del receptor.'); return; }
 
   const tipoCbte = parseInt(document.getElementById('afip-tipo-cbte')?.value || '6', 10);
   const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3;
   const ALIC = { 3: 0, 4: 0.105, 5: 0.21, 6: 0.27, 8: 0.05, 9: 0.025 };
   const rate = ALIC[alicuotaId] || 0;
-  const impNeto = netoVal;
-  const impIva = esA ? netoVal * rate : 0;
-  const impTotal = impNeto + impIva;
+  // El usuario ingresa el total con IVA; calculamos neto e IVA desde ese total
+  const impTotal = parseFloat(g('afip-emit-total-input') || '0');
+  let impNeto, impIva;
+  if (esA && rate > 0) {
+    impNeto = impTotal / (1 + rate);
+    impIva  = impTotal - impNeto;
+  } else {
+    impNeto = impTotal;
+    impIva  = 0;
+  }
 
   const hoy = new Date().toISOString().slice(0, 10);
   const clienteNombre = document.getElementById('afip-emit-cliente')?.selectedOptions[0]?.text || '';
@@ -16832,12 +16864,14 @@ async function emitirFacturaAfip() {
       // Refresh list and metrics
       await loadAfipFacturas();
       // Clear form
-      ['afip-emit-cliente','afip-emit-docnro','afip-emit-desc','afip-emit-desde','afip-emit-hasta','afip-emit-neto','afip-emit-iva-monto'].forEach(id => {
+      ['afip-emit-cliente','afip-emit-docnro','afip-emit-desc','afip-emit-desde','afip-emit-hasta','afip-emit-total-input'].forEach(id => {
         const el = document.getElementById(id);
         if (el && el.tagName !== 'SELECT') el.value = '';
       });
       const td = document.getElementById('afip-emit-total-display');
       if (td) td.textContent = '$0,00';
+      const dsg = document.getElementById('afip-emit-desglose');
+      if (dsg) dsg.style.display = 'none';
     } else {
       const errMsg = r?.error || 'Error desconocido';
       if (res) {
