@@ -2969,7 +2969,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <span>Descripción</span><span>Precio ARS/mes</span><span></span>
           </div>
           <div id="precios-rows"></div>
-          <button class="btn btn-sm" id="btn-add-tier" style="margin-top:8px">+ Agregar fila</button>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-sm" id="btn-add-tier">+ Agregar fila</button>
+            <button class="btn btn-sm" id="btn-pres-sync-web" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)" title="Carga los precios actuales de la calculadora de la landing">🌐 Desde web</button>
+          </div>
         </div>
         <button class="btn btn-full" id="btn-preview-pres" style="background:rgba(99,102,241,0.2);color:#818cf8;border-color:rgba(99,102,241,0.4);font-weight:600;padding:12px;font-size:14px">👁 Generar vista previa</button>
       </div>
@@ -8997,12 +9000,31 @@ let presupuestoTiers = DEFAULT_TIERS.map(t => ({...t}));
 function saveTiers() {
   sbUpsert('rhinos_pres_tiers', [{ id: 'default', data: presupuestoTiers }]);
 }
+// Carga precios desde la calculadora de la web y los aplica al presupuesto
+async function presLoadFromWeb(notify = true) {
+  try {
+    const { siteContent } = await callWcAPI('wc_get_site_content');
+    const plans = siteContent?.calculatorPlans || [];
+    if (!plans.length) { if (notify) showToast('La web no tiene precios configurados aún'); return; }
+    presupuestoTiers = plans.map(p => ({ desc: p.label, price: p.price }));
+    saveTiers();
+    renderTiersTable();
+    if (notify) showToast('Precios sincronizados desde la web 🌐');
+  } catch(e) {
+    console.warn('[sync] pres_from_web:', e.message);
+    if (notify) showToast('Error: ' + e.message);
+  }
+}
+
 async function loadTiersFromSupabase() {
   try {
     const rows = await sbFetch('rhinos_pres_tiers?id=eq.default');
     if (Array.isArray(rows) && rows.length && Array.isArray(rows[0].data) && rows[0].data.length) {
       presupuestoTiers = rows[0].data;
       renderTiersTable();
+    } else {
+      // Sin datos en Supabase → cargar desde la web como defaults
+      await presLoadFromWeb(false);
     }
   } catch(e) { console.warn('[sync] pres_tiers:', e.message); }
 }
@@ -9036,6 +9058,8 @@ document.getElementById('btn-add-tier').addEventListener('click', () => {
   presupuestoTiers.push({ desc: 'Nueva fila', price: 0 });
   saveTiers(); renderTiersTable();
 });
+
+document.getElementById('btn-pres-sync-web').addEventListener('click', () => presLoadFromWeb(true));
 
 function fmtARS(n) {
   return '$ ' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -15512,7 +15536,11 @@ document.getElementById('btn-calc-save-plans').addEventListener('click', async (
     const updated = { ...siteContent, calculatorPlans: calcPlans.map(p => ({ min: Number(p.min), max: Number(p.max), price: Number(p.price), label: p.label })) };
     const r = await callWcAPI('wc_save_site_content', { siteContent: updated });
     if (r.error) throw new Error(r.error);
-    status.innerHTML = '<span style="color:var(--green)">✓ Guardado. Los precios estarán activos en la calculadora en 1-2 minutos.</span>';
+    // Sincronizar automáticamente al presupuesto
+    presupuestoTiers = calcPlans.map(p => ({ desc: p.label, price: p.price }));
+    saveTiers();
+    renderTiersTable();
+    status.innerHTML = '<span style="color:var(--green)">✓ Guardado. Precios activos en la calculadora en 1-2 min y sincronizados al presupuesto.</span>';
   } catch (e) {
     status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
   }
