@@ -978,6 +978,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="tab-row">
       <button class="tab-btn active" data-wctab="articulos">📝 Artículos</button>
       <button class="tab-btn" data-wctab="contenido">🧩 Contenido de la página</button>
+      <button class="tab-btn" data-wctab="precios">💰 Precios calculadora</button>
     </div>
 
     <!-- ARTICULOS -->
@@ -1043,6 +1044,38 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         </div>
       </div>
       <div id="wc-content-status" style="margin-top:8px;font-size:12px"></div>
+    </div>
+
+    <!-- PRECIOS CALCULADORA -->
+    <div class="tab-content" id="wctab-precios">
+      <div class="card" style="border-color:rgba(0,229,204,0.25);background:rgba(0,229,204,0.03)">
+        <div style="font-size:12px;color:var(--text2);line-height:1.6">
+          Cada fila es un rango de usuarios con su precio mensual. Al guardar, se actualiza automáticamente en la calculadora de la landing y en el email que reciben los leads.
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden">
+        <table id="calc-plans-table" style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);background:var(--surface2)">
+              <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-weight:700">Desde</th>
+              <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-weight:700">Hasta</th>
+              <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-weight:700">Etiqueta</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-weight:700">Precio / mes</th>
+              <th style="padding:10px 14px;width:36px"></th>
+            </tr>
+          </thead>
+          <tbody id="calc-plans-body">
+            <tr><td colspan="5" style="padding:24px;text-align:center;color:var(--text3)">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px">
+        <button class="btn btn-sm" id="btn-calc-add-row" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">+ Agregar rango</button>
+        <button class="btn btn-full" id="btn-calc-save-plans" style="max-width:200px;background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">Guardar y publicar</button>
+      </div>
+      <div id="calc-plans-status" style="margin-top:8px;font-size:12px"></div>
     </div>
   </div>
 
@@ -15398,6 +15431,103 @@ document.getElementById('btn-wc-confirm-publish').addEventListener('click', asyn
     document.getElementById('wc-changes-card').style.display = 'none';
     wcRenderContentTree();
     status.innerHTML = '<span style="color:var(--green)">✓ Publicado. Va a estar en vivo en 1-2 minutos.</span>';
+  } catch (e) {
+    status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+});
+
+// ── PRECIOS CALCULADORA ──────────────────────────────────────────────────────
+let calcPlans = [];
+
+function calcFmtARS(n) {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Number(n) || 0);
+}
+
+function calcRenderTable() {
+  const tbody = document.getElementById('calc-plans-body');
+  if (!calcPlans.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--text3)">Sin rangos. Agregá uno.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = calcPlans.map((p, i) => `
+    <tr style="border-bottom:1px solid var(--border);${i % 2 === 1 ? 'background:rgba(255,255,255,0.02)' : ''}">
+      <td style="padding:8px 14px">
+        <input type="number" min="1" value="${p.min}" data-ci="${i}" data-cf="min"
+          style="width:64px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:13px;font-family:var(--font)">
+      </td>
+      <td style="padding:8px 14px">
+        <input type="number" min="1" value="${p.max}" data-ci="${i}" data-cf="max"
+          style="width:64px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:13px;font-family:var(--font)">
+      </td>
+      <td style="padding:8px 14px">
+        <input type="text" value="${p.label}" data-ci="${i}" data-cf="label"
+          style="width:140px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:13px;font-family:var(--font)">
+      </td>
+      <td style="padding:8px 14px;text-align:right">
+        <input type="number" min="0" value="${p.price}" data-ci="${i}" data-cf="price"
+          style="width:120px;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--cyan);font-size:13px;font-family:var(--font);text-align:right">
+      </td>
+      <td style="padding:8px 10px;text-align:center">
+        <button onclick="calcDeleteRow(${i})" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:2px 6px;border-radius:4px;transition:color .15s" title="Eliminar" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">×</button>
+      </td>
+    </tr>
+  `).join('');
+
+  // Sync input changes back to calcPlans
+  tbody.querySelectorAll('input[data-ci]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const i = parseInt(inp.dataset.ci);
+      const f = inp.dataset.cf;
+      calcPlans[i][f] = f === 'label' ? inp.value : Number(inp.value);
+    });
+  });
+}
+
+function calcDeleteRow(i) {
+  calcPlans.splice(i, 1);
+  calcRenderTable();
+}
+
+document.getElementById('btn-calc-add-row').addEventListener('click', () => {
+  const last = calcPlans.at(-1);
+  const newMin = last ? last.max + 1 : 1;
+  calcPlans.push({ min: newMin, max: newMin + 4, price: 0, label: `${newMin}–${newMin + 4} usuarios` });
+  calcRenderTable();
+  document.getElementById('calc-plans-table').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+document.getElementById('btn-calc-save-plans').addEventListener('click', async () => {
+  const status = document.getElementById('calc-plans-status');
+  if (!calcPlans.length) { status.innerHTML = '<span style="color:var(--amber)">Agregá al menos un rango.</span>'; return; }
+
+  // Validate: all prices > 0
+  const invalid = calcPlans.findIndex(p => !p.price || !p.min || !p.max || !p.label);
+  if (invalid !== -1) { status.innerHTML = `<span style="color:var(--red)">Fila ${invalid + 1}: completá todos los campos.</span>`; return; }
+
+  status.textContent = 'Guardando…';
+  try {
+    // Read current siteContent, replace calculatorPlans, save
+    const { siteContent } = await callWcAPI('wc_get_site_content');
+    if (!siteContent) throw new Error('No se pudo leer el contenido del sitio');
+    const updated = { ...siteContent, calculatorPlans: calcPlans.map(p => ({ min: Number(p.min), max: Number(p.max), price: Number(p.price), label: p.label })) };
+    const r = await callWcAPI('wc_save_site_content', { siteContent: updated });
+    if (r.error) throw new Error(r.error);
+    status.innerHTML = '<span style="color:var(--green)">✓ Guardado. Los precios estarán activos en la calculadora en 1-2 minutos.</span>';
+  } catch (e) {
+    status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+});
+
+// Load plans when tab is clicked
+document.querySelector('[data-wctab="precios"]').addEventListener('click', async () => {
+  if (calcPlans.length) return; // already loaded
+  const status = document.getElementById('calc-plans-status');
+  status.textContent = 'Cargando precios…';
+  try {
+    const { siteContent } = await callWcAPI('wc_get_site_content');
+    calcPlans = (siteContent?.calculatorPlans || []).map(p => ({ ...p }));
+    calcRenderTable();
+    status.textContent = '';
   } catch (e) {
     status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
   }
