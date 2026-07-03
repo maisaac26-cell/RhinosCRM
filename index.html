@@ -15304,61 +15304,61 @@ function wcEscapeHtml(s) {
 function wcBuildSections(c) {
   return [
     { title: '🧭 Encabezado / menú', fields: [
-      { path: 'header.navLinks', label: `Enlaces del menú (uno por línea — son ${c.header.navLinks.length}, no agregues ni quites líneas)`, type: 'list' },
+      { path: 'header.navLinks', label: `Ítems del menú (uno por línea — son ${c.header?.navLinks?.length ?? 5}, no agregues ni quites líneas)`, type: 'list' },
       { path: 'header.loginLabel', label: 'Texto del botón "Log in"', type: 'text' },
     ]},
     { title: '🚀 Portada principal (Hero)', fields: [
       { path: 'hero.preheadline', label: 'Texto pequeño arriba del título', type: 'text' },
       { path: 'hero.title', label: 'Título principal (H1)', type: 'textarea' },
-      { path: 'hero.subtitle', label: 'Subtítulo', type: 'textarea' },
-      { path: 'hero.ctaLabel', label: 'Texto del botón principal ("Agendar demo")', type: 'text' },
-      { path: 'hero.aiText', label: 'Texto del cartel de IA', type: 'text' },
+      { path: 'hero.subtitle', label: 'Subtítulo debajo del título', type: 'textarea' },
+      { path: 'hero.ctaLabel', label: 'Texto del botón CTA (WhatsApp)', type: 'text' },
+      { path: 'hero.aiText', label: 'Texto del cartel de IA (parte inferior)', type: 'text' },
     ]},
     { title: '⚙️ Funcionalidades del CRM', fields: [
-      { path: 'features.title', label: 'Título de la tarjeta destacada', type: 'textarea' },
-      { path: 'features.description', label: 'Descripción de la tarjeta destacada', type: 'textarea' },
-      ...c.features.items.flatMap((_, i) => [
-        { path: `features.items.${i}.title`, label: `Funcionalidad ${i + 1} — título`, type: 'text' },
-        { path: `features.items.${i}.description`, label: `Funcionalidad ${i + 1} — descripción`, type: 'textarea' },
+      { path: 'features.title', label: 'Título de la sección de funcionalidades', type: 'textarea' },
+      { path: 'features.description', label: 'Descripción de la sección', type: 'textarea' },
+      ...(c.features?.items ?? []).flatMap((_, i) => [
+        { path: `features.items.${i}.title`, label: `Módulo ${i + 1} — nombre`, type: 'text' },
+        { path: `features.items.${i}.description`, label: `Módulo ${i + 1} — descripción corta`, type: 'textarea' },
       ]),
     ]},
-    { title: '📊 Comparación: tu método vs Rhinosapp', fields: [
+    { title: '🏷️ Ticker — empresas que migraron', fields: [
+      { path: 'ticker.label', label: 'Etiqueta arriba del ticker', type: 'text' },
+      { path: 'ticker.companies', label: `Empresas (una por línea — son ${c.ticker?.companies?.length ?? 8})`, type: 'list' },
+    ]},
+    { title: '📈 Métricas de resultados', fields: [
+      { path: 'outcomes.label', label: 'Etiqueta arriba de los números', type: 'text' },
+      ...(c.outcomes?.items ?? []).flatMap((_, i) => [
+        { path: `outcomes.items.${i}.value`, label: `Métrica ${i + 1} — número (ej: -70%, 3×, +40%)`, type: 'text' },
+        { path: `outcomes.items.${i}.label`, label: `Métrica ${i + 1} — descripción`, type: 'text' },
+      ]),
+    ]},
+    { title: '📊 Comparación: método actual vs Rhinosapp', fields: [
       { path: 'comparison.title', label: 'Título de la sección', type: 'text' },
       { path: 'comparison.subtitle', label: 'Subtítulo de la sección', type: 'textarea' },
-      { path: 'comparison.current.title', label: 'Columna izquierda — título', type: 'text' },
-      { path: 'comparison.current.subtitle', label: 'Columna izquierda — subtítulo', type: 'text' },
-      { path: 'comparison.current.items', label: `Columna izquierda — ítems (uno por línea, ${c.comparison.current.items.length} en total)`, type: 'list' },
-      { path: 'comparison.rhinos.title', label: 'Columna derecha — título', type: 'text' },
-      { path: 'comparison.rhinos.subtitle', label: 'Columna derecha — subtítulo', type: 'text' },
-      { path: 'comparison.rhinos.items', label: `Columna derecha — ítems (uno por línea, ${c.comparison.rhinos.items.length} en total)`, type: 'list' },
-    ]},
-    { title: '💲 Precios y plan', fields: [
-      { path: 'pricing.title', label: 'Título de la sección', type: 'text' },
-      { path: 'pricing.subtitle', label: 'Subtítulo de la sección', type: 'text' },
-      { path: 'pricing.plan.name', label: 'Nombre del plan', type: 'text' },
-      { path: 'pricing.plan.description', label: 'Descripción del plan', type: 'text' },
-      { path: 'pricing.plan.features', label: 'Funcionalidades incluidas (una por línea)', type: 'list' },
-      ...c.pricing.bonuses.flatMap((_, i) => [
-        { path: `pricing.bonuses.${i}.title`, label: `Bono ${i + 1} — título`, type: 'text' },
-        { path: `pricing.bonuses.${i}.description`, label: `Bono ${i + 1} — descripción`, type: 'textarea' },
-      ]),
+      { path: 'comparison.current.title', label: 'Columna "tu método" — título', type: 'text' },
+      { path: 'comparison.current.subtitle', label: 'Columna "tu método" — subtítulo', type: 'text' },
+      { path: 'comparison.current.items', label: `Columna "tu método" — ítems (uno por línea, ${c.comparison?.current?.items?.length ?? 8} en total)`, type: 'list' },
+      { path: 'comparison.rhinos.title', label: 'Columna Rhinosapp — título', type: 'text' },
+      { path: 'comparison.rhinos.subtitle', label: 'Columna Rhinosapp — subtítulo', type: 'text' },
+      { path: 'comparison.rhinos.items', label: `Columna Rhinosapp — ítems (uno por línea, ${c.comparison?.rhinos?.items?.length ?? 8} en total)`, type: 'list' },
     ]},
     { title: '📬 Contacto', fields: [
       { path: 'contact.title', label: 'Título de la sección', type: 'textarea' },
-      { path: 'contact.subtitle', label: 'Subtítulo', type: 'text' },
-      { path: 'contact.whatsappQuestion', label: '"¿Preferís hablar por WhatsApp?"', type: 'text' },
+      { path: 'contact.subtitle', label: 'Subtítulo / descripción', type: 'text' },
+      { path: 'contact.whatsappQuestion', label: 'Pregunta de WhatsApp', type: 'text' },
       { path: 'contact.whatsappButtonLabel', label: 'Texto del botón de WhatsApp', type: 'text' },
       { path: 'contact.calendlyButtonLabel', label: 'Texto del botón de Calendly', type: 'text' },
     ]},
-    { title: '📰 Blog (vista previa en la home)', fields: [
-      { path: 'blog.badge', label: 'Etiqueta ("Blog")', type: 'text' },
-      { path: 'blog.title', label: 'Título', type: 'text' },
+    { title: '📰 Blog (sección en la home)', fields: [
+      { path: 'blog.badge', label: 'Etiqueta / badge', type: 'text' },
+      { path: 'blog.title', label: 'Título de la sección', type: 'text' },
       { path: 'blog.subtitle', label: 'Subtítulo', type: 'textarea' },
       { path: 'blog.ctaLabel', label: 'Texto del botón "Ver el blog"', type: 'text' },
     ]},
     { title: '👣 Pie de página', fields: [
-      { path: 'footer.tagline', label: 'Texto debajo del nombre', type: 'textarea' },
-      { path: 'footer.copyright', label: 'Texto de copyright (después del año)', type: 'text' },
+      { path: 'footer.tagline', label: 'Tagline debajo del logo', type: 'textarea' },
+      { path: 'footer.copyright', label: 'Texto de copyright', type: 'text' },
     ]},
   ];
 }
