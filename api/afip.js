@@ -479,6 +479,36 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, message: `✅ Conexión exitosa con AFIP WSAA (${env}). Token válido hasta ${expIso.slice(0, 16).replace('T', ' ')}.` });
     }
 
+    // ── tipos_habilitados ────────────────────────────────────────────
+    if (action === 'tipos_habilitados') {
+      const cfg = await getAfipConfig();
+      const { token, sign } = await getOrRefreshTAM(cfg);
+      const wsfeUrl = cfg.afip_ambiente === 'produccion' ? WSFE_PROD : WSFE_HOMO;
+      const body = `<?xml version="1.0" encoding="UTF-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <FEParamGetTiposCbte xmlns="http://ar.gov.afip.dif.FEV1/">
+      <Auth>
+        <Token>${token}</Token>
+        <Sign>${sign}</Sign>
+        <Cuit>${cfg.afip_cuit}</Cuit>
+      </Auth>
+    </FEParamGetTiposCbte>
+  </soap12:Body>
+</soap12:Envelope>`;
+      const resp = await soapCall(wsfeUrl, '', body, true);
+      // Extract all CbteTipo entries
+      const tipos = [];
+      const re = /<CbteTipo>([\s\S]*?)<\/CbteTipo>/gi;
+      let m;
+      while ((m = re.exec(resp.body)) !== null) {
+        const id = xmlVal(m[1], 'Id');
+        const desc = xmlVal(m[1], 'Desc');
+        if (id) tipos.push({ id: parseInt(id, 10), desc: desc || '' });
+      }
+      return res.json({ ok: true, tipos });
+    }
+
     // ── ultimo_cbte ──────────────────────────────────────────────────
     if (action === 'ultimo_cbte') {
       const cfg = await getAfipConfig();

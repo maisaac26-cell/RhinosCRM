@@ -2392,6 +2392,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <div style="display:flex;gap:8px;margin-top:12px">
                 <button class="btn btn-sm" onclick="saveAfipConfig()" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3)">💾 Guardar config</button>
                 <button class="btn btn-sm" id="afip-test-btn" onclick="testAfipAuth()" style="color:var(--text2);border-color:var(--border2)">🔌 Probar conexión AFIP</button>
+                <button class="btn btn-sm" onclick="verificarTiposAfip()" style="color:var(--text3);border-color:var(--border2);font-size:10px">📋 Ver tipos habilitados</button>
               </div>
               <div id="afip-test-result" style="margin-top:8px;font-size:12px;display:none"></div>
             </div>
@@ -16849,6 +16850,28 @@ async function saveAfipConfig() {
 }
 
 // ── Probar conexión ──────────────────────────────────────────────────────────
+
+async function verificarTiposAfip() {
+  const res = document.getElementById('afip-test-result');
+  if (res) { res.style.display = 'block'; res.style.color = 'var(--text2)'; res.textContent = '⏳ Consultando tipos habilitados...'; }
+  try {
+    const r = await callAfipAPI('tipos_habilitados');
+    if (r?.ok && r.tipos?.length) {
+      const NOMBRES = {1:'Factura A',2:'ND A',3:'NC A',6:'Factura B',7:'ND B',8:'NC B',11:'Factura C',12:'ND C',13:'NC C',51:'Fact A OSR',52:'ND A OSR',53:'NC A OSR'};
+      const lista = r.tipos.map(t => `• [${t.id}] ${NOMBRES[t.id] || t.desc}`).join('\n');
+      if (res) {
+        res.style.display = 'block';
+        res.style.color = 'var(--cyan)';
+        res.style.whiteSpace = 'pre-line';
+        res.textContent = 'Tipos habilitados para este CUIT:\n' + lista;
+      }
+    } else {
+      if (res) { res.style.color = 'var(--red)'; res.textContent = '❌ ' + (r?.error || 'Sin respuesta'); }
+    }
+  } catch(e) {
+    if (res) { res.style.color = 'var(--red)'; res.textContent = '❌ ' + e.message; }
+  }
+}
 
 async function testAfipAuth() {
   const btn = document.getElementById('afip-test-btn');
