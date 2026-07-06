@@ -17273,8 +17273,8 @@ async function getLogoDataUrl() {
 }
 
 async function generarComprobantePDF(factura) {
-  const TIPO_LETRA = { 1:'A', 2:'A', 3:'A', 6:'B', 7:'B', 8:'B', 11:'C', 12:'C', 13:'C' };
-  const TIPO_NOMBRE = { 1:'FACTURA', 2:'NOTA DE DÉBITO', 3:'NOTA DE CRÉDITO', 6:'FACTURA', 7:'NOTA DE DÉBITO', 8:'NOTA DE CRÉDITO', 11:'FACTURA', 12:'NOTA DE DÉBITO', 13:'NOTA DE CRÉDITO' };
+  const TIPO_LETRA = { 1:'A', 2:'A', 3:'A', 6:'B', 7:'B', 8:'B', 11:'C', 12:'C', 13:'C', 51:'A', 52:'A', 53:'A' };
+  const TIPO_NOMBRE = { 1:'FACTURA', 2:'NOTA DE DÉBITO', 3:'NOTA DE CRÉDITO', 6:'FACTURA', 7:'NOTA DE DÉBITO', 8:'NOTA DE CRÉDITO', 11:'FACTURA', 12:'NOTA DE DÉBITO', 13:'NOTA DE CRÉDITO', 51:'FACTURA', 52:'NOTA DE DÉBITO', 53:'NOTA DE CRÉDITO' };
   const ALIC_LABEL = { 3:'0% (Exento)', 4:'10,5%', 5:'21%', 6:'27%', 8:'5%', 9:'2,5%' };
 
   const cfg   = _afipPdfCfg;
@@ -17440,7 +17440,7 @@ async function generarComprobantePDF(factura) {
 
   const container = document.createElement('div');
   container.innerHTML = html;
-  container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:780px;background:white';
+  container.style.cssText = 'position:fixed;top:0;left:-9999px;width:780px;background:white;z-index:-1';
   document.body.appendChild(container);
 
   try {
