@@ -2404,6 +2404,18 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <div style="font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);margin-bottom:14px">📤 Emitir factura</div>
             <div id="afip-emit-body">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div>
+                  <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Tipo de comprobante</label>
+                  <select id="afip-emit-tipo-cbte" class="inp" style="width:100%;box-sizing:border-box" onchange="afipRecalcMontos()">
+                    <option value="1">Factura A</option>
+                    <option value="51">Factura A con Retención (OSR)</option>
+                    <option value="6">Factura B</option>
+                    <option value="11">Factura C</option>
+                  </select>
+                </div>
+                <div style="display:flex;align-items:flex-end">
+                  <div id="afip-emit-tipo-hint" style="font-size:10px;color:var(--text3);padding-bottom:6px;line-height:1.4"></div>
+                </div>
                 <div style="grid-column:span 2">
                   <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Cliente</label>
                   <select id="afip-emit-cliente" class="inp" style="width:100%;box-sizing:border-box" onchange="afipAutoFillCliente()">
@@ -16785,6 +16797,7 @@ async function loadAfipConfig() {
     if (v('afip-condicion')) v('afip-condicion').value = c.afip_condicion_iva || 'RI';
     if (v('afip-pto-venta')) v('afip-pto-venta').value = c.afip_punto_venta || '1';
     if (v('afip-tipo-cbte')) v('afip-tipo-cbte').value = c.afip_tipo_cbte || '6';
+    if (v('afip-emit-tipo-cbte')) v('afip-emit-tipo-cbte').value = c.afip_tipo_cbte || '6';
     const amb = c.afip_ambiente || 'homologacion';
     document.querySelectorAll('input[name="afip-ambiente"]').forEach(r => { r.checked = r.value === amb; });
     // Show cert/key status
@@ -16929,7 +16942,7 @@ function afipAutoFillCliente() {
 // ── Recalcular montos ────────────────────────────────────────────────────────
 
 function afipRecalcMontos() {
-  const tipoCbte = parseInt(document.getElementById('afip-tipo-cbte')?.value || '6', 10);
+  const tipoCbte = parseInt(document.getElementById('afip-emit-tipo-cbte')?.value || document.getElementById('afip-tipo-cbte')?.value || '6', 10);
   const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3 || tipoCbte === 51 || tipoCbte === 52 || tipoCbte === 53;
   const alicId = parseInt(document.getElementById('afip-emit-iva')?.value || '5', 10);
   const ALIC = { 3: 0, 4: 0.105, 5: 0.21, 6: 0.27, 8: 0.05, 9: 0.025 };
@@ -16996,7 +17009,7 @@ async function emitirFacturaAfip() {
   if (!(parseFloat(g('afip-emit-total-input') || '0') > 0)) { showToast('El importe debe ser mayor a 0.'); return; }
   if (docTipo !== 99 && !docNro) { showToast('Ingresá el número de documento del receptor.'); return; }
 
-  const tipoCbte = parseInt(document.getElementById('afip-tipo-cbte')?.value || '6', 10);
+  const tipoCbte = parseInt(document.getElementById('afip-emit-tipo-cbte')?.value || document.getElementById('afip-tipo-cbte')?.value || '6', 10);
   const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3 || tipoCbte === 51 || tipoCbte === 52 || tipoCbte === 53;
   const ALIC = { 3: 0, 4: 0.105, 5: 0.21, 6: 0.27, 8: 0.05, 9: 0.025 };
   const rate = ALIC[alicuotaId] || 0;
