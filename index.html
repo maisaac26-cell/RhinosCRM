@@ -17431,25 +17431,16 @@ async function generarComprobantePDF(factura) {
 </html>`;
 
   const opt = {
-    margin: 0,
+    margin: [8, 8, 8, 8],
     filename: `factura_${ptoVta}-${nro}_${factura.fecha_cbte || ''}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
+    image: { type: 'jpeg', quality: 0.97 },
+    html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0, backgroundColor: '#ffffff' },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
   };
 
-  const container = document.createElement('div');
-  container.innerHTML = html;
-  container.style.cssText = 'position:fixed;top:0;left:-9999px;width:780px;background:white;z-index:-1';
-  document.body.appendChild(container);
-
-  try {
-    showToast('📄 Generando PDF...');
-    await html2pdf().set(opt).from(container.querySelector('.page')).save();
-    showToast('✅ Comprobante descargado');
-  } finally {
-    document.body.removeChild(container);
-  }
+  showToast('📄 Generando PDF...');
+  await html2pdf().set(opt).from(html, 'string').save();
+  showToast('✅ Comprobante descargado');
 }
 
 // ── Click en tab Facturas ────────────────────────────────────────────────────
