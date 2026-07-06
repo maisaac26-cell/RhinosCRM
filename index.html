@@ -2201,6 +2201,12 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <div class="field"><label>Asunto</label><input id="email-asunto" placeholder="Asunto del email"/></div>
               <div class="field"><label>Cuerpo</label><textarea id="email-cuerpo" rows="12" style="font-size:13px;line-height:1.7" placeholder="El email aparecerá aquí..."></textarea></div>
               <div style="font-size:11px;color:var(--text3)">Variables disponibles: <code>[nombre]</code> <code>[empresa]</code> <code>[monto]</code> <code>[periodo]</code> <code>[fecha_vencimiento]</code></div>
+              <div style="margin-top:10px;padding:10px 12px;border:1px dashed var(--border2);border-radius:8px;display:flex;align-items:center;gap:10px">
+                <label for="email-adjunto-input" style="cursor:pointer;font-size:12px;color:var(--cyan);font-weight:500;white-space:nowrap">📎 Adjuntar archivo</label>
+                <input type="file" id="email-adjunto-input" style="font-size:11px;color:var(--text2);flex:1;min-width:0" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx,.txt,.csv">
+                <button id="email-adjunto-clear" title="Quitar adjunto" style="display:none;background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px">✕</button>
+              </div>
+              <div id="email-adjunto-info" style="display:none;font-size:11px;color:var(--text2);margin-top:4px;padding:4px 12px"></div>
             </div>
           </div>
         </div>
@@ -10447,6 +10453,30 @@ document.getElementById('btn-gen-email-cobro').addEventListener('click', async f
   this.disabled = false; this.textContent = '🦏 Generar con IA';
 });
 
+// ── Adjunto manual en email compose ──────────────────────────────────────────
+let _emailAdjuntoData = null; // { base64, filename, mimeType }
+
+document.getElementById('email-adjunto-input').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) { _emailAdjuntoData = null; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    _emailAdjuntoData = { base64: e.target.result, filename: file.name, mimeType: file.type || 'application/octet-stream' };
+    const kb = (file.size / 1024).toFixed(0);
+    document.getElementById('email-adjunto-info').textContent = `📎 ${file.name} (${kb} KB)`;
+    document.getElementById('email-adjunto-info').style.display = 'block';
+    document.getElementById('email-adjunto-clear').style.display = 'inline';
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('email-adjunto-clear').addEventListener('click', function() {
+  _emailAdjuntoData = null;
+  document.getElementById('email-adjunto-input').value = '';
+  document.getElementById('email-adjunto-info').style.display = 'none';
+  this.style.display = 'none';
+});
+
 document.getElementById('btn-enviar-email-cobro').addEventListener('click', async function() {
   const tokens = (() => { try { return JSON.parse(localStorage.getItem('rhinos_gmail_tokens')); } catch(e){ return null; } })();
   if (!tokens?.access_token) { showToast('Conectá Gmail primero'); return; }
@@ -10460,7 +10490,8 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
   if (dest === 'vencidos') targets = targets.filter(c => { const co = cobros.find(x => x.clientId===c.id); return co?.status === 'vencido'; });
   if (dest === 'uno') { const id = document.getElementById('email-cli-sel').value; targets = targets.filter(c => c.id === id); }
   if (!targets.length) { showToast('No hay destinatarios'); return; }
-  if (!confirm(`¿Enviar a ${targets.length} cliente${targets.length!==1?'s':''}?`)) return;
+  const adjuntoLabel = _emailAdjuntoData ? ` con adjunto "${_emailAdjuntoData.filename}"` : '';
+  if (!confirm(`¿Enviar a ${targets.length} cliente${targets.length!==1?'s':''}${adjuntoLabel}?`)) return;
   this.disabled = true; this.textContent = `Enviando (0/${targets.length})...`;
   let sent = 0;
   const periodo = cobPeriodLabel(cobCurrentPeriod);
@@ -10483,9 +10514,7 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
       .replace(/\[monto\]/g, montoFormateado)
       .replace(/\[fecha_vencimiento\]/g, fechaVenc)
       .replace(/\[dias_plazo\]/g, String(c.dias_plazo||10));
-    // Enviar al email principal
     const emailsDestino = [c.email];
-    // Agregar emails CC si existen
     if (c.emails_cc) {
       c.emails_cc.split(',').map(e => e.trim()).filter(Boolean).forEach(e => emailsDestino.push(e));
     }
@@ -10493,14 +10522,18 @@ document.getElementById('btn-enviar-email-cobro').addEventListener('click', asyn
       for (const emailDest of emailsDestino) {
         const remitenteAlias = document.getElementById('email-remitente')?.value || 'cobranzas@rhinosapp.com';
         const remitenteNombre = { 'cobranzas@rhinosapp.com':'Cobranzas RhinosApp', 'comercial@rhinosapp.com':'Comercial RhinosApp', 'administracion@rhinosapp.com':'Administración RhinosApp', 'ventas@rhinosapp.com':'Ventas RhinosApp', 'info@rhinosapp.com':'Info RhinosApp' }[remitenteAlias] || 'RhinosApp';
-        await callAPI('gmail_send', { access_token: tokens.access_token, to: emailDest, subject, body, from: `${remitenteNombre} <${remitenteAlias}>` });
+        await callAPI('gmail_send', {
+          access_token: tokens.access_token, to: emailDest, subject, body,
+          from: `${remitenteNombre} <${remitenteAlias}>`,
+          attachment: _emailAdjuntoData || undefined,
+        });
       }
       sent++;
     } catch(e){}
     this.textContent = `Enviando (${sent}/${targets.length})...`;
     if (targets.length > 1) await new Promise(r => setTimeout(r, 500));
   }
-  showToast(`✅ ${sent} email${sent!==1?'s':''} enviado${sent!==1?'s':''} 🦏`);
+  showToast(`✅ ${sent} email${sent!==1?'s':''} enviado${sent!==1?'s':''}${_emailAdjuntoData?' con adjunto':''} 🦏`);
   this.disabled = false; this.textContent = 'Enviar';
 });
 
@@ -17598,9 +17631,14 @@ async function _generarAfipPdfBase64(factura) {
     html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0, backgroundColor: '#ffffff' },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
   };
-  // Obtener base64 en lugar de descargar
-  const dataUri = await html2pdf().set(opt).from(html, 'string').outputPdf('datauristring');
-  return dataUri; // "data:application/pdf;base64,..."
+  // Blob → FileReader es más confiable que outputPdf('datauristring') en todos los browsers
+  const blob = await html2pdf().set(opt).from(html, 'string').outputPdf('blob');
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result); // "data:application/pdf;base64,..."
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -1508,20 +1508,23 @@ Respondé SOLO con JSON válido, sin markdown:
       const encodedSubject = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
       const contentType = is_html ? 'text/html' : 'text/plain';
 
+      // RFC 2045: base64 lines must be ≤76 chars
+      function wrapBase64(str) { return str.replace(/(.{76})/g, '$1\r\n'); }
+
       let rawEmail;
       if (attachment && attachment.base64 && attachment.filename) {
-        // Multipart MIME with PDF attachment
+        // Multipart MIME with attachment
         const boundary = 'rhinosapp_' + Date.now();
+        // Strip data URI prefix if present, then wrap at 76 chars per RFC 2045
+        const b64 = wrapBase64(attachment.base64.replace(/^data:[^;]+;base64,/, '').replace(/\s/g, ''));
+        const mimeType = attachment.mimeType || 'application/pdf';
         rawEmail = `MIME-Version: 1.0\r\n`;
         if (effectiveFrom) rawEmail += `From: ${encodeFromHeader(effectiveFrom)}\r\n`;
         rawEmail += `To: ${to}\r\nSubject: ${encodedSubject}\r\n`;
         if (thread_id) rawEmail += `In-Reply-To: ${in_reply_to || ''}\r\nReferences: ${references || ''}\r\n`;
         rawEmail += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n`;
         rawEmail += `--${boundary}\r\nContent-Type: ${contentType}; charset=utf-8\r\n\r\n${emailBody}\r\n\r\n`;
-        // Strip data URI prefix if present
-        const b64 = attachment.base64.replace(/^data:[^;]+;base64,/, '');
-        const mimeType = attachment.mimeType || 'application/pdf';
-        rawEmail += `--${boundary}\r\nContent-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="${attachment.filename}"\r\n\r\n${b64}\r\n\r\n--${boundary}--`;
+        rawEmail += `--${boundary}\r\nContent-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="${attachment.filename}"\r\n\r\n${b64}\r\n--${boundary}--`;
       } else {
         rawEmail = `MIME-Version: 1.0\r\n`;
         if (effectiveFrom) rawEmail += `From: ${encodeFromHeader(effectiveFrom)}\r\n`;
