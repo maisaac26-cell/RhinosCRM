@@ -2087,6 +2087,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
               <div class="field" style="margin:0"><label>Nombre</label><input id="cli-nombre" placeholder="Juan García"/></div>
               <div class="field" style="margin:0"><label>Empresa</label><input id="cli-empresa" placeholder="Distribuidora El Sol SRL"/></div>
+              <div class="field" style="margin:0;grid-column:span 2">
+                <label>CUIT <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;font-size:10px">(opcional — se usa para facturar)</span></label>
+                <input id="cli-cuit" placeholder="30-12345678-9" style="font-family:monospace"/>
+              </div>
               <div class="field" style="margin:0"><label>Email</label><input id="cli-email" type="email" placeholder="juan@empresa.com"/></div>
               <div class="field" style="margin:0"><label>Precio mensual</label>
                 <div style="display:flex;gap:4px">
@@ -9898,6 +9902,7 @@ function renderClientes() {
       clientEditId = c.id;
       document.getElementById('cli-nombre').value = c.nombre;
       document.getElementById('cli-empresa').value = c.empresa||'';
+      document.getElementById('cli-cuit').value = c.cuit||'';
       document.getElementById('cli-email').value = c.email;
       document.getElementById('cli-precio').value = c.precio;
       document.getElementById('cli-inicio').value = c.inicio||'';
@@ -10325,7 +10330,7 @@ document.querySelectorAll('.ctab-btn').forEach(btn => {
 // Formulario cliente
 document.getElementById('btn-nuevo-cliente').addEventListener('click', () => {
   clientEditId = null;
-  ['cli-nombre','cli-empresa','cli-email','cli-emails-cc','cli-precio','cli-inicio','cli-notas','cli-contrato-fin','cli-contrato-notas','cli-tags'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['cli-nombre','cli-empresa','cli-cuit','cli-email','cli-emails-cc','cli-precio','cli-inicio','cli-notas','cli-contrato-fin','cli-contrato-notas','cli-tags'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   const dpEl = document.getElementById('cli-dias-plazo'); if(dpEl) dpEl.value = '10';
   document.getElementById('cli-estado').value = 'activo';
   document.getElementById('cli-inicio').value = new Date().toISOString().slice(0,10);
@@ -10346,7 +10351,8 @@ document.getElementById('btn-guardar-cliente').addEventListener('click', async f
   const contrato_fin = document.getElementById('cli-contrato-fin').value || null;
   const contrato_notas = document.getElementById('cli-contrato-notas').value.trim() || null;
   const tags = document.getElementById('cli-tags').value.trim() || null;
-  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), email, emails_cc: emailsCC, precio: +precio||0, moneda, frecuencia_pago, dias_plazo: diasPlazo, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim(), contrato_fin, contrato_notas, tags };
+  const cuit = (document.getElementById('cli-cuit').value||'').replace(/\s/g,'').trim();
+  const data = { nombre, empresa: document.getElementById('cli-empresa').value.trim(), cuit: cuit||null, email, emails_cc: emailsCC, precio: +precio||0, moneda, frecuencia_pago, dias_plazo: diasPlazo, inicio: document.getElementById('cli-inicio').value, estado: document.getElementById('cli-estado').value, notas: document.getElementById('cli-notas').value.trim(), contrato_fin, contrato_notas, tags };
 
   if (clientEditId) {
     // Edición: PATCH directo solo este cliente
@@ -16925,11 +16931,18 @@ function afipAutoFillCliente() {
   if (!cid) return;
   const client = getClients().find(c => c.id === cid);
   if (!client) return;
-  // Pre-fill total with client precio (assumed to be total con IVA)
+  // Pre-fill total with client precio
   const totalEl = document.getElementById('afip-emit-total-input');
   if (totalEl && client.precio) {
     totalEl.value = parseFloat(client.precio) || 0;
     afipRecalcMontos();
+  }
+  // Pre-fill CUIT if stored on client
+  const docNroEl = document.getElementById('afip-emit-docnro');
+  if (docNroEl && client.cuit) {
+    docNroEl.value = client.cuit.replace(/\D/g, '');
+    const docTipoEl = document.getElementById('afip-emit-doctipo');
+    if (docTipoEl) docTipoEl.value = '80'; // CUIT
   }
   // Pre-fill description
   const descEl = document.getElementById('afip-emit-desc');
