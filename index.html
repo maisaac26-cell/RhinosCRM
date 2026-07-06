@@ -2325,6 +2325,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                   <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Tipo de comprobante</label>
                   <select id="afip-tipo-cbte" class="inp" style="width:100%;box-sizing:border-box">
                     <option value="1">Factura A</option>
+                    <option value="51">Factura A con Retención (OSR)</option>
                     <option value="6" selected>Factura B</option>
                     <option value="11">Factura C</option>
                   </select>
@@ -16929,7 +16930,7 @@ function afipAutoFillCliente() {
 
 function afipRecalcMontos() {
   const tipoCbte = parseInt(document.getElementById('afip-tipo-cbte')?.value || '6', 10);
-  const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3;
+  const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3 || tipoCbte === 51 || tipoCbte === 52 || tipoCbte === 53;
   const alicId = parseInt(document.getElementById('afip-emit-iva')?.value || '5', 10);
   const ALIC = { 3: 0, 4: 0.105, 5: 0.21, 6: 0.27, 8: 0.05, 9: 0.025 };
   const ALIC_LABEL = { 3: '0% (Exento)', 4: '10,5%', 5: '21%', 6: '27%', 8: '5%', 9: '2,5%' };
@@ -16996,7 +16997,7 @@ async function emitirFacturaAfip() {
   if (docTipo !== 99 && !docNro) { showToast('Ingresá el número de documento del receptor.'); return; }
 
   const tipoCbte = parseInt(document.getElementById('afip-tipo-cbte')?.value || '6', 10);
-  const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3;
+  const esA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3 || tipoCbte === 51 || tipoCbte === 52 || tipoCbte === 53;
   const ALIC = { 3: 0, 4: 0.105, 5: 0.21, 6: 0.27, 8: 0.05, 9: 0.025 };
   const rate = ALIC[alicuotaId] || 0;
   // El usuario ingresa el total con IVA; calculamos neto e IVA desde ese total

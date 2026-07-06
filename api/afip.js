@@ -283,7 +283,7 @@ async function wsfeSolicitarCAE(cfg, token, sign, inv) {
   const tipoCbte = inv.tipoCbte;
 
   // Only Factura A (1,2,3) discriminates IVA
-  const esFacturaA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3;
+  const esFacturaA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3 || tipoCbte === 51 || tipoCbte === 52 || tipoCbte === 53;
 
   const ivaBlock = esFacturaA && inv.alicuotaId !== 3
     ? `<Iva><AlicIva><Id>${inv.alicuotaId}</Id><BaseImp>${inv.impNeto.toFixed(2)}</BaseImp><Importe>${inv.impIva.toFixed(2)}</Importe></AlicIva></Iva>`
@@ -528,7 +528,7 @@ module.exports = async function handler(req, res) {
       const ptoVta = parseInt(body.punto_venta || cfg.afip_punto_venta || '1', 10);
       const tipoCbte = parseInt(body.tipo_cbte || cfg.afip_tipo_cbte || '6', 10);
       const ambiente = cfg.afip_ambiente || 'homologacion';
-      const esFacturaA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3;
+      const esFacturaA = tipoCbte === 1 || tipoCbte === 2 || tipoCbte === 3 || tipoCbte === 51 || tipoCbte === 52 || tipoCbte === 53;
       const concepto = parseInt(body.concepto || '2', 10);
       const docTipo = parseInt(body.doc_tipo || '80', 10);
       const docNro = String(body.doc_nro || '0').replace(/\D/g, '') || '0';
