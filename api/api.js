@@ -1477,7 +1477,7 @@ Respondé SOLO con JSON válido, sin markdown:
     }
 
     else if (action === 'gmail_send') {
-      const { access_token, to, subject, body: emailBody, thread_id, in_reply_to, references, from: fromOverride, is_html } = body;
+      const { access_token, to, subject, body: emailBody, thread_id, in_reply_to, references, from: fromOverride, is_html, attachment } = body;
 
       // Obtener email del usuario para el header From (necesario para guardar en Enviados)
       let senderEmail = '';
@@ -1507,11 +1507,29 @@ Respondé SOLO con JSON válido, sin markdown:
 
       const encodedSubject = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
       const contentType = is_html ? 'text/html' : 'text/plain';
-      let rawEmail = `MIME-Version: 1.0\r\n`;
-      if (effectiveFrom) rawEmail += `From: ${encodeFromHeader(effectiveFrom)}\r\n`;
-      rawEmail += `To: ${to}\r\nSubject: ${encodedSubject}\r\nContent-Type: ${contentType}; charset=utf-8\r\n`;
-      if (thread_id) rawEmail += `In-Reply-To: ${in_reply_to || ''}\r\nReferences: ${references || ''}\r\n`;
-      rawEmail += `\r\n${emailBody}`;
+
+      let rawEmail;
+      if (attachment && attachment.base64 && attachment.filename) {
+        // Multipart MIME with PDF attachment
+        const boundary = 'rhinosapp_' + Date.now();
+        rawEmail = `MIME-Version: 1.0\r\n`;
+        if (effectiveFrom) rawEmail += `From: ${encodeFromHeader(effectiveFrom)}\r\n`;
+        rawEmail += `To: ${to}\r\nSubject: ${encodedSubject}\r\n`;
+        if (thread_id) rawEmail += `In-Reply-To: ${in_reply_to || ''}\r\nReferences: ${references || ''}\r\n`;
+        rawEmail += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n`;
+        rawEmail += `--${boundary}\r\nContent-Type: ${contentType}; charset=utf-8\r\n\r\n${emailBody}\r\n\r\n`;
+        // Strip data URI prefix if present
+        const b64 = attachment.base64.replace(/^data:[^;]+;base64,/, '');
+        const mimeType = attachment.mimeType || 'application/pdf';
+        rawEmail += `--${boundary}\r\nContent-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="${attachment.filename}"\r\n\r\n${b64}\r\n\r\n--${boundary}--`;
+      } else {
+        rawEmail = `MIME-Version: 1.0\r\n`;
+        if (effectiveFrom) rawEmail += `From: ${encodeFromHeader(effectiveFrom)}\r\n`;
+        rawEmail += `To: ${to}\r\nSubject: ${encodedSubject}\r\nContent-Type: ${contentType}; charset=utf-8\r\n`;
+        if (thread_id) rawEmail += `In-Reply-To: ${in_reply_to || ''}\r\nReferences: ${references || ''}\r\n`;
+        rawEmail += `\r\n${emailBody}`;
+      }
+
       const encoded = Buffer.from(rawEmail).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
       const payload = JSON.stringify({ raw: encoded, ...(thread_id ? { threadId: thread_id } : {}) });
       const sendData = await new Promise((resolve, reject) => {

@@ -17480,6 +17480,476 @@ document.querySelector('.tab-btn[data-ftab="afip"]')?.addEventListener('click', 
 // ── Listener tipo comprobante → recalcular ───────────────────────────────────
 
 document.getElementById('afip-tipo-cbte')?.addEventListener('change', afipRecalcMontos);
+
+// ── Genera PDF de factura AFIP en base64 (para adjuntar en email) ────────────
+async function _generarAfipPdfBase64(factura) {
+  const TIPO_LETRA = { 1:'A',2:'A',3:'A',6:'B',7:'B',8:'B',11:'C',12:'C',13:'C',51:'A',52:'A',53:'A' };
+  const TIPO_NOMBRE = { 1:'FACTURA',2:'NOTA DE DÉBITO',3:'NOTA DE CRÉDITO',6:'FACTURA',7:'NOTA DE DÉBITO',8:'NOTA DE CRÉDITO',11:'FACTURA',12:'NOTA DE DÉBITO',13:'NOTA DE CRÉDITO',51:'FACTURA',52:'NOTA DE DÉBITO',53:'NOTA DE CRÉDITO' };
+  const ALIC_LABEL = { 3:'0% (Exento)',4:'10,5%',5:'21%',6:'27%',8:'5%',9:'2,5%' };
+
+  const cfg   = _afipPdfCfg;
+  const letra = TIPO_LETRA[factura.tipo_cbte] || 'B';
+  const tipo  = TIPO_NOMBRE[factura.tipo_cbte] || 'FACTURA';
+  const esA   = letra === 'A';
+  const ptoVta = String(factura.punto_venta || (cfg?.afip_punto_venta || 1)).padStart(4, '0');
+  const nro    = String(factura.numero || 0).padStart(8, '0');
+  const neto   = +factura.imp_neto  || 0;
+  const iva    = +factura.imp_iva   || 0;
+  const total  = +factura.imp_total || 0;
+  const alicLabel = ALIC_LABEL[factura.alicuota_id] || '21%';
+  const isHomo = factura.estado === 'homologacion';
+
+  const logoUrl = await getLogoDataUrl();
+  const logoImg = logoUrl ? `<img src="${logoUrl}" style="width:52px;height:52px;border-radius:8px;object-fit:cover;margin-bottom:6px">` : '🦏';
+
+  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#1a1a1a;background:#fff;padding:24px 32px}
+  .page{max-width:680px;margin:0 auto}
+  .header-outer{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #00e5cc}
+  .logo-col{text-align:center;min-width:120px}
+  .logo-name{font-size:22px;font-weight:900;letter-spacing:-.03em;color:#0a0a0a}
+  .logo-name span{color:#00e5cc}
+  .cbte-box{border:2px solid #1a1a1a;padding:10px 18px;text-align:center;min-width:90px}
+  .cbte-letra{font-size:40px;font-weight:900;line-height:1}
+  .cbte-tipo{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:4px}
+  .cbte-nro-col{text-align:right;font-size:11px;line-height:1.9;min-width:200px}
+  .cbte-nro-col strong{font-size:14px;font-family:monospace}
+  .section-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:4px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:11px}
+  .info-box{padding:10px 14px;background:#f8f9fa;border-radius:6px}
+  table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px}
+  th{background:#f0fffe;color:#0a7c6f;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:7px 8px;text-align:left;border-bottom:2px solid #00e5cc;font-size:10px}
+  td{padding:7px 8px;border-bottom:1px solid #eee}
+  .totals-table td{border:none;padding:5px 8px}
+  .total-final{font-size:15px;font-weight:700;border-top:2px solid #00e5cc!important;padding-top:10px!important}
+  .cae-box{background:#f8f9fa;border-radius:6px;padding:10px 14px;font-size:10px;line-height:1.9;margin-bottom:12px}
+  .footer{text-align:center;font-size:9px;color:#999;border-top:1px solid #eee;padding-top:10px}
+  ${isHomo ? '.homo-stamp{display:block;text-align:center;color:#d97706;font-weight:700;font-size:11px;letter-spacing:.06em;margin-bottom:12px;padding:6px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px}' : ''}
+</style></head><body>
+<div class="page">
+  ${isHomo ? '<div class="homo-stamp">⚠ COMPROBANTE DE HOMOLOGACIÓN — SIN VALIDEZ FISCAL</div>' : ''}
+  <div class="header-outer">
+    <div class="logo-col">
+      ${logoImg}
+      <div class="logo-name">RHINOS<span>APP</span></div>
+      ${cfg?.afip_razon_social ? `<div style="font-size:10px;color:#666;margin-top:3px">${cfg.afip_razon_social}</div>` : ''}
+      ${cfg?.afip_cuit ? `<div style="font-size:10px;color:#666">CUIT: ${cfg.afip_cuit}</div>` : ''}
+    </div>
+    <div class="cbte-box">
+      <div class="cbte-letra">${letra}</div>
+      <div class="cbte-tipo">${tipo}</div>
+    </div>
+    <div class="cbte-nro-col">
+      <div><strong>Punto de Venta: ${ptoVta}</strong></div>
+      <div><strong>Comprobante Nro: ${nro}</strong></div>
+      <div>Fecha: ${factura.fecha_cbte || new Date().toISOString().slice(0,10)}</div>
+      ${cfg?.afip_iibb ? `<div>Ing. Brutos: ${cfg.afip_iibb}</div>` : ''}
+      ${cfg?.afip_inicio_actividades ? `<div>Inicio act.: ${cfg.afip_inicio_actividades}</div>` : ''}
+      <div>IVA: Responsable Inscripto</div>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="section-label">Receptor</div>
+      <div style="font-weight:600">${factura.cliente_nombre || '—'}</div>
+      ${factura.doc_nro && factura.doc_nro !== '0' ? `<div>CUIT/Doc.: ${factura.doc_nro}</div>` : ''}
+    </div>
+    <div class="info-box">
+      <div class="section-label">Período del servicio</div>
+      <div>${factura.fecha_cbte || ''}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:60%">Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>${factura.descripcion || 'Servicios'}</td>
+        <td style="text-align:right">1</td>
+        <td style="text-align:right">$${(esA?neto:total).toLocaleString('es-AR',{minimumFractionDigits:2})}</td>
+        <td style="text-align:right">$${(esA?neto:total).toLocaleString('es-AR',{minimumFractionDigits:2})}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+    <table class="totals-table" style="width:260px">
+      ${esA && neto ? `<tr><td style="color:#666">Subtotal neto:</td><td style="text-align:right">$${neto.toLocaleString('es-AR',{minimumFractionDigits:2})}</td></tr>` : ''}
+      ${esA && iva  ? `<tr><td style="color:#666">IVA ${alicLabel}:</td><td style="text-align:right">$${iva.toLocaleString('es-AR',{minimumFractionDigits:2})}</td></tr>` : ''}
+      <tr><td class="total-final">TOTAL:</td><td class="total-final" style="text-align:right">$${total.toLocaleString('es-AR',{minimumFractionDigits:2})}</td></tr>
+    </table>
+  </div>
+
+  <div class="cae-box">
+    <strong>CAE:</strong> ${factura.cae || '—'} &nbsp;|&nbsp; <strong>Vencimiento CAE:</strong> ${factura.cae_fch_vto || '—'}
+  </div>
+
+  <div class="footer">Comprobante generado con RhinosCRM — ${isHomo ? 'HOMOLOGACIÓN (sin validez fiscal)' : 'Ambiente de producción AFIP/ARCA'}</div>
+</div>
+</body></html>`;
+
+  const opt = {
+    margin: [8, 8, 8, 8],
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0, backgroundColor: '#ffffff' },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  };
+  // Obtener base64 en lugar de descargar
+  const dataUri = await html2pdf().set(opt).from(html, 'string').outputPdf('datauristring');
+  return dataUri; // "data:application/pdf;base64,..."
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MODAL CONFIRMAR PAGO — Factura AFIP + Email de confirmación opcionales
+// ══════════════════════════════════════════════════════════════════════════════
+
+(function() {
+  // Inyectar HTML del modal en el DOM
+  const modalHtml = `
+<div id="modal-confirmar-pago" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.72);align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:28px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.5)">
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">Confirmar pago recibido</div>
+    <div id="mcp-client-info" style="font-size:13px;color:var(--text2);margin-bottom:20px;padding:12px;background:var(--surface2);border-radius:8px;line-height:1.7"></div>
+
+    <!-- ── Sección AFIP ── -->
+    <div style="border:1px solid var(--border2);border-radius:8px;padding:16px;margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text)">
+        <input type="checkbox" id="mcp-do-factura" style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer">
+        📄 Emitir factura AFIP
+      </label>
+      <div id="mcp-factura-opts" style="display:none;margin-top:14px;display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div>
+            <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Tipo de comprobante</label>
+            <select id="mcp-tipo-cbte" class="inp" style="font-size:12px">
+              <option value="6">Factura B</option>
+              <option value="11">Factura C</option>
+              <option value="1">Factura A</option>
+              <option value="51">Factura A con Retención (OSR)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Condición IVA receptor</label>
+            <select id="mcp-cond-iva" class="inp" style="font-size:12px">
+              <option value="5">Consumidor Final</option>
+              <option value="1">IVA Responsable Inscripto</option>
+              <option value="6">Responsable Monotributo</option>
+              <option value="4">IVA Sujeto Exento</option>
+              <option value="3">IVA no Responsable</option>
+              <option value="9">Cliente del Exterior</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div>
+            <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Tipo doc. receptor</label>
+            <select id="mcp-doc-tipo" class="inp" style="font-size:12px">
+              <option value="80">CUIT</option>
+              <option value="96">DNI</option>
+              <option value="99">Sin doc. (Consumidor Final)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Nro. de documento</label>
+            <input id="mcp-doc-nro" class="inp" placeholder="30-12345678-9" style="font-size:12px;font-family:monospace">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Descripción del servicio</label>
+          <input id="mcp-desc" class="inp" style="font-size:12px;width:100%;box-sizing:border-box">
+        </div>
+        <div id="mcp-factura-warn" style="display:none;margin-top:8px;font-size:11px;color:var(--amber);padding:6px 10px;background:rgba(245,158,11,0.08);border-radius:6px"></div>
+      </div>
+    </div>
+
+    <!-- ── Sección Email ── -->
+    <div style="border:1px solid var(--border2);border-radius:8px;padding:16px;margin-bottom:20px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text)">
+        <input type="checkbox" id="mcp-do-email" checked style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer">
+        📧 Enviar email de confirmación
+      </label>
+      <div id="mcp-email-opts" style="margin-top:14px">
+        <div style="margin-bottom:8px">
+          <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Asunto</label>
+          <input id="mcp-email-asunto" class="inp" style="font-size:12px;width:100%;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Cuerpo del email</label>
+          <textarea id="mcp-email-cuerpo" class="inp" rows="5" style="font-size:12px;width:100%;box-sizing:border-box;resize:vertical;line-height:1.5"></textarea>
+        </div>
+        <div id="mcp-email-adjunto-note" style="display:none;margin-top:8px;font-size:11px;color:var(--cyan);padding:6px 10px;background:rgba(0,229,204,0.08);border-radius:6px">📎 La factura AFIP se adjuntará automáticamente como PDF.</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button id="mcp-btn-cancel" class="btn" style="color:var(--text2)">Cancelar</button>
+      <button id="mcp-btn-confirm" class="btn" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);font-weight:600;min-width:160px">✓ Confirmar pago</button>
+    </div>
+  </div>
+</div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // ── Estado del modal ──────────────────────────────────────────────────────
+  let _mcpResolve = null;
+
+  function mcpClose() {
+    document.getElementById('modal-confirmar-pago').style.display = 'none';
+    if (_mcpResolve) { _mcpResolve(null); _mcpResolve = null; }
+  }
+
+  document.getElementById('mcp-btn-cancel').addEventListener('click', mcpClose);
+  document.getElementById('modal-confirmar-pago').addEventListener('click', function(e) {
+    if (e.target === this) mcpClose();
+  });
+
+  // Mostrar/ocultar sección AFIP
+  document.getElementById('mcp-do-factura').addEventListener('change', function() {
+    const opts = document.getElementById('mcp-factura-opts');
+    opts.style.display = this.checked ? 'block' : 'none';
+    document.getElementById('mcp-email-adjunto-note').style.display =
+      (this.checked && document.getElementById('mcp-do-email').checked) ? 'block' : 'none';
+  });
+
+  // Mostrar/ocultar nota de adjunto
+  document.getElementById('mcp-do-email').addEventListener('change', function() {
+    const opts = document.getElementById('mcp-email-opts');
+    opts.style.display = this.checked ? 'block' : 'none';
+    document.getElementById('mcp-email-adjunto-note').style.display =
+      (this.checked && document.getElementById('mcp-do-factura').checked) ? 'block' : 'none';
+  });
+
+  // Tipo doc → si es "Sin doc" ocultar campo nro
+  document.getElementById('mcp-doc-tipo').addEventListener('change', function() {
+    const nroEl = document.getElementById('mcp-doc-nro');
+    nroEl.disabled = this.value === '99';
+    if (this.value === '99') nroEl.value = '';
+  });
+
+  // ── Abrir modal ───────────────────────────────────────────────────────────
+  window.abrirConfirmarPagoModal = function(clientId, monto) {
+    return new Promise(resolve => {
+      _mcpResolve = resolve;
+      const client = getClients().find(c => c.id === clientId);
+      if (!client) { resolve(null); return; }
+      const monedaCli = client.moneda || 'ARS';
+      const periodo = cobPeriodLabel(cobCurrentPeriod);
+      const montoFmt = fmtMoneda(monto, monedaCli);
+      const mes = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+
+      // Info del cliente
+      document.getElementById('mcp-client-info').innerHTML =
+        `<strong>${client.nombre}</strong>${client.empresa ? ' · ' + client.empresa : ''}<br>` +
+        `Monto: <strong>${montoFmt}</strong>&nbsp; · &nbsp;Período: <strong>${periodo}</strong>`;
+
+      // Pre-fill AFIP
+      const cuitLimpio = (client.cuit || '').replace(/\D/g, '');
+      document.getElementById('mcp-doc-nro').value = cuitLimpio;
+      document.getElementById('mcp-doc-tipo').value = cuitLimpio ? '80' : '99';
+      document.getElementById('mcp-doc-nro').disabled = !cuitLimpio;
+      document.getElementById('mcp-desc').value = `Servicios — ${client.nombre || client.empresa || ''} — ${mes}`;
+      // Tipo cbte: leer del config AFIP si está disponible, default B
+      const cfgTipo = document.getElementById('afip-tipo-cbte')?.value || '6';
+      document.getElementById('mcp-tipo-cbte').value = cfgTipo;
+      // Condición IVA: si tiene CUIT → RI por defecto, si no → CF
+      document.getElementById('mcp-cond-iva').value = cuitLimpio ? '1' : '5';
+
+      // Sección AFIP colapsada por defecto
+      document.getElementById('mcp-do-factura').checked = false;
+      document.getElementById('mcp-factura-opts').style.display = 'none';
+      document.getElementById('mcp-factura-warn').style.display = 'none';
+      document.getElementById('mcp-email-adjunto-note').style.display = 'none';
+
+      // Pre-fill email
+      document.getElementById('mcp-do-email').checked = true;
+      document.getElementById('mcp-email-opts').style.display = 'block';
+      document.getElementById('mcp-email-asunto').value = '✅ Pago recibido — RhinosApp';
+      document.getElementById('mcp-email-cuerpo').value =
+        `Hola ${client.nombre},\n\nConfirmamos la recepción de tu pago de ${montoFmt} correspondiente a ${periodo}. ¡Muchas gracias!\n\nTu acceso a RhinosApp sigue activo. Ante cualquier consulta estamos disponibles.\n\nEquipo RhinosApp 🦏`;
+
+      document.getElementById('modal-confirmar-pago').style.display = 'flex';
+    });
+  };
+
+  // ── Confirmar ─────────────────────────────────────────────────────────────
+  document.getElementById('mcp-btn-confirm').addEventListener('click', async function() {
+    const doFactura = document.getElementById('mcp-do-factura').checked;
+    const doEmail   = document.getElementById('mcp-do-email').checked;
+    const btn = this;
+
+    // Validaciones AFIP
+    if (doFactura) {
+      const docTipo = document.getElementById('mcp-doc-tipo').value;
+      const docNro  = document.getElementById('mcp-doc-nro').value.replace(/\D/g,'');
+      if (docTipo !== '99' && !docNro) {
+        document.getElementById('mcp-factura-warn').textContent = 'Ingresá el número de documento del receptor para emitir la factura.';
+        document.getElementById('mcp-factura-warn').style.display = 'block';
+        return;
+      }
+    }
+
+    // Capturar valores del modal antes de cerrarlo
+    const modalData = {
+      doFactura,
+      doEmail,
+      tipoCbte:    parseInt(document.getElementById('mcp-tipo-cbte').value, 10),
+      condIva:     parseInt(document.getElementById('mcp-cond-iva').value, 10),
+      docTipo:     parseInt(document.getElementById('mcp-doc-tipo').value, 10),
+      docNro:      document.getElementById('mcp-doc-nro').value.replace(/\D/g,''),
+      desc:        document.getElementById('mcp-desc').value.trim(),
+      emailAsunto: document.getElementById('mcp-email-asunto').value.trim(),
+      emailCuerpo: document.getElementById('mcp-email-cuerpo').value.trim(),
+    };
+
+    btn.disabled = true; btn.textContent = '⏳ Procesando...';
+    document.getElementById('modal-confirmar-pago').style.display = 'none';
+
+    const resolve = _mcpResolve;
+    _mcpResolve = null;
+    if (resolve) resolve(modalData);
+    btn.disabled = false; btn.textContent = '✓ Confirmar pago';
+  });
+})();
+
+// ── Handler [data-pagar] usando el modal ─────────────────────────────────────
+// (reemplaza el confirm() nativo del listener inline en renderCobrosPeriodo)
+
+async function _ejecutarConfirmarPago(clientId, monto) {
+  const client = getClients().find(c => c.id === clientId);
+  if (!client) return;
+  const monedaCli = client.moneda || 'ARS';
+  const montoLabel = fmtMoneda(monto, monedaCli) + (monedaCli==='USD' ? ` = ${fmtARS(toARS(monto, monedaCli))}` : '');
+
+  const modalData = await abrirConfirmarPagoModal(clientId, monto);
+  if (!modalData) return; // cancelado
+
+  // ── 1. Marcar cobro como pagado ──
+  const today = new Date().toISOString().slice(0,10);
+  const cobros = getCobros();
+  const idx = cobros.findIndex(c => c.clientId === clientId && c.periodo === cobCurrentPeriod);
+  if (idx >= 0) cobros[idx] = {...cobros[idx], status:'pagado', fechaPago: today};
+  else cobros.push({ clientId, periodo: cobCurrentPeriod, status:'pagado', monto, fechaPago: today });
+  saveCobros(cobros);
+  // Registrar ingreso en Finanzas
+  try {
+    const montoARS = toARS(monto, monedaCli);
+    const [tx] = await sbFetch('rhinos_transactions', 'POST', {
+      type: 'ingreso', amount: montoARS, date: today,
+      description: `Suscripción RhinosApp — ${client.nombre||clientId} (${cobPeriodLabel(cobCurrentPeriod)})${monedaCli==='USD'?` | USD ${monto} × TC $${getTcOficial()}`:''}`,
+      category: 'Ventas', partner: 'empresa', notes: `Cobro mensual cliente | Moneda original: ${monedaCli} ${monto}`, currency: 'ARS'
+    });
+    notifyFinanzas('Ingreso cobro', { ...tx, type:'ingreso' });
+    notifyWhatsApp('Ingreso cobro', { ...tx, type:'ingreso' });
+  } catch(e) { console.warn('No se pudo registrar en Finanzas:', e.message); }
+  renderCobrosPeriodo(); renderClientStats();
+  showToast(`Pago de ${client.nombre} registrado ✓`);
+
+  // ── 2. Emitir factura AFIP (opcional) ──
+  let pdfBase64 = null;
+  let facturaNumero = null;
+  if (modalData.doFactura) {
+    showToast('📤 Emitiendo factura AFIP...');
+    try {
+      const hoy = today;
+      const esA = modalData.tipoCbte === 1 || modalData.tipoCbte === 51;
+      // Siempre facturar en ARS (PES); convertir si el cliente paga en USD
+      const impTotal = Math.round(toARS(monto, monedaCli) * 100) / 100;
+      const rate = esA ? 0.21 : 0; // 21% IVA para Factura A; B/C no discrimina
+      const impNeto  = rate > 0 ? impTotal / (1 + rate) : impTotal;
+      const impIva   = esA ? (impTotal - impNeto) : 0;
+
+      const r = await callAfipAPI('emitir', {
+        cliente_id: clientId || null,
+        cliente_nombre: client.nombre || '',
+        doc_tipo: modalData.docTipo,
+        doc_nro: modalData.docTipo === 99 ? '0' : modalData.docNro,
+        descripcion: modalData.desc,
+        periodo_desde: hoy,
+        periodo_hasta: hoy,
+        fecha: hoy,
+        concepto: 2,
+        tipo_cbte: modalData.tipoCbte,
+        alicuota_id: esA ? 5 : 3,
+        imp_neto: impNeto,
+        imp_iva: impIva,
+        imp_total: impTotal,
+        moneda_id: 'PES',
+        condicion_iva_receptor: modalData.condIva,
+      });
+
+      if (r?.ok) {
+        facturaNumero = r.numero;
+        showToast(`✅ Factura emitida — CAE: ${r.cae}`);
+        // Generar PDF en base64 para adjuntar
+        try {
+          pdfBase64 = await _generarAfipPdfBase64({
+            ...r.factura,
+            cliente_nombre: client.nombre,
+          });
+        } catch(pdfErr) { console.warn('PDF gen error:', pdfErr); }
+        await loadAfipFacturas();
+      } else {
+        showToast('⚠ Error AFIP: ' + (r?.error || 'Error desconocido').slice(0, 80));
+      }
+    } catch(e) {
+      showToast('⚠ Error AFIP: ' + e.message.slice(0, 80));
+    }
+  }
+
+  // ── 3. Enviar email de confirmación (opcional) ──
+  if (modalData.doEmail && client.email) {
+    const tokens = (() => { try { return JSON.parse(localStorage.getItem('rhinos_gmail_tokens')); } catch(e){ return null; } })();
+    if (!tokens?.access_token) {
+      showToast('⚠ Email no enviado: conectá Gmail primero');
+    } else {
+      try {
+        showToast('📧 Enviando email...');
+        const remitenteAlias = document.getElementById('email-remitente')?.value || 'cobranzas@rhinosapp.com';
+        const remitenteNombre = { 'cobranzas@rhinosapp.com':'Cobranzas RhinosApp', 'comercial@rhinosapp.com':'Comercial RhinosApp', 'administracion@rhinosapp.com':'Administración RhinosApp' }[remitenteAlias] || 'RhinosApp';
+        const attachment = pdfBase64 ? {
+          base64: pdfBase64,
+          filename: `factura_${facturaNumero || Date.now()}.pdf`,
+          mimeType: 'application/pdf',
+        } : undefined;
+        await callAPI('gmail_send', {
+          access_token: tokens.access_token,
+          to: client.email,
+          subject: modalData.emailAsunto,
+          body: modalData.emailCuerpo,
+          from: `${remitenteNombre} <${remitenteAlias}>`,
+          attachment,
+        });
+        showToast('✅ Email de confirmación enviado' + (attachment ? ' con factura adjunta' : ''));
+      } catch(e) { showToast('⚠ Error enviando email: ' + e.message.slice(0, 60)); }
+    }
+  }
+
+  showCrossModuleAlert(`Cobro recibido — ${client.nombre || clientId}`, [
+    `Ingreso de ${montoLabel} registrado en Finanzas → Resumen`,
+    modalData.doFactura && facturaNumero ? `Factura AFIP emitida — Nro. ${facturaNumero}` : null,
+    modalData.doEmail && client.email ? `Email de confirmación enviado a ${client.email}` : null,
+    'El estado del cobro cambió a ✓ Pagado en este período',
+  ].filter(Boolean));
+}
+
+// ── Parche: reemplazar el handler [data-pagar] original ──────────────────────
+// El listener está registrado en renderCobrosPeriodo() dentro del forEach.
+// Usamos event delegation en el contenedor para interceptarlo.
+(function() {
+  const list = document.getElementById('cobros-periodo-list');
+  if (!list) return;
+  list.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-pagar]');
+    if (!btn || btn.dataset._mcpHandled) return;
+    e.stopImmediatePropagation();
+    const clientId = btn.dataset.pagar;
+    const monto = +btn.dataset.monto;
+    _ejecutarConfirmarPago(clientId, monto);
+  }, true); // capture: true — se ejecuta antes del listener del renderCobrosPeriodo
+})();
 </script>
 </body>
 </html>
