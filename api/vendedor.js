@@ -131,7 +131,7 @@ async function claudeChat(systemPrompt, userMsg) {
 }
 
 async function getConfig() {
-  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto)');
+  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_whatsapp,vendedor_nombre_vendedor)');
   const map = {};
   rows.forEach(r => { map[r.key] = r.value; });
   return {
@@ -142,11 +142,22 @@ async function getConfig() {
     max_dia:          parseInt(map.vendedor_max_dia       || '20', 10),
     mensaje_ejemplo:  map.vendedor_mensaje_ejemplo || '',
     website:          map.vendedor_website || '',
-    rubro_auto:       map.vendedor_rubro_auto       || '',
-    provincias_auto:  map.vendedor_provincias_auto  || '',
-    cantidad_auto:    parseInt(map.vendedor_cantidad_auto || '20', 10),
-    minimo_auto:      parseInt(map.vendedor_minimo_auto  || '10', 10),
+    rubro_auto:        map.vendedor_rubro_auto        || '',
+    provincias_auto:   map.vendedor_provincias_auto   || '',
+    cantidad_auto:     parseInt(map.vendedor_cantidad_auto || '20', 10),
+    minimo_auto:       parseInt(map.vendedor_minimo_auto  || '10', 10),
+    whatsapp:          map.vendedor_whatsapp          || '',
+    nombre_vendedor:   map.vendedor_nombre_vendedor   || '',
   };
+}
+
+function buildFirma(cfg) {
+  const lines = ['--'];
+  if (cfg.nombre_vendedor) lines.push(cfg.nombre_vendedor);
+  lines.push(cfg.razon_social || '');
+  if (cfg.whatsapp) lines.push(`💬 WhatsApp: https://wa.me/${cfg.whatsapp}`);
+  if (cfg.website)  lines.push(`🌐 ${cfg.website}`);
+  return lines.join('\n');
 }
 
 async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
@@ -156,9 +167,12 @@ async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
   const websiteLinea = cfg.website ? `\n${cfg.website}` : '';
 
   const calcLink = 'https://rhinosapp.vercel.app/#calculadora';
+  const waLink   = cfg.whatsapp ? `https://wa.me/${cfg.whatsapp}` : null;
+  const firma    = buildFirma(cfg);
+
   const system = esFollowup
-    ? `Sos del equipo comercial de "${cfg.razon_social}". Servicios: ${cfg.servicios}. El primer email no tuvo respuesta. Escribí un follow-up breve (máximo 100 palabras) en español argentino, tono conversacional con emojis, ángulo diferente al email anterior. CTA principal: invitá a calcular cuánto pueden ahorrar con la calculadora interactiva → ${calcLink} (mencionala de forma llamativa, que entre curiosidad). Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`
-    : `Sos del equipo comercial de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial inicial en español argentino, conversacional, con emojis. Estructura: saludo informal con nombre de empresa → presentación breve del producto → lista de 4-5 funcionalidades clave con emojis relevantes al rubro de la empresa → modelo de precio (suscripción mensual en pesos, todo incluido, sin sorpresas) → por qué somos diferentes → CTA PRINCIPAL (destacado, con salto de línea propio): invitá a calcular cuánto pueden ahorrar en su negocio con la calculadora interactiva: ${calcLink} — generá curiosidad para que entren.${websiteLinea ? ` Web: ${websiteLinea}` : ''} Máximo 250 palabras. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
+    ? `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". El primer email no tuvo respuesta. Escribí un follow-up en español argentino, tono personal y directo — máximo 80 palabras en el cuerpo (SIN contar la firma). Ángulo diferente al email anterior. CTA único: calculá cuánto podés ahorrar → ${calcLink}. Terminá con esta firma exacta (copiala sin cambiar nada):\n${firma}\nDevolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. El campo cuerpo incluye texto + firma, separados por doble salto de línea. Texto plano.${estiloRef}`
+    : `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial en español argentino — tiene que sentirse como enviado a mano a esta empresa, NO como spam masivo. Sé breve, cálido y concreto. Estructura:\n1. Saludo directo con el nombre de la empresa\n2. 2 oraciones conectando el producto con su rubro específico\n3. Lista de 3-4 funcionalidades clave con emojis\n4. Precio: suscripción mensual en pesos, todo incluido, sin sorpresas\n5. CTA destacado (línea sola): "👉 Calculá cuánto podés ahorrar: ${calcLink}"\n6. Firma exacta (copiala sin cambiar nada):\n${firma}\nMáximo 160 palabras en el cuerpo (SIN contar firma). Tono: directo, sin frases genéricas tipo "espero que estén bien" o "me pongo en contacto". Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
 
   const userMsg = esFollowup
     ? `Empresa: ${prospecto.empresa}\nRubro: ${prospecto.rubro || ''}\nLocalidad: ${prospecto.localidad || ''}\nEmail anterior — Asunto: ${emailAnterior.asunto}\nCuerpo: ${emailAnterior.cuerpo}`

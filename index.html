@@ -3288,6 +3288,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <input id="via-cfg-dias" class="inp" type="number" min="1" max="30" placeholder="3"/></div>
           <div class="field"><label>Máx. emails por día (automático)</label>
             <input id="via-cfg-max" class="inp" type="number" min="1" max="50" placeholder="20"/></div>
+          <div class="field"><label>Tu nombre (firma del email)</label>
+            <input id="via-cfg-nombre-vendedor" class="inp" placeholder="Ej: Isaac"/></div>
+          <div class="field"><label>WhatsApp <span style="color:var(--text3);font-weight:400">(con código de país, sin +)</span></label>
+            <input id="via-cfg-whatsapp" class="inp" placeholder="Ej: 5491156781234"/></div>
           <div class="field"><label>Website / link a incluir en el email</label>
             <input id="via-cfg-website" class="inp" placeholder="rhinosapp.vercel.app"/></div>
           <div class="field" style="grid-column:span 2"><label>Mensaje de referencia de estilo <span style="color:var(--text3);font-weight:400">(pegá un ejemplo de WhatsApp o email tuyo — la IA lo imita)</span></label>
@@ -16704,6 +16708,8 @@ async function loadViaCfg() {
     document.getElementById('via-cfg-tono').value = config.tono || 'profesional';
     document.getElementById('via-cfg-dias').value = config.followup_dias || 3;
     document.getElementById('via-cfg-max').value = config.max_dia || 20;
+    if (config.nombre_vendedor) document.getElementById('via-cfg-nombre-vendedor').value = config.nombre_vendedor;
+    if (config.whatsapp)        document.getElementById('via-cfg-whatsapp').value = config.whatsapp;
     if (config.website)         document.getElementById('via-cfg-website').value = config.website;
     if (config.mensaje_ejemplo) document.getElementById('via-cfg-mensaje').value = config.mensaje_ejemplo;
     if (config.rubro_auto)      document.getElementById('via-cfg-rubro-auto').value = config.rubro_auto;
@@ -16792,6 +16798,8 @@ document.getElementById('btn-via-save-cfg')?.addEventListener('click', async () 
       vendedor_tono:            document.getElementById('via-cfg-tono').value,
       vendedor_followup_dias:   document.getElementById('via-cfg-dias').value || '3',
       vendedor_max_dia:         document.getElementById('via-cfg-max').value || '20',
+      vendedor_nombre_vendedor: document.getElementById('via-cfg-nombre-vendedor').value.trim(),
+      vendedor_whatsapp:        document.getElementById('via-cfg-whatsapp').value.trim(),
       vendedor_website:         document.getElementById('via-cfg-website').value.trim(),
       vendedor_mensaje_ejemplo: document.getElementById('via-cfg-mensaje').value.trim(),
       vendedor_rubro_auto:      document.getElementById('via-cfg-rubro-auto').value.trim(),

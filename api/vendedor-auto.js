@@ -124,17 +124,26 @@ async function claudeChat(system, userMsg) {
   });
 }
 
+function buildFirma(cfg) {
+  const lines = ['--'];
+  if (cfg.nombre_vendedor) lines.push(cfg.nombre_vendedor);
+  lines.push(cfg.razon_social || '');
+  if (cfg.whatsapp) lines.push(`💬 WhatsApp: https://wa.me/${cfg.whatsapp}`);
+  if (cfg.website)  lines.push(`🌐 ${cfg.website}`);
+  return lines.join('\n');
+}
+
 function buildEmailSystem(cfg, esFollowup) {
   const estiloRef = cfg.mensaje_ejemplo
-    ? `\n\nESTILO DE REFERENCIA (adoptá este tono y estructura exacta, NO copies el texto):\n"""\n${cfg.mensaje_ejemplo.slice(0, 800)}\n"""`
+    ? `\n\nESTILO DE REFERENCIA (adoptá este tono, NO copies el texto):\n"""\n${cfg.mensaje_ejemplo.slice(0, 800)}\n"""`
     : '';
-  const websiteLinea = cfg.website ? `\n${cfg.website}` : '';
-
   const calcLink = 'https://rhinosapp.vercel.app/#calculadora';
+  const firma    = buildFirma(cfg);
+
   if (esFollowup) {
-    return `Sos del equipo comercial de "${cfg.razon_social}". El primer email no tuvo respuesta. Escribí un follow-up breve (máximo 100 palabras) en español argentino, conversacional con emojis, ángulo diferente. CTA principal: invitá a calcular cuánto pueden ahorrar con esta calculadora interactiva → ${calcLink} (mencionala de forma llamativa, que entre curiosidad). Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
+    return `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". El primer email no tuvo respuesta. Escribí un follow-up en español argentino, tono personal y directo — máximo 80 palabras en el cuerpo (SIN contar la firma). Ángulo diferente al email anterior. CTA único: calculá cuánto podés ahorrar → ${calcLink}. Terminá con esta firma exacta (copiala sin cambiar nada):\n${firma}\nDevolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. El campo cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
   }
-  return `Sos del equipo comercial de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial inicial en español argentino, conversacional, con emojis. Estructura: saludo informal con nombre de empresa → presentación breve del producto → lista de 4-5 funcionalidades clave con emojis relevantes al rubro de la empresa → modelo de precio (suscripción mensual en pesos, todo incluido, sin sorpresas) → por qué somos diferentes → CTA PRINCIPAL (destacado, con salto de línea propio): invitá a calcular cuánto pueden ahorrar en su negocio con la calculadora interactiva: ${calcLink} — generá curiosidad para que entren.${websiteLinea ? ` Web: ${websiteLinea}` : ''} Máximo 250 palabras. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
+  return `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial en español argentino — tiene que sentirse como enviado a mano a esta empresa, NO como spam masivo. Sé breve, cálido y concreto. Estructura:\n1. Saludo directo con el nombre de la empresa\n2. 2 oraciones conectando el producto con su rubro específico\n3. Lista de 3-4 funcionalidades clave con emojis\n4. Precio: suscripción mensual en pesos, todo incluido, sin sorpresas\n5. CTA destacado (línea sola): "👉 Calculá cuánto podés ahorrar: ${calcLink}"\n6. Firma exacta (copiala sin cambiar nada):\n${firma}\nMáximo 160 palabras en el cuerpo (SIN contar firma). Tono: directo, sin frases genéricas tipo "espero que estén bien". Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
 }
 
 async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
@@ -163,7 +172,7 @@ module.exports = async function handler(req, res) {
 
   try {
     // Cargar config
-    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website)');
+    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_whatsapp,vendedor_nombre_vendedor)');
     const cfgMap = {};
     cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
     const cfg = {
@@ -173,7 +182,9 @@ module.exports = async function handler(req, res) {
       followup_dias:   parseInt(cfgMap.vendedor_followup_dias || '3', 10),
       max_dia:         parseInt(cfgMap.vendedor_max_dia       || '20', 10),
       mensaje_ejemplo: cfgMap.vendedor_mensaje_ejemplo || '',
-      website:         cfgMap.vendedor_website || '',
+      website:         cfgMap.vendedor_website         || '',
+      whatsapp:        cfgMap.vendedor_whatsapp        || '',
+      nombre_vendedor: cfgMap.vendedor_nombre_vendedor || '',
     };
 
     let token;
