@@ -130,10 +130,11 @@ function buildEmailSystem(cfg, esFollowup) {
     : '';
   const websiteLinea = cfg.website ? `\n${cfg.website}` : '';
 
+  const calcLink = 'https://rhinosapp.vercel.app/#calculadora';
   if (esFollowup) {
-    return `Sos del equipo comercial de "${cfg.razon_social}". El primer email no tuvo respuesta. Escribí un follow-up breve (máximo 100 palabras) en español argentino, conversacional con emojis, ángulo diferente — enfatizá la demo gratuita de 30 minutos o un beneficio clave para su rubro. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
+    return `Sos del equipo comercial de "${cfg.razon_social}". El primer email no tuvo respuesta. Escribí un follow-up breve (máximo 100 palabras) en español argentino, conversacional con emojis, ángulo diferente. CTA principal: invitá a calcular cuánto pueden ahorrar con esta calculadora interactiva → ${calcLink} (mencionala de forma llamativa, que entre curiosidad). Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
   }
-  return `Sos del equipo comercial de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial inicial en español argentino, conversacional, con emojis. Estructura: saludo informal con nombre de empresa → presentación breve del producto → lista de 4-5 funcionalidades clave con emojis relevantes al rubro de la empresa → modelo de precio (suscripción mensual en pesos, todo incluido, sin sorpresas) → por qué somos diferentes → CTA: demo 30 minutos sin compromiso.${websiteLinea ? ` Incluí este link al final: ${websiteLinea}` : ''} Máximo 250 palabras. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
+  return `Sos del equipo comercial de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial inicial en español argentino, conversacional, con emojis. Estructura: saludo informal con nombre de empresa → presentación breve del producto → lista de 4-5 funcionalidades clave con emojis relevantes al rubro de la empresa → modelo de precio (suscripción mensual en pesos, todo incluido, sin sorpresas) → por qué somos diferentes → CTA PRINCIPAL (destacado, con salto de línea propio): invitá a calcular cuánto pueden ahorrar en su negocio con la calculadora interactiva: ${calcLink} — generá curiosidad para que entren.${websiteLinea ? ` Web: ${websiteLinea}` : ''} Máximo 250 palabras. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
 }
 
 async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {

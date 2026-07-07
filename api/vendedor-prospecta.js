@@ -142,8 +142,8 @@ function extractEmails(html) {
   return [...new Set((html.match(EMAIL_RE) || []).filter(e => !SKIP_EMAIL.test(e) && e.includes('.') && e.length < 80))];
 }
 
-async function findEmailForSite(website) {
-  if (!website) return null;
+async function findEmailsForSite(website) {
+  if (!website) return [];
   try {
     const base = website.startsWith('http') ? new URL(website).origin : 'https://' + website;
     const [mainHtml, contactHtml] = await Promise.all([
@@ -155,8 +155,8 @@ async function findEmailForSite(website) {
       const en = await fetchHtml(base + '/contact').catch(() => '');
       emails = extractEmails(en);
     }
-    return emails[0] || null;
-  } catch { return null; }
+    return emails.slice(0, 5); // máximo 5 emails por sitio
+  } catch { return []; }
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -203,32 +203,35 @@ module.exports = async function handler(req, res) {
         if (nuevos.length >= cantidad) break;
         if (!place.website) continue;
 
-        const email = await findEmailForSite(place.website);
-        if (!email) continue;
+        const emails = await findEmailsForSite(place.website);
+        if (!emails.length) continue;
 
-        const emailNorm = email.toLowerCase().trim();
-        if (emailsYaEnPipeline.has(emailNorm)) { summary.duplicados++; continue; }
+        for (const email of emails) {
+          if (nuevos.length >= cantidad) break;
+          const emailNorm = email.toLowerCase().trim();
+          if (emailsYaEnPipeline.has(emailNorm)) { summary.duplicados++; continue; }
 
-        emailsYaEnPipeline.add(emailNorm);
-        summary.con_email++;
+          emailsYaEnPipeline.add(emailNorm);
+          summary.con_email++;
 
-        nuevos.push({
-          id:              place.id + '_' + Date.now().toString(36),
-          empresa:         place.name,
-          nombre_contacto: '',
-          email:           email,
-          telefono:        place.phone || '',
-          website:         place.website || '',
-          rubro:           rubro,
-          localidad:       provincia,
-          origen:          'auto_prospecta',
-          estado:          'nuevo',
-          ia_contactado:   false,
-          ia_followup_count: 0,
-          ia_reply:        false,
-          created_at:      new Date().toISOString(),
-          updated_at:      new Date().toISOString(),
-        });
+          nuevos.push({
+            id:              place.id + '_' + emailNorm.replace(/[^a-z0-9]/g, '') + '_' + Date.now().toString(36),
+            empresa:         place.name,
+            nombre_contacto: '',
+            email:           email,
+            telefono:        place.phone || '',
+            website:         place.website || '',
+            rubro:           rubro,
+            localidad:       provincia,
+            origen:          'auto_prospecta',
+            estado:          'nuevo',
+            ia_contactado:   false,
+            ia_followup_count: 0,
+            ia_reply:        false,
+            created_at:      new Date().toISOString(),
+            updated_at:      new Date().toISOString(),
+          });
+        }
       }
     }
 
