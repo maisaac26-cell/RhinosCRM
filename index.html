@@ -3305,8 +3305,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <input id="via-cfg-rubro-auto" class="inp" placeholder="distribuidora de alimentos"/></div>
             <div class="field"><label>Cantidad máx. de prospectos por búsqueda</label>
               <input id="via-cfg-cantidad-auto" class="inp" type="number" min="5" max="200" placeholder="20"/></div>
-            <div class="field"><label>Mínimo diario de prospectos <span style="color:var(--text3);font-weight:400">(sigue buscando hasta alcanzarlo)</span></label>
+            <div class="field"><label>Mínimo diario total <span style="color:var(--text3);font-weight:400">(sigue buscando hasta alcanzarlo)</span></label>
               <input id="via-cfg-minimo-auto" class="inp" type="number" min="1" max="200" placeholder="10"/></div>
+            <div class="field"><label>Mínimo por búsqueda <span style="color:var(--text3);font-weight:400">(si rinde menos, cambia de rubro)</span></label>
+              <input id="via-cfg-minimo-busqueda" class="inp" type="number" min="1" max="20" placeholder="2"/></div>
             <div class="field" style="grid-column:span 2"><label>Provincias target <span style="color:var(--text3);font-weight:400">(separadas por coma, vacío = aleatoria)</span></label>
               <input id="via-cfg-provincias-auto" class="inp" placeholder="Buenos Aires, Córdoba, Santa Fe"/></div>
           </div>
@@ -16715,7 +16717,8 @@ async function loadViaCfg() {
     if (config.rubro_auto)      document.getElementById('via-cfg-rubro-auto').value = config.rubro_auto;
     if (config.provincias_auto) document.getElementById('via-cfg-provincias-auto').value = config.provincias_auto;
     if (config.cantidad_auto)   document.getElementById('via-cfg-cantidad-auto').value = config.cantidad_auto;
-    if (config.minimo_auto)     document.getElementById('via-cfg-minimo-auto').value = config.minimo_auto;
+    if (config.minimo_auto)      document.getElementById('via-cfg-minimo-auto').value = config.minimo_auto;
+    if (config.minimo_busqueda) document.getElementById('via-cfg-minimo-busqueda').value = config.minimo_busqueda;
   } catch(e) { console.warn('via cfg:', e.message); }
 }
 
@@ -16806,6 +16809,7 @@ document.getElementById('btn-via-save-cfg')?.addEventListener('click', async () 
       vendedor_provincias_auto: document.getElementById('via-cfg-provincias-auto').value.trim(),
       vendedor_cantidad_auto:   document.getElementById('via-cfg-cantidad-auto').value || '20',
       vendedor_minimo_auto:     document.getElementById('via-cfg-minimo-auto').value || '10',
+      vendedor_minimo_busqueda: document.getElementById('via-cfg-minimo-busqueda').value || '2',
     });
     const ok = document.getElementById('via-cfg-ok');
     if (ok) { ok.style.display = 'inline'; setTimeout(() => { ok.style.display = 'none'; }, 2500); }

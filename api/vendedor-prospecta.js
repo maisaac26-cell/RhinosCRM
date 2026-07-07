@@ -172,35 +172,40 @@ module.exports = async function handler(req, res) {
 
   try {
     // Cargar config
-    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto)');
+    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_minimo_busqueda)');
     const cfgMap  = {};
     cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
 
-    const cantidad = parseInt(cfgMap.vendedor_cantidad_auto || '20', 10);
-    const minimo   = parseInt(cfgMap.vendedor_minimo_auto   || '10', 10);
+    const cantidad        = parseInt(cfgMap.vendedor_cantidad_auto    || '50',  10); // máximo total
+    const minimo          = parseInt(cfgMap.vendedor_minimo_auto      || '10',  10); // mínimo total diario
+    const minimoBusqueda  = parseInt(cfgMap.vendedor_minimo_busqueda  || '2',   10); // mínimo por iteración
 
-    const rubroFijo       = (cfgMap.vendedor_rubro_auto || '').trim();
-    const provinciasConf  = (cfgMap.vendedor_provincias_auto || '').split(',').map(s => s.trim()).filter(Boolean);
+    const rubroFijo      = (cfgMap.vendedor_rubro_auto || '').trim();
+    const provinciasConf = (cfgMap.vendedor_provincias_auto || '').split(',').map(s => s.trim()).filter(Boolean);
 
     // Obtener emails ya en el pipeline para deduplicar
     const existentes = await sbGet('rhinos_prospectos?select=email&limit=5000');
     const emailsYaEnPipeline = new Set(existentes.map(r => (r.email || '').toLowerCase().trim()).filter(Boolean));
 
     const nuevos = [];
-    const MAX_INTENTOS = 8; // máximo 8 búsquedas para no exceder timeout de Vercel
+    const startTime  = Date.now();
+    const TIME_LIMIT = 240000; // 240s — margen de 60s antes del timeout de 300s
 
-    while (nuevos.length < minimo && summary.intentos < MAX_INTENTOS) {
-      const rubro    = rubroFijo || pick(RUBROS_RANDOM);
+    while (nuevos.length < minimo && (Date.now() - startTime) < TIME_LIMIT) {
+      const rubro     = rubroFijo || pick(RUBROS_RANDOM);
       const provincia = provinciasConf.length ? provinciasConf[summary.intentos % provinciasConf.length] : pick(PROVINCIAS_RANDOM);
       summary.intentos++;
-      if (!summary.rubros.includes(rubro))     summary.rubros.push(rubro);
+      if (!summary.rubros.includes(rubro))         summary.rubros.push(rubro);
       if (!summary.provincias.includes(provincia)) summary.provincias.push(provincia);
 
       const places = await searchPlaces(rubro, provincia, PLACES_KEY);
       summary.buscados += places.length;
 
+      let encontradosEnEstaIteracion = 0;
+
       for (const place of places) {
         if (nuevos.length >= cantidad) break;
+        if ((Date.now() - startTime) >= TIME_LIMIT) break;
         if (!place.website) continue;
 
         const emails = await findEmailsForSite(place.website);
@@ -213,9 +218,10 @@ module.exports = async function handler(req, res) {
 
           emailsYaEnPipeline.add(emailNorm);
           summary.con_email++;
+          encontradosEnEstaIteracion++;
 
           nuevos.push({
-            id:              place.id + '_' + emailNorm.replace(/[^a-z0-9]/g, '') + '_' + Date.now().toString(36),
+            id:              place.id + '_' + emailNorm.replace(/[^a-z0-9]/g, '').slice(0, 30) + '_' + Date.now().toString(36),
             empresa:         place.name,
             nombre_contacto: '',
             email:           email,
@@ -233,6 +239,10 @@ module.exports = async function handler(req, res) {
           });
         }
       }
+
+      // Si esta iteración rindió menos que el mínimo por búsqueda Y todavía no llegamos
+      // al mínimo total, seguimos con otro rubro/provincia sin contar como "intento fallido".
+      summary.errors.push({ iteracion: summary.intentos, rubro, provincia, encontrados: encontradosEnEstaIteracion });
     }
 
     if (nuevos.length) {

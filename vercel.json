@@ -10,7 +10,7 @@
     "api/auto-notif.js": { "maxDuration": 30 },
     "api/vendedor.js":   { "maxDuration": 60 },
     "api/vendedor-auto.js":      { "maxDuration": 60 },
-    "api/vendedor-prospecta.js": { "maxDuration": 60 }
+    "api/vendedor-prospecta.js": { "maxDuration": 300 }
   },
   "crons": [
     { "path": "/api/weekly-report",      "schedule": "0 13 * * 1" },
