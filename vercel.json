@@ -7,13 +7,16 @@
     "api/weekly-report.js": { "maxDuration": 30 },
     "api/auto-emails.js": { "maxDuration": 30 },
     "api/keepalive.js": { "maxDuration": 15 },
-    "api/auto-notif.js": { "maxDuration": 30 }
+    "api/auto-notif.js": { "maxDuration": 30 },
+    "api/vendedor.js":   { "maxDuration": 60 },
+    "api/vendedor-auto.js": { "maxDuration": 60 }
   },
   "crons": [
-    { "path": "/api/weekly-report", "schedule": "0 13 * * 1" },
-    { "path": "/api/auto-emails",   "schedule": "0 12 * * *" },
-    { "path": "/api/keepalive",     "schedule": "0 12 * * *" },
-    { "path": "/api/auto-notif",    "schedule": "0 12 * * *" }
+    { "path": "/api/weekly-report",  "schedule": "0 13 * * 1" },
+    { "path": "/api/auto-emails",    "schedule": "0 12 * * *" },
+    { "path": "/api/keepalive",      "schedule": "0 12 * * *" },
+    { "path": "/api/auto-notif",     "schedule": "0 12 * * *" },
+    { "path": "/api/vendedor-auto",  "schedule": "0 9 * * 1-5" }
   ],
   "rewrites": [
     { "source": "/auth/callback", "destination": "/index.html" },

@@ -534,6 +534,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="nav-group-label">Operaciones</div>
     <button class="nav-btn" data-sec="tareas"><span class="nav-icon">📋</span>Tareas</button>
     <button class="nav-btn" data-sec="agente"><span class="nav-icon">🤖</span>Agente IA</button>
+    <button class="nav-btn" data-sec="vendedor-ia"><span class="nav-icon">🎯</span>Vendedor IA</button>
     <button class="nav-btn" data-sec="notificaciones"><span class="nav-icon">📢</span>Notificaciones</button>
     <button class="nav-btn" data-sec="soporte" id="nav-soporte-btn"><span class="nav-icon">🎫</span>Soporte<span id="nav-soporte-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;line-height:1.4"></span></button>
 
@@ -3221,6 +3222,72 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           </div>
           <div class="agente-output-text" id="agente-output-body"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VENDEDOR IA -->
+  <div class="section" id="s-vendedor-ia">
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div><div class="page-title">VEND<span>EDOR IA</span></div>
+      <div class="page-sub">Prospección + contacto automático + follow-up solo para contactos de la IA.</div></div>
+    </div>
+
+    <!-- Stats -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:16px">
+      <div class="metric-card"><div class="m-label">Pipeline</div><div class="m-val cyan" id="via-stat-total">—</div><div class="m-sub">prospectos</div></div>
+      <div class="metric-card"><div class="m-label">Contactados</div><div class="m-val" id="via-stat-contactados">—</div><div class="m-sub">por la IA</div></div>
+      <div class="metric-card"><div class="m-label">Respondieron</div><div class="m-val" style="color:var(--green)" id="via-stat-replies">—</div><div class="m-sub">interesados</div></div>
+      <div class="metric-card"><div class="m-label">Fríos</div><div class="m-val" style="color:var(--text3)" id="via-stat-frios">—</div><div class="m-sub">sin respuesta</div></div>
+    </div>
+
+    <!-- Acciones rápidas -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn btn-cyan" id="btn-via-followups" style="gap:6px">⚡ Ejecutar follow-ups ahora</button>
+      <button class="btn" id="btn-via-refresh" style="gap:6px">↻ Actualizar</button>
+      <select id="via-filtro-estado" class="inp" style="width:auto;font-size:12px">
+        <option value="todos">Todos los estados</option>
+        <option value="contactado">Contactados</option>
+        <option value="follow_up_1">Follow-up 1</option>
+        <option value="follow_up_2">Follow-up 2</option>
+        <option value="interesado">Interesados</option>
+        <option value="frio">Fríos</option>
+      </select>
+    </div>
+
+    <!-- Tabs: Pipeline / Config -->
+    <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:0">
+      <button class="tab-btn active" data-via-tab="pipeline" style="font-size:12px">📋 Pipeline</button>
+      <button class="tab-btn" data-via-tab="config" style="font-size:12px">⚙️ Configuración</button>
+    </div>
+
+    <!-- Tab Pipeline -->
+    <div id="via-tab-pipeline">
+      <div id="via-prospectos-list"><div class="empty">Cargando...</div></div>
+    </div>
+
+    <!-- Tab Config -->
+    <div id="via-tab-config" style="display:none">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px">Configuración del Vendedor IA</div>
+        <div class="grid2">
+          <div class="field"><label>Nombre / Razón Social</label>
+            <input id="via-cfg-razon" class="inp" placeholder="Ej: Rhinos CRM Marketing"/></div>
+          <div class="field"><label>Tono del email</label>
+            <select id="via-cfg-tono" class="inp">
+              <option value="profesional">Profesional</option>
+              <option value="amigable">Amigable y cercano</option>
+              <option value="directo">Directo y conciso</option>
+            </select></div>
+          <div class="field" style="grid-column:span 2"><label>Descripción de servicios que ofrecés</label>
+            <textarea id="via-cfg-servicios" class="inp" rows="3" placeholder="Ej: CRM para distribuidoras de alimentos, con gestión de clientes, facturación AFIP, reportes automáticos y agente IA comercial."></textarea></div>
+          <div class="field"><label>Días antes del primer follow-up</label>
+            <input id="via-cfg-dias" class="inp" type="number" min="1" max="30" placeholder="3"/></div>
+          <div class="field"><label>Máx. emails por día (automático)</label>
+            <input id="via-cfg-max" class="inp" type="number" min="1" max="50" placeholder="20"/></div>
+        </div>
+        <button class="btn btn-cyan" id="btn-via-save-cfg" style="margin-top:12px">💾 Guardar configuración</button>
+        <span id="via-cfg-ok" style="display:none;font-size:12px;color:var(--green);margin-left:10px">✓ Guardado</span>
       </div>
     </div>
   </div>
@@ -8941,6 +9008,8 @@ function updateCampaignBar() {
   if (igBtn) igBtn.style.display = withIG > 0 ? 'inline-flex' : 'none';
   const waBtn = document.getElementById('btn-wa-campaign-launch');
   if (waBtn) waBtn.style.display = withPhone > 0 ? 'inline-flex' : 'none';
+  const viaBtn = document.getElementById('btn-vendedor-ia-launch');
+  if (viaBtn) viaBtn.style.display = withEmail > 0 ? 'inline-flex' : 'none';
 }
 
 function renderIGBadge(username) {
@@ -8995,6 +9064,7 @@ function renderProspects() {
         <button class="btn btn-sm" id="btn-wa-campaign-launch" style="background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3);font-weight:600;display:none">💬 Campaña WA</button>
         <button class="btn btn-sm" id="btn-campaign-send" style="background:rgba(0,229,204,0.15);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600">📧 Campaña email</button>
         <button class="btn btn-sm" id="btn-ig-campaign-open" style="background:linear-gradient(135deg,rgba(131,58,180,0.15),rgba(253,29,29,0.08));color:#a78bfa;border-color:rgba(131,58,180,0.3);font-weight:600;display:none">📸 Campaña IG DM</button>
+        <button class="btn btn-sm" id="btn-vendedor-ia-launch" style="background:rgba(16,185,129,0.15);color:#34d399;border-color:rgba(16,185,129,0.3);font-weight:600;display:none">🎯 Vendedor IA</button>
       </div>
     </div>
 
@@ -16467,6 +16537,250 @@ document.getElementById('btn-save-vendedor')?.addEventListener('click', async fu
 });
 
 document.querySelector('.nav-btn[data-sec="vendedores"]')?.addEventListener('click', loadVendedores);
+
+// ── VENDEDOR IA ───────────────────────────────────────
+
+async function callVendedorAPI(action, data = {}) {
+  const r = await fetch('/api/vendedor', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...data })
+  });
+  const json = await r.json();
+  if (!r.ok || json.error) throw new Error(json.error || 'Error en Vendedor API');
+  return json;
+}
+
+const VIA_ESTADO_LABEL = {
+  contactado: { label: 'Contactado', color: 'var(--cyan)' },
+  follow_up_1: { label: 'Follow-up 1', color: 'var(--amber)' },
+  follow_up_2: { label: 'Follow-up 2', color: '#f97316' },
+  interesado: { label: '⭐ Interesado', color: 'var(--green)' },
+  frio: { label: 'Frío', color: 'var(--text3)' },
+  nuevo: { label: 'Nuevo', color: 'var(--text2)' },
+};
+
+async function loadVendedorIA() {
+  await Promise.all([loadViaStats(), loadViaProspectos()]);
+  loadViaCfg();
+}
+
+async function loadViaStats() {
+  try {
+    const { stats } = await callVendedorAPI('get_stats');
+    document.getElementById('via-stat-total').textContent = stats.total;
+    document.getElementById('via-stat-contactados').textContent = stats.contactados;
+    document.getElementById('via-stat-replies').textContent = stats.interesados;
+    document.getElementById('via-stat-frios').textContent = stats.frios;
+  } catch(e) { console.warn('via stats:', e.message); }
+}
+
+async function loadViaProspectos() {
+  const list = document.getElementById('via-prospectos-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loader" style="margin:20px auto"></div>';
+  try {
+    const estado = document.getElementById('via-filtro-estado')?.value || 'todos';
+    const { prospectos } = await callVendedorAPI('get_prospectos', { estado, limit: 100 });
+    if (!prospectos.length) { list.innerHTML = '<div class="empty">Sin prospectos en el pipeline todavía.<br><small>Buscá prospectos en la sección Prospectos y contactalos con el botón "🎯 Vendedor IA".</small></div>'; return; }
+    list.innerHTML = `
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);color:var(--text3);text-align:left">
+              <th style="padding:8px 10px">Empresa</th>
+              <th style="padding:8px 6px">Rubro</th>
+              <th style="padding:8px 6px">Localidad</th>
+              <th style="padding:8px 6px">Estado</th>
+              <th style="padding:8px 6px">Contactado</th>
+              <th style="padding:8px 6px">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="via-tbody">
+          ${prospectos.map(p => {
+            const est = VIA_ESTADO_LABEL[p.estado] || { label: p.estado, color: 'var(--text2)' };
+            const fecha = p.ia_fecha_contacto ? new Date(p.ia_fecha_contacto).toLocaleDateString('es-AR') : '—';
+            const followupFecha = p.ia_followup_fecha ? ` · FU: ${new Date(p.ia_followup_fecha).toLocaleDateString('es-AR')}` : '';
+            return `<tr style="border-bottom:1px solid var(--border2)" data-pid="${p.id}">
+              <td style="padding:8px 10px;font-weight:500;color:var(--text)">${p.empresa}<br><span style="font-size:11px;color:var(--text3)">${p.email}</span></td>
+              <td style="padding:8px 6px;color:var(--text2)">${p.rubro || '—'}</td>
+              <td style="padding:8px 6px;color:var(--text2)">${p.localidad || '—'}</td>
+              <td style="padding:8px 6px"><span style="font-size:11px;font-weight:600;color:${est.color}">${est.label}</span>${p.ia_reply ? ' <span style="color:var(--green);font-size:10px">✓ Reply</span>' : ''}</td>
+              <td style="padding:8px 6px;color:var(--text3)">${fecha}${followupFecha}</td>
+              <td style="padding:8px 6px">
+                <div style="display:flex;gap:4px">
+                  <button class="btn btn-sm via-btn-ver" data-pid="${p.id}" data-empresa="${p.empresa}" data-asunto="${(p.ia_email_asunto||'').replace(/"/g,'&quot;')}" data-body="${(p.ia_email_body||'').replace(/"/g,'&quot;')}" title="Ver email enviado" style="font-size:11px;padding:3px 8px">📧</button>
+                  <button class="btn btn-sm via-btn-marcar" data-pid="${p.id}" title="Marcar como interesado" style="font-size:11px;padding:3px 8px;color:var(--green);border-color:rgba(34,197,94,0.3)">⭐</button>
+                  <button class="btn btn-sm via-btn-del" data-pid="${p.id}" title="Eliminar" style="font-size:11px;padding:3px 8px;color:var(--red);border-color:rgba(239,68,68,0.3)">✕</button>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    list.querySelectorAll('.via-btn-ver').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const asunto = btn.dataset.asunto;
+        const body = btn.dataset.body;
+        showToast(`Asunto: ${asunto}`);
+        const modal = document.getElementById('modal-via-email') || (() => {
+          const m = document.createElement('div');
+          m.id = 'modal-via-email';
+          m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+          m.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto">
+            <div style="font-weight:600;margin-bottom:12px;color:var(--text)" id="modal-via-empresa"></div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:6px">Asunto:</div>
+            <div style="font-size:13px;font-weight:500;color:var(--cyan);margin-bottom:12px" id="modal-via-asunto"></div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:6px">Email enviado:</div>
+            <div style="font-size:13px;white-space:pre-wrap;line-height:1.7;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px" id="modal-via-body"></div>
+            <button class="btn btn-full" style="margin-top:16px" onclick="document.getElementById('modal-via-email').style.display='none'">Cerrar</button>
+          </div>`;
+          document.body.appendChild(m);
+          m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; });
+          return m;
+        })();
+        document.getElementById('modal-via-empresa').textContent = btn.dataset.empresa;
+        document.getElementById('modal-via-asunto').textContent = asunto;
+        document.getElementById('modal-via-body').textContent = body;
+        modal.style.display = 'flex';
+      });
+    });
+
+    list.querySelectorAll('.via-btn-marcar').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await callVendedorAPI('update_prospecto', { id: btn.dataset.pid, estado: 'interesado', ia_reply: true });
+          showToast('Marcado como interesado ⭐');
+          loadViaProspectos(); loadViaStats();
+        } catch(e) { showToast('Error: ' + e.message); btn.disabled = false; }
+      });
+    });
+
+    list.querySelectorAll('.via-btn-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('¿Eliminar este prospecto del pipeline?')) return;
+        try {
+          await callVendedorAPI('delete_prospecto', { id: btn.dataset.pid });
+          btn.closest('tr').remove();
+          loadViaStats();
+        } catch(e) { showToast('Error: ' + e.message); }
+      });
+    });
+  } catch(e) {
+    list.innerHTML = `<div class="empty" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+async function loadViaCfg() {
+  try {
+    const { config } = await callVendedorAPI('get_config');
+    if (config.razon_social && config.razon_social !== 'nuestra empresa') document.getElementById('via-cfg-razon').value = config.razon_social;
+    if (config.servicios && config.servicios !== 'servicios de gestión comercial') document.getElementById('via-cfg-servicios').value = config.servicios;
+    document.getElementById('via-cfg-tono').value = config.tono || 'profesional';
+    document.getElementById('via-cfg-dias').value = config.followup_dias || 3;
+    document.getElementById('via-cfg-max').value = config.max_dia || 20;
+  } catch(e) { console.warn('via cfg:', e.message); }
+}
+
+// Tab switching
+document.querySelectorAll('[data-via-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-via-tab]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('via-tab-pipeline').style.display = btn.dataset.viaTab === 'pipeline' ? 'block' : 'none';
+    document.getElementById('via-tab-config').style.display = btn.dataset.viaTab === 'config' ? 'block' : 'none';
+  });
+});
+
+// Filtro estado
+document.getElementById('via-filtro-estado')?.addEventListener('change', loadViaProspectos);
+
+// Follow-ups
+document.getElementById('btn-via-followups')?.addEventListener('click', async () => {
+  const btn = document.getElementById('btn-via-followups');
+  btn.disabled = true; btn.textContent = '⏳ Ejecutando...';
+  try {
+    const { procesados, results } = await callVendedorAPI('run_followups');
+    const respondieron = results.filter(r => r.accion === 'respondio').length;
+    const enviados = results.filter(r => r.accion === 'followup_enviado').length;
+    const frios = results.filter(r => r.estado === 'frio').length;
+    showToast(`✅ ${procesados} revisados · ${respondieron} respondieron · ${enviados} follow-ups enviados · ${frios} fríos`);
+    loadVendedorIA();
+  } catch(e) { showToast('Error: ' + e.message); }
+  btn.disabled = false; btn.textContent = '⚡ Ejecutar follow-ups ahora';
+});
+
+// Refresh
+document.getElementById('btn-via-refresh')?.addEventListener('click', loadVendedorIA);
+
+// Guardar config
+document.getElementById('btn-via-save-cfg')?.addEventListener('click', async () => {
+  const btn = document.getElementById('btn-via-save-cfg');
+  btn.disabled = true;
+  try {
+    await callVendedorAPI('save_config', {
+      vendedor_razon_social: document.getElementById('via-cfg-razon').value.trim(),
+      vendedor_servicios: document.getElementById('via-cfg-servicios').value.trim(),
+      vendedor_tono: document.getElementById('via-cfg-tono').value,
+      vendedor_followup_dias: document.getElementById('via-cfg-dias').value || '3',
+      vendedor_max_dia: document.getElementById('via-cfg-max').value || '20',
+    });
+    const ok = document.getElementById('via-cfg-ok');
+    if (ok) { ok.style.display = 'inline'; setTimeout(() => { ok.style.display = 'none'; }, 2500); }
+  } catch(e) { showToast('Error guardando config: ' + e.message); }
+  btn.disabled = false;
+});
+
+// Nav click
+document.querySelector('.nav-btn[data-sec="vendedor-ia"]')?.addEventListener('click', loadVendedorIA);
+
+// Botón "🎯 Vendedor IA" en la barra de campaña de prospectos
+document.addEventListener('click', async function(e) {
+  if (!e.target.matches('#btn-vendedor-ia-launch')) return;
+  const selected = [...selectedProspects];
+  const savedEmails = getProspectEmails();
+  const conEmail = selected.filter(i => {
+    const p = prospectsData[i];
+    return p && savedEmails[p.id];
+  });
+  if (!conEmail.length) { showToast('Seleccioná prospectos con email primero'); return; }
+
+  if (!confirm(`¿Contactar ${conEmail.length} prospectos con el Vendedor IA?\n\nLa IA generará un email personalizado para cada uno y lo enviará por Gmail.\n\nEsto puede tardar ${Math.ceil(conEmail.length * 0.8)} segundos.`)) return;
+
+  const btn = document.getElementById('btn-vendedor-ia-launch');
+  btn.disabled = true; btn.textContent = `⏳ Enviando 0/${conEmail.length}...`;
+
+  const prospectos = conEmail.map(i => {
+    const p = prospectsData[i];
+    return {
+      id: p.id,
+      empresa: p.name,
+      nombre_contacto: '',
+      email: savedEmails[p.id],
+      telefono: p.phone || '',
+      website: p.website || '',
+      rubro: p.type || '',
+      localidad: p.address || '',
+      origen: 'google_places'
+    };
+  });
+
+  try {
+    btn.textContent = `⏳ Generando emails con IA...`;
+    const { results } = await callVendedorAPI('contactar_lote', { prospectos });
+    const ok = results.filter(r => r.ok).length;
+    const err = results.filter(r => !r.ok).length;
+    showToast(`🎯 ${ok} emails enviados${err > 0 ? ` · ${err} errores` : ''}`);
+    selectedProspects.clear();
+    updateCampaignBar();
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = '🎯 Vendedor IA';
+});
 
 // ── DASHBOARD COMERCIAL ───────────────────────────────
 async function loadCommercialDashboard() {
