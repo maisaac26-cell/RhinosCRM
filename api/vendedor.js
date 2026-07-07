@@ -200,10 +200,13 @@ function buildFirma(cfg) {
 }
 
 async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
-  const estiloRef = cfg.mensaje_ejemplo
-    ? `\n\nESTILO DE REFERENCIA (adaptá este tono y estructura, NO copies el texto):\n"""\n${cfg.mensaje_ejemplo.slice(0, 800)}\n"""`
-    : '';
   const websiteLinea = cfg.website ? `\n${cfg.website}` : '';
+  const ejemploLimpio = cfg.mensaje_ejemplo || '';
+  const esEjemploSpam = (ejemploLimpio.match(/[📦🛒💳🧾📊📱✅❌🎯🦏👉]/gu) || []).length > 2
+    || (ejemploLimpio.match(/^[•\-\*]/gm) || []).length > 2;
+  const estiloRef = (!esEjemploSpam && ejemploLimpio.length > 20)
+    ? `\n\nTONO DE REFERENCIA (solo el tono, NO la estructura ni el contenido):\n"""\n${ejemploLimpio.slice(0, 300)}\n"""`
+    : '';
 
   const calcLink = 'https://rhinosapp.vercel.app/#calculadora';
   const waLink   = cfg.whatsapp ? `https://wa.me/${cfg.whatsapp}` : null;
@@ -211,7 +214,7 @@ async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
 
   const system = esFollowup
     ? `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}". Ya le escribiste a esta empresa y no respondió. Escribí un segundo contacto muy breve en español rioplatense.\n\nREGLAS ANTI-SPAM (críticas):\n- Máximo 45 palabras en el cuerpo (SIN firma)\n- Sin emojis en el asunto ni en el cuerpo\n- Sin "hacemos seguimiento", "te quería recordar", "perdiste mi email"\n- Sin listas ni bullets\n- Ángulo diferente: hacé UNA pregunta sobre su negocio, o mencioná un resultado concreto\n- Un solo link integrado en el texto: ${calcLink}\n- Firma exacta sin modificar:\n${firma}\n\nDevolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo incluye texto + firma separados por \\n\\n. Texto plano.${estiloRef}`
-    : `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}" (${cfg.servicios}). Vas a escribirle a una empresa.\n\nOBJETIVO: Un email que parezca escrito a mano, pase filtros anti-spam y que el dueño quiera leer.\n\nREGLAS DE ENTREGABILIDAD (no las rompas):\n- Máximo 70 palabras en el cuerpo (SIN firma)\n- NINGÚN emoji en el asunto\n- NINGÚN bullet point ni lista en el cuerpo\n- NINGUNA palabra spam: "oferta", "suscripción", "precio", "calculá", "ahorrar", "gratis", "garantía"\n- Un SOLO link externo, integrado en una oración natural (no en línea sola)\n- Sin signos de exclamación en el asunto\n- Sin "espero que estén bien", sin "me dirijo a usted", sin "vimos que manejan"\n- Tono: directo y natural, persona hablándole a persona\n\nESTRUCTURA DEL CUERPO:\nFrase 1: algo específico de su rubro que muestre que sabés de su actividad\nFrase 2: qué hace "${cfg.razon_social}" y cómo puede servirles concretamente\nFrase 3: invitación simple con el link: ${calcLink}\nFirma exacta sin modificar:\n${firma}\n\nASUNTO — 3 variantes, NINGUNA con emoji ni signos de exclamación:\nasunto_a: nombre de la empresa + tema específico\nasunto_b: pregunta directa sobre su negocio\nasunto_c: súper corto, 3-4 palabras máximo\n\nDevolvé SOLO JSON: {"asunto_a":"...","asunto_b":"...","asunto_c":"...","cuerpo":"..."}. Cuerpo incluye texto + \\n\\n + firma. Texto plano, sin markdown.${estiloRef}`;
+    : `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}" — sistema de gestión para PyMEs argentinas (${(cfg.servicios || '').slice(0, 120).split('\n')[0]}). Vas a escribirle a una empresa.\n\nOBJETIVO: Un email que parezca escrito a mano, pase filtros anti-spam y que el dueño quiera leer.\n\nREGLAS DE ENTREGABILIDAD (no las rompas):\n- Máximo 70 palabras en el cuerpo (SIN firma)\n- NINGÚN emoji en el asunto\n- NINGÚN bullet point ni lista en el cuerpo\n- NINGUNA palabra spam: "oferta", "suscripción", "precio", "calculá", "ahorrar", "gratis", "garantía"\n- Un SOLO link externo, integrado en una oración natural (no en línea sola)\n- Sin signos de exclamación en el asunto\n- Sin "espero que estén bien", sin "me dirijo a usted", sin "vimos que manejan"\n- Tono: directo y natural, persona hablándole a persona\n\nESTRUCTURA DEL CUERPO:\nFrase 1: algo específico de su rubro que muestre que sabés de su actividad\nFrase 2: qué hace "${cfg.razon_social}" y cómo puede servirles concretamente\nFrase 3: invitación simple con el link: ${calcLink}\nFirma exacta sin modificar:\n${firma}\n\nASUNTO — 3 variantes, NINGUNA con emoji ni signos de exclamación:\nasunto_a: nombre de la empresa + tema específico\nasunto_b: pregunta directa sobre su negocio\nasunto_c: súper corto, 3-4 palabras máximo\n\nDevolvé SOLO JSON: {"asunto_a":"...","asunto_b":"...","asunto_c":"...","cuerpo":"..."}. Cuerpo incluye texto + \\n\\n + firma. Texto plano, sin markdown.${estiloRef}`;
 
   const userMsg = esFollowup
     ? `Empresa: ${prospecto.empresa}\nRubro: ${prospecto.rubro || ''}\nLocalidad: ${prospecto.localidad || ''}\nEmail anterior — Asunto: ${emailAnterior.asunto}\nCuerpo: ${emailAnterior.cuerpo}`

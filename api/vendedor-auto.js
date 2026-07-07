@@ -220,8 +220,13 @@ function buildFirma(cfg) {
 }
 
 function buildEmailSystem(cfg, esFollowup) {
-  const estiloRef = cfg.mensaje_ejemplo
-    ? `\n\nESTILO DE REFERENCIA (adoptá este tono, NO copies el texto):\n"""\n${cfg.mensaje_ejemplo.slice(0, 500)}\n"""`
+  // Sanitizar el ejemplo: si tiene muchos emojis/bullets probablemente sea un pitch de venta
+  // que haría que Claude genere emails spam. Solo usarlo si parece un email personal limpio.
+  const ejemploLimpio = cfg.mensaje_ejemplo || '';
+  const esEjemploSpam = (ejemploLimpio.match(/[📦🛒💳🧾📊📱✅❌🎯🦏👉]/gu) || []).length > 2
+    || (ejemploLimpio.match(/^[•\-\*]/gm) || []).length > 2;
+  const estiloRef = (!esEjemploSpam && ejemploLimpio.length > 20)
+    ? `\n\nTONO DE REFERENCIA (solo el tono, NO la estructura ni el contenido):\n"""\n${ejemploLimpio.slice(0, 300)}\n"""`
     : '';
   const calcLink = 'https://rhinosapp.vercel.app/#calculadora';
   const firma    = buildFirma(cfg);
@@ -241,7 +246,9 @@ REGLAS ANTI-SPAM (críticas):
 Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. El cuerpo incluye texto + firma separados por \\n\\n. Texto plano.${estiloRef}`;
   }
 
-  return `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}" (${cfg.servicios}). Vas a escribirle a una empresa.
+  // Truncar servicios para que no contamine el prompt con el pitch completo
+  const serviciosCorto = (cfg.servicios || '').slice(0, 120).split('\n')[0];
+  return `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}" — sistema de gestión para PyMEs argentinas (${serviciosCorto}). Vas a escribirle a una empresa.
 
 OBJETIVO: Un email que parezca escrito a mano, pase filtros anti-spam y que el dueño quiera leer.
 
