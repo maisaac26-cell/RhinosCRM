@@ -131,20 +131,29 @@ async function claudeChat(systemPrompt, userMsg) {
 }
 
 async function getConfig() {
-  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia)');
+  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website)');
   const map = {};
   rows.forEach(r => { map[r.key] = r.value; });
   return {
-    razon_social: map.vendedor_razon_social || 'nuestra empresa',
-    servicios: map.vendedor_servicios || 'servicios de gestión comercial',
-    tono: map.vendedor_tono || 'profesional',
-    followup_dias: parseInt(map.vendedor_followup_dias || '3', 10),
-    max_dia: parseInt(map.vendedor_max_dia || '20', 10),
+    razon_social:     map.vendedor_razon_social || 'nuestra empresa',
+    servicios:        map.vendedor_servicios    || 'servicios de gestión comercial',
+    tono:             map.vendedor_tono         || 'profesional',
+    followup_dias:    parseInt(map.vendedor_followup_dias || '3', 10),
+    max_dia:          parseInt(map.vendedor_max_dia       || '20', 10),
+    mensaje_ejemplo:  map.vendedor_mensaje_ejemplo || '',
+    website:          map.vendedor_website || '',
   };
 }
 
 async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
-  const system = `Sos el vendedor de "${cfg.razon_social}". Ofrecemos: ${cfg.servicios}. Tono: ${cfg.tono}. Objetivo: conseguir una reunión o llamada, NO vender directamente. ${esFollowup ? 'Es un follow-up: cambiá el ángulo del mensaje anterior.' : 'Es el primer contacto. Sé breve, natural y personalizado.'} Devolvé SOLO un objeto JSON válido sin texto extra: {"asunto": "...", "cuerpo": "..."}. El cuerpo es texto plano, máximo ${esFollowup ? '80' : '150'} palabras.`;
+  const estiloRef = cfg.mensaje_ejemplo
+    ? `\n\nESTILO DE REFERENCIA (adaptá este tono y estructura, NO copies el texto):\n"""\n${cfg.mensaje_ejemplo.slice(0, 800)}\n"""`
+    : '';
+  const websiteLinea = cfg.website ? `\n${cfg.website}` : '';
+
+  const system = esFollowup
+    ? `Sos del equipo comercial de "${cfg.razon_social}". Servicios: ${cfg.servicios}. El primer email no tuvo respuesta. Escribí un follow-up breve (máximo 100 palabras) en español argentino, tono conversacional con emojis, ángulo diferente al email anterior — enfatizá la demo gratuita de 30 minutos o un beneficio clave para su rubro. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`
+    : `Sos del equipo comercial de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial inicial en español argentino, conversacional, con emojis. Estructura: saludo informal con nombre de empresa → presentación breve del producto → lista de 4-5 funcionalidades clave con emojis relevantes al rubro de la empresa → modelo de precio (suscripción mensual en pesos, todo incluido, sin sorpresas) → por qué somos diferentes → CTA: demo 30 minutos sin compromiso → link.${websiteLinea ? ` Incluí este link al final: ${websiteLinea}` : ''} Máximo 250 palabras. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
 
   const userMsg = esFollowup
     ? `Empresa: ${prospecto.empresa}\nRubro: ${prospecto.rubro || ''}\nLocalidad: ${prospecto.localidad || ''}\nEmail anterior — Asunto: ${emailAnterior.asunto}\nCuerpo: ${emailAnterior.cuerpo}`
@@ -177,7 +186,7 @@ module.exports = async function handler(req, res) {
   try {
     // ── save_config ──────────────────────────────────────────────────
     if (action === 'save_config') {
-      const keys = ['vendedor_razon_social', 'vendedor_servicios', 'vendedor_tono', 'vendedor_followup_dias', 'vendedor_max_dia'];
+      const keys = ['vendedor_razon_social', 'vendedor_servicios', 'vendedor_tono', 'vendedor_followup_dias', 'vendedor_max_dia', 'vendedor_mensaje_ejemplo', 'vendedor_website'];
       const rows = keys.filter(k => body[k] !== undefined).map(k => ({ key: k, value: String(body[k]), updated_at: new Date().toISOString() }));
       if (rows.length) await sbReq('POST', 'rhinos_config', rows);
       return res.json({ ok: true });
@@ -201,11 +210,38 @@ module.exports = async function handler(req, res) {
       const rows = await sbGet('rhinos_prospectos?select=estado,ia_contactado,ia_reply');
       return res.json({ ok: true, stats: {
         total:       rows.length,
+        en_cola:     rows.filter(r => !r.ia_contactado).length,
         contactados: rows.filter(r => r.ia_contactado).length,
         replies:     rows.filter(r => r.ia_reply).length,
         interesados: rows.filter(r => r.estado === 'interesado').length,
         frios:       rows.filter(r => r.estado === 'frio').length,
       }});
+    }
+
+    // ── agregar_pipeline ─────────────────────────────────────────────
+    if (action === 'agregar_pipeline') {
+      const { prospectos = [] } = body;
+      if (!prospectos.length) return res.json({ ok: true, agregados: 0 });
+      const now = new Date().toISOString();
+      const rows = prospectos.map(p => ({
+        id:              p.id || (Date.now().toString(36) + Math.random().toString(36).slice(2)),
+        empresa:         p.empresa,
+        nombre_contacto: p.nombre_contacto || '',
+        email:           p.email,
+        telefono:        p.telefono || '',
+        website:         p.website || '',
+        rubro:           p.rubro || '',
+        localidad:       p.localidad || '',
+        origen:          p.origen || 'google_places',
+        estado:          'nuevo',
+        ia_contactado:   false,
+        ia_followup_count: 0,
+        ia_reply:        false,
+        created_at:      now,
+        updated_at:      now,
+      }));
+      await sbReq('POST', 'rhinos_prospectos', rows);
+      return res.json({ ok: true, agregados: rows.length });
     }
 
     // ── update_prospecto ─────────────────────────────────────────────

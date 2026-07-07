@@ -1,5 +1,6 @@
-// Cron diario — ejecuta follow-ups automáticos del Vendedor IA.
-// Solo procesa prospectos contactados por la IA, no respuestas manuales.
+// Cron diario lun-vie 9am — contacto inicial + follow-ups del Vendedor IA.
+// 1. Manda emails iniciales a prospectos en cola (estado='nuevo') hasta max_dia.
+// 2. Envía follow-ups a contactados sin respuesta pasados followup_dias días.
 'use strict';
 const https = require('https');
 
@@ -57,7 +58,7 @@ async function getGmailToken() {
     });
     req.on('error', reject); req.write(rPayload); req.end();
   });
-  if (!refreshed.access_token) throw new Error('No se pudo refrescar el token');
+  if (!refreshed.access_token) throw new Error('No se pudo refrescar el token de Gmail');
 
   const newExpiry = new Date(Date.now() + (refreshed.expires_in || 3600) * 1000).toISOString();
   const upd = JSON.stringify([
@@ -107,7 +108,7 @@ async function hasReply(token, threadId) {
 
 async function claudeChat(system, userMsg) {
   const payload = JSON.stringify({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 512,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 700,
     system, messages: [{ role: 'user', content: userMsg }]
   });
   return new Promise((resolve, reject) => {
@@ -123,36 +124,99 @@ async function claudeChat(system, userMsg) {
   });
 }
 
+function buildEmailSystem(cfg, esFollowup) {
+  const estiloRef = cfg.mensaje_ejemplo
+    ? `\n\nESTILO DE REFERENCIA (adoptá este tono y estructura exacta, NO copies el texto):\n"""\n${cfg.mensaje_ejemplo.slice(0, 800)}\n"""`
+    : '';
+  const websiteLinea = cfg.website ? `\n${cfg.website}` : '';
+
+  if (esFollowup) {
+    return `Sos del equipo comercial de "${cfg.razon_social}". El primer email no tuvo respuesta. Escribí un follow-up breve (máximo 100 palabras) en español argentino, conversacional con emojis, ángulo diferente — enfatizá la demo gratuita de 30 minutos o un beneficio clave para su rubro. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
+  }
+  return `Sos del equipo comercial de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial inicial en español argentino, conversacional, con emojis. Estructura: saludo informal con nombre de empresa → presentación breve del producto → lista de 4-5 funcionalidades clave con emojis relevantes al rubro de la empresa → modelo de precio (suscripción mensual en pesos, todo incluido, sin sorpresas) → por qué somos diferentes → CTA: demo 30 minutos sin compromiso.${websiteLinea ? ` Incluí este link al final: ${websiteLinea}` : ''} Máximo 250 palabras. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo texto plano.${estiloRef}`;
+}
+
+async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
+  const system = buildEmailSystem(cfg, esFollowup);
+  const userMsg = esFollowup
+    ? `Empresa: ${prospecto.empresa}\nRubro: ${prospecto.rubro || ''}\nEmail anterior — Asunto: ${emailAnterior.asunto}\nCuerpo: ${emailAnterior.cuerpo}`
+    : `Empresa: ${prospecto.empresa}\nContacto: ${prospecto.nombre_contacto || ''}\nRubro: ${prospecto.rubro || ''}\nLocalidad: ${prospecto.localidad || ''}`;
+
+  const raw = await claudeChat(system, userMsg);
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('JSON inválido de Claude');
+  return JSON.parse(match[0]);
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
-  const summary = { revisados: 0, respondieron: 0, followup_enviados: 0, frios: 0, errors: [] };
+  const summary = {
+    iniciales_enviados: 0,
+    followup_enviados: 0,
+    respondieron: 0,
+    frios: 0,
+    errors: []
+  };
 
   try {
-    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias)');
+    // Cargar config
+    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website)');
     const cfgMap = {};
     cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
-    const razon_social = cfgMap.vendedor_razon_social || 'nuestra empresa';
-    const servicios = cfgMap.vendedor_servicios || 'servicios de gestión comercial';
-    const tono = cfgMap.vendedor_tono || 'profesional';
-    const diasMin = parseInt(cfgMap.vendedor_followup_dias || '3', 10);
-
-    const cutoff = new Date(Date.now() - diasMin * 86400000).toISOString();
-    const pendientes = await sbGet(
-      `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.2&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=neq.frio&order=ia_fecha_contacto.asc&limit=30`
-    );
-
-    if (!pendientes.length) return res.json({ ok: true, summary });
+    const cfg = {
+      razon_social:    cfgMap.vendedor_razon_social || 'nuestra empresa',
+      servicios:       cfgMap.vendedor_servicios    || 'servicios de gestión comercial',
+      tono:            cfgMap.vendedor_tono         || 'profesional',
+      followup_dias:   parseInt(cfgMap.vendedor_followup_dias || '3', 10),
+      max_dia:         parseInt(cfgMap.vendedor_max_dia       || '20', 10),
+      mensaje_ejemplo: cfgMap.vendedor_mensaje_ejemplo || '',
+      website:         cfgMap.vendedor_website || '',
+    };
 
     let token;
     try { token = await getGmailToken(); }
     catch(e) { return res.json({ ok: false, error: 'Gmail: ' + e.message, summary }); }
 
-    for (const p of pendientes) {
-      summary.revisados++;
+    let enviados = 0;
+
+    // ── PASO 1: contacto inicial (estado='nuevo', ia_contactado=false) ──
+    const enCola = await sbGet(
+      `rhinos_prospectos?estado=eq.nuevo&ia_contactado=eq.false&order=created_at.asc&limit=${cfg.max_dia}`
+    );
+
+    for (const p of enCola) {
+      if (enviados >= cfg.max_dia) break;
       try {
-        const now = new Date().toISOString();
+        const email = await generarEmail(cfg, p, false, null);
+        const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo);
+        const now   = new Date().toISOString();
+        await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+          estado: 'contactado', ia_contactado: true, ia_fecha_contacto: now,
+          ia_gmail_thread_id: sent.threadId || null,
+          ia_gmail_msg_id:    sent.id       || null,
+          ia_email_asunto:    email.asunto,
+          ia_email_body:      email.cuerpo,
+          updated_at:         now,
+        });
+        summary.iniciales_enviados++;
+        enviados++;
+      } catch(e) {
+        summary.errors.push({ empresa: p.empresa, tipo: 'inicial', error: e.message });
+      }
+      await new Promise(r => setTimeout(r, 700));
+    }
+
+    // ── PASO 2: follow-ups (ia_contactado=true, sin respuesta, vencido) ──
+    const cutoff = new Date(Date.now() - cfg.followup_dias * 86400000).toISOString();
+    const pendientes = await sbGet(
+      `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.2&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=neq.frio&order=ia_fecha_contacto.asc&limit=30`
+    );
+
+    for (const p of pendientes) {
+      try {
+        const now     = new Date().toISOString();
         const replied = await hasReply(token, p.ia_gmail_thread_id);
 
         if (replied) {
@@ -161,28 +225,23 @@ module.exports = async function handler(req, res) {
           continue;
         }
 
-        const system = `Sos el vendedor de "${razon_social}". Ofrecemos: ${servicios}. Tono: ${tono}. Es un follow-up: cambiá el ángulo del mensaje anterior. Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Máximo 80 palabras en el cuerpo.`;
-        const userMsg = `Empresa: ${p.empresa}\nRubro: ${p.rubro || ''}\nEmail anterior — Asunto: ${p.ia_email_asunto}\nCuerpo: ${p.ia_email_body}`;
-        const raw = await claudeChat(system, userMsg);
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error('JSON inválido de Claude');
-        const email = JSON.parse(match[0]);
-
-        const sent = await sendGmail(token, p.email, email.asunto, email.cuerpo);
+        const email    = await generarEmail(cfg, p, true, { asunto: p.ia_email_asunto, cuerpo: p.ia_email_body });
+        const sent     = await sendGmail(token, p.email, email.asunto, email.cuerpo);
         const newCount = (p.ia_followup_count || 0) + 1;
-        const nuevoEstado = newCount >= 2 ? 'frio' : 'follow_up_' + newCount;
+        const estado   = newCount >= 2 ? 'frio' : 'follow_up_' + newCount;
 
         await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
           ia_followup_count: newCount, ia_followup_fecha: now,
           ia_gmail_thread_id: sent.threadId || p.ia_gmail_thread_id,
-          estado: nuevoEstado, updated_at: now
+          estado, updated_at: now,
         });
-        if (nuevoEstado === 'frio') summary.frios++; else summary.followup_enviados++;
+        if (estado === 'frio') summary.frios++; else summary.followup_enviados++;
       } catch(e) {
-        summary.errors.push({ empresa: p.empresa, error: e.message });
+        summary.errors.push({ empresa: p.empresa, tipo: 'followup', error: e.message });
       }
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 700));
     }
+
     return res.json({ ok: true, summary });
   } catch(e) {
     return res.status(500).json({ ok: false, error: e.message, summary });
