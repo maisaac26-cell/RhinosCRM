@@ -3255,6 +3255,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <option value="follow_up_2">Follow-up 2</option>
         <option value="interesado">Interesados</option>
         <option value="frio">Fríos</option>
+        <option value="invalido">❌ Rebotados</option>
       </select>
     </div>
 
@@ -16580,12 +16581,13 @@ async function callVendedorAPI(action, data = {}) {
 }
 
 const VIA_ESTADO_LABEL = {
-  contactado: { label: 'Contactado', color: 'var(--cyan)' },
-  follow_up_1: { label: 'Follow-up 1', color: 'var(--amber)' },
-  follow_up_2: { label: 'Follow-up 2', color: '#f97316' },
-  interesado: { label: '⭐ Interesado', color: 'var(--green)' },
-  frio: { label: 'Frío', color: 'var(--text3)' },
-  nuevo: { label: 'Nuevo', color: 'var(--text2)' },
+  contactado:  { label: 'Contactado',      color: 'var(--cyan)' },
+  follow_up_1: { label: 'Follow-up 1',     color: 'var(--amber)' },
+  follow_up_2: { label: 'Follow-up 2',     color: '#f97316' },
+  interesado:  { label: '⭐ Interesado',   color: 'var(--green)' },
+  frio:        { label: 'Frío',            color: 'var(--text3)' },
+  nuevo:       { label: 'Nuevo',           color: 'var(--text2)' },
+  invalido:    { label: '❌ Rebotado',     color: 'var(--red)' },
 };
 
 async function loadVendedorIA() {
@@ -16763,7 +16765,7 @@ document.getElementById('btn-via-enviar')?.addEventListener('click', async funct
     const data = await r.json();
     if (data.ok) {
       const s = data.summary || {};
-      showToast(`📤 ${s.iniciales_enviados || 0} emails iniciales · ${s.followup_enviados || 0} follow-ups · ${s.respondieron || 0} respondieron · ${s.frios || 0} fríos`);
+      showToast(`📤 ${s.iniciales_enviados || 0} iniciales · ${s.followup_enviados || 0} follow-ups · ${s.respondieron || 0} respondieron · ${s.frios || 0} fríos${s.rebotes ? ` · ❌ ${s.rebotes} rebotes` : ''}`);
       loadVendedorIA();
     } else {
       showToast('Error: ' + (data.error || 'desconocido'));

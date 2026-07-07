@@ -230,11 +230,12 @@ module.exports = async function handler(req, res) {
       const rows = await sbGet('rhinos_prospectos?select=estado,ia_contactado,ia_reply');
       return res.json({ ok: true, stats: {
         total:       rows.length,
-        en_cola:     rows.filter(r => !r.ia_contactado).length,
-        contactados: rows.filter(r => r.ia_contactado).length,
+        en_cola:     rows.filter(r => r.estado === 'nuevo').length,
+        contactados: rows.filter(r => r.ia_contactado && r.estado !== 'invalido').length,
         replies:     rows.filter(r => r.ia_reply).length,
         interesados: rows.filter(r => r.estado === 'interesado').length,
         frios:       rows.filter(r => r.estado === 'frio').length,
+        rebotados:   rows.filter(r => r.estado === 'invalido').length,
       }});
     }
 
@@ -321,7 +322,7 @@ module.exports = async function handler(req, res) {
       const cfg = await getConfig();
       const cutoff = new Date(Date.now() - cfg.followup_dias * 86400000).toISOString();
       const pendientes = await sbGet(
-        `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.2&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=neq.frio&order=ia_fecha_contacto.asc&limit=30`
+        `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.2&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=not.in.(frio,invalido)&order=ia_fecha_contacto.asc&limit=30`
       );
 
       if (!pendientes.length) return res.json({ ok: true, procesados: 0, results: [] });

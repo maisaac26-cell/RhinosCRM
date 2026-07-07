@@ -91,6 +91,54 @@ async function sendGmail(token, to, subject, bodyText) {
   });
 }
 
+function gmailGet(token, path) {
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'gmail.googleapis.com', path, method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token }
+    }, (res) => {
+      let raw = ''; res.on('data', c => raw += c);
+      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+    });
+    req.on('error', () => resolve({})); req.end();
+  });
+}
+
+function extractBodyText(parts) {
+  let text = '';
+  for (const p of (parts || [])) {
+    if (p.mimeType === 'text/plain' && p.body?.data) {
+      text += Buffer.from(p.body.data, 'base64url').toString('utf-8');
+    }
+    if (p.parts) text += extractBodyText(p.parts);
+  }
+  return text;
+}
+
+async function checkBounces(token) {
+  const EMAIL_RE   = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  const SKIP_HOSTS = /mailer-daemon|postmaster|google|noreply|bounce|example\.com/i;
+
+  // Buscar notificaciones de rebote de las últimas 48hs
+  const q = encodeURIComponent('from:mailer-daemon newer_than:2d');
+  const list = await gmailGet(token, `/gmail/v1/users/me/messages?q=${q}&maxResults=50`);
+  const msgs  = (list.messages || []).slice(0, 30);
+
+  const bouncedEmails = new Set();
+
+  for (const msg of msgs) {
+    const full   = await gmailGet(token, `/gmail/v1/users/me/messages/${msg.id}?format=full`);
+    const body   = extractBodyText(full.payload?.parts || [full.payload]) + ' ' + (full.snippet || '');
+    const found  = (body.match(EMAIL_RE) || []);
+    found.forEach(e => {
+      const norm = e.toLowerCase();
+      if (!SKIP_HOSTS.test(norm.split('@')[1] || '')) bouncedEmails.add(norm);
+    });
+  }
+
+  return [...bouncedEmails];
+}
+
 async function hasReply(token, threadId) {
   if (!threadId) return false;
   return new Promise((resolve) => {
@@ -167,6 +215,7 @@ module.exports = async function handler(req, res) {
     followup_enviados: 0,
     respondieron: 0,
     frios: 0,
+    rebotes: 0,
     errors: []
   };
 
@@ -190,6 +239,30 @@ module.exports = async function handler(req, res) {
     let token;
     try { token = await getGmailToken(); }
     catch(e) { return res.json({ ok: false, error: 'Gmail: ' + e.message, summary }); }
+
+    // ── PASO 0: detectar y limpiar rebotes de las últimas 48hs ──────────
+    try {
+      const bouncedEmails = await checkBounces(token);
+      if (bouncedEmails.length) {
+        // Cargar prospectos que tengan esos emails para cruzar
+        const todos = await sbGet('rhinos_prospectos?select=id,email&ia_contactado=eq.true&limit=5000');
+        const prospMap = {};
+        todos.forEach(p => { if (p.email) prospMap[p.email.toLowerCase().trim()] = p.id; });
+
+        for (const email of bouncedEmails) {
+          const id = prospMap[email];
+          if (!id) continue;
+          await sbReq('PATCH', `rhinos_prospectos?id=eq.${id}`, {
+            estado:      'invalido',
+            notas:       '❌ Email rebotado — dirección no existe o buzón lleno',
+            updated_at:  new Date().toISOString(),
+          });
+          summary.rebotes++;
+        }
+      }
+    } catch(e) {
+      summary.errors.push({ tipo: 'bounce_check', error: e.message });
+    }
 
     let enviados = 0;
 
@@ -223,7 +296,7 @@ module.exports = async function handler(req, res) {
     // ── PASO 2: follow-ups (ia_contactado=true, sin respuesta, vencido) ──
     const cutoff = new Date(Date.now() - cfg.followup_dias * 86400000).toISOString();
     const pendientes = await sbGet(
-      `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.2&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=neq.frio&order=ia_fecha_contacto.asc&limit=30`
+      `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.2&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=not.in.(frio,invalido)&order=ia_fecha_contacto.asc&limit=30`
     );
 
     for (const p of pendientes) {
