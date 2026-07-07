@@ -74,10 +74,29 @@ async function getGmailToken() {
   return refreshed.access_token;
 }
 
-async function sendGmail(token, to, subject, bodyText) {
-  const encodedSubject = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
-  const raw = `MIME-Version: 1.0\r\nTo: ${to}\r\nSubject: ${encodedSubject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${bodyText}`;
-  const encoded = Buffer.from(raw).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function buildMultipartRaw(to, subject, textBody, prospId) {
+  const boundary = 'RHINOS' + Date.now().toString(36);
+  const subj64 = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const htmlBody = textBody.split('\n\n')
+    .map(para => `<p style="margin:0 0 14px">${esc(para).replace(/\n/g,'<br>')}</p>`)
+    .join('');
+  const pixel = prospId
+    ? `<img src="https://rhinos-crm.vercel.app/api/vendedor-track?id=${encodeURIComponent(prospId)}" width="1" height="1" alt="" style="display:none">`
+    : '';
+  const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a1a;max-width:580px;padding:24px 20px">${htmlBody}${pixel}</body></html>`;
+  return (
+    `MIME-Version: 1.0\r\nTo: ${to}\r\nSubject: ${subj64}\r\n` +
+    `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n` +
+    `--${boundary}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${textBody}\r\n\r\n` +
+    `--${boundary}\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${html}\r\n\r\n` +
+    `--${boundary}--`
+  );
+}
+
+async function sendGmail(token, to, subject, bodyText, prospId) {
+  const encoded = Buffer.from(buildMultipartRaw(to, subject, bodyText, prospId))
+    .toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   const payload = JSON.stringify({ raw: encoded });
   return new Promise((resolve, reject) => {
     const req = https.request({
@@ -89,6 +108,22 @@ async function sendGmail(token, to, subject, bodyText) {
     });
     req.on('error', reject); req.write(payload); req.end();
   });
+}
+
+async function crearLeadSiNoExiste(prospecto) {
+  try {
+    const ex = await sbGet(`rhinos_leads?email=eq.${encodeURIComponent(prospecto.email)}&limit=1`);
+    if (ex.length > 0) return;
+    const { randomUUID } = require('crypto');
+    const now = new Date().toISOString();
+    await sbReq('POST', 'rhinos_leads', {
+      id: randomUUID(), name: prospecto.nombre_contacto || '', company: prospecto.empresa || '',
+      email: prospecto.email, phone: prospecto.telefono || '',
+      source: 'Vendedor IA', status: 'nuevo', temperature: 'caliente',
+      notes: `Vendedor IA — respondió al email. Rubro: ${prospecto.rubro || ''}${prospecto.localidad ? ' · ' + prospecto.localidad : ''}`,
+      created_at: now, updated_at: now,
+    });
+  } catch(e) { /* non-critical */ }
 }
 
 function gmailGet(token, path) {
@@ -191,7 +226,7 @@ function buildEmailSystem(cfg, esFollowup) {
   if (esFollowup) {
     return `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". El primer email no tuvo respuesta. Escribí un follow-up en español argentino, tono personal y directo — máximo 80 palabras en el cuerpo (SIN contar la firma). Ángulo diferente al email anterior. CTA único: calculá cuánto podés ahorrar → ${calcLink}. Terminá con esta firma exacta (copiala sin cambiar nada):\n${firma}\nDevolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. El campo cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
   }
-  return `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial en español argentino — tiene que sentirse como enviado a mano a esta empresa, NO como spam masivo. Sé breve, cálido y concreto. Estructura:\n1. Saludo directo con el nombre de la empresa\n2. 2 oraciones conectando el producto con su rubro específico\n3. Lista de 3-4 funcionalidades clave con emojis\n4. Precio: suscripción mensual en pesos, todo incluido, sin sorpresas\n5. CTA destacado (línea sola): "👉 Calculá cuánto podés ahorrar: ${calcLink}"\n6. Firma exacta (copiala sin cambiar nada):\n${firma}\nMáximo 160 palabras en el cuerpo (SIN contar firma). Tono: directo, sin frases genéricas tipo "espero que estén bien". Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
+  return `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial en español argentino — tiene que sentirse como enviado a mano a esta empresa, NO como spam masivo. Sé breve, cálido y concreto. Estructura:\n1. Saludo directo con el nombre de la empresa\n2. 2 oraciones conectando el producto con su rubro específico\n3. Lista de 3-4 funcionalidades clave con emojis\n4. Precio: suscripción mensual en pesos, todo incluido, sin sorpresas\n5. CTA destacado (línea sola): "👉 Calculá cuánto podés ahorrar: ${calcLink}"\n6. Firma exacta (copiala sin cambiar nada):\n${firma}\nMáximo 160 palabras en el cuerpo (SIN contar firma). Tono: directo, sin frases genéricas tipo "espero que estén bien". Devolvé SOLO JSON con 3 variantes de asunto y 1 cuerpo: {"asunto_a":"(genera curiosidad o contraste, ej: ¿Cuánto perdés sin sistema?)","asunto_b":"(directo con beneficio o número, ej: Digitalizá tu negocio en 48hs)","asunto_c":"(ultra corto, máx 5 palabras, como de un conocido)","cuerpo":"..."}. Cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
 }
 
 async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
@@ -203,7 +238,13 @@ async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
   const raw = await claudeChat(system, userMsg);
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('JSON inválido de Claude');
-  return JSON.parse(match[0]);
+  const parsed = JSON.parse(match[0]);
+
+  if (!esFollowup && parsed.asunto_a) {
+    const v = ['a','b','c'][Math.floor(Math.random() * 3)];
+    return { asunto: parsed[`asunto_${v}`] || parsed.asunto_a, cuerpo: parsed.cuerpo, variant: v };
+  }
+  return { asunto: parsed.asunto || '', cuerpo: parsed.cuerpo, variant: null };
 }
 
 module.exports = async function handler(req, res) {
@@ -275,7 +316,7 @@ module.exports = async function handler(req, res) {
       if (enviados >= cfg.max_dia) break;
       try {
         const email = await generarEmail(cfg, p, false, null);
-        const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo);
+        const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id);
         const now   = new Date().toISOString();
         await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
           estado: 'contactado', ia_contactado: true, ia_fecha_contacto: now,
@@ -283,6 +324,7 @@ module.exports = async function handler(req, res) {
           ia_gmail_msg_id:    sent.id       || null,
           ia_email_asunto:    email.asunto,
           ia_email_body:      email.cuerpo,
+          ia_subject_variant: email.variant || null,
           updated_at:         now,
         });
         summary.iniciales_enviados++;
@@ -306,6 +348,7 @@ module.exports = async function handler(req, res) {
 
         if (replied) {
           await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, { ia_reply: true, ia_reply_fecha: now, estado: 'interesado', updated_at: now });
+          await crearLeadSiNoExiste(p);
           summary.respondieron++;
           continue;
         }

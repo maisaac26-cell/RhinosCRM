@@ -73,6 +73,40 @@ const PROVINCIAS_RANDOM = [
   'Jujuy', 'Santiago del Estero', 'San Luis', 'La Pampa',
 ];
 
+// Ciudades específicas para búsquedas más granulares
+const CIUDADES_ARGENTINA = [
+  'Quilmes', 'Avellaneda', 'Lanús', 'Lomas de Zamora', 'Morón',
+  'San Isidro', 'Vicente López', 'Tigre', 'San Martín Buenos Aires', 'Tres de Febrero',
+  'Merlo Buenos Aires', 'Moreno Buenos Aires', 'Florencio Varela', 'Berazategui',
+  'Bahía Blanca', 'Tandil', 'Pergamino', 'San Nicolás de los Arroyos',
+  'Junín Buenos Aires', 'Necochea', 'Olavarría', 'Zárate', 'Campana Buenos Aires',
+  'Pilar Buenos Aires', 'Luján Buenos Aires', 'Azul Buenos Aires', 'Chivilcoy',
+  'Río Cuarto Córdoba', 'Villa María Córdoba', 'San Francisco Córdoba',
+  'Bell Ville Córdoba', 'Río Tercero', 'Villa Carlos Paz', 'Alta Gracia',
+  'Rafaela Santa Fe', 'Venado Tuerto', 'Reconquista Santa Fe', 'Santo Tomé Santa Fe',
+  'San Rafael Mendoza', 'Godoy Cruz', 'Guaymallén', 'Maipú Mendoza',
+  'San Miguel de Tucumán', 'Yerba Buena Tucumán',
+  'Salta capital', 'Jujuy capital', 'Bariloche', 'San Juan capital',
+  'Corrientes capital', 'Resistencia Chaco', 'Posadas Misiones', 'Paraná Entre Ríos',
+];
+
+// Mapeo provincia/ciudad → código de estado ML (ISO 3166-2 AR)
+const ML_ESTADOS = {
+  'Buenos Aires': 'AR-B', 'La Plata': 'AR-B', 'Mar del Plata': 'AR-B',
+  'Quilmes': 'AR-B', 'Avellaneda': 'AR-B', 'Lanús': 'AR-B',
+  'Rosario': 'AR-S', 'Santa Fe': 'AR-S', 'Rafaela': 'AR-S',
+  'Córdoba': 'AR-X', 'Río Cuarto': 'AR-X', 'Villa María': 'AR-X',
+  'Mendoza': 'AR-M', 'San Rafael': 'AR-M',
+  'Tucumán': 'AR-T', 'San Miguel de Tucumán': 'AR-T',
+  'Salta': 'AR-A', 'Entre Ríos': 'AR-E', 'Paraná': 'AR-E',
+  'Misiones': 'AR-N', 'Posadas': 'AR-N',
+  'Chaco': 'AR-H', 'Resistencia': 'AR-H',
+  'Corrientes': 'AR-W', 'San Juan': 'AR-J',
+  'Neuquén': 'AR-Q', 'Río Negro': 'AR-R', 'Bariloche': 'AR-R',
+  'Jujuy': 'AR-Y', 'Santiago del Estero': 'AR-G',
+  'San Luis': 'AR-D', 'La Pampa': 'AR-L', 'CABA': 'AR-C',
+};
+
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
@@ -148,6 +182,42 @@ async function searchPlaces(query, location, apiKey) {
   return enriched;
 }
 
+// ── Mercado Libre API ─────────────────────────────────────────────────────────
+
+async function searchMercadoLibre(query, provincia, maxResults) {
+  try {
+    const state = ML_ESTADOS[provincia] || ML_ESTADOS[provincia.split(' ')[0]] || 'AR-B';
+    const q = encodeURIComponent(query);
+    const r = await httpGet(`https://api.mercadolibre.com/sites/MLA/search?q=${q}&state=${state}&official_store=all&limit=50`);
+    let data;
+    try { data = JSON.parse(r.body); } catch { return []; }
+
+    const storeIds = new Set();
+    for (const item of (data.results || [])) {
+      if (item.official_store_id) storeIds.add(item.official_store_id);
+    }
+
+    const enriched = [];
+    for (const storeId of [...storeIds].slice(0, maxResults)) {
+      const sr = await httpGet(`https://api.mercadolibre.com/sites/MLA/official_stores/${storeId}`);
+      let store;
+      try { store = JSON.parse(sr.body); } catch { continue; }
+      if (!store || store.error || !store.name) continue;
+      const website = store.site_url || '';
+      if (!website || website.includes('mercadolibre')) continue;
+      enriched.push({
+        id:      'ml_' + storeId,
+        name:    store.name,
+        address: store.location?.address_line || '',
+        phone:   '',
+        website,
+      });
+      await new Promise(r => setTimeout(r, 250));
+    }
+    return enriched;
+  } catch { return []; }
+}
+
 // ── Email extraction ──────────────────────────────────────────────────────────
 
 const EMAIL_RE   = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
@@ -216,13 +286,14 @@ module.exports = async function handler(req, res) {
 
   try {
     // Cargar config
-    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_minimo_busqueda)');
+    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_minimo_busqueda,vendedor_fuente_auto)');
     const cfgMap  = {};
     cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
 
-    const cantidad        = parseInt(cfgMap.vendedor_cantidad_auto    || '50',  10); // máximo total
-    const minimo          = parseInt(cfgMap.vendedor_minimo_auto      || '10',  10); // mínimo total diario
-    const minimoBusqueda  = parseInt(cfgMap.vendedor_minimo_busqueda  || '2',   10); // mínimo por iteración
+    const cantidad        = parseInt(cfgMap.vendedor_cantidad_auto    || '50',  10);
+    const minimo          = parseInt(cfgMap.vendedor_minimo_auto      || '10',  10);
+    const minimoBusqueda  = parseInt(cfgMap.vendedor_minimo_busqueda  || '2',   10);
+    const fuente          = (cfgMap.vendedor_fuente_auto || 'google').trim();
 
     const rubroFijo      = (cfgMap.vendedor_rubro_auto || '').trim();
     const provinciasConf = (cfgMap.vendedor_provincias_auto || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -236,13 +307,23 @@ module.exports = async function handler(req, res) {
     const TIME_LIMIT = 240000; // 240s — margen de 60s antes del timeout de 300s
 
     while (nuevos.length < minimo && (Date.now() - startTime) < TIME_LIMIT) {
-      const rubro     = rubroFijo || pick(RUBROS_RANDOM);
-      const provincia = provinciasConf.length ? provinciasConf[summary.intentos % provinciasConf.length] : pick(PROVINCIAS_RANDOM);
+      const rubro    = rubroFijo || pick(RUBROS_RANDOM);
+      // Alternar entre ciudades específicas y provincias para mayor cobertura
+      const useCity  = !provinciasConf.length && Math.random() < 0.5;
+      const provincia = provinciasConf.length
+        ? provinciasConf[summary.intentos % provinciasConf.length]
+        : useCity ? pick(CIUDADES_ARGENTINA) : pick(PROVINCIAS_RANDOM);
       summary.intentos++;
       if (!summary.rubros.includes(rubro))         summary.rubros.push(rubro);
       if (!summary.provincias.includes(provincia)) summary.provincias.push(provincia);
 
-      const places = await searchPlaces(rubro, provincia, PLACES_KEY);
+      // Elegir fuente: Google Places, Mercado Libre o ambos alternando
+      const usarML     = fuente === 'mercadolibre' || (fuente === 'ambos' && summary.intentos % 2 === 0);
+      const usarGoogle = fuente === 'google'       || (fuente === 'ambos' && summary.intentos % 2 !== 0);
+
+      let places = [];
+      if (usarGoogle) places = await searchPlaces(rubro, provincia, PLACES_KEY);
+      if (usarML)     places = [...places, ...(await searchMercadoLibre(rubro, provincia, 5))];
       summary.buscados += places.length;
 
       let encontradosEnEstaIteracion = 0;

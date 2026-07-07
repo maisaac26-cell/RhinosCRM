@@ -71,10 +71,29 @@ async function getGmailToken() {
   return refreshed.access_token;
 }
 
-async function sendGmail(token, to, subject, bodyText) {
-  const encodedSubject = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
-  const raw = `MIME-Version: 1.0\r\nTo: ${to}\r\nSubject: ${encodedSubject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${bodyText}`;
-  const encoded = Buffer.from(raw).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function buildMultipartRaw(to, subject, textBody, prospId) {
+  const boundary = 'RHINOS' + Date.now().toString(36);
+  const subj64 = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const htmlBody = textBody.split('\n\n')
+    .map(para => `<p style="margin:0 0 14px">${esc(para).replace(/\n/g,'<br>')}</p>`)
+    .join('');
+  const pixel = prospId
+    ? `<img src="https://rhinos-crm.vercel.app/api/vendedor-track?id=${encodeURIComponent(prospId)}" width="1" height="1" alt="" style="display:none">`
+    : '';
+  const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a1a;max-width:580px;padding:24px 20px">${htmlBody}${pixel}</body></html>`;
+  return (
+    `MIME-Version: 1.0\r\nTo: ${to}\r\nSubject: ${subj64}\r\n` +
+    `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n` +
+    `--${boundary}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${textBody}\r\n\r\n` +
+    `--${boundary}\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${html}\r\n\r\n` +
+    `--${boundary}--`
+  );
+}
+
+async function sendGmail(token, to, subject, bodyText, prospId) {
+  const encoded = Buffer.from(buildMultipartRaw(to, subject, bodyText, prospId))
+    .toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   const payload = JSON.stringify({ raw: encoded });
   return new Promise((resolve, reject) => {
     const req = https.request({
@@ -86,6 +105,22 @@ async function sendGmail(token, to, subject, bodyText) {
     });
     req.on('error', reject); req.write(payload); req.end();
   });
+}
+
+async function crearLeadSiNoExiste(prospecto) {
+  try {
+    const ex = await sbGet(`rhinos_leads?email=eq.${encodeURIComponent(prospecto.email)}&limit=1`);
+    if (ex.length > 0) return;
+    const { randomUUID } = require('crypto');
+    const now = new Date().toISOString();
+    await sbReq('POST', 'rhinos_leads', {
+      id: randomUUID(), name: prospecto.nombre_contacto || '', company: prospecto.empresa || '',
+      email: prospecto.email, phone: prospecto.telefono || '',
+      source: 'Vendedor IA', status: 'nuevo', temperature: 'caliente',
+      notes: `Vendedor IA — respondió al email. Rubro: ${prospecto.rubro || ''}${prospecto.localidad ? ' · ' + prospecto.localidad : ''}`,
+      created_at: now, updated_at: now,
+    });
+  } catch(e) { /* non-critical */ }
 }
 
 async function hasReply(token, threadId) {
@@ -131,7 +166,7 @@ async function claudeChat(systemPrompt, userMsg) {
 }
 
 async function getConfig() {
-  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_minimo_busqueda,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_reply_modo,vendedor_reply_max)');
+  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_minimo_busqueda,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_reply_modo,vendedor_reply_max,vendedor_fuente_auto)');
   const map = {};
   rows.forEach(r => { map[r.key] = r.value; });
   return {
@@ -151,6 +186,7 @@ async function getConfig() {
     nombre_vendedor:   map.vendedor_nombre_vendedor   || '',
     reply_modo:        map.vendedor_reply_modo        || 'draft',
     reply_max:         parseInt(map.vendedor_reply_max || '5', 10),
+    fuente_auto:       map.vendedor_fuente_auto       || 'google',
   };
 }
 
@@ -175,7 +211,7 @@ async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
 
   const system = esFollowup
     ? `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". El primer email no tuvo respuesta. Escribí un follow-up en español argentino, tono personal y directo — máximo 80 palabras en el cuerpo (SIN contar la firma). Ángulo diferente al email anterior. CTA único: calculá cuánto podés ahorrar → ${calcLink}. Terminá con esta firma exacta (copiala sin cambiar nada):\n${firma}\nDevolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. El campo cuerpo incluye texto + firma, separados por doble salto de línea. Texto plano.${estiloRef}`
-    : `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial en español argentino — tiene que sentirse como enviado a mano a esta empresa, NO como spam masivo. Sé breve, cálido y concreto. Estructura:\n1. Saludo directo con el nombre de la empresa\n2. 2 oraciones conectando el producto con su rubro específico\n3. Lista de 3-4 funcionalidades clave con emojis\n4. Precio: suscripción mensual en pesos, todo incluido, sin sorpresas\n5. CTA destacado (línea sola): "👉 Calculá cuánto podés ahorrar: ${calcLink}"\n6. Firma exacta (copiala sin cambiar nada):\n${firma}\nMáximo 160 palabras en el cuerpo (SIN contar firma). Tono: directo, sin frases genéricas tipo "espero que estén bien" o "me pongo en contacto". Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
+    : `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial en español argentino — tiene que sentirse como enviado a mano a esta empresa, NO como spam masivo. Sé breve, cálido y concreto. Estructura:\n1. Saludo directo con el nombre de la empresa\n2. 2 oraciones conectando el producto con su rubro específico\n3. Lista de 3-4 funcionalidades clave con emojis\n4. Precio: suscripción mensual en pesos, todo incluido, sin sorpresas\n5. CTA destacado (línea sola): "👉 Calculá cuánto podés ahorrar: ${calcLink}"\n6. Firma exacta (copiala sin cambiar nada):\n${firma}\nMáximo 160 palabras en el cuerpo (SIN contar firma). Tono: directo, sin frases genéricas tipo "espero que estén bien" o "me pongo en contacto". Devolvé SOLO JSON con 3 variantes de asunto: {"asunto_a":"(genera curiosidad o contraste)","asunto_b":"(directo con beneficio o número)","asunto_c":"(ultra corto, máx 5 palabras, como de un conocido)","cuerpo":"..."}. Cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
 
   const userMsg = esFollowup
     ? `Empresa: ${prospecto.empresa}\nRubro: ${prospecto.rubro || ''}\nLocalidad: ${prospecto.localidad || ''}\nEmail anterior — Asunto: ${emailAnterior.asunto}\nCuerpo: ${emailAnterior.cuerpo}`
@@ -184,7 +220,13 @@ async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
   const raw = await claudeChat(system, userMsg);
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('Claude no devolvió JSON válido');
-  return JSON.parse(match[0]);
+  const parsed = JSON.parse(match[0]);
+
+  if (!esFollowup && parsed.asunto_a) {
+    const v = ['a','b','c'][Math.floor(Math.random() * 3)];
+    return { asunto: parsed[`asunto_${v}`] || parsed.asunto_a, cuerpo: parsed.cuerpo, variant: v };
+  }
+  return { asunto: parsed.asunto || '', cuerpo: parsed.cuerpo, variant: null };
 }
 
 function readBody(req) {
@@ -208,7 +250,13 @@ module.exports = async function handler(req, res) {
   try {
     // ── save_config ──────────────────────────────────────────────────
     if (action === 'save_config') {
-      const keys = ['vendedor_razon_social', 'vendedor_servicios', 'vendedor_tono', 'vendedor_followup_dias', 'vendedor_max_dia', 'vendedor_mensaje_ejemplo', 'vendedor_website'];
+      const keys = [
+        'vendedor_razon_social', 'vendedor_servicios', 'vendedor_tono', 'vendedor_followup_dias',
+        'vendedor_max_dia', 'vendedor_mensaje_ejemplo', 'vendedor_website',
+        'vendedor_rubro_auto', 'vendedor_provincias_auto', 'vendedor_cantidad_auto',
+        'vendedor_minimo_auto', 'vendedor_minimo_busqueda', 'vendedor_whatsapp',
+        'vendedor_nombre_vendedor', 'vendedor_reply_modo', 'vendedor_reply_max', 'vendedor_fuente_auto',
+      ];
       const rows = keys.filter(k => body[k] !== undefined).map(k => ({ key: k, value: String(body[k]), updated_at: new Date().toISOString() }));
       if (rows.length) await sbReq('POST', 'rhinos_config', rows);
       return res.json({ ok: true });
@@ -229,7 +277,8 @@ module.exports = async function handler(req, res) {
 
     // ── get_stats ────────────────────────────────────────────────────
     if (action === 'get_stats') {
-      const rows = await sbGet('rhinos_prospectos?select=estado,ia_contactado,ia_reply');
+      const rows = await sbGet('rhinos_prospectos?select=estado,ia_contactado,ia_reply,ia_abierto,ia_subject_variant');
+      const abiertos = rows.filter(r => r.ia_abierto);
       return res.json({ ok: true, stats: {
         total:       rows.length,
         en_cola:     rows.filter(r => r.estado === 'nuevo').length,
@@ -238,6 +287,12 @@ module.exports = async function handler(req, res) {
         interesados: rows.filter(r => r.estado === 'interesado').length,
         frios:       rows.filter(r => r.estado === 'frio').length,
         rebotados:   rows.filter(r => r.estado === 'invalido').length,
+        abiertos:    abiertos.length,
+        ab_stats: {
+          a: rows.filter(r => r.ia_subject_variant === 'a').length,
+          b: rows.filter(r => r.ia_subject_variant === 'b').length,
+          c: rows.filter(r => r.ia_subject_variant === 'c').length,
+        },
       }});
     }
 
@@ -294,10 +349,10 @@ module.exports = async function handler(req, res) {
 
       for (const p of prospectos) {
         try {
-          const email = await generarEmail(cfg, p, false, null);
-          const sent = await sendGmail(token, p.email, email.asunto, email.cuerpo);
-          const now = new Date().toISOString();
           const id = p.id || (Date.now().toString(36) + Math.random().toString(36).slice(2));
+          const email = await generarEmail(cfg, p, false, null);
+          const sent = await sendGmail(token, p.email, email.asunto, email.cuerpo, id);
+          const now = new Date().toISOString();
           await sbReq('POST', 'rhinos_prospectos', [{
             id, empresa: p.empresa, nombre_contacto: p.nombre_contacto || '',
             email: p.email, telefono: p.telefono || '', website: p.website || '',
@@ -307,10 +362,11 @@ module.exports = async function handler(req, res) {
             ia_gmail_thread_id: sent.threadId || null,
             ia_gmail_msg_id: sent.id || null,
             ia_email_asunto: email.asunto, ia_email_body: email.cuerpo,
+            ia_subject_variant: email.variant || null,
             ia_followup_count: 0, ia_reply: false,
             created_at: now, updated_at: now
           }]);
-          results.push({ empresa: p.empresa, ok: true, asunto: email.asunto });
+          results.push({ empresa: p.empresa, ok: true, asunto: email.asunto, variant: email.variant });
         } catch(e) {
           results.push({ empresa: p.empresa, ok: false, error: e.message });
         }
@@ -339,6 +395,7 @@ module.exports = async function handler(req, res) {
 
           if (replied) {
             await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, { ia_reply: true, ia_reply_fecha: now, estado: 'interesado', updated_at: now });
+            await crearLeadSiNoExiste(p);
             results.push({ empresa: p.empresa, accion: 'respondio', estado: 'interesado' });
             continue;
           }

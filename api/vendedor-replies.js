@@ -127,6 +127,23 @@ async function createDraft(token, to, subject, body, threadId, inReplyTo) {
     { message: encodeEmail(to, subject, body, threadId, inReplyTo) });
 }
 
+// ── Lead creation ─────────────────────────────────────────────────────────────
+async function crearLeadSiNoExiste(prospecto) {
+  try {
+    const ex = await sbGet(`rhinos_leads?email=eq.${encodeURIComponent(prospecto.email)}&limit=1`);
+    if (ex.length > 0) return;
+    const { randomUUID } = require('crypto');
+    const now = new Date().toISOString();
+    await sbReq('POST', 'rhinos_leads', {
+      id: randomUUID(), name: prospecto.nombre_contacto || '', company: prospecto.empresa || '',
+      email: prospecto.email, phone: prospecto.telefono || '',
+      source: 'Vendedor IA', status: 'nuevo', temperature: 'caliente',
+      notes: `Vendedor IA — respondió al email. Rubro: ${prospecto.rubro || ''}${prospecto.localidad ? ' · ' + prospecto.localidad : ''}`,
+      created_at: now, updated_at: now,
+    });
+  } catch(e) { /* non-critical */ }
+}
+
 // ── Claude ────────────────────────────────────────────────────────────────────
 async function claudeChat(system, userMsg) {
   const payload = JSON.stringify({
@@ -283,6 +300,7 @@ module.exports = async function handler(req, res) {
           ia_last_msg_id:      latestProspectMsgId,
           updated_at:          now,
         });
+        if (currentCount === 0) await crearLeadSiNoExiste(p);
 
       } catch(e) {
         summary.errors.push({ empresa: p.empresa, error: e.message });

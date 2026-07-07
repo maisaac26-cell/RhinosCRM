@@ -11,7 +11,8 @@
     "api/vendedor.js":   { "maxDuration": 60 },
     "api/vendedor-auto.js":      { "maxDuration": 60 },
     "api/vendedor-prospecta.js": { "maxDuration": 300 },
-    "api/vendedor-replies.js":   { "maxDuration": 60  }
+    "api/vendedor-replies.js":   { "maxDuration": 60  },
+    "api/vendedor-track.js":    { "maxDuration": 10  }
   },
   "crons": [
     { "path": "/api/weekly-report",      "schedule": "0 13 * * 1" },

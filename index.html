@@ -3237,9 +3237,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <!-- Stats -->
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px">
       <div class="metric-card"><div class="m-label">En cola</div><div class="m-val" style="color:var(--amber)" id="via-stat-cola">—</div><div class="m-sub">pendientes</div></div>
-      <div class="metric-card"><div class="m-label">Contactados</div><div class="m-val cyan" id="via-stat-contactados">—</div><div class="m-sub">por la IA</div></div>
+      <div class="metric-card"><div class="m-label">Contactados</div><div class="m-val cyan" id="via-stat-contactados">—</div><div class="m-sub" id="via-stat-abiertos-sub" style="color:var(--green);font-size:10px"></div></div>
       <div class="metric-card"><div class="m-label">Respondieron</div><div class="m-val" style="color:var(--green)" id="via-stat-replies">—</div><div class="m-sub">interesados</div></div>
       <div class="metric-card"><div class="m-label">Fríos</div><div class="m-val" style="color:var(--text3)" id="via-stat-frios">—</div><div class="m-sub">sin respuesta</div></div>
+      <div class="metric-card"><div class="m-label">Rebotados</div><div class="m-val" style="color:var(--red)" id="via-stat-rebotados">—</div><div class="m-sub" id="via-stat-ab" style="font-size:10px;color:var(--text3)"></div></div>
     </div>
 
     <!-- Acciones rápidas -->
@@ -3320,6 +3321,12 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <input id="via-cfg-minimo-busqueda" class="inp" type="number" min="1" max="20" placeholder="2"/></div>
             <div class="field" style="grid-column:span 2"><label>Provincias target <span style="color:var(--text3);font-weight:400">(separadas por coma, vacío = aleatoria)</span></label>
               <input id="via-cfg-provincias-auto" class="inp" placeholder="Buenos Aires, Córdoba, Santa Fe"/></div>
+            <div class="field"><label>Fuente de prospectos</label>
+              <select id="via-cfg-fuente-auto" class="inp">
+                <option value="google">Google Places (recomendado)</option>
+                <option value="mercadolibre">Mercado Libre (tiendas oficiales)</option>
+                <option value="ambos">Ambos — máxima cobertura</option>
+              </select></div>
           </div>
         </div>
 
@@ -16610,6 +16617,14 @@ async function loadViaStats() {
     document.getElementById('via-stat-contactados').textContent = stats.contactados;
     document.getElementById('via-stat-replies').textContent = stats.interesados;
     document.getElementById('via-stat-frios').textContent = stats.frios;
+    document.getElementById('via-stat-rebotados').textContent = stats.rebotados || 0;
+    const ab = document.getElementById('via-stat-ab');
+    if (ab && stats.ab_stats) ab.textContent = `A:${stats.ab_stats.a} B:${stats.ab_stats.b} C:${stats.ab_stats.c}`;
+    const abiSub = document.getElementById('via-stat-abiertos-sub');
+    if (abiSub && stats.abiertos != null) {
+      const pct = stats.contactados > 0 ? Math.round(stats.abiertos / stats.contactados * 100) : 0;
+      abiSub.textContent = `✉️ ${stats.abiertos} abrieron (${pct}%)`;
+    }
   } catch(e) { console.warn('via stats:', e.message); }
 }
 
@@ -16648,6 +16663,8 @@ async function loadViaProspectos() {
                 ${p.ia_auto_reply_count > 0 ? `<span style="margin-left:4px;font-size:10px;background:rgba(99,102,241,0.15);color:#818cf8;padding:1px 5px;border-radius:6px">💬 ${p.ia_auto_reply_count}</span>` : ''}
                 ${p.ia_pausado ? '<span style="margin-left:4px;font-size:10px;background:rgba(245,158,11,0.15);color:var(--amber);padding:1px 5px;border-radius:6px">⏸ Pausada</span>' : ''}
                 ${p.ia_draft_id ? '<span style="margin-left:4px;font-size:10px;background:rgba(16,185,129,0.15);color:#34d399;padding:1px 5px;border-radius:6px">📋 Borrador</span>' : ''}
+                ${p.ia_abierto ? '<span style="margin-left:4px;font-size:10px;background:rgba(34,197,94,0.1);color:var(--green);padding:1px 5px;border-radius:6px">✉️ Abierto</span>' : ''}
+                ${p.ia_subject_variant ? `<span style="margin-left:4px;font-size:9px;background:rgba(0,229,204,0.08);color:var(--cyan);padding:1px 4px;border-radius:4px;font-weight:700">${p.ia_subject_variant.toUpperCase()}</span>` : ''}
               </td>
               <td style="padding:8px 6px;color:var(--text3)">${fecha}${followupFecha}</td>
               <td style="padding:8px 6px">
@@ -16760,6 +16777,7 @@ async function loadViaCfg() {
     if (config.cantidad_auto)   document.getElementById('via-cfg-cantidad-auto').value = config.cantidad_auto;
     if (config.minimo_auto)      document.getElementById('via-cfg-minimo-auto').value = config.minimo_auto;
     if (config.minimo_busqueda) document.getElementById('via-cfg-minimo-busqueda').value = config.minimo_busqueda;
+    if (config.fuente_auto)     document.getElementById('via-cfg-fuente-auto').value = config.fuente_auto;
   } catch(e) { console.warn('via cfg:', e.message); }
 }
 
@@ -16853,6 +16871,7 @@ document.getElementById('btn-via-save-cfg')?.addEventListener('click', async () 
       vendedor_cantidad_auto:   document.getElementById('via-cfg-cantidad-auto').value || '20',
       vendedor_minimo_auto:     document.getElementById('via-cfg-minimo-auto').value || '10',
       vendedor_minimo_busqueda: document.getElementById('via-cfg-minimo-busqueda').value || '2',
+      vendedor_fuente_auto:     document.getElementById('via-cfg-fuente-auto').value || 'google',
     });
     const ok = document.getElementById('via-cfg-ok');
     if (ok) { ok.style.display = 'inline'; setTimeout(() => { ok.style.display = 'none'; }, 2500); }
