@@ -11,15 +11,59 @@ const SB_URL = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
 
 const RUBROS_RANDOM = [
+  // Distribución y mayoristas
   'distribuidora de alimentos', 'distribuidora de bebidas', 'mayorista de alimentos',
   'distribuidora de lácteos', 'distribuidora de carnes y embutidos',
   'supermercado mayorista', 'distribuidora de productos de limpieza',
   'distribuidora de congelados', 'distribuidora de panificados',
-  'ferretería mayorista', 'distribuidora mayorista', 'proveedor de gastronomía',
-  'empresa de logística Argentina', 'depósito mayorista', 'cash and carry Argentina',
-  'distribuidora de frutas y verduras', 'importadora de productos',
-  'distribuidora de indumentaria', 'materiales de construcción mayorista',
-  'distribuidora de electrónica', 'farmacia mayorista', 'librería mayorista',
+  'distribuidora de frutas y verduras', 'distribuidora de indumentaria',
+  'distribuidora de electrónica', 'farmacia mayorista', 'cash and carry Argentina',
+
+  // Comercio minorista de alimentos
+  'kiosco', 'almacén de barrio', 'fiambrería', 'carnicería',
+  'verdulería y frutería', 'panadería y confitería', 'heladería',
+  'rotisería', 'dietética', 'mercado de barrio', 'despensa',
+  'vinoteca', 'cervecería artesanal', 'empresa de catering',
+
+  // Gastronomía y atención al público
+  'restaurante', 'pizzería', 'hamburguesería', 'bar y cafetería',
+  'confitería y café', 'sushi bar', 'bodegón', 'parrilla',
+  'delivery de comida', 'fast food Argentina',
+
+  // Ferretería, construcción y hogar
+  'ferretería', 'corralón de materiales', 'maderera',
+  'pinturería', 'sanitarios y plomería', 'empresa de construcción',
+  'electricidad materiales', 'cerrajería',
+
+  // Indumentaria y calzado
+  'negocio de ropa', 'boutique de indumentaria', 'zapatería',
+  'local de ropa deportiva', 'lencería', 'marroquinería',
+  'negocios de telas y mercería',
+
+  // Electrónica, tecnología y telefonía
+  'negocio de celulares', 'tienda de informática', 'electrodomésticos',
+  'tienda de electrónica', 'servicio técnico de computadoras',
+
+  // Salud y belleza
+  'farmacia', 'perfumería', 'peluquería y barbería', 'estética y spa',
+  'óptica', 'ortopedia', 'dietética y naturismo',
+
+  // Automotriz
+  'taller mecánico', 'lubricentro y gomería', 'repuestos de autos',
+  'concesionaria de autos usados', 'lavadero de autos',
+
+  // Mascotas
+  'veterinaria', 'pet shop', 'estética canina',
+
+  // Librería, juguetería y entretenimiento
+  'librería y papelería', 'juguetería', 'bazar y regalería',
+  'artículos de cotillón', 'disquería y multimedia',
+
+  // Servicios al público con stock
+  'vivero y jardinería', 'pesca y camping', 'óptica',
+  'artículos de limpieza y cotillón', 'bicicletería',
+  'mueblería y decoración', 'colchonería', 'artículos de deporte',
+  'floristería', 'pyme industrial Argentina',
 ];
 
 const PROVINCIAS_RANDOM = [
