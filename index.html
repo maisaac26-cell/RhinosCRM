@@ -1760,7 +1760,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').setAttribute('style','display:block');renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
       <button class="tab-btn" data-ftab="empleados">👥 Empleados</button>
       <button class="tab-btn" data-ftab="afip">📄 Facturas</button>
-      <button class="tab-btn" data-ftab="ddjj">🏛 Impuestos</button>
+      <button class="tab-btn" data-ftab="ddjj">🏛 Impuestos<span id="ddjj-tab-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;line-height:1.6;vertical-align:middle"></span></button>
+      <button class="tab-btn" data-ftab="extracto">🏦 Extracto</button>
     </div>
 
     <!-- RESUMEN -->
@@ -2419,15 +2420,50 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                 <div>
                   <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Tipo de comprobante</label>
-                  <select id="afip-emit-tipo-cbte" class="inp" style="width:100%;box-sizing:border-box" onchange="afipRecalcMontos()">
-                    <option value="1">Factura A</option>
-                    <option value="51">Factura A con Retención (OSR)</option>
-                    <option value="6">Factura B</option>
-                    <option value="11">Factura C</option>
+                  <select id="afip-emit-tipo-cbte" class="inp" style="width:100%;box-sizing:border-box" onchange="afipRecalcMontos();_afipToggleAsoc()">
+                    <optgroup label="Facturas">
+                      <option value="1">Factura A</option>
+                      <option value="51">Factura A con Retención (OSR)</option>
+                      <option value="6">Factura B</option>
+                      <option value="11">Factura C</option>
+                    </optgroup>
+                    <optgroup label="Notas de Crédito">
+                      <option value="3">Nota de Crédito A</option>
+                      <option value="8">Nota de Crédito B</option>
+                      <option value="13">Nota de Crédito C</option>
+                    </optgroup>
+                    <optgroup label="Notas de Débito">
+                      <option value="2">Nota de Débito A</option>
+                      <option value="7">Nota de Débito B</option>
+                      <option value="12">Nota de Débito C</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div style="display:flex;align-items:flex-end">
                   <div id="afip-emit-tipo-hint" style="font-size:10px;color:var(--text3);padding-bottom:6px;line-height:1.4"></div>
+                </div>
+                <!-- Comprobante asociado — visible solo para NC/ND -->
+                <div id="afip-asoc-section" style="display:none;grid-column:span 2;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:10px 12px">
+                  <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:8px">📎 Comprobante original que se nota</div>
+                  <div style="display:grid;grid-template-columns:1fr 80px 1fr;gap:8px">
+                    <div>
+                      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Tipo</label>
+                      <select id="afip-asoc-tipo" class="inp" style="width:100%;box-sizing:border-box">
+                        <option value="1">Factura A</option>
+                        <option value="6">Factura B</option>
+                        <option value="11">Factura C</option>
+                        <option value="51">Fact. A OSR</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Pto. Venta</label>
+                      <input id="afip-asoc-ptovta" class="inp" type="number" min="1" placeholder="1" value="1" style="width:100%;box-sizing:border-box">
+                    </div>
+                    <div>
+                      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Nro. Comprobante</label>
+                      <input id="afip-asoc-nro" class="inp" type="number" min="1" placeholder="12345" style="width:100%;box-sizing:border-box">
+                    </div>
+                  </div>
                 </div>
                 <div style="grid-column:span 2">
                   <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Cliente</label>
@@ -2766,6 +2802,69 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
 
     </div><!-- /ftab-ddjj -->
+
+    <!-- ── EXTRACTO BANCARIO ─────────────────────────────────────── -->
+    <div class="ftab-content" id="ftab-extracto" style="display:none">
+
+      <!-- Alertas DDJJ (aparece cuando hay vencimientos próximos) -->
+      <div id="ddjj-alerta-banner" style="display:none;margin-bottom:14px;padding:12px 16px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;font-size:12px;color:var(--red)">
+        <div style="font-weight:700;margin-bottom:4px">⏰ Vencimientos DDJJ próximos</div>
+        <div id="ddjj-alerta-lista"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text)">Importar extracto bancario</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">CSV con columnas: fecha, descripción, débito/crédito (o monto). El sistema detecta impuestos y duplicados automáticamente.</div>
+          </div>
+          <label class="btn" style="cursor:pointer;color:var(--cyan);border-color:rgba(0,229,204,0.3)">
+            📂 Seleccionar CSV
+            <input type="file" id="extracto-file-input" accept=".csv,.txt" style="display:none">
+          </label>
+        </div>
+        <div id="extracto-col-map" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--surface3);border-radius:8px;border:1px solid var(--border2)">
+          <div style="font-size:11px;color:var(--cyan);font-weight:600;margin-bottom:8px">Mapeo de columnas detectado — ajustá si hace falta</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            <div><label style="font-size:11px;color:var(--text3)">Fecha</label><select id="exc-col-fecha" class="inp" style="width:100%;box-sizing:border-box;font-size:12px"></select></div>
+            <div><label style="font-size:11px;color:var(--text3)">Descripción</label><select id="exc-col-desc" class="inp" style="width:100%;box-sizing:border-box;font-size:12px"></select></div>
+            <div><label style="font-size:11px;color:var(--text3)">Débito (salida)</label><select id="exc-col-debito" class="inp" style="width:100%;box-sizing:border-box;font-size:12px"></select></div>
+            <div><label style="font-size:11px;color:var(--text3)">Crédito (entrada)</label><select id="exc-col-credito" class="inp" style="width:100%;box-sizing:border-box;font-size:12px"></select></div>
+          </div>
+          <button class="btn btn-sm" id="btn-exc-remap" style="margin-top:8px;color:var(--cyan);border-color:rgba(0,229,204,0.3)">↻ Actualizar preview</button>
+        </div>
+        <div id="extracto-stats" style="display:none;font-size:12px;color:var(--text3);margin-bottom:8px"></div>
+      </div>
+
+      <div id="extracto-preview-wrap" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px;cursor:pointer">
+              <input type="checkbox" id="exc-check-all" checked> Seleccionar todo
+            </label>
+            <span style="font-size:11px;color:var(--text3)" id="exc-sel-count"></span>
+          </div>
+          <button class="btn btn-green" id="btn-exc-importar">✓ Importar seleccionados</button>
+        </div>
+        <div id="extracto-table-wrap" style="overflow-x:auto">
+          <table id="extracto-table" style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border2)">
+                <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:500;width:32px"></th>
+                <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:500">Fecha</th>
+                <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:500">Descripción</th>
+                <th style="padding:6px 8px;text-align:right;color:var(--text3);font-weight:500">Monto</th>
+                <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:500">Tipo</th>
+                <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:500">Categoría</th>
+                <th style="padding:6px 8px;text-align:left;color:var(--text3);font-weight:500">Estado</th>
+              </tr>
+            </thead>
+            <tbody id="extracto-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /ftab-extracto -->
 
   </div>
 
@@ -3726,6 +3825,51 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <div id="fprov-list"><div class="empty" style="font-size:12px">Generá las facturas del mes para ver el estado.</div></div>
         </div>
       </div>
+    </div>
+
+    <!-- Facturas de compra con IA -->
+    <div class="card" style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <span style="font-family:var(--display);font-size:12px;font-weight:800;letter-spacing:.04em">FACTURAS DE COMPRA</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">IVA Crédito Fiscal</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="compras-cf-total" style="font-size:12px;color:var(--green);font-weight:600"></span>
+          <label class="btn btn-sm" style="cursor:pointer;color:var(--cyan);border-color:rgba(0,229,204,0.3)">
+            📎 Subir factura
+            <input type="file" id="compras-file-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none">
+          </label>
+        </div>
+      </div>
+      <div id="compras-extract-preview" style="display:none;background:rgba(0,229,204,0.05);border:1px solid rgba(0,229,204,0.2);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--cyan);font-weight:600;margin-bottom:8px">✨ Datos extraídos por IA — confirmá antes de guardar</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="field" style="margin:0"><label>Proveedor</label><input id="cx-proveedor" class="inp" style="width:100%;box-sizing:border-box"></div>
+          <div class="field" style="margin:0"><label>CUIT</label><input id="cx-cuit" class="inp" style="width:100%;box-sizing:border-box"></div>
+          <div class="field" style="margin:0"><label>Fecha</label><input id="cx-fecha" class="inp" type="date" style="width:100%;box-sizing:border-box"></div>
+          <div class="field" style="margin:0"><label>Nro. Comprobante</label><input id="cx-nro" class="inp" style="width:100%;box-sizing:border-box"></div>
+          <div class="field" style="margin:0"><label>Tipo</label>
+            <select id="cx-tipo" class="inp" style="width:100%;box-sizing:border-box">
+              <option value="A">Factura A</option><option value="B">Factura B</option><option value="C">Factura C</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0"><label>Alícuota IVA</label>
+            <select id="cx-alicuota" class="inp" style="width:100%;box-sizing:border-box">
+              <option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0"><label>Imp. Neto</label><input id="cx-neto" class="inp" type="number" step="0.01" style="width:100%;box-sizing:border-box" oninput="cxRecalc()"></div>
+          <div class="field" style="margin:0"><label>IVA CF</label><input id="cx-iva" class="inp" type="number" step="0.01" style="width:100%;box-sizing:border-box"></div>
+          <div class="field" style="margin:0;grid-column:span 2"><label>Imp. Total</label><input id="cx-total" class="inp" type="number" step="0.01" style="width:100%;box-sizing:border-box;font-size:15px;font-weight:700"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+          <button class="btn btn-sm" id="btn-cx-cancel">Cancelar</button>
+          <button class="btn btn-sm btn-green" id="btn-cx-save">✓ Guardar factura de compra</button>
+        </div>
+      </div>
+      <div id="compras-extract-loading" style="display:none;padding:16px;text-align:center;font-size:12px;color:var(--text3)">✨ Analizando factura con IA...</div>
+      <div id="compras-list"><div class="empty" style="font-size:12px">Subí una factura de compra para registrar el IVA crédito fiscal.</div></div>
     </div>
   </div>
 
@@ -8478,6 +8622,9 @@ document.querySelectorAll('.tab-btn[data-ftab]').forEach(btn => {
     document.querySelectorAll('.ftab-content').forEach(t => t.style.display = 'none');
     this.classList.add('active');
     document.getElementById('ftab-' + this.dataset.ftab).style.display = 'block';
+    if (this.dataset.ftab === 'extracto') {
+      setTimeout(() => { if (typeof ddjjCheckAlertas === 'function') ddjjCheckAlertas(); }, 200);
+    }
   });
 });
 
@@ -10085,6 +10232,7 @@ function renderClientes() {
         <td style="padding:8px;text-align:center"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.estado==='activo'?'rgba(34,197,94,0.12)':c.estado==='pausado'?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)'};color:${c.estado==='activo'?'var(--green)':c.estado==='pausado'?'var(--amber)':'var(--red)'}">${c.estado}</span></td>
         <td style="padding:8px;display:flex;gap:4px">
           <button class="btn btn-sm" data-cuenta-cli="${c.id}" style="color:var(--green);padding:3px 10px;border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.08)">📋 Cuenta</button>
+          <button class="btn btn-sm" data-hist-cli="${c.id}" style="color:var(--cyan);padding:3px 8px;border-color:rgba(0,229,204,0.2)" title="Historial unificado">🕐</button>
           <button class="btn btn-sm" data-edit-cli="${c.id}" style="color:var(--cyan);padding:3px 8px;border-color:rgba(0,229,204,0.2)">✏</button>
           <button class="btn btn-sm" data-del-cli="${c.id}" style="color:var(--red);padding:3px 8px">✕</button>
         </td>
@@ -10092,6 +10240,9 @@ function renderClientes() {
     </tbody></table></div>`;
   list.querySelectorAll('[data-cuenta-cli]').forEach(btn => {
     btn.addEventListener('click', function() { openCuentaCorriente(this.dataset.cuentaCli); });
+  });
+  list.querySelectorAll('[data-hist-cli]').forEach(btn => {
+    btn.addEventListener('click', function() { abrirHistorialCliente(this.dataset.histCli); });
   });
 
   list.querySelectorAll('[data-edit-cli]').forEach(btn => {
@@ -17235,6 +17386,13 @@ function afipRecalcMontos() {
   if (ivaLbl)    ivaLbl.textContent    = 'IVA ' + (ALIC_LABEL[alicId] || '21%') + ':';
 }
 
+function _afipToggleAsoc() {
+  const tipo = parseInt(document.getElementById('afip-emit-tipo-cbte')?.value || '6', 10);
+  const esNota = [2,3,7,8,12,13].includes(tipo);
+  const sec = document.getElementById('afip-asoc-section');
+  if (sec) sec.style.display = esNota ? 'block' : 'none';
+}
+
 // ── Poblar select de clientes ─────────────────────────────────────────────────
 
 function afipPopulateClienteSelect() {
@@ -17289,6 +17447,16 @@ async function emitirFacturaAfip() {
   if (res) { res.style.display = 'none'; }
 
   try {
+    // Armar cbtes_asoc para NC/ND
+    const esNota = [2,3,7,8,12,13].includes(tipoCbte);
+    const cbtesAsoc = [];
+    if (esNota) {
+      const asocTipo = parseInt(document.getElementById('afip-asoc-tipo')?.value || '6', 10);
+      const asocPv   = parseInt(document.getElementById('afip-asoc-ptovta')?.value || '1', 10);
+      const asocNro  = parseInt(document.getElementById('afip-asoc-nro')?.value || '0', 10);
+      if (asocNro > 0) cbtesAsoc.push({ tipo: asocTipo, ptoVta: asocPv, nro: asocNro });
+    }
+
     const r = await callAfipAPI('emitir', {
       cliente_id: clienteId || null,
       cliente_nombre: clienteNombre !== '— seleccionar cliente —' ? clienteNombre : '',
@@ -17306,6 +17474,7 @@ async function emitirFacturaAfip() {
       imp_total: impTotal,
       moneda_id: monedaId,
       condicion_iva_receptor: condicionIvaReceptor,
+      cbtes_asoc: cbtesAsoc,
     });
 
     if (r?.ok) {
@@ -18153,6 +18322,397 @@ document.querySelector('.tab-btn[data-ftab="ddjj"]').addEventListener('click', a
   ddjjRenderConfig();
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ALERTAS DDJJ — badge en tab + banner en extracto
+// ══════════════════════════════════════════════════════════════════════════════
+
+function ddjjCheckAlertas() {
+  const cfg = getDDJJConfig ? getDDJJConfig() : {};
+  const hoy = new Date();
+  const alertas = [];
+
+  const periodos = [];
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    periodos.push(d.toISOString().slice(0, 7));
+  }
+
+  periodos.forEach(p => {
+    const rec = getDDJJRecord ? getDDJJRecord('iva', p) : {};
+    if (!rec || rec.estado === 'presentado' || rec.estado === 'pagado') return;
+    const vencStr = ddjjCalcVencimiento ? ddjjCalcVencimiento('iva', p) : null;
+    if (!vencStr) return;
+    const venc = new Date(vencStr + 'T23:59:00');
+    const diffDays = Math.ceil((venc - hoy) / 86400000);
+    if (diffDays <= 7) {
+      alertas.push({ label: `IVA ${p}`, venc: vencStr, dias: diffDays, overdue: diffDays < 0 });
+    }
+  });
+
+  const autMonto = parseFloat(cfg.autonomos_monto || 0);
+  if (autMonto > 0) {
+    const pActual = hoy.toISOString().slice(0, 7);
+    const recAut = getDDJJRecord ? getDDJJRecord('autonomos', pActual) : {};
+    if (!recAut || (recAut.estado !== 'pagado')) {
+      const diaVenc = parseInt(cfg.autonomos_dia_venc || 7, 10);
+      const vencAut = new Date(hoy.getFullYear(), hoy.getMonth(), diaVenc);
+      const diffAut = Math.ceil((vencAut - hoy) / 86400000);
+      if (diffAut <= 7) alertas.push({ label: `Autónomos ${pActual}`, venc: vencAut.toISOString().slice(0,10), dias: diffAut, overdue: diffAut < 0 });
+    }
+  }
+
+  // Badge en tab
+  const badge = document.getElementById('ddjj-tab-badge');
+  if (badge) {
+    if (alertas.length > 0) {
+      badge.textContent = alertas.length;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // Banner en extracto tab
+  const banner = document.getElementById('ddjj-alerta-banner');
+  const lista = document.getElementById('ddjj-alerta-lista');
+  if (banner && lista) {
+    if (alertas.length > 0) {
+      lista.innerHTML = alertas.map(a =>
+        `<div style="margin-top:3px">${a.overdue ? '🔴 VENCIDO' : '⚠'} <strong>${a.label}</strong> vence ${a.overdue ? 'hace ' + Math.abs(a.dias) + ' día(s)' : 'en ' + a.dias + ' día(s)'} (${a.venc})</div>`
+      ).join('');
+      banner.style.display = 'block';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+}
+
+// Correr al cargar finanzas
+document.querySelector('[data-sec="finanzas"]')?.addEventListener('click', () => setTimeout(ddjjCheckAlertas, 800));
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FACTURAS DE COMPRA — localStorage + IA extraction
+// ══════════════════════════════════════════════════════════════════════════════
+
+const COMPRAS_KEY = 'rhinos_compras_v1';
+function getCompras() { try { return JSON.parse(localStorage.getItem(COMPRAS_KEY) || '[]'); } catch(e) { return []; } }
+function saveCompras(arr) { localStorage.setItem(COMPRAS_KEY, JSON.stringify(arr)); }
+
+function cxRecalc() {
+  const neto = parseFloat(document.getElementById('cx-neto')?.value || 0);
+  const alic = parseFloat(document.getElementById('cx-alicuota')?.value || 21);
+  const iva = Math.round(neto * (alic / 100) * 100) / 100;
+  const total = Math.round((neto + iva) * 100) / 100;
+  const ivaEl = document.getElementById('cx-iva');
+  const totalEl = document.getElementById('cx-total');
+  if (ivaEl) ivaEl.value = iva;
+  if (totalEl) totalEl.value = total;
+}
+
+function renderComprasList() {
+  const el = document.getElementById('compras-list');
+  const cfEl = document.getElementById('compras-cf-total');
+  if (!el) return;
+  const compras = getCompras().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const totalCF = compras.reduce((a, c) => a + (+c.imp_iva || 0), 0);
+  if (cfEl) cfEl.textContent = totalCF > 0 ? `IVA CF: $${totalCF.toLocaleString('es-AR', {minimumFractionDigits:2})}` : '';
+  if (!compras.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Subí una factura de compra para registrar el IVA crédito fiscal.</div>'; return; }
+  el.innerHTML = compras.map(c => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;color:var(--text)">${c.proveedor || '—'}</div>
+        <div style="font-size:11px;color:var(--text3)">${c.fecha||''} · Nro: ${c.nro_cbte||'—'} · Tipo ${c.tipo||'?'}</div>
+        <div style="font-size:11px;color:var(--text3)">CUIT: ${c.cuit||'—'}</div>
+      </div>
+      <div style="text-align:right;margin-left:12px;flex-shrink:0">
+        <div style="font-weight:600;color:var(--text)">$${(+c.imp_total||0).toLocaleString('es-AR',{minimumFractionDigits:2})}</div>
+        <div style="font-size:11px;color:var(--green)">IVA CF: $${(+c.imp_iva||0).toLocaleString('es-AR',{minimumFractionDigits:2})}</div>
+      </div>
+      <button data-del-compra="${c.id}" style="background:none;border:none;color:var(--red);cursor:pointer;padding:0 0 0 10px;font-size:14px;flex-shrink:0">✕</button>
+    </div>`).join('');
+  el.querySelectorAll('[data-del-compra]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (!confirm('¿Eliminar esta factura de compra?')) return;
+      saveCompras(getCompras().filter(c => c.id !== this.dataset.delCompra));
+      renderComprasList();
+    });
+  });
+}
+
+(function initCompras() {
+  const fileInput = document.getElementById('compras-file-input');
+  if (!fileInput) return;
+
+  fileInput.addEventListener('change', async function() {
+    const file = this.files?.[0];
+    if (!file) return;
+    this.value = '';
+    const loadEl = document.getElementById('compras-extract-loading');
+    const prevEl = document.getElementById('compras-extract-preview');
+    if (loadEl) loadEl.style.display = 'block';
+    if (prevEl) prevEl.style.display = 'none';
+
+    try {
+      const reader = new FileReader();
+      const b64 = await new Promise((res, rej) => {
+        reader.onload = e => res(e.target.result.split(',')[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+      const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+      const r = await callAPI('extract_factura_compra', { fileBase64: b64, mimeType });
+      if (!r?.ok || !r.data) throw new Error(r?.error || 'No se pudo extraer');
+      const d = r.data;
+      document.getElementById('cx-proveedor').value = d.proveedor || '';
+      document.getElementById('cx-cuit').value = d.cuit || '';
+      document.getElementById('cx-fecha').value = d.fecha || '';
+      document.getElementById('cx-nro').value = d.nro_cbte || '';
+      document.getElementById('cx-tipo').value = d.tipo || 'A';
+      document.getElementById('cx-alicuota').value = String(d.alicuota_iva||21);
+      document.getElementById('cx-neto').value = d.imp_neto || '';
+      document.getElementById('cx-iva').value = d.imp_iva || '';
+      document.getElementById('cx-total').value = d.imp_total || '';
+      if (loadEl) loadEl.style.display = 'none';
+      if (prevEl) prevEl.style.display = 'block';
+    } catch(err) {
+      if (loadEl) loadEl.style.display = 'none';
+      showToast('Error al extraer: ' + (err.message || err));
+    }
+  });
+
+  document.getElementById('btn-cx-cancel')?.addEventListener('click', () => {
+    document.getElementById('compras-extract-preview').style.display = 'none';
+  });
+
+  document.getElementById('btn-cx-save')?.addEventListener('click', () => {
+    const g = id => (document.getElementById(id)?.value || '').trim();
+    const compra = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+      proveedor: g('cx-proveedor'),
+      cuit: g('cx-cuit'),
+      fecha: g('cx-fecha'),
+      nro_cbte: g('cx-nro'),
+      tipo: g('cx-tipo'),
+      alicuota_iva: parseFloat(g('cx-alicuota')||21),
+      imp_neto: parseFloat(g('cx-neto')||0),
+      imp_iva: parseFloat(g('cx-iva')||0),
+      imp_total: parseFloat(g('cx-total')||0),
+      createdAt: new Date().toISOString().slice(0,10),
+    };
+    if (!compra.proveedor || !compra.imp_total) { showToast('Completá proveedor e importe.'); return; }
+    saveCompras([...getCompras(), compra]);
+    document.getElementById('compras-extract-preview').style.display = 'none';
+    renderComprasList();
+    showToast('✅ Factura de compra guardada — IVA CF registrado 🦏');
+  });
+
+  renderComprasList();
+})();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXTRACTO BANCARIO — CSV import con checkboxes y detección de impuestos
+// ══════════════════════════════════════════════════════════════════════════════
+
+const TAX_PATTERNS = [
+  { re: /percep.*iibb|iibb.*percep|ing.*brutos/i, cat: 'Impuesto IIBB', tipo: 'gasto' },
+  { re: /reten.*ganancias|ganancias.*reten/i, cat: 'Impuesto Ganancias', tipo: 'gasto' },
+  { re: /debito.*automatico.*afip|afip.*deb.*aut/i, cat: 'Pago AFIP', tipo: 'gasto' },
+  { re: /percep.*iva|iva.*percep/i, cat: 'Impuesto IVA CF', tipo: 'gasto' },
+  { re: /arba|agip|rentas|reten.*prov/i, cat: 'Impuesto IIBB', tipo: 'gasto' },
+  { re: /impuesto|tributo|reten|percep/i, cat: 'Impuesto', tipo: 'gasto' },
+  { re: /sueldo|salario|haberes/i, cat: 'Sueldos', tipo: 'gasto' },
+  { re: /honorar/i, cat: 'Honorarios', tipo: 'gasto' },
+  { re: /hosting|dominio|servidor/i, cat: 'Tecnología', tipo: 'gasto' },
+];
+
+let _extractoRows = [];
+let _extractoHeaders = [];
+
+function parseExtractoCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return { headers: [], rows: [] };
+  const sep = lines[0].includes(';') ? ';' : ',';
+  const parseRow = l => l.split(sep).map(c => c.trim().replace(/^["']|["']$/g, ''));
+  const headers = parseRow(lines[0]);
+  const rows = lines.slice(1).filter(l => l.trim()).map(l => {
+    const vals = parseRow(l);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+    return obj;
+  });
+  return { headers, rows };
+}
+
+function autoDetectCols(headers) {
+  const hLower = headers.map(h => h.toLowerCase());
+  const find = (...kws) => headers[hLower.findIndex(h => kws.some(k => h.includes(k)))] || '';
+  return {
+    fecha:   find('fecha', 'date', 'dia', 'fec'),
+    desc:    find('descr', 'concepto', 'detalle', 'movim', 'operac'),
+    debito:  find('debit', 'débito', 'egreso', 'salid', 'debe'),
+    credito: find('credit', 'crédito', 'ingreso', 'entra', 'haber'),
+  };
+}
+
+function buildExtractoPreview() {
+  const col = {
+    fecha:   document.getElementById('exc-col-fecha')?.value,
+    desc:    document.getElementById('exc-col-desc')?.value,
+    debito:  document.getElementById('exc-col-debito')?.value,
+    credito: document.getElementById('exc-col-credito')?.value,
+  };
+  const tbody = document.getElementById('extracto-tbody');
+  const selCount = document.getElementById('exc-sel-count');
+  if (!tbody) return;
+
+  const parseNum = v => {
+    if (!v) return 0;
+    const clean = v.replace(/[.$\s]/g, '').replace(',', '.');
+    return parseFloat(clean) || 0;
+  };
+  const parseFecha = v => {
+    if (!v) return '';
+    const m1 = v.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (m1) return `${m1[3]}-${m1[2]}-${m1[1]}`;
+    const m2 = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m2) return v.slice(0, 10);
+    const m3 = v.match(/^(\d{2})-(\d{2})-(\d{4})/);
+    if (m3) return `${m3[3]}-${m3[2]}-${m3[1]}`;
+    return v;
+  };
+
+  _extractoRows = _extractoRows.map((raw, i) => {
+    const fecha = parseFecha(raw[col.fecha] || '');
+    const desc  = raw[col.desc] || '';
+    const deb   = parseNum(raw[col.debito]);
+    const cred  = parseNum(raw[col.credito]);
+    const monto = cred > 0 ? cred : -deb;
+    const tipo  = monto >= 0 ? 'ingreso' : 'gasto';
+    const taxMatch = TAX_PATTERNS.find(p => p.re.test(desc));
+    const cat = taxMatch ? taxMatch.cat : (tipo === 'ingreso' ? 'Otros Ingresos' : 'Otros Gastos');
+    const isDup = (finTx || []).some(t => t.date === fecha && Math.abs(Math.abs(+t.amount) - Math.abs(monto)) < 1 && t.description?.toLowerCase().slice(0,20) === desc.toLowerCase().slice(0,20));
+    return { ...raw, _fecha: fecha, _desc: desc, _monto: monto, _tipo: tipo, _cat: cat, _dup: isDup, _idx: i, _isTax: !!taxMatch };
+  });
+
+  const valid = _extractoRows.filter(r => r._fecha && r._monto !== 0);
+  const dups = valid.filter(r => r._dup).length;
+  const taxes = valid.filter(r => r._isTax).length;
+  const statsEl = document.getElementById('extracto-stats');
+  if (statsEl) {
+    statsEl.style.display = 'block';
+    statsEl.innerHTML = `${valid.length} movimientos · ${taxes} impuestos detectados · <span style="color:var(--amber)">${dups} posibles duplicados</span>`;
+  }
+
+  tbody.innerHTML = valid.map(r => {
+    const montoColor = r._monto >= 0 ? 'var(--green)' : 'var(--red)';
+    const taxBadge = r._isTax ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(239,68,68,0.12);color:var(--red);margin-left:4px">impuesto</span>` : '';
+    const dupBadge = r._dup ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(245,158,11,0.12);color:var(--amber);margin-left:4px">posible dup.</span>` : '';
+    return `<tr style="border-bottom:1px solid var(--border);${r._dup ? 'opacity:0.6' : ''}">
+      <td style="padding:6px 8px"><input type="checkbox" class="exc-row-check" data-idx="${r._idx}" ${r._dup ? '' : 'checked'}></td>
+      <td style="padding:6px 8px;color:var(--text2)">${r._fecha}</td>
+      <td style="padding:6px 8px;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r._desc}">${r._desc}${taxBadge}${dupBadge}</td>
+      <td style="padding:6px 8px;text-align:right;font-weight:600;color:${montoColor}">${r._monto >= 0 ? '+' : ''}${r._monto.toLocaleString('es-AR',{minimumFractionDigits:2})}</td>
+      <td style="padding:6px 8px;color:var(--text3)">${r._tipo}</td>
+      <td style="padding:6px 8px"><input class="exc-cat-input" data-idx="${r._idx}" value="${r._cat}" style="font-size:11px;padding:2px 6px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;color:var(--text2);width:150px"></td>
+      <td style="padding:6px 8px">${r._dup ? '<span style="color:var(--amber);font-size:11px">⚠ ya existe</span>' : '<span style="color:var(--text3);font-size:11px">nuevo</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  // update category on edit
+  tbody.querySelectorAll('.exc-cat-input').forEach(inp => {
+    inp.addEventListener('change', function() {
+      const idx = +this.dataset.idx;
+      const row = _extractoRows.find(r => r._idx === idx);
+      if (row) row._cat = this.value;
+    });
+  });
+
+  const checked = tbody.querySelectorAll('.exc-row-check:checked').length;
+  if (selCount) selCount.textContent = `${checked} seleccionados`;
+
+  tbody.querySelectorAll('.exc-row-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const c = tbody.querySelectorAll('.exc-row-check:checked').length;
+      if (selCount) selCount.textContent = `${c} seleccionados`;
+    });
+  });
+
+  document.getElementById('extracto-preview-wrap').style.display = 'block';
+}
+
+function populateColSelects(headers) {
+  const selIds = ['exc-col-fecha','exc-col-desc','exc-col-debito','exc-col-credito'];
+  const detected = autoDetectCols(headers);
+  const detected_vals = [detected.fecha, detected.desc, detected.debito, detected.credito];
+  selIds.forEach((id, i) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— ninguna —</option>' + headers.map(h => `<option value="${h}">${h}</option>`).join('');
+    if (detected_vals[i]) sel.value = detected_vals[i];
+  });
+  document.getElementById('extracto-col-map').style.display = 'block';
+}
+
+(function initExtracto() {
+  const fileInput = document.getElementById('extracto-file-input');
+  if (!fileInput) return;
+
+  fileInput.addEventListener('change', function() {
+    const file = this.files?.[0];
+    if (!file) return;
+    this.value = '';
+    const reader = new FileReader();
+    reader.onload = e => {
+      const { headers, rows } = parseExtractoCSV(e.target.result);
+      _extractoHeaders = headers;
+      _extractoRows = rows;
+      populateColSelects(headers);
+      buildExtractoPreview();
+    };
+    reader.readAsText(file, 'latin1');
+  });
+
+  document.getElementById('btn-exc-remap')?.addEventListener('click', buildExtractoPreview);
+
+  document.getElementById('exc-check-all')?.addEventListener('change', function() {
+    document.querySelectorAll('.exc-row-check').forEach(cb => { cb.checked = this.checked; });
+    const c = document.querySelectorAll('.exc-row-check:checked').length;
+    const selCount = document.getElementById('exc-sel-count');
+    if (selCount) selCount.textContent = `${c} seleccionados`;
+  });
+
+  document.getElementById('btn-exc-importar')?.addEventListener('click', async function() {
+    const checked = [...document.querySelectorAll('.exc-row-check:checked')].map(cb => +cb.dataset.idx);
+    const toImport = _extractoRows.filter(r => checked.includes(r._idx) && r._fecha && r._monto !== 0);
+    if (!toImport.length) { showToast('Seleccioná al menos un movimiento.'); return; }
+    this.disabled = true; this.textContent = '⏳ Importando...';
+    let ok = 0, err = 0;
+    for (const r of toImport) {
+      try {
+        const tx = {
+          type: r._tipo,
+          amount: Math.abs(r._monto),
+          date: r._fecha,
+          description: r._desc.slice(0, 120),
+          category: r._cat,
+          currency: 'ARS',
+          notes: 'Importado del extracto bancario',
+        };
+        const [saved] = await sbFetch('rhinos_transactions', 'POST', tx);
+        if (saved) { finTx.unshift(saved); ok++; }
+        else { err++; }
+      } catch(e) { err++; }
+    }
+    renderResumen(); renderTransacciones && renderTransacciones();
+    showToast(`✅ ${ok} movimiento${ok!==1?'s':''} importado${ok!==1?'s':''}${err ? ' · ' + err + ' error(es)' : ''} 🦏`);
+    this.disabled = false; this.textContent = '✓ Importar seleccionados';
+    document.getElementById('extracto-preview-wrap').style.display = 'none';
+    document.getElementById('extracto-col-map').style.display = 'none';
+    document.getElementById('extracto-stats').style.display = 'none';
+    _extractoRows = [];
+  });
+})();
+
 // ── Genera PDF de factura AFIP en base64 (para adjuntar en email) ────────────
 async function _generarAfipPdfBase64(factura) {
   const TIPO_LETRA = { 1:'A',2:'A',3:'A',6:'B',7:'B',8:'B',11:'C',12:'C',13:'C',51:'A',52:'A',53:'A' };
@@ -18278,6 +18838,72 @@ async function _generarAfipPdfBase64(factura) {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HISTORIAL UNIFICADO DE CLIENTE
+// ══════════════════════════════════════════════════════════════════════════════
+
+(function() {
+  const html = `
+<div id="modal-historial-cliente" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.72);align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:700px;max-width:96vw;padding:24px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.5);margin-bottom:40px">
+    <button onclick="document.getElementById('modal-historial-cliente').style.display='none'" style="position:absolute;top:14px;right:14px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1">✕</button>
+    <div id="mhc-nombre" style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:2px"></div>
+    <div id="mhc-meta" style="font-size:12px;color:var(--text3);margin-bottom:16px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px" id="mhc-metrics"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Facturas AFIP</div>
+        <div id="mhc-facturas"><div class="empty" style="font-size:12px">Sin facturas emitidas.</div></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Cobros</div>
+        <div id="mhc-cobros"><div class="empty" style="font-size:12px">Sin cobros registrados.</div></div>
+      </div>
+    </div>
+  </div>
+</div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+})();
+
+function abrirHistorialCliente(clientId) {
+  const client = (typeof getClients === 'function' ? getClients() : []).find(c => c.id === clientId);
+  if (!client) return;
+  const cobros = (typeof getCobros === 'function' ? getCobros() : []).filter(c => c.clientId === clientId).sort((a,b) => b.periodo.localeCompare(a.periodo));
+  const facturas = (typeof _afipFacturas !== 'undefined' ? _afipFacturas : []).filter(f => f.cliente_id === clientId).sort((a,b) => b.fecha_cbte.localeCompare(a.fecha_cbte));
+
+  const totalCobrado = cobros.filter(c => c.status === 'pagado').reduce((a,c) => a + (+c.monto||0), 0);
+  const totalPendiente = cobros.filter(c => c.status !== 'pagado').reduce((a,c) => a + (+c.monto||0), 0);
+  const totalFacturado = facturas.reduce((a,f) => a + (+f.imp_total||0), 0);
+
+  const TIPO_LABEL = {1:'FA',2:'NDA',3:'NCA',6:'FB',7:'NDB',8:'NCB',11:'FC',12:'NDC',13:'NCC',51:'FA-OSR'};
+  const ESTADO_COLOR = {pagado:'var(--green)',pendiente:'var(--amber)',vencido:'var(--red)'};
+
+  document.getElementById('mhc-nombre').textContent = client.nombre || client.empresa || clientId;
+  document.getElementById('mhc-meta').textContent = `${client.empresa || ''}${client.cuit ? ' · CUIT ' + client.cuit : ''}${client.precio ? ' · $' + (+client.precio).toLocaleString('es-AR') + '/mes' : ''}`;
+
+  document.getElementById('mhc-metrics').innerHTML = [
+    { label: 'Total cobrado', val: '$' + totalCobrado.toLocaleString('es-AR',{minimumFractionDigits:0}), color: 'var(--green)' },
+    { label: 'Pendiente', val: '$' + totalPendiente.toLocaleString('es-AR',{minimumFractionDigits:0}), color: 'var(--amber)' },
+    { label: 'Total facturado AFIP', val: '$' + totalFacturado.toLocaleString('es-AR',{minimumFractionDigits:0}), color: 'var(--cyan)' },
+  ].map(m => `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:var(--text3)">${m.label}</div><div style="font-size:18px;font-weight:700;color:${m.color}">${m.val}</div></div>`).join('');
+
+  document.getElementById('mhc-facturas').innerHTML = facturas.length
+    ? facturas.map(f => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <div><span style="font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(0,229,204,0.1);color:var(--cyan);margin-right:5px">${TIPO_LABEL[f.tipo_cbte]||f.tipo_cbte}</span>${f.fecha_cbte}<div style="font-size:11px;color:var(--text3);margin-top:1px">${f.descripcion||''}</div></div>
+        <div style="text-align:right"><div style="font-weight:600;color:var(--text)">$${(+f.imp_total).toLocaleString('es-AR',{minimumFractionDigits:0})}</div><div style="font-size:10px;color:var(--text3)">CAE ${f.cae||'—'}</div></div>
+      </div>`).join('')
+    : '<div class="empty" style="font-size:12px">Sin facturas emitidas.</div>';
+
+  document.getElementById('mhc-cobros').innerHTML = cobros.length
+    ? cobros.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <div><div style="font-weight:500">${c.periodo}</div>${c.fechaPago ? `<div style="font-size:11px;color:var(--text3)">Pagado ${c.fechaPago}</div>` : ''}</div>
+        <div style="text-align:right"><div style="font-weight:600;color:${ESTADO_COLOR[c.status]||'var(--text)'}">$${(+c.monto).toLocaleString('es-AR',{minimumFractionDigits:0})}</div><div style="font-size:10px;color:${ESTADO_COLOR[c.status]||'var(--text3)'}">${c.status}</div></div>
+      </div>`).join('')
+    : '<div class="empty" style="font-size:12px">Sin cobros registrados.</div>';
+
+  document.getElementById('modal-historial-cliente').style.display = 'flex';
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -73,6 +73,47 @@ async function igFetch(path, method, body) {
   });
 }
 
+function anthropicVisionFetch(fileBase64, mimeType, promptText) {
+  const contentType = mimeType === 'application/pdf' ? 'document' : 'image';
+  const payload = JSON.stringify({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: contentType, source: { type: 'base64', media_type: mimeType, data: fileBase64 } },
+        { type: 'text', text: promptText }
+      ]
+    }]
+  });
+  return new Promise((resolve, reject) => {
+    const req = require('https').request({
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    }, (res) => {
+      let raw = '';
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try {
+          const d = JSON.parse(raw);
+          const text = d.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
+          resolve(text);
+        } catch(e) { reject(new Error(raw.slice(0, 200))); }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
 function anthropicFetch(messages, system) {
   const payload = JSON.stringify({
     model: 'claude-haiku-4-5-20251001',
@@ -735,6 +776,21 @@ module.exports = async function handler(req, res) {
         message: { text: message }
       });
       result = sent;
+    }
+
+    else if (action === 'extract_factura_compra') {
+      const { fileBase64, mimeType } = body;
+      if (!fileBase64 || !mimeType) return res.status(400).json({ error: 'fileBase64 y mimeType requeridos' });
+      const prompt = `Analizá esta factura argentina. Extraé los datos y devolvé SOLO un objeto JSON válido (sin texto antes ni después, sin markdown):
+{"proveedor":"nombre empresa emisora","cuit":"CUIT sin guiones ni espacios","fecha":"YYYY-MM-DD","nro_cbte":"numero completo del comprobante ej 0001-00001234","tipo":"A o B o C","punto_venta":1,"imp_neto":0,"imp_iva":0,"imp_total":0,"alicuota_iva":21}
+Si un campo no está disponible, usá null. imp_neto es el importe antes de IVA. imp_total es el importe final con IVA. alicuota_iva puede ser 21, 10.5, 27 o 0.`;
+      const raw = await anthropicVisionFetch(fileBase64, mimeType, prompt);
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) return res.status(422).json({ error: 'No se pudo extraer datos. Intentá con una imagen más clara.' });
+      try {
+        const data = JSON.parse(match[0]);
+        return res.json({ ok: true, data });
+      } catch(e) { return res.status(422).json({ error: 'JSON inválido del modelo: ' + raw.slice(0, 100) }); }
     }
 
     else if (action === 'ai_reply') {

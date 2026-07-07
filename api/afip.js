@@ -293,6 +293,10 @@ async function wsfeSolicitarCAE(cfg, token, sign, inv) {
     ? `<FchServDesde>${inv.periodoDesde}</FchServDesde><FchServHasta>${inv.periodoHasta}</FchServHasta><FchVtoPago>${inv.fecha}</FchVtoPago>`
     : '';
 
+  const cbtesAsocBlock = Array.isArray(inv.cbtesAsoc) && inv.cbtesAsoc.length
+    ? `<CbtesAsoc>${inv.cbtesAsoc.map(a => `<CbteAsoc><Tipo>${a.tipo}</Tipo><PtoVta>${a.ptoVta}</PtoVta><Nro>${a.nro}</Nro></CbteAsoc>`).join('')}</CbtesAsoc>`
+    : '';
+
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
@@ -327,6 +331,7 @@ async function wsfeSolicitarCAE(cfg, token, sign, inv) {
             <MonCotiz>${inv.monedaId === 'PES' ? 1 : inv.monCotiz || 1}</MonCotiz>
             <CondicionIvaReceptor>${inv.condicionIvaReceptor || 1}</CondicionIvaReceptor>
             ${ivaBlock}
+            ${cbtesAsocBlock}
           </FECAEDetRequest>
         </FeDetReq>
       </FeCAEReq>
@@ -558,11 +563,13 @@ module.exports = async function handler(req, res) {
       try { ultimoNum = await wsfeUltimoCbte(cfg, token, sign, ptoVta, tipoCbte); } catch(e) { /* first */ }
       const numero = ultimoNum + 1;
 
+      const cbtesAsoc = Array.isArray(body.cbtes_asoc) ? body.cbtes_asoc : [];
+
       const { cae, caeFchVto } = await wsfeSolicitarCAE(cfg, token, sign, {
         ptoVta, tipoCbte, concepto, docTipo, docNro,
         impNeto, impIva, impTotal, alicuotaId,
         monedaId, monCotiz, fecha, periodoDesde, periodoHasta, numero,
-        condicionIvaReceptor,
+        condicionIvaReceptor, cbtesAsoc,
       });
 
       // Save to rhinos_facturas
