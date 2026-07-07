@@ -327,11 +327,11 @@ async function wsfeSolicitarCAE(cfg, token, sign, inv) {
             <ImpOpEx>0.00</ImpOpEx>
             <ImpIVA>${inv.impIva.toFixed(2)}</ImpIVA>
             <ImpTrib>0.00</ImpTrib>
+            ${cbtesAsocBlock}
+            ${ivaBlock}
             <MonId>${inv.monedaId}</MonId>
             <MonCotiz>${inv.monedaId === 'PES' ? 1 : inv.monCotiz || 1}</MonCotiz>
             <CondicionIvaReceptor>${inv.condicionIvaReceptor || 1}</CondicionIvaReceptor>
-            ${ivaBlock}
-            ${cbtesAsocBlock}
           </FECAEDetRequest>
         </FeDetReq>
       </FeCAEReq>
