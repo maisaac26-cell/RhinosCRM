@@ -1760,6 +1760,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="tab-btn" data-ftab="cobros" onclick="document.getElementById('ftab-cobros').setAttribute('style','display:block');renderClientes();renderClientStats();" style="background:rgba(0,229,204,0.08);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">💳 Clientes & Cobros</button>
       <button class="tab-btn" data-ftab="empleados">👥 Empleados</button>
       <button class="tab-btn" data-ftab="afip">📄 Facturas</button>
+      <button class="tab-btn" data-ftab="ddjj">🏛 Impuestos</button>
     </div>
 
     <!-- RESUMEN -->
@@ -1770,6 +1771,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="metric-card"><div class="m-label">Inversiones</div><div class="m-val" id="fin-inversiones" style="color:var(--blue)">$0</div><div class="m-sub">Capital social</div></div>
         <div class="metric-card"><div class="m-label">Balance</div><div class="m-val" id="fin-balance">$0</div><div class="m-sub">Ingresos - Gastos</div></div>
       </div>
+
+      <div id="fin-iva-warn" style="display:none;margin:0 0 12px 0;padding:10px 14px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:8px;font-size:12px;color:var(--amber)"></div>
 
       <div class="card" id="pendientes-card" style="border-color:rgba(245,158,11,0.3);display:none">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -2587,6 +2590,182 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div><!-- /grid -->
 
     </div><!-- /ftab-afip -->
+
+    <!-- ══════════════════════════════════════════════════ -->
+    <!-- IMPUESTOS / DDJJ                                   -->
+    <!-- ══════════════════════════════════════════════════ -->
+    <div class="ftab-content" id="ftab-ddjj" style="display:none">
+
+      <!-- Métricas resumen -->
+      <div class="metrics-row" id="ddjj-metrics">
+        <div class="metric-card"><div class="m-label">IVA a pagar (est.)</div><div class="m-val" id="ddjj-m-iva" style="color:var(--red)">—</div><div class="m-sub" id="ddjj-m-iva-sub">período actual</div></div>
+        <div class="metric-card"><div class="m-label">Autónomos mes</div><div class="m-val" id="ddjj-m-aut" style="color:var(--amber)">—</div><div class="m-sub">aporte mensual fijo</div></div>
+        <div class="metric-card"><div class="m-label">F.931 estimado</div><div class="m-val" id="ddjj-m-f931" style="color:var(--amber)">—</div><div class="m-sub">cargas sociales nómina</div></div>
+        <div class="metric-card"><div class="m-label">Próximo vencimiento</div><div class="m-val" id="ddjj-m-prox" style="color:var(--cyan);font-size:18px">—</div><div class="m-sub" id="ddjj-m-prox-sub">—</div></div>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div class="tab-row" id="ddjj-subtabs" style="margin-bottom:16px">
+        <button class="tab-btn ddjj-stab active" data-dstab="iva">📊 IVA</button>
+        <button class="tab-btn ddjj-stab" data-dstab="autonomos">👤 Autónomos</button>
+        <button class="tab-btn ddjj-stab" data-dstab="f931">👥 F.931</button>
+        <button class="tab-btn ddjj-stab" data-dstab="iibb" style="color:var(--text3)">🔒 IIBB</button>
+        <button class="tab-btn ddjj-stab" data-dstab="config">⚙ Configuración</button>
+      </div>
+
+      <!-- ── IVA ─────────────────────────────────────── -->
+      <div id="dstab-iva">
+        <!-- Period nav -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <button class="btn btn-sm" id="ddjj-iva-prev">←</button>
+          <span id="ddjj-iva-periodo-label" style="font-size:15px;font-weight:700;color:var(--text);min-width:140px;text-align:center"></span>
+          <button class="btn btn-sm" id="ddjj-iva-next">→</button>
+          <span id="ddjj-iva-load-note" style="font-size:11px;color:var(--amber)"></span>
+        </div>
+        <div class="grid2">
+          <!-- Posición IVA -->
+          <div class="card" style="border-color:rgba(239,68,68,0.3)">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+              Posición de IVA
+              <span style="font-size:10px;font-weight:400;color:var(--cyan);background:rgba(0,229,204,0.1);padding:2px 8px;border-radius:8px">⚡ auto desde facturas AFIP</span>
+            </div>
+            <div id="ddjj-iva-posicion">
+              <div class="empty" style="font-size:12px">Cargando...</div>
+            </div>
+          </div>
+          <!-- Estado presentación -->
+          <div class="card" style="border-color:rgba(99,102,241,0.3)">
+            <div class="card-title">Estado de la presentación</div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Vencimiento: <strong id="ddjj-iva-venc" style="color:var(--amber)">—</strong></div>
+            <div style="display:flex;gap:8px;margin-bottom:14px">
+              <button class="btn btn-sm ddjj-estado-btn" data-tipo="iva" data-estado="pendiente" style="flex:1;font-size:11px">⏳ Pendiente</button>
+              <button class="btn btn-sm ddjj-estado-btn" data-tipo="iva" data-estado="presentada" style="flex:1;font-size:11px">📤 Presentada</button>
+              <button class="btn btn-sm ddjj-estado-btn" data-tipo="iva" data-estado="pagada" style="flex:1;font-size:11px">✓ Pagada</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+              <div class="field" style="margin:0"><label>Fecha presentación</label><input type="date" id="ddjj-iva-fpres" class="inp" style="font-size:12px"></div>
+              <div class="field" style="margin:0"><label>Fecha de pago</label><input type="date" id="ddjj-iva-fpago" class="inp" style="font-size:12px"></div>
+            </div>
+            <div class="field" style="margin-bottom:12px"><label>Monto pagado ($)</label><input type="number" id="ddjj-iva-monto-pagado" class="inp" placeholder="0" style="font-size:12px"></div>
+            <div class="field" style="margin:0"><label>Notas</label><textarea id="ddjj-iva-notas" class="inp" rows="2" placeholder="Ej: Presentado vía Mis Aplicaciones AFIP..." style="font-size:12px"></textarea></div>
+            <button class="btn btn-sm" id="ddjj-iva-guardar" style="margin-top:12px;width:100%;background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3)">💾 Guardar estado</button>
+          </div>
+        </div>
+        <!-- Historial IVA -->
+        <div class="card" style="margin-top:12px">
+          <div class="card-title">Historial — últimos 6 períodos</div>
+          <div id="ddjj-iva-historial"><div class="empty" style="font-size:12px">Sin datos</div></div>
+        </div>
+      </div>
+
+      <!-- ── AUTÓNOMOS ─────────────────────────────── -->
+      <div id="dstab-autonomos" style="display:none">
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title">Estado por período</div>
+            <div id="ddjj-aut-list"><div class="empty" style="font-size:12px">Configura el monto mensual →</div></div>
+          </div>
+          <div class="card" style="border-color:rgba(245,158,11,0.3)">
+            <div class="card-title">Información</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:14px">
+              Los aportes de autónomos se pagan <strong>cada mes</strong>, independientemente de si facturaste o no.<br>
+              El monto lo fija AFIP según tu <strong>categoría</strong> (I al V para RI) en base a los ingresos del año anterior.<br>
+              <strong>Vencimiento:</strong> día <span id="ddjj-aut-venc-dia-label">—</span> de cada mes.
+            </div>
+            <div class="field" style="margin-bottom:10px"><label>Monto mensual ($)</label><input type="number" id="ddjj-aut-monto" class="inp" placeholder="0" style="font-size:12px"></div>
+            <div class="field" style="margin:0"><label>Categoría autónomo</label>
+              <select id="ddjj-aut-categoria" class="inp" style="font-size:12px">
+                <option value="">Seleccioná...</option>
+                <option value="I">Categoría I (ingresos hasta $X)</option>
+                <option value="II">Categoría II</option>
+                <option value="III">Categoría III</option>
+                <option value="IV">Categoría IV</option>
+                <option value="V">Categoría V (mayor ingreso)</option>
+              </select>
+            </div>
+            <button class="btn btn-sm btn-cyan" id="ddjj-aut-guardar-config" style="margin-top:12px;width:100%">Guardar configuración</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── F.931 ──────────────────────────────────── -->
+      <div id="dstab-f931" style="display:none">
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title">Estado por período</div>
+            <div id="ddjj-f931-list"><div class="empty" style="font-size:12px">Cargando nómina...</div></div>
+          </div>
+          <div class="card" style="border-color:rgba(99,102,241,0.3)">
+            <div class="card-title">Estimación F.931</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:14px">
+              El Formulario 931 consolida las contribuciones patronales (SIPA, Obra Social, ART) y las retenciones al empleado.<br>
+              El <strong>monto exacto lo calcula Simplificación Registral</strong> de ARCA. Esta es una estimación referencial.
+            </div>
+            <div id="ddjj-f931-estimacion" style="background:var(--surface2);border-radius:8px;padding:12px;font-size:12px;margin-bottom:12px"></div>
+            <div style="font-size:11px;color:var(--text3)">Vencimiento aprox.: día <span id="ddjj-f931-venc-dia-label">—</span> del mes siguiente.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── IIBB ───────────────────────────────────── -->
+      <div id="dstab-iibb" style="display:none">
+        <div class="card" style="max-width:600px;border-color:rgba(245,158,11,0.3)">
+          <div class="card-title" style="color:var(--amber)">🔒 Ingresos Brutos — no configurado</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.9;margin-bottom:16px">
+            Cuando empieces a tributar IIBB, habilitalo en <strong>Configuración</strong> de este módulo.<br>
+            La base imponible se calculará automáticamente desde tus facturas AFIP del período.<br><br>
+            <strong>¿Cuándo aplica?</strong><br>
+            • Desde el primer mes que superás el mínimo no imponible provincial.<br>
+            • Si operás en más de una provincia, te corresponde <em>Convenio Multilateral (CM)</em>.
+          </div>
+          <button class="btn btn-sm" onclick="document.querySelector('[data-dstab=config]').click()" style="background:rgba(245,158,11,0.1);color:var(--amber);border-color:rgba(245,158,11,0.3)">⚙ Ir a Configuración →</button>
+        </div>
+      </div>
+
+      <!-- ── CONFIG ─────────────────────────────────── -->
+      <div id="dstab-config" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div class="card">
+            <div class="card-title">Vencimientos AFIP</div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Configurá el día de vencimiento según el último dígito de tu CUIT y el calendario que publica AFIP cada año.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div class="field" style="margin:0"><label>CUIT — último dígito</label><input type="number" id="cfg-cuit-digito" class="inp" min="0" max="9" placeholder="5" style="font-size:12px"></div>
+              <div class="field" style="margin:0"><label>Venc. IVA (día del mes sig.)</label><input type="number" id="cfg-venc-iva" class="inp" min="1" max="31" placeholder="18" style="font-size:12px"></div>
+              <div class="field" style="margin:0"><label>Venc. Autónomos (día)</label><input type="number" id="cfg-venc-aut" class="inp" min="1" max="31" placeholder="7" style="font-size:12px"></div>
+              <div class="field" style="margin:0"><label>Venc. F.931 (día del mes sig.)</label><input type="number" id="cfg-venc-f931" class="inp" min="1" max="31" placeholder="10" style="font-size:12px"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Ingresos Brutos</div>
+            <div style="margin-bottom:12px">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text)">
+                <input type="checkbox" id="cfg-iibb-hab" style="width:16px;height:16px;accent-color:var(--cyan)">
+                Habilitar módulo IIBB
+              </label>
+            </div>
+            <div id="cfg-iibb-opts" style="display:none">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div class="field" style="margin:0;grid-column:1/-1"><label>Provincia / Régimen</label>
+                  <select id="cfg-iibb-provincia" class="inp" style="font-size:12px">
+                    <option value="">Seleccioná...</option>
+                    <option value="ba_local">Buenos Aires — Régimen Local (ARBA)</option>
+                    <option value="caba_local">CABA — Régimen Local (AGIP)</option>
+                    <option value="cordoba_local">Córdoba — Régimen Local</option>
+                    <option value="cm">Convenio Multilateral (varias provincias)</option>
+                  </select>
+                </div>
+                <div class="field" style="margin:0"><label>Alícuota (%)</label><input type="number" id="cfg-iibb-alicuota" class="inp" step="0.01" placeholder="3.5" style="font-size:12px"></div>
+                <div class="field" style="margin:0"><label>Venc. IIBB (día del mes sig.)</label><input type="number" id="cfg-venc-iibb" class="inp" min="1" max="31" placeholder="15" style="font-size:12px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-cyan" id="ddjj-cfg-guardar" style="min-width:180px">💾 Guardar configuración</button>
+        </div>
+      </div>
+
+    </div><!-- /ftab-ddjj -->
 
   </div>
 
@@ -7692,6 +7871,20 @@ function renderResumen() {
   const lbl = displayCurrency === 'USD' ? `USD (TC $${tcActual})` : `ARS acumulado (TC $${tcActual})`;
   const s1 = document.getElementById('fin-ingresos-sub'); if (s1) s1.textContent = lbl;
   const s2 = document.getElementById('fin-gastos-sub'); if (s2) s2.textContent = lbl;
+
+  // Advertencia IVA: si hay facturas AFIP, mostrar cuánto IVA está incluido en ingresos
+  const ivaWarnEl = document.getElementById('fin-iva-warn');
+  if (ivaWarnEl) {
+    const afipData = (typeof _afipFacturas !== 'undefined' && _afipFacturas) ? _afipFacturas : [];
+    const totalIvaAfip = afipData.reduce((a,f) => a + (+f.imp_iva||0), 0);
+    if (totalIvaAfip > 0) {
+      const ivaDisp = displayCurrency === 'USD' && tcActual > 0 ? fmtDisplay(totalIvaAfip/tcActual) : fmtARS2(totalIvaAfip);
+      ivaWarnEl.style.display = '';
+      ivaWarnEl.innerHTML = `⚠ Los ingresos incluyen <strong>${ivaDisp}</strong> de IVA débito (pertenece a AFIP, no es ingreso neto). <a href="#" onclick="event.preventDefault();document.querySelector('[data-ftab=ddjj]')?.click()" style="color:var(--cyan);font-size:11px">Ver DDJJ →</a>`;
+    } else {
+      ivaWarnEl.style.display = 'none';
+    }
+  }
 
   // Gastos por categoría
   const cats = {};
@@ -14606,6 +14799,25 @@ document.getElementById('btn-balance-sync').addEventListener('click', async func
       }
     });
 
+    // Separar IVA débito de ventas: el IVA no es ingreso, es pasivo (iva_pagar)
+    try {
+      let afipRows = typeof _afipFacturas !== 'undefined' && _afipFacturas && _afipFacturas.length
+        ? _afipFacturas
+        : await sbFetch('rhinos_facturas?order=fecha_cbte.desc');
+      const factEjercicio = (afipRows||[]).filter(f => f.fecha_cbte >= inicio && f.fecha_cbte <= cierre);
+      const ivaDebito = factEjercicio.reduce((a,f) => a + (+f.imp_iva||0), 0);
+      if (ivaDebito > 0) {
+        acum['ventas'] = Math.max(0, (acum['ventas']||0) - ivaDebito);
+        acum['iva_pagar'] = ivaDebito;
+      }
+      // IVA crédito fiscal acumulado desde DDJJ
+      const ddjjStore = (() => { try { return JSON.parse(localStorage.getItem('rhinos_ddjj')||'{}'); } catch(e){ return {}; } })();
+      const creditoAcum = Object.values(ddjjStore.records||{})
+        .filter(r => r && r.tipo === 'iva' && r.periodo >= inicio.slice(0,7) && r.periodo <= cierre.slice(0,7))
+        .reduce((a,r) => a + (+r.credito_fiscal||0), 0);
+      if (creditoAcum > 0) acum['iva_cf'] = creditoAcum;
+    } catch(eiva) { console.warn('IVA sync:', eiva); }
+
     // Saldo acumulado → caja (ingresos - gastos)
     const totalIngresos = txs.filter(t=>t.type==='ingreso').reduce((a,t)=>a+Math.abs(+t.amount||0),0);
     const totalGastos = txs.filter(t=>t.type==='gasto').reduce((a,t)=>a+Math.abs(+t.amount||0),0);
@@ -17513,6 +17725,433 @@ document.querySelector('.tab-btn[data-ftab="afip"]')?.addEventListener('click', 
 // ── Listener tipo comprobante → recalcular ───────────────────────────────────
 
 document.getElementById('afip-tipo-cbte')?.addEventListener('change', afipRecalcMontos);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO IMPUESTOS / DDJJ
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Helpers de persistencia ───────────────────────────────────────────────────
+function getDDJJData() { try { return JSON.parse(localStorage.getItem('rhinos_ddjj') || '{}'); } catch(e) { return {}; } }
+function saveDDJJData(d) { localStorage.setItem('rhinos_ddjj', JSON.stringify(d)); }
+function getDDJJRecord(tipo, periodo) { return ((getDDJJData().records || {})[`${tipo}_${periodo}`]) || {}; }
+function saveDDJJRecord(tipo, periodo, rec) {
+  const d = getDDJJData();
+  if (!d.records) d.records = {};
+  d.records[`${tipo}_${periodo}`] = rec;
+  saveDDJJData(d);
+}
+function getDDJJConfig() {
+  return { cuit_digito:5, venc_iva_dia:18, venc_aut_dia:7, venc_f931_dia:10,
+           autonomos_monto:0, autonomos_categoria:'', iibb_habilitado:false,
+           iibb_provincia:'', iibb_alicuota:0, venc_iibb_dia:15,
+           ...((getDDJJData().config)||{}) };
+}
+function saveDDJJConfig(cfg) { const d=getDDJJData(); d.config=cfg; saveDDJJData(d); }
+
+// ── Utilidades ────────────────────────────────────────────────────────────────
+let _ddjjIvaPeriodo = (() => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; })();
+const _meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function ddjjPeriodLabel(p) { const [y,m]=p.split('-'); return `${_meses[+m-1]} ${y}`; }
+
+function ddjjCalcVencimiento(tipo, periodo) {
+  const cfg = getDDJJConfig();
+  const [y,m] = periodo.split('-').map(Number);
+  const nextY = m===12 ? y+1 : y;
+  const nextM = m===12 ? 1 : m+1;
+  const nextPeriod = `${nextY}-${String(nextM).padStart(2,'0')}`;
+  const dia = s => String(s).padStart(2,'0');
+  if (tipo==='iva')       return `${nextPeriod}-${dia(cfg.venc_iva_dia)}`;
+  if (tipo==='autonomos') return `${periodo}-${dia(cfg.venc_aut_dia)}`;
+  if (tipo==='f931')      return `${nextPeriod}-${dia(cfg.venc_f931_dia)}`;
+  if (tipo==='iibb')      return `${nextPeriod}-${dia(cfg.venc_iibb_dia)}`;
+  return null;
+}
+
+function ddjjVencColor(fechaVenc) {
+  if (!fechaVenc) return 'var(--text3)';
+  const today = new Date().toISOString().slice(0,10);
+  const diff = (new Date(fechaVenc) - new Date(today)) / 86400000;
+  if (diff < 0) return 'var(--red)';
+  if (diff <= 7) return 'var(--amber)';
+  return 'var(--green)';
+}
+
+function ddjjEstadoBadge(estado) {
+  const map = {
+    pendiente: { bg:'rgba(245,158,11,0.15)', color:'var(--amber)', txt:'⏳ Pendiente' },
+    presentada:{ bg:'rgba(99,102,241,0.15)', color:'#818cf8',      txt:'📤 Presentada' },
+    pagada:    { bg:'rgba(34,197,94,0.15)',  color:'var(--green)', txt:'✓ Pagada' },
+  };
+  const s = map[estado] || map.pendiente;
+  return `<span style="font-size:11px;padding:2px 10px;border-radius:10px;background:${s.bg};color:${s.color}">${s.txt}</span>`;
+}
+
+// ── IVA Débito desde facturas ─────────────────────────────────────────────────
+function ddjjCalcIvaDebito(periodo) {
+  if (!_afipFacturas || !_afipFacturas.length) return null;
+  return _afipFacturas
+    .filter(f => (f.fecha_cbte||'').startsWith(periodo))
+    .reduce((a,f) => a + (+f.imp_iva||0), 0);
+}
+
+function ddjjCalcIvaTotal(periodo) {
+  if (!_afipFacturas || !_afipFacturas.length) return null;
+  return _afipFacturas
+    .filter(f => (f.fecha_cbte||'').startsWith(periodo))
+    .reduce((a,f) => a + (+f.imp_total||0), 0);
+}
+
+// ── Render IVA tab ────────────────────────────────────────────────────────────
+function ddjjRenderIva() {
+  const periodo  = _ddjjIvaPeriodo;
+  const cfg      = getDDJJConfig();
+  const rec      = getDDJJRecord('iva', periodo);
+  const debito   = ddjjCalcIvaDebito(periodo);
+  const credito  = +(rec.credito_fiscal||0);
+  const saldo    = debito !== null ? debito - credito : null;
+  const venc     = ddjjCalcVencimiento('iva', periodo);
+
+  document.getElementById('ddjj-iva-periodo-label').textContent = ddjjPeriodLabel(periodo);
+  document.getElementById('ddjj-iva-load-note').textContent =
+    debito === null ? '⚠ Abrí el tab Facturas para cargar datos' : '';
+
+  // Vencimiento
+  const vencEl = document.getElementById('ddjj-iva-venc');
+  if (venc) { vencEl.textContent = fmtFecha(venc); vencEl.style.color = ddjjVencColor(venc); }
+
+  // Posición IVA
+  const pos = document.getElementById('ddjj-iva-posicion');
+  if (debito === null) {
+    pos.innerHTML = `<div style="font-size:12px;color:var(--amber);padding:12px 0">
+      Facturas AFIP no cargadas. Abrí el tab 📄 Facturas primero para que se calculen automáticamente.
+    </div>`;
+  } else {
+    const facturasPeriodo = (_afipFacturas||[]).filter(f=>(f.fecha_cbte||'').startsWith(periodo));
+    const listaFacturas = facturasPeriodo.length
+      ? facturasPeriodo.map(f=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">
+          <span>Factura ${f.tipo_cbte||''} Nro. ${String(f.numero||0).padStart(4,'0')} · ${f.fecha_cbte||''}</span>
+          <span style="font-weight:500;color:${+f.imp_iva>0?'var(--text)':'var(--text3)'}">IVA: ${fmtARS2(+f.imp_iva||0)}</span>
+        </div>`).join('')
+      : '<div style="font-size:11px;color:var(--text3);padding:6px 0">Sin facturas emitidas este período.</div>';
+
+    pos.innerHTML = `
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;color:var(--text2)">Débito Fiscal (facturas emitidas)</span>
+        <span style="font-size:14px;font-weight:600;color:var(--red)">${fmtARS2(debito)}</span>
+      </div>
+      <div style="margin:6px 0 10px;max-height:140px;overflow-y:auto">${listaFacturas}</div>
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;color:var(--text2);flex:1">Crédito Fiscal (compras con IVA)</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:var(--text3)">$</span>
+          <input type="number" id="ddjj-iva-credito" class="inp" value="${credito||''}" placeholder="0"
+            style="width:110px;font-size:12px;text-align:right" oninput="ddjjOnCreditoChange(this.value)">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+        <span style="font-size:14px;font-weight:700;color:var(--text)">
+          ${saldo >= 0 ? 'Saldo a pagar a AFIP' : 'Saldo a <strong>favor</strong>'}
+        </span>
+        <span style="font-size:20px;font-weight:800;color:${saldo>=0?'var(--red)':'var(--green)'}">${fmtARS2(Math.abs(saldo))}</span>
+      </div>`;
+  }
+
+  // Estado buttons
+  document.querySelectorAll('.ddjj-estado-btn[data-tipo="iva"]').forEach(btn => {
+    const active = (rec.estado||'pendiente') === btn.dataset.estado;
+    btn.style.background = active ? 'rgba(0,229,204,0.2)' : '';
+    btn.style.color = active ? 'var(--cyan)' : '';
+    btn.style.borderColor = active ? 'rgba(0,229,204,0.5)' : '';
+  });
+
+  // Form fields
+  document.getElementById('ddjj-iva-fpres').value = rec.fecha_presentacion||'';
+  document.getElementById('ddjj-iva-fpago').value = rec.fecha_pago||'';
+  document.getElementById('ddjj-iva-monto-pagado').value = rec.monto_pagado||'';
+  document.getElementById('ddjj-iva-notas').value = rec.notas||'';
+}
+
+function ddjjOnCreditoChange(val) {
+  const periodo = _ddjjIvaPeriodo;
+  const rec = getDDJJRecord('iva', periodo);
+  rec.credito_fiscal = +val||0;
+  saveDDJJRecord('iva', periodo, rec);
+  // Recalcular saldo en pantalla sin full re-render
+  const debito = ddjjCalcIvaDebito(periodo)||0;
+  const saldo = debito - (+val||0);
+  ddjjRenderIva();
+}
+
+function ddjjRenderIvaHistorial() {
+  const el = document.getElementById('ddjj-iva-historial');
+  if (!el) return;
+  const periodos = [];
+  const now = new Date();
+  for (let i=5; i>=0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    periodos.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  el.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="color:var(--text3);border-bottom:1px solid var(--border)">
+      <th style="text-align:left;padding:6px 8px;font-weight:500">Período</th>
+      <th style="text-align:right;padding:6px 8px;font-weight:500">Débito Fiscal</th>
+      <th style="text-align:right;padding:6px 8px;font-weight:500">Crédito Fiscal</th>
+      <th style="text-align:right;padding:6px 8px;font-weight:500">Saldo</th>
+      <th style="text-align:center;padding:6px 8px;font-weight:500">Estado</th>
+      <th style="text-align:right;padding:6px 8px;font-weight:500">Pagado</th>
+    </tr></thead><tbody>
+    ${periodos.map(p => {
+      const rec = getDDJJRecord('iva', p);
+      const deb = ddjjCalcIvaDebito(p);
+      const cred = +(rec.credito_fiscal||0);
+      const saldo = deb !== null ? deb - cred : null;
+      return `<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="_ddjjIvaPeriodo='${p}';ddjjRenderIva();ddjjRenderIvaHistorial()">
+        <td style="padding:7px 8px;font-weight:${p===_ddjjIvaPeriodo?'700':'400'};color:${p===_ddjjIvaPeriodo?'var(--cyan)':'var(--text)'}">${ddjjPeriodLabel(p)}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--red)">${deb!==null?fmtARS2(deb):'—'}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--green)">${cred?fmtARS2(cred):'—'}</td>
+        <td style="padding:7px 8px;text-align:right;font-weight:600;color:${saldo===null?'var(--text3)':saldo>=0?'var(--red)':'var(--green)'}">${saldo!==null?fmtARS2(Math.abs(saldo)):'—'}</td>
+        <td style="padding:7px 8px;text-align:center">${ddjjEstadoBadge(rec.estado||'pendiente')}</td>
+        <td style="padding:7px 8px;text-align:right;color:var(--text2)">${rec.monto_pagado?fmtARS2(+rec.monto_pagado):'—'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div>`;
+}
+
+// ── Render Autónomos tab ──────────────────────────────────────────────────────
+function ddjjRenderAutonomos() {
+  const cfg = getDDJJConfig();
+  document.getElementById('ddjj-aut-monto').value = cfg.autonomos_monto||'';
+  document.getElementById('ddjj-aut-categoria').value = cfg.autonomos_categoria||'';
+  document.getElementById('ddjj-aut-venc-dia-label').textContent = cfg.venc_aut_dia||7;
+  const monto = +cfg.autonomos_monto||0;
+  const el = document.getElementById('ddjj-aut-list');
+  if (!monto) { el.innerHTML = '<div class="empty" style="font-size:12px">Configurá el monto mensual →</div>'; return; }
+  const periodos = [];
+  const now = new Date();
+  for (let i=5; i>=0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    periodos.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  el.innerHTML = periodos.map(p => {
+    const rec = getDDJJRecord('autonomos', p);
+    const estado = rec.estado||'pendiente';
+    const venc = ddjjCalcVencimiento('autonomos', p);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500;color:var(--text)">${ddjjPeriodLabel(p)}</div>
+        <div style="font-size:11px;color:var(--text3)">Vence: ${venc?fmtFecha(venc):'—'}</div>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:var(--amber)">${fmtARS2(monto)}</div>
+      ${ddjjEstadoBadge(estado)}
+      <select class="inp" onchange="ddjjSetEstado('autonomos','${p}',this.value)" style="font-size:11px;padding:3px 6px;width:110px">
+        <option value="pendiente" ${estado==='pendiente'?'selected':''}>⏳ Pendiente</option>
+        <option value="presentada" ${estado==='presentada'?'selected':''}>📤 Presentada</option>
+        <option value="pagada" ${estado==='pagada'?'selected':''}>✓ Pagada</option>
+      </select>
+    </div>`;
+  }).join('');
+}
+
+// ── Render F.931 tab ──────────────────────────────────────────────────────────
+function ddjjRenderF931() {
+  const cfg = getDDJJConfig();
+  document.getElementById('ddjj-f931-venc-dia-label').textContent = cfg.venc_f931_dia||10;
+
+  const tc = getTcOficial()||1;
+  const empleados = (typeof getEmpleados==='function'?getEmpleados():[]).filter(e=>e.estado!=='baja');
+  const totalBruto = empleados.reduce((a,e)=>a+(e.moneda==='USD'?+e.salario*tc:+e.salario),0);
+  const patronal = Math.round(totalBruto*0.175);
+  const retEmpleado = Math.round(totalBruto*0.11);
+  const total = patronal + retEmpleado;
+
+  document.getElementById('ddjj-f931-estimacion').innerHTML = empleados.length
+    ? `<div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Masa salarial bruta</span><strong>${fmtARS2(totalBruto)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Contribuciones patronales (~17,5%)</span><span style="color:var(--amber)">${fmtARS2(patronal)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Retenciones empleado (~11%)</span><span style="color:var(--amber)">${fmtARS2(retEmpleado)}</span></div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px"><strong>Total F.931 estimado</strong><strong style="color:var(--red)">${fmtARS2(total)}</strong></div>
+        <div style="font-size:10px;color:var(--text3)">* Estimación referencial. El monto exacto lo calcula SICOSS/Simplificación Registral AFIP.</div>
+      </div>`
+    : '<div style="color:var(--text3);font-size:12px">Sin empleados activos en nómina.</div>';
+
+  const periodos = [];
+  const now = new Date();
+  for (let i=5; i>=0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    periodos.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  const el = document.getElementById('ddjj-f931-list');
+  el.innerHTML = periodos.map(p => {
+    const rec = getDDJJRecord('f931', p);
+    const estado = rec.estado||'pendiente';
+    const venc = ddjjCalcVencimiento('f931', p);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500;color:var(--text)">${ddjjPeriodLabel(p)}</div>
+        <div style="font-size:11px;color:var(--text3)">Vence: ${venc?fmtFecha(venc):'—'} · estimado: ${empleados.length?fmtARS2(total):'—'}</div>
+      </div>
+      ${ddjjEstadoBadge(estado)}
+      <select class="inp" onchange="ddjjSetEstado('f931','${p}',this.value)" style="font-size:11px;padding:3px 6px;width:110px">
+        <option value="pendiente" ${estado==='pendiente'?'selected':''}>⏳ Pendiente</option>
+        <option value="presentada" ${estado==='presentada'?'selected':''}>📤 Presentada</option>
+        <option value="pagada" ${estado==='pagada'?'selected':''}>✓ Pagada</option>
+      </select>
+    </div>`;
+  }).join('');
+}
+
+// ── Render Config tab ─────────────────────────────────────────────────────────
+function ddjjRenderConfig() {
+  const cfg = getDDJJConfig();
+  document.getElementById('cfg-cuit-digito').value = cfg.cuit_digito||5;
+  document.getElementById('cfg-venc-iva').value = cfg.venc_iva_dia||18;
+  document.getElementById('cfg-venc-aut').value = cfg.venc_aut_dia||7;
+  document.getElementById('cfg-venc-f931').value = cfg.venc_f931_dia||10;
+  document.getElementById('cfg-iibb-hab').checked = !!cfg.iibb_habilitado;
+  document.getElementById('cfg-iibb-opts').style.display = cfg.iibb_habilitado?'block':'none';
+  document.getElementById('cfg-iibb-provincia').value = cfg.iibb_provincia||'';
+  document.getElementById('cfg-iibb-alicuota').value = cfg.iibb_alicuota||'';
+  document.getElementById('cfg-venc-iibb').value = cfg.venc_iibb_dia||15;
+}
+
+// ── Render métricas header ────────────────────────────────────────────────────
+function ddjjRenderMetricas() {
+  const cfg = getDDJJConfig();
+  const now = new Date();
+  const periodoActual = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const debito = ddjjCalcIvaDebito(periodoActual);
+  const rec = getDDJJRecord('iva', periodoActual);
+  const saldo = debito !== null ? debito - (+(rec.credito_fiscal||0)) : null;
+  const mAut = +cfg.autonomos_monto||0;
+  const tc = getTcOficial()||1;
+  const empleados = (typeof getEmpleados==='function'?getEmpleados():[]).filter(e=>e.estado!=='baja');
+  const totalBruto = empleados.reduce((a,e)=>a+(e.moneda==='USD'?+e.salario*tc:+e.salario),0);
+  const f931 = Math.round(totalBruto*0.285);
+
+  document.getElementById('ddjj-m-iva').textContent = saldo!==null ? fmtARS2(saldo) : '—';
+  document.getElementById('ddjj-m-iva-sub').textContent = debito!==null ? `débito ${fmtARS2(debito)}` : 'abrí tab Facturas';
+  document.getElementById('ddjj-m-aut').textContent = mAut ? fmtARS2(mAut) : '—';
+  document.getElementById('ddjj-m-f931').textContent = f931 ? fmtARS2(f931) : '—';
+
+  // Próximo vencimiento
+  const candidatos = [
+    { tipo:'iva', label:'IVA' }, { tipo:'autonomos', label:'Autónomos' }, { tipo:'f931', label:'F.931' }
+  ].map(t => ({ label:t.label, fecha:ddjjCalcVencimiento(t.tipo, periodoActual) }))
+   .filter(t => t.fecha)
+   .sort((a,b) => a.fecha.localeCompare(b.fecha));
+
+  const today = now.toISOString().slice(0,10);
+  const prox = candidatos.find(t => t.fecha >= today) || candidatos[0];
+  if (prox) {
+    const diff = Math.round((new Date(prox.fecha) - now) / 86400000);
+    document.getElementById('ddjj-m-prox').textContent = diff<=0 ? 'HOY' : `${diff}d`;
+    document.getElementById('ddjj-m-prox-sub').textContent = `${prox.label} · ${fmtFecha(prox.fecha)}`;
+    document.getElementById('ddjj-m-prox').style.color = diff<=3?'var(--red)':diff<=7?'var(--amber)':'var(--cyan)';
+  }
+}
+
+// ── Estado genérico ───────────────────────────────────────────────────────────
+function ddjjSetEstado(tipo, periodo, estado) {
+  const rec = getDDJJRecord(tipo, periodo);
+  rec.estado = estado;
+  saveDDJJRecord(tipo, periodo, rec);
+  if (tipo==='iva') ddjjRenderIva();
+  if (tipo==='autonomos') ddjjRenderAutonomos();
+  if (tipo==='f931') ddjjRenderF931();
+  ddjjRenderMetricas();
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+document.getElementById('ddjj-iva-prev').addEventListener('click', () => {
+  const [y,m] = _ddjjIvaPeriodo.split('-').map(Number);
+  _ddjjIvaPeriodo = m===1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+  ddjjRenderIva(); ddjjRenderIvaHistorial();
+});
+document.getElementById('ddjj-iva-next').addEventListener('click', () => {
+  const [y,m] = _ddjjIvaPeriodo.split('-').map(Number);
+  _ddjjIvaPeriodo = m===12 ? `${y+1}-01` : `${y}-${String(m+1).padStart(2,'0')}`;
+  ddjjRenderIva(); ddjjRenderIvaHistorial();
+});
+
+document.getElementById('ddjj-iva-guardar').addEventListener('click', () => {
+  const periodo = _ddjjIvaPeriodo;
+  const rec = getDDJJRecord('iva', periodo);
+  rec.fecha_presentacion = document.getElementById('ddjj-iva-fpres').value||null;
+  rec.fecha_pago = document.getElementById('ddjj-iva-fpago').value||null;
+  rec.monto_pagado = +(document.getElementById('ddjj-iva-monto-pagado').value)||0;
+  rec.notas = document.getElementById('ddjj-iva-notas').value.trim()||null;
+  saveDDJJRecord('iva', periodo, rec);
+  showToast('✅ Estado IVA guardado');
+  ddjjRenderIva(); ddjjRenderIvaHistorial();
+});
+
+document.querySelectorAll('.ddjj-estado-btn[data-tipo="iva"]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const rec = getDDJJRecord('iva', _ddjjIvaPeriodo);
+    rec.estado = btn.dataset.estado;
+    saveDDJJRecord('iva', _ddjjIvaPeriodo, rec);
+    ddjjRenderIva();
+  });
+});
+
+document.getElementById('ddjj-aut-guardar-config').addEventListener('click', () => {
+  const cfg = getDDJJConfig();
+  cfg.autonomos_monto = +(document.getElementById('ddjj-aut-monto').value)||0;
+  cfg.autonomos_categoria = document.getElementById('ddjj-aut-categoria').value||'';
+  saveDDJJConfig(cfg);
+  ddjjRenderAutonomos(); ddjjRenderMetricas();
+  showToast('✅ Configuración autónomos guardada');
+});
+
+document.getElementById('ddjj-cfg-guardar').addEventListener('click', () => {
+  const cfg = getDDJJConfig();
+  cfg.cuit_digito = +(document.getElementById('cfg-cuit-digito').value)||5;
+  cfg.venc_iva_dia = +(document.getElementById('cfg-venc-iva').value)||18;
+  cfg.venc_aut_dia = +(document.getElementById('cfg-venc-aut').value)||7;
+  cfg.venc_f931_dia = +(document.getElementById('cfg-venc-f931').value)||10;
+  cfg.iibb_habilitado = document.getElementById('cfg-iibb-hab').checked;
+  cfg.iibb_provincia = document.getElementById('cfg-iibb-provincia').value||'';
+  cfg.iibb_alicuota = +(document.getElementById('cfg-iibb-alicuota').value)||0;
+  cfg.venc_iibb_dia = +(document.getElementById('cfg-venc-iibb').value)||15;
+  saveDDJJConfig(cfg);
+  // Update IIBB tab visibility
+  document.querySelector('[data-dstab="iibb"]').style.display = cfg.iibb_habilitado ? '' : '';
+  showToast('✅ Configuración guardada');
+  ddjjRenderMetricas(); ddjjRenderIva(); ddjjRenderAutonomos(); ddjjRenderF931();
+});
+
+document.getElementById('cfg-iibb-hab').addEventListener('change', function() {
+  document.getElementById('cfg-iibb-opts').style.display = this.checked ? 'block' : 'none';
+});
+
+// Sub-tab switching
+document.querySelectorAll('.ddjj-stab').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.ddjj-stab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#ftab-ddjj [id^="dstab-"]').forEach(t => t.style.display='none');
+    this.classList.add('active');
+    document.getElementById('dstab-' + this.dataset.dstab).style.display = 'block';
+  });
+});
+
+// Tab click → init
+document.querySelector('.tab-btn[data-ftab="ddjj"]').addEventListener('click', async () => {
+  if (!getEmpleados().length) await syncEmpleadosFromSupabase();
+  // Load facturas if not already loaded
+  if (!_afipFacturas.length) {
+    try {
+      const r = await callAfipAPI('list_facturas');
+      _afipFacturas = r?.facturas || [];
+    } catch(e) { console.warn('DDJJ: no se pudieron cargar facturas', e.message); }
+  }
+  ddjjRenderMetricas();
+  ddjjRenderIva();
+  ddjjRenderIvaHistorial();
+  ddjjRenderAutonomos();
+  ddjjRenderF931();
+  ddjjRenderConfig();
+});
 
 // ── Genera PDF de factura AFIP en base64 (para adjuntar en email) ────────────
 async function _generarAfipPdfBase64(factura) {
