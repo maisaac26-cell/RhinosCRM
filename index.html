@@ -18525,6 +18525,25 @@ const TAX_PATTERNS = [
   { re: /hosting|dominio|servidor/i, cat: 'Tecnología', tipo: 'gasto' },
 ];
 
+// Patrones de inversión — determinan tipo 'inversion' (salida) o 'ingreso' cat=Retorno (entrada)
+const INVEST_PATTERNS = [
+  // FCI / Fondos comunes
+  { re: /suscripci[oó]n.*fci|fci.*suscripci[oó]n|cuotapartes.*fci|fci.*cuotapartes/i, cat: 'FCI' },
+  { re: /rescate.*fci|fci.*rescate|cuotapartes.*rescate/i, cat: 'FCI' },
+  { re: /fondo.*com[uú]n|transferencia.*fci|fci\b/i, cat: 'FCI' },
+  // Plazo fijo
+  { re: /constituci[oó]n.*pf|pf.*constituci[oó]n|constit.*plazo\s*fijo/i, cat: 'Plazo Fijo' },
+  { re: /vencimiento.*pf|pf.*vencimiento|venc.*plazo\s*fijo/i, cat: 'Plazo Fijo' },
+  { re: /renovaci[oó]n.*pf|plazo\s*fijo/i, cat: 'Plazo Fijo' },
+  // Brokers
+  { re: /balanz|invertir.*online|iol\b|ppi\b|allaria|cohen\b|rava\b|max\s*capital|portfolio.*per/i, cat: 'Broker' },
+  { re: /compra.*t[ií]tulo|venta.*t[ií]tulo|acreditaci[oó]n.*t[ií]tulo|compraventa/i, cat: 'Títulos' },
+  { re: /cau[cç]i[oó]n|repo\b|letras?\s*lici/i, cat: 'Caución/Repo' },
+  { re: /oblig.*negoc|bonos?\s*corp/i, cat: 'Bonos' },
+  // Genérico
+  { re: /\binversi[oó]n\b|\binversiones\b/i, cat: 'Inversión' },
+];
+
 let _extractoRows = [];
 let _extractoHeaders = [];
 
@@ -18587,32 +18606,59 @@ function buildExtractoPreview() {
     const deb   = parseNum(raw[col.debito]);
     const cred  = parseNum(raw[col.credito]);
     const monto = cred > 0 ? cred : -deb;
-    const tipo  = monto >= 0 ? 'ingreso' : 'gasto';
-    const taxMatch = TAX_PATTERNS.find(p => p.re.test(desc));
-    const cat = taxMatch ? taxMatch.cat : (tipo === 'ingreso' ? 'Otros Ingresos' : 'Otros Gastos');
+    const isDebito = monto < 0;
+
+    const taxMatch    = TAX_PATTERNS.find(p => p.re.test(desc));
+    const investMatch = INVEST_PATTERNS.find(p => p.re.test(desc));
+
+    let tipo, cat;
+    if (investMatch) {
+      // Salida de dinero = se invirtió; entrada de dinero = retorno de inversión
+      tipo = isDebito ? 'inversion' : 'ingreso';
+      cat  = isDebito ? investMatch.cat : 'Retorno de Inversión';
+    } else if (taxMatch) {
+      tipo = taxMatch.tipo;
+      cat  = taxMatch.cat;
+    } else {
+      tipo = monto >= 0 ? 'ingreso' : 'gasto';
+      cat  = tipo === 'ingreso' ? 'Otros Ingresos' : 'Otros Gastos';
+    }
+
     const isDup = (finTx || []).some(t => t.date === fecha && Math.abs(Math.abs(+t.amount) - Math.abs(monto)) < 1 && t.description?.toLowerCase().slice(0,20) === desc.toLowerCase().slice(0,20));
-    return { ...raw, _fecha: fecha, _desc: desc, _monto: monto, _tipo: tipo, _cat: cat, _dup: isDup, _idx: i, _isTax: !!taxMatch };
+    return { ...raw, _fecha: fecha, _desc: desc, _monto: monto, _tipo: tipo, _cat: cat, _dup: isDup, _idx: i, _isTax: !!taxMatch, _isInversion: !!investMatch };
   });
 
   const valid = _extractoRows.filter(r => r._fecha && r._monto !== 0);
   const dups = valid.filter(r => r._dup).length;
   const taxes = valid.filter(r => r._isTax).length;
+  const inversiones = valid.filter(r => r._isInversion).length;
   const statsEl = document.getElementById('extracto-stats');
   if (statsEl) {
     statsEl.style.display = 'block';
-    statsEl.innerHTML = `${valid.length} movimientos · ${taxes} impuestos detectados · <span style="color:var(--amber)">${dups} posibles duplicados</span>`;
+    statsEl.innerHTML = `${valid.length} movimientos`
+      + (taxes ? ` · <span style="color:var(--red)">${taxes} impuestos</span>` : '')
+      + (inversiones ? ` · <span style="color:var(--cyan)">${inversiones} inversiones</span>` : '')
+      + (dups ? ` · <span style="color:var(--amber)">${dups} posibles duplicados</span>` : '');
   }
 
+  const TIPO_LABEL = { ingreso: 'ingreso', gasto: 'gasto', inversion: 'inversión' };
+  const TIPO_COLOR = { ingreso: 'var(--green)', gasto: 'var(--red)', inversion: 'var(--cyan)' };
+
   tbody.innerHTML = valid.map(r => {
-    const montoColor = r._monto >= 0 ? 'var(--green)' : 'var(--red)';
-    const taxBadge = r._isTax ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(239,68,68,0.12);color:var(--red);margin-left:4px">impuesto</span>` : '';
-    const dupBadge = r._dup ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(245,158,11,0.12);color:var(--amber);margin-left:4px">posible dup.</span>` : '';
-    return `<tr style="border-bottom:1px solid var(--border);${r._dup ? 'opacity:0.6' : ''}">
+    const montoColor = r._isInversion ? 'var(--cyan)' : (r._monto >= 0 ? 'var(--green)' : 'var(--red)');
+    const taxBadge = r._isTax
+      ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(239,68,68,0.12);color:var(--red);margin-left:4px">impuesto</span>` : '';
+    const invBadge = r._isInversion
+      ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(0,229,204,0.12);color:var(--cyan);margin-left:4px">${r._monto < 0 ? 'inversión' : 'retorno'}</span>` : '';
+    const dupBadge = r._dup
+      ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(245,158,11,0.12);color:var(--amber);margin-left:4px">posible dup.</span>` : '';
+    const rowBg = r._isInversion ? 'background:rgba(0,229,204,0.03);' : '';
+    return `<tr style="border-bottom:1px solid var(--border);${rowBg}${r._dup ? 'opacity:0.6' : ''}">
       <td style="padding:6px 8px"><input type="checkbox" class="exc-row-check" data-idx="${r._idx}" ${r._dup ? '' : 'checked'}></td>
       <td style="padding:6px 8px;color:var(--text2)">${r._fecha}</td>
-      <td style="padding:6px 8px;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r._desc}">${r._desc}${taxBadge}${dupBadge}</td>
+      <td style="padding:6px 8px;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r._desc}">${r._desc}${taxBadge}${invBadge}${dupBadge}</td>
       <td style="padding:6px 8px;text-align:right;font-weight:600;color:${montoColor}">${r._monto >= 0 ? '+' : ''}${r._monto.toLocaleString('es-AR',{minimumFractionDigits:2})}</td>
-      <td style="padding:6px 8px;color:var(--text3)">${r._tipo}</td>
+      <td style="padding:6px 8px;font-size:11px;color:${TIPO_COLOR[r._tipo]||'var(--text3)'}">${TIPO_LABEL[r._tipo]||r._tipo}</td>
       <td style="padding:6px 8px"><input class="exc-cat-input" data-idx="${r._idx}" value="${r._cat}" style="font-size:11px;padding:2px 6px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;color:var(--text2);width:150px"></td>
       <td style="padding:6px 8px">${r._dup ? '<span style="color:var(--amber);font-size:11px">⚠ ya existe</span>' : '<span style="color:var(--text3);font-size:11px">nuevo</span>'}</td>
     </tr>`;
