@@ -1668,6 +1668,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <button class="btn btn-cyan" id="btn-bulk-search-prospects" style="gap:6px">🚀 Búsqueda masiva <span style="font-size:10px;opacity:0.7">(multi-keyword)</span></button>
         <button class="btn btn-sm" id="btn-export-prospects" style="display:none">📥 Exportar CSV</button>
         <button class="btn btn-sm" id="btn-find-all-ig" style="display:none;background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);color:white;border:none">📸 Buscar IG en todos</button>
+        <button class="btn btn-sm" id="btn-auto-pipeline" style="background:rgba(16,185,129,0.15);color:#34d399;border-color:rgba(16,185,129,0.3);gap:4px" title="Busca prospectos con email automáticamente y los agrega al pipeline del Vendedor IA">🤖 Auto-pipeline</button>
         <span id="p-count" style="font-size:12px;color:var(--text2)"></span>
         <span id="p-ig-count" style="font-size:12px;color:var(--cyan);display:none"></span>
       </div>
@@ -3290,6 +3291,19 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <div class="field" style="grid-column:span 2"><label>Mensaje de referencia de estilo <span style="color:var(--text3);font-weight:400">(pegá un ejemplo de WhatsApp o email tuyo — la IA lo imita)</span></label>
             <textarea id="via-cfg-mensaje" class="inp" rows="6" placeholder="Holaa! Te cuento un poco de..."></textarea></div>
         </div>
+
+        <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+          <div class="card-title" style="margin-bottom:12px">⚙️ Búsqueda automática de prospectos (6pm diaria)</div>
+          <div class="grid2">
+            <div class="field"><label>Rubro a buscar <span style="color:var(--text3);font-weight:400">(vacío = aleatorio cada día)</span></label>
+              <input id="via-cfg-rubro-auto" class="inp" placeholder="distribuidora de alimentos"/></div>
+            <div class="field"><label>Cantidad máx. de prospectos por búsqueda</label>
+              <input id="via-cfg-cantidad-auto" class="inp" type="number" min="5" max="50" placeholder="20"/></div>
+            <div class="field" style="grid-column:span 2"><label>Provincias target <span style="color:var(--text3);font-weight:400">(separadas por coma, vacío = aleatoria)</span></label>
+              <input id="via-cfg-provincias-auto" class="inp" placeholder="Buenos Aires, Córdoba, Santa Fe"/></div>
+          </div>
+        </div>
+
         <button class="btn btn-cyan" id="btn-via-save-cfg" style="margin-top:12px">💾 Guardar configuración</button>
         <span id="via-cfg-ok" style="display:none;font-size:12px;color:var(--green);margin-left:10px">✓ Guardado</span>
       </div>
@@ -16686,8 +16700,11 @@ async function loadViaCfg() {
     document.getElementById('via-cfg-tono').value = config.tono || 'profesional';
     document.getElementById('via-cfg-dias').value = config.followup_dias || 3;
     document.getElementById('via-cfg-max').value = config.max_dia || 20;
-    if (config.website) document.getElementById('via-cfg-website').value = config.website;
+    if (config.website)         document.getElementById('via-cfg-website').value = config.website;
     if (config.mensaje_ejemplo) document.getElementById('via-cfg-mensaje').value = config.mensaje_ejemplo;
+    if (config.rubro_auto)      document.getElementById('via-cfg-rubro-auto').value = config.rubro_auto;
+    if (config.provincias_auto) document.getElementById('via-cfg-provincias-auto').value = config.provincias_auto;
+    if (config.cantidad_auto)   document.getElementById('via-cfg-cantidad-auto').value = config.cantidad_auto;
   } catch(e) { console.warn('via cfg:', e.message); }
 }
 
@@ -16728,13 +16745,16 @@ document.getElementById('btn-via-save-cfg')?.addEventListener('click', async () 
   btn.disabled = true;
   try {
     await callVendedorAPI('save_config', {
-      vendedor_razon_social:   document.getElementById('via-cfg-razon').value.trim(),
-      vendedor_servicios:      document.getElementById('via-cfg-servicios').value.trim(),
-      vendedor_tono:           document.getElementById('via-cfg-tono').value,
-      vendedor_followup_dias:  document.getElementById('via-cfg-dias').value || '3',
-      vendedor_max_dia:        document.getElementById('via-cfg-max').value || '20',
-      vendedor_website:        document.getElementById('via-cfg-website').value.trim(),
+      vendedor_razon_social:    document.getElementById('via-cfg-razon').value.trim(),
+      vendedor_servicios:       document.getElementById('via-cfg-servicios').value.trim(),
+      vendedor_tono:            document.getElementById('via-cfg-tono').value,
+      vendedor_followup_dias:   document.getElementById('via-cfg-dias').value || '3',
+      vendedor_max_dia:         document.getElementById('via-cfg-max').value || '20',
+      vendedor_website:         document.getElementById('via-cfg-website').value.trim(),
       vendedor_mensaje_ejemplo: document.getElementById('via-cfg-mensaje').value.trim(),
+      vendedor_rubro_auto:      document.getElementById('via-cfg-rubro-auto').value.trim(),
+      vendedor_provincias_auto: document.getElementById('via-cfg-provincias-auto').value.trim(),
+      vendedor_cantidad_auto:   document.getElementById('via-cfg-cantidad-auto').value || '20',
     });
     const ok = document.getElementById('via-cfg-ok');
     if (ok) { ok.style.display = 'inline'; setTimeout(() => { ok.style.display = 'none'; }, 2500); }
@@ -16780,6 +16800,27 @@ document.addEventListener('click', async function(e) {
     showToast('Error: ' + e.message);
   }
   btn.disabled = false; btn.textContent = '📋 Agregar al pipeline';
+});
+
+// Botón "🤖 Auto-pipeline" — dispara búsqueda automática de prospectos
+document.getElementById('btn-auto-pipeline')?.addEventListener('click', async function() {
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = '⏳ Buscando...';
+  try {
+    const r = await fetch('/api/vendedor-prospecta', { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      const s = data.summary || {};
+      showToast(`🤖 Auto-pipeline: ${s.agregados || 0} nuevos (${s.buscados || 0} buscados, ${s.duplicados || 0} duplicados) — ${s.rubro || ''} en ${s.provincia || ''}`);
+    } else {
+      showToast('Error auto-pipeline: ' + (data.error || 'desconocido'));
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = '🤖 Auto-pipeline';
 });
 
 // ── DASHBOARD COMERCIAL ───────────────────────────────
