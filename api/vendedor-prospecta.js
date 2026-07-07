@@ -168,64 +168,68 @@ module.exports = async function handler(req, res) {
   const PLACES_KEY = process.env.GOOGLE_PLACES_KEY;
   if (!PLACES_KEY) return res.json({ ok: false, error: 'GOOGLE_PLACES_KEY no configurada' });
 
-  const summary = { buscados: 0, con_email: 0, duplicados: 0, agregados: 0, rubro: '', provincia: '', errors: [] };
+  const summary = { buscados: 0, con_email: 0, duplicados: 0, agregados: 0, intentos: 0, rubros: [], provincias: [], errors: [] };
 
   try {
     // Cargar config
-    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto)');
+    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto)');
     const cfgMap  = {};
     cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
 
     const cantidad = parseInt(cfgMap.vendedor_cantidad_auto || '20', 10);
+    const minimo   = parseInt(cfgMap.vendedor_minimo_auto   || '10', 10);
 
-    // Rubro: config o aleatorio
-    const rubro = (cfgMap.vendedor_rubro_auto || '').trim() || pick(RUBROS_RANDOM);
-    summary.rubro = rubro;
-
-    // Provincia: config (puede ser lista separada por coma) o aleatoria
-    const provinciasConf = (cfgMap.vendedor_provincias_auto || '').split(',').map(s => s.trim()).filter(Boolean);
-    const provincia = provinciasConf.length ? provinciasConf[Math.floor(Math.random() * provinciasConf.length)] : pick(PROVINCIAS_RANDOM);
-    summary.provincia = provincia;
+    const rubroFijo       = (cfgMap.vendedor_rubro_auto || '').trim();
+    const provinciasConf  = (cfgMap.vendedor_provincias_auto || '').split(',').map(s => s.trim()).filter(Boolean);
 
     // Obtener emails ya en el pipeline para deduplicar
     const existentes = await sbGet('rhinos_prospectos?select=email&limit=5000');
     const emailsYaEnPipeline = new Set(existentes.map(r => (r.email || '').toLowerCase().trim()).filter(Boolean));
 
-    // Buscar en Google Places
-    const places = await searchPlaces(rubro, provincia, PLACES_KEY);
-    summary.buscados = places.length;
-
     const nuevos = [];
-    for (const place of places) {
-      if (nuevos.length >= cantidad) break;
-      if (!place.website) continue;
+    const MAX_INTENTOS = 8; // máximo 8 búsquedas para no exceder timeout de Vercel
 
-      const email = await findEmailForSite(place.website);
-      if (!email) continue;
+    while (nuevos.length < minimo && summary.intentos < MAX_INTENTOS) {
+      const rubro    = rubroFijo || pick(RUBROS_RANDOM);
+      const provincia = provinciasConf.length ? provinciasConf[summary.intentos % provinciasConf.length] : pick(PROVINCIAS_RANDOM);
+      summary.intentos++;
+      if (!summary.rubros.includes(rubro))     summary.rubros.push(rubro);
+      if (!summary.provincias.includes(provincia)) summary.provincias.push(provincia);
 
-      const emailNorm = email.toLowerCase().trim();
-      if (emailsYaEnPipeline.has(emailNorm)) { summary.duplicados++; continue; }
+      const places = await searchPlaces(rubro, provincia, PLACES_KEY);
+      summary.buscados += places.length;
 
-      emailsYaEnPipeline.add(emailNorm); // evitar duplicar en el mismo batch
-      summary.con_email++;
+      for (const place of places) {
+        if (nuevos.length >= cantidad) break;
+        if (!place.website) continue;
 
-      nuevos.push({
-        id:              place.id + '_' + Date.now().toString(36),
-        empresa:         place.name,
-        nombre_contacto: '',
-        email:           email,
-        telefono:        place.phone || '',
-        website:         place.website || '',
-        rubro:           rubro,
-        localidad:       provincia,
-        origen:          'auto_prospecta',
-        estado:          'nuevo',
-        ia_contactado:   false,
-        ia_followup_count: 0,
-        ia_reply:        false,
-        created_at:      new Date().toISOString(),
-        updated_at:      new Date().toISOString(),
-      });
+        const email = await findEmailForSite(place.website);
+        if (!email) continue;
+
+        const emailNorm = email.toLowerCase().trim();
+        if (emailsYaEnPipeline.has(emailNorm)) { summary.duplicados++; continue; }
+
+        emailsYaEnPipeline.add(emailNorm);
+        summary.con_email++;
+
+        nuevos.push({
+          id:              place.id + '_' + Date.now().toString(36),
+          empresa:         place.name,
+          nombre_contacto: '',
+          email:           email,
+          telefono:        place.phone || '',
+          website:         place.website || '',
+          rubro:           rubro,
+          localidad:       provincia,
+          origen:          'auto_prospecta',
+          estado:          'nuevo',
+          ia_contactado:   false,
+          ia_followup_count: 0,
+          ia_reply:        false,
+          created_at:      new Date().toISOString(),
+          updated_at:      new Date().toISOString(),
+        });
+      }
     }
 
     if (nuevos.length) {

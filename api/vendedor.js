@@ -131,7 +131,7 @@ async function claudeChat(systemPrompt, userMsg) {
 }
 
 async function getConfig() {
-  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto)');
+  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto)');
   const map = {};
   rows.forEach(r => { map[r.key] = r.value; });
   return {
@@ -145,6 +145,7 @@ async function getConfig() {
     rubro_auto:       map.vendedor_rubro_auto       || '',
     provincias_auto:  map.vendedor_provincias_auto  || '',
     cantidad_auto:    parseInt(map.vendedor_cantidad_auto || '20', 10),
+    minimo_auto:      parseInt(map.vendedor_minimo_auto  || '10', 10),
   };
 }
 
