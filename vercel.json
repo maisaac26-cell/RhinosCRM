@@ -10,7 +10,8 @@
     "api/auto-notif.js": { "maxDuration": 30 },
     "api/vendedor.js":   { "maxDuration": 60 },
     "api/vendedor-auto.js":      { "maxDuration": 60 },
-    "api/vendedor-prospecta.js": { "maxDuration": 300 }
+    "api/vendedor-prospecta.js": { "maxDuration": 300 },
+    "api/vendedor-replies.js":   { "maxDuration": 60  }
   },
   "crons": [
     { "path": "/api/weekly-report",      "schedule": "0 13 * * 1" },
@@ -18,7 +19,8 @@
     { "path": "/api/keepalive",          "schedule": "0 12 * * *" },
     { "path": "/api/auto-notif",         "schedule": "0 12 * * *" },
     { "path": "/api/vendedor-auto",      "schedule": "0 12 * * 1-5" },
-    { "path": "/api/vendedor-prospecta", "schedule": "0 21 * * *"  }
+    { "path": "/api/vendedor-prospecta", "schedule": "0 21 * * *"  },
+    { "path": "/api/vendedor-replies",   "schedule": "0 */2 * * *" }
   ],
   "rewrites": [
     { "source": "/auth/callback", "destination": "/index.html" },

@@ -3246,6 +3246,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
       <button class="btn" id="btn-via-prospectar" style="background:rgba(16,185,129,0.15);color:#34d399;border-color:rgba(16,185,129,0.3);gap:6px" title="Busca nuevos prospectos con email en Google Places y los agrega al pipeline">🔍 Prospectar ahora</button>
       <button class="btn" id="btn-via-enviar" style="background:rgba(99,102,241,0.15);color:#818cf8;border-color:rgba(99,102,241,0.3);gap:6px" title="Envía emails iniciales a los prospectos en cola + procesa follow-ups">📤 Enviar emails ahora</button>
+      <button class="btn" id="btn-via-replies" style="background:rgba(139,92,246,0.15);color:#a78bfa;border-color:rgba(139,92,246,0.3);gap:6px" title="Revisa respuestas de prospectos y hace que la IA responda o genere un borrador">💬 Revisar respuestas</button>
       <button class="btn btn-cyan" id="btn-via-followups" style="gap:6px">⚡ Solo follow-ups</button>
       <button class="btn" id="btn-via-refresh" style="gap:6px">↻ Actualizar</button>
       <select id="via-filtro-estado" class="inp" style="width:auto;font-size:12px">
@@ -3289,6 +3290,13 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <input id="via-cfg-dias" class="inp" type="number" min="1" max="30" placeholder="3"/></div>
           <div class="field"><label>Máx. emails por día (automático)</label>
             <input id="via-cfg-max" class="inp" type="number" min="1" max="50" placeholder="20"/></div>
+          <div class="field"><label>Respuestas IA — modo</label>
+            <select id="via-cfg-reply-modo" class="inp">
+              <option value="draft">📋 Borrador (revisás antes de enviar)</option>
+              <option value="auto">🤖 Automático (envía solo)</option>
+            </select></div>
+          <div class="field"><label>Máx. respuestas IA por conversación <span style="color:var(--text3);font-weight:400">(luego te avisa y para)</span></label>
+            <input id="via-cfg-reply-max" class="inp" type="number" min="1" max="20" placeholder="5"/></div>
           <div class="field"><label>Tu nombre (firma del email)</label>
             <input id="via-cfg-nombre-vendedor" class="inp" placeholder="Ej: Isaac"/></div>
           <div class="field"><label>WhatsApp <span style="color:var(--text3);font-weight:400">(con código de país, sin +)</span></label>
@@ -16635,11 +16643,18 @@ async function loadViaProspectos() {
               <td style="padding:8px 10px;font-weight:500;color:var(--text)">${p.empresa}<br><span style="font-size:11px;color:var(--text3)">${p.email}</span></td>
               <td style="padding:8px 6px;color:var(--text2)">${p.rubro || '—'}</td>
               <td style="padding:8px 6px;color:var(--text2)">${p.localidad || '—'}</td>
-              <td style="padding:8px 6px"><span style="font-size:11px;font-weight:600;color:${est.color}">${est.label}</span>${p.ia_reply ? ' <span style="color:var(--green);font-size:10px">✓ Reply</span>' : ''}</td>
+              <td style="padding:8px 6px">
+                <span style="font-size:11px;font-weight:600;color:${est.color}">${est.label}</span>
+                ${p.ia_auto_reply_count > 0 ? `<span style="margin-left:4px;font-size:10px;background:rgba(99,102,241,0.15);color:#818cf8;padding:1px 5px;border-radius:6px">💬 ${p.ia_auto_reply_count}</span>` : ''}
+                ${p.ia_pausado ? '<span style="margin-left:4px;font-size:10px;background:rgba(245,158,11,0.15);color:var(--amber);padding:1px 5px;border-radius:6px">⏸ Pausada</span>' : ''}
+                ${p.ia_draft_id ? '<span style="margin-left:4px;font-size:10px;background:rgba(16,185,129,0.15);color:#34d399;padding:1px 5px;border-radius:6px">📋 Borrador</span>' : ''}
+              </td>
               <td style="padding:8px 6px;color:var(--text3)">${fecha}${followupFecha}</td>
               <td style="padding:8px 6px">
-                <div style="display:flex;gap:4px">
+                <div style="display:flex;gap:4px;flex-wrap:wrap">
                   <button class="btn btn-sm via-btn-ver" data-pid="${p.id}" data-empresa="${p.empresa}" data-asunto="${(p.ia_email_asunto||'').replace(/"/g,'&quot;')}" data-body="${(p.ia_email_body||'').replace(/"/g,'&quot;')}" title="Ver email enviado" style="font-size:11px;padding:3px 8px">📧</button>
+                  ${!p.ia_pausado && p.ia_reply ? `<button class="btn btn-sm via-btn-pausar" data-pid="${p.id}" title="Pausar IA — tomás el control vos" style="font-size:11px;padding:3px 8px;color:var(--amber);border-color:rgba(245,158,11,0.3)">⛔ Pausar</button>` : ''}
+                  ${p.ia_pausado ? `<button class="btn btn-sm via-btn-reactivar" data-pid="${p.id}" title="Reactivar IA para este prospecto" style="font-size:11px;padding:3px 8px;color:#818cf8;border-color:rgba(99,102,241,0.3)">▶ Reactivar</button>` : ''}
                   <button class="btn btn-sm via-btn-marcar" data-pid="${p.id}" title="Marcar como interesado" style="font-size:11px;padding:3px 8px;color:var(--green);border-color:rgba(34,197,94,0.3)">⭐</button>
                   <button class="btn btn-sm via-btn-del" data-pid="${p.id}" title="Eliminar" style="font-size:11px;padding:3px 8px;color:var(--red);border-color:rgba(239,68,68,0.3)">✕</button>
                 </div>
@@ -16689,6 +16704,28 @@ async function loadViaProspectos() {
       });
     });
 
+    list.querySelectorAll('.via-btn-pausar').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await callVendedorAPI('update_prospecto', { id: btn.dataset.pid, ia_pausado: true, notas: '⏸️ IA pausada manualmente — conversación tomada por el equipo.' });
+          showToast('⛔ IA pausada — ahora respondés vos desde Gmail');
+          loadViaProspectos();
+        } catch(e) { showToast('Error: ' + e.message); btn.disabled = false; }
+      });
+    });
+
+    list.querySelectorAll('.via-btn-reactivar').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await callVendedorAPI('update_prospecto', { id: btn.dataset.pid, ia_pausado: false, ia_last_msg_id: null });
+          showToast('▶ IA reactivada — va a responder en la próxima corrida');
+          loadViaProspectos();
+        } catch(e) { showToast('Error: ' + e.message); btn.disabled = false; }
+      });
+    });
+
     list.querySelectorAll('.via-btn-del').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm('¿Eliminar este prospecto del pipeline?')) return;
@@ -16714,6 +16751,8 @@ async function loadViaCfg() {
     document.getElementById('via-cfg-max').value = config.max_dia || 20;
     if (config.nombre_vendedor) document.getElementById('via-cfg-nombre-vendedor').value = config.nombre_vendedor;
     if (config.whatsapp)        document.getElementById('via-cfg-whatsapp').value = config.whatsapp;
+    if (config.reply_modo)      document.getElementById('via-cfg-reply-modo').value = config.reply_modo;
+    if (config.reply_max)       document.getElementById('via-cfg-reply-max').value = config.reply_max;
     if (config.website)         document.getElementById('via-cfg-website').value = config.website;
     if (config.mensaje_ejemplo) document.getElementById('via-cfg-mensaje').value = config.mensaje_ejemplo;
     if (config.rubro_auto)      document.getElementById('via-cfg-rubro-auto').value = config.rubro_auto;
@@ -16805,6 +16844,8 @@ document.getElementById('btn-via-save-cfg')?.addEventListener('click', async () 
       vendedor_max_dia:         document.getElementById('via-cfg-max').value || '20',
       vendedor_nombre_vendedor: document.getElementById('via-cfg-nombre-vendedor').value.trim(),
       vendedor_whatsapp:        document.getElementById('via-cfg-whatsapp').value.trim(),
+      vendedor_reply_modo:      document.getElementById('via-cfg-reply-modo').value,
+      vendedor_reply_max:       document.getElementById('via-cfg-reply-max').value || '5',
       vendedor_website:         document.getElementById('via-cfg-website').value.trim(),
       vendedor_mensaje_ejemplo: document.getElementById('via-cfg-mensaje').value.trim(),
       vendedor_rubro_auto:      document.getElementById('via-cfg-rubro-auto').value.trim(),
@@ -16857,6 +16898,25 @@ document.addEventListener('click', async function(e) {
     showToast('Error: ' + e.message);
   }
   btn.disabled = false; btn.textContent = '📋 Agregar al pipeline';
+});
+
+// Botón "💬 Revisar respuestas" — dispara vendedor-replies
+document.getElementById('btn-via-replies')?.addEventListener('click', async function() {
+  const btn = this;
+  btn.disabled = true; btn.textContent = '⏳ Revisando...';
+  try {
+    const r = await fetch('/api/vendedor-replies', { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      const s = data.summary || {};
+      const modo = s.respondidos > 0 ? `${s.respondidos} enviados` : s.borradores > 0 ? `${s.borradores} borradores en Gmail` : 'sin novedades';
+      showToast(`💬 ${s.revisados} revisados · ${modo}${s.pausados ? ` · ⏸ ${s.pausados} pausados` : ''}${(s.errors||[]).length ? ` · ⚠️ ${s.errors.length} errores` : ''}`);
+      loadVendedorIA();
+    } else {
+      showToast('Error: ' + (data.error || 'desconocido'));
+    }
+  } catch(e) { showToast('Error: ' + e.message); }
+  btn.disabled = false; btn.textContent = '💬 Revisar respuestas';
 });
 
 // Botón "🤖 Auto-pipeline" — dispara búsqueda automática de prospectos
