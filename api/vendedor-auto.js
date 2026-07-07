@@ -154,24 +154,27 @@ async function checkBounces(token) {
   const EMAIL_RE   = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
   const SKIP_HOSTS = /mailer-daemon|postmaster|google|noreply|bounce|example\.com/i;
 
-  // Buscar notificaciones de rebote de las últimas 48hs
-  const q = encodeURIComponent('from:mailer-daemon newer_than:2d');
+  const q    = encodeURIComponent('from:mailer-daemon newer_than:2d');
   const list = await gmailGet(token, `/gmail/v1/users/me/messages?q=${q}&maxResults=50`);
-  const msgs  = (list.messages || []).slice(0, 30);
+  const msgs = (list.messages || []).slice(0, 30);
 
-  const bouncedEmails = new Set();
+  const bounced = new Map(); // email → razon
 
   for (const msg of msgs) {
     const full   = await gmailGet(token, `/gmail/v1/users/me/messages/${msg.id}?format=full`);
     const body   = extractBodyText(full.payload?.parts || [full.payload]) + ' ' + (full.snippet || '');
-    const found  = (body.match(EMAIL_RE) || []);
+    const isSpam = /5\.7\.|spam|calificado|filtro|blocked|blacklist/i.test(body);
+    const razon  = isSpam
+      ? '🚫 Servidor rechazó como spam — revisar contenido del email o dominio de envío'
+      : '❌ Email rebotado — dirección no existe o buzón lleno';
+    const found = (body.match(EMAIL_RE) || []);
     found.forEach(e => {
       const norm = e.toLowerCase();
-      if (!SKIP_HOSTS.test(norm.split('@')[1] || '')) bouncedEmails.add(norm);
+      if (!SKIP_HOSTS.test(norm.split('@')[1] || '')) bounced.set(norm, razon);
     });
   }
 
-  return [...bouncedEmails];
+  return [...bounced.entries()].map(([email, razon]) => ({ email, razon }));
 }
 
 async function hasReply(token, threadId) {
@@ -218,15 +221,52 @@ function buildFirma(cfg) {
 
 function buildEmailSystem(cfg, esFollowup) {
   const estiloRef = cfg.mensaje_ejemplo
-    ? `\n\nESTILO DE REFERENCIA (adoptá este tono, NO copies el texto):\n"""\n${cfg.mensaje_ejemplo.slice(0, 800)}\n"""`
+    ? `\n\nESTILO DE REFERENCIA (adoptá este tono, NO copies el texto):\n"""\n${cfg.mensaje_ejemplo.slice(0, 500)}\n"""`
     : '';
   const calcLink = 'https://rhinosapp.vercel.app/#calculadora';
   const firma    = buildFirma(cfg);
 
   if (esFollowup) {
-    return `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". El primer email no tuvo respuesta. Escribí un follow-up en español argentino, tono personal y directo — máximo 80 palabras en el cuerpo (SIN contar la firma). Ángulo diferente al email anterior. CTA único: calculá cuánto podés ahorrar → ${calcLink}. Terminá con esta firma exacta (copiala sin cambiar nada):\n${firma}\nDevolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. El campo cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
+    return `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}". Ya le escribiste a esta empresa y no respondió. Escribí un segundo contacto muy breve en español rioplatense.
+
+REGLAS ANTI-SPAM (críticas):
+- Máximo 45 palabras en el cuerpo (SIN firma)
+- Sin emojis en el asunto ni en el cuerpo
+- Sin "hacemos seguimiento", "te quería recordar", "perdiste mi email"
+- Sin listas ni bullets
+- Ángulo diferente: hacé UNA pregunta sobre su negocio, o mencioná un resultado concreto de otro cliente similar
+- Un solo link integrado en el texto (no en línea sola): ${calcLink}
+- Firma exacta sin modificar:\n${firma}
+
+Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. El cuerpo incluye texto + firma separados por \\n\\n. Texto plano.${estiloRef}`;
   }
-  return `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". Servicios: ${cfg.servicios}. Escribí un email comercial en español argentino — tiene que sentirse como enviado a mano a esta empresa, NO como spam masivo. Sé breve, cálido y concreto. Estructura:\n1. Saludo directo con el nombre de la empresa\n2. 2 oraciones conectando el producto con su rubro específico\n3. Lista de 3-4 funcionalidades clave con emojis\n4. Precio: suscripción mensual en pesos, todo incluido, sin sorpresas\n5. CTA destacado (línea sola): "👉 Calculá cuánto podés ahorrar: ${calcLink}"\n6. Firma exacta (copiala sin cambiar nada):\n${firma}\nMáximo 160 palabras en el cuerpo (SIN contar firma). Tono: directo, sin frases genéricas tipo "espero que estén bien". Devolvé SOLO JSON con 3 variantes de asunto y 1 cuerpo: {"asunto_a":"(genera curiosidad o contraste, ej: ¿Cuánto perdés sin sistema?)","asunto_b":"(directo con beneficio o número, ej: Digitalizá tu negocio en 48hs)","asunto_c":"(ultra corto, máx 5 palabras, como de un conocido)","cuerpo":"..."}. Cuerpo incluye texto + firma separados por doble salto de línea. Texto plano.${estiloRef}`;
+
+  return `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}" (${cfg.servicios}). Vas a escribirle a una empresa.
+
+OBJETIVO: Un email que parezca escrito a mano, pase filtros anti-spam y que el dueño quiera leer.
+
+REGLAS DE ENTREGABILIDAD (no las rompas):
+- Máximo 70 palabras en el cuerpo (SIN firma)
+- NINGÚN emoji en el asunto
+- NINGÚN bullet point ni lista en el cuerpo
+- NINGUNA palabra spam: "oferta", "suscripción", "precio", "calculá", "ahorrar", "gratis", "garantía"
+- Un SOLO link externo, integrado en una oración natural (no en línea sola)
+- Sin signos de exclamación en el asunto
+- Sin "espero que estén bien", sin "me dirijo a usted", sin "vimos que manejan"
+- Tono: directo y natural, persona hablándole a persona
+
+ESTRUCTURA DEL CUERPO:
+Frase 1: algo específico de su rubro que muestre que sabés de su actividad
+Frase 2: qué hace "${cfg.razon_social}" y cómo puede servirles concretamente
+Frase 3: invitación simple con el link: ${calcLink}
+Firma exacta sin modificar:\n${firma}
+
+ASUNTO — 3 variantes, NINGUNA con emoji ni signos de exclamación:
+asunto_a: nombre de la empresa + tema específico (ej: "Du Graty — gestión de stock")
+asunto_b: pregunta directa sobre su negocio (ej: "¿Cómo manejan el inventario en Du Graty?")
+asunto_c: súper corto, 3-4 palabras máximo (ej: "Para la ferretería")
+
+Devolvé SOLO JSON: {"asunto_a":"...","asunto_b":"...","asunto_c":"...","cuerpo":"..."}. Cuerpo incluye texto + \\n\\n + firma. Texto plano, sin markdown.${estiloRef}`;
 }
 
 async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
@@ -290,12 +330,12 @@ module.exports = async function handler(req, res) {
         const prospMap = {};
         todos.forEach(p => { if (p.email) prospMap[p.email.toLowerCase().trim()] = p.id; });
 
-        for (const email of bouncedEmails) {
+        for (const { email, razon } of bouncedEmails) {
           const id = prospMap[email];
           if (!id) continue;
           await sbReq('PATCH', `rhinos_prospectos?id=eq.${id}`, {
             estado:      'invalido',
-            notas:       '❌ Email rebotado — dirección no existe o buzón lleno',
+            notas:       razon,
             updated_at:  new Date().toISOString(),
           });
           summary.rebotes++;
@@ -316,7 +356,7 @@ module.exports = async function handler(req, res) {
       if (enviados >= cfg.max_dia) break;
       try {
         const email = await generarEmail(cfg, p, false, null);
-        const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id);
+        const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo, null); // sin pixel en primer email
         const now   = new Date().toISOString();
         await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
           estado: 'contactado', ia_contactado: true, ia_fecha_contacto: now,
@@ -332,7 +372,8 @@ module.exports = async function handler(req, res) {
       } catch(e) {
         summary.errors.push({ empresa: p.empresa, tipo: 'inicial', error: e.message });
       }
-      await new Promise(r => setTimeout(r, 700));
+      // Delay variable (3-8s) para simular comportamiento humano
+      await new Promise(r => setTimeout(r, 3000 + Math.random() * 5000));
     }
 
     // ── PASO 2: follow-ups (ia_contactado=true, sin respuesta, vencido) ──
@@ -367,7 +408,7 @@ module.exports = async function handler(req, res) {
       } catch(e) {
         summary.errors.push({ empresa: p.empresa, tipo: 'followup', error: e.message });
       }
-      await new Promise(r => setTimeout(r, 700));
+      await new Promise(r => setTimeout(r, 2000 + Math.random() * 4000));
     }
 
     return res.json({ ok: true, summary });
