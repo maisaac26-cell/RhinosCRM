@@ -3244,7 +3244,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
     <!-- Acciones rápidas -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-      <button class="btn btn-cyan" id="btn-via-followups" style="gap:6px">⚡ Ejecutar follow-ups ahora</button>
+      <button class="btn" id="btn-via-prospectar" style="background:rgba(16,185,129,0.15);color:#34d399;border-color:rgba(16,185,129,0.3);gap:6px" title="Busca nuevos prospectos con email en Google Places y los agrega al pipeline">🔍 Prospectar ahora</button>
+      <button class="btn" id="btn-via-enviar" style="background:rgba(99,102,241,0.15);color:#818cf8;border-color:rgba(99,102,241,0.3);gap:6px" title="Envía emails iniciales a los prospectos en cola + procesa follow-ups">📤 Enviar emails ahora</button>
+      <button class="btn btn-cyan" id="btn-via-followups" style="gap:6px">⚡ Solo follow-ups</button>
       <button class="btn" id="btn-via-refresh" style="gap:6px">↻ Actualizar</button>
       <select id="via-filtro-estado" class="inp" style="width:auto;font-size:12px">
         <option value="todos">Todos los estados</option>
@@ -16722,6 +16724,43 @@ document.querySelectorAll('[data-via-tab]').forEach(btn => {
 document.getElementById('via-filtro-estado')?.addEventListener('change', loadViaProspectos);
 
 // Follow-ups
+// Prospectar ahora — dispara vendedor-prospecta
+document.getElementById('btn-via-prospectar')?.addEventListener('click', async function() {
+  const btn = this;
+  btn.disabled = true; btn.textContent = '⏳ Buscando...';
+  try {
+    const r = await fetch('/api/vendedor-prospecta', { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      const s = data.summary || {};
+      showToast(`🔍 ${s.agregados || 0} prospectos agregados (${s.buscados || 0} encontrados, ${s.duplicados || 0} duplicados) — ${s.rubro || ''} · ${s.provincia || ''}`);
+      loadVendedorIA();
+    } else {
+      showToast('Error: ' + (data.error || 'desconocido'));
+    }
+  } catch(e) { showToast('Error: ' + e.message); }
+  btn.disabled = false; btn.textContent = '🔍 Prospectar ahora';
+});
+
+// Enviar emails ahora — dispara vendedor-auto (iniciales + follow-ups)
+document.getElementById('btn-via-enviar')?.addEventListener('click', async function() {
+  const btn = this;
+  btn.disabled = true; btn.textContent = '⏳ Enviando...';
+  try {
+    const r = await fetch('/api/vendedor-auto', { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      const s = data.summary || {};
+      showToast(`📤 ${s.iniciales_enviados || 0} emails iniciales · ${s.followup_enviados || 0} follow-ups · ${s.respondieron || 0} respondieron · ${s.frios || 0} fríos`);
+      loadVendedorIA();
+    } else {
+      showToast('Error: ' + (data.error || 'desconocido'));
+    }
+  } catch(e) { showToast('Error: ' + e.message); }
+  btn.disabled = false; btn.textContent = '📤 Enviar emails ahora';
+});
+
+// Solo follow-ups
 document.getElementById('btn-via-followups')?.addEventListener('click', async () => {
   const btn = document.getElementById('btn-via-followups');
   btn.disabled = true; btn.textContent = '⏳ Ejecutando...';
@@ -16733,7 +16772,7 @@ document.getElementById('btn-via-followups')?.addEventListener('click', async ()
     showToast(`✅ ${procesados} revisados · ${respondieron} respondieron · ${enviados} follow-ups enviados · ${frios} fríos`);
     loadVendedorIA();
   } catch(e) { showToast('Error: ' + e.message); }
-  btn.disabled = false; btn.textContent = '⚡ Ejecutar follow-ups ahora';
+  btn.disabled = false; btn.textContent = '⚡ Solo follow-ups';
 });
 
 // Refresh
