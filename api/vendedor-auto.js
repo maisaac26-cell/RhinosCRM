@@ -74,28 +74,43 @@ async function getGmailToken() {
   return refreshed.access_token;
 }
 
-function buildMultipartRaw(to, subject, textBody, prospId) {
-  const boundary = 'RHINOS' + Date.now().toString(36);
+function buildMultipartRaw(to, subject, textBody, prospId, fromDisplay, gmailFrom) {
+  // Boundary aleatorio — evita que filtros bloqueen por firma conocida
+  const boundary = 'MP' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const subj64 = '=?UTF-8?B?' + Buffer.from(subject || '').toString('base64') + '?=';
+
+  // Footer de opt-out — requerido por CAN-SPAM y reduce marcaciones manuales como spam
+  const unsubLine = '\n\n---\nPara no recibir más emails: respondé "no gracias" a este mensaje.';
+  const fullText = textBody + unsubLine;
+
   const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const htmlBody = textBody.split('\n\n')
+  const htmlBody = fullText.split('\n\n')
     .map(para => `<p style="margin:0 0 14px">${esc(para).replace(/\n/g,'<br>')}</p>`)
     .join('');
   const pixel = prospId
     ? `<img src="https://rhinos-crm.vercel.app/api/vendedor?action=track&id=${encodeURIComponent(prospId)}" width="1" height="1" alt="" style="display:none">`
     : '';
-  const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a1a;max-width:580px;padding:24px 20px">${htmlBody}${pixel}</body></html>`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:-apple-system,Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a1a;max-width:580px;margin:0 auto;padding:24px 20px">${htmlBody}${pixel}</body></html>`;
+
+  // From con nombre real mejora la apertura y disminuye marcaciones como spam
+  const fromAddr = gmailFrom || 'comercial@rhinosapp.com';
+  const fromHdr  = fromDisplay
+    ? `=?UTF-8?B?${Buffer.from(fromDisplay).toString('base64')}?= <${fromAddr}>`
+    : fromAddr;
+
   return (
-    `MIME-Version: 1.0\r\nTo: ${to}\r\nSubject: ${subj64}\r\n` +
+    `MIME-Version: 1.0\r\nFrom: ${fromHdr}\r\nTo: ${to}\r\nSubject: ${subj64}\r\n` +
+    `List-Unsubscribe: <mailto:${fromAddr}?subject=Unsubscribe>\r\n` +
+    `List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n` +
     `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n` +
-    `--${boundary}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${textBody}\r\n\r\n` +
+    `--${boundary}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${fullText}\r\n\r\n` +
     `--${boundary}\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${html}\r\n\r\n` +
     `--${boundary}--`
   );
 }
 
-async function sendGmail(token, to, subject, bodyText, prospId) {
-  const encoded = Buffer.from(buildMultipartRaw(to, subject, bodyText, prospId))
+async function sendGmail(token, to, subject, bodyText, prospId, fromDisplay, gmailFrom) {
+  const encoded = Buffer.from(buildMultipartRaw(to, subject, bodyText, prospId, fromDisplay, gmailFrom))
     .toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   const payload = JSON.stringify({ raw: encoded });
   return new Promise((resolve, reject) => {
@@ -265,68 +280,91 @@ function getRubroContext(rubro) {
   return 'Facturación electrónica AFIP, stock y cuentas corrientes';
 }
 
-function buildEmailSystem(cfg, esFollowup) {
-  // Sanitizar el ejemplo: si tiene muchos emojis/bullets probablemente sea un pitch de venta
-  // que haría que Claude genere emails spam. Solo usarlo si parece un email personal limpio.
+function buildEmailSystem(cfg, esFollowup, abrioEmail) {
   const ejemploLimpio = cfg.mensaje_ejemplo || '';
   const esEjemploSpam = (ejemploLimpio.match(/[📦🛒💳🧾📊📱✅❌🎯🦏👉]/gu) || []).length > 2
     || (ejemploLimpio.match(/^[•\-\*]/gm) || []).length > 2;
   const estiloRef = (!esEjemploSpam && ejemploLimpio.length > 20)
     ? `\n\nTONO DE REFERENCIA (solo el tono, NO la estructura ni el contenido):\n"""\n${ejemploLimpio.slice(0, 300)}\n"""`
     : '';
-  const calcLink = 'https://rhinosapp.vercel.app/#calculadora';
+  const calcLink = cfg.calendly || 'https://rhinosapp.vercel.app/#calculadora';
   const firma    = buildFirma(cfg);
 
-  if (esFollowup) {
-    return `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}". Ya le escribiste a esta empresa y no respondió. Escribí un segundo contacto muy breve en español rioplatense.
+  // Lista de palabras que activan filtros de spam — Claude no debe usar ninguna
+  const PALABRAS_SPAM = '"oferta", "precio", "suscripción", "calculá", "ahorrar", "ahorro", "gratis", "garantía", "descuento", "exclusivo", "urgente", "oportunidad", "limitado", "tiempo limitado", "actúa ahora", "hacé clic", "click aquí", "visitá nuestra", "100%", "beneficio", "rentabilidad", "sin costo", "sin cargo", "probá gratis", "felicitaciones", "ganaste", "promo"';
 
-REGLAS ANTI-SPAM (críticas):
-- Máximo 45 palabras en el cuerpo (SIN firma)
-- Sin emojis en el asunto ni en el cuerpo
-- Sin "hacemos seguimiento", "te quería recordar", "perdiste mi email"
-- Sin listas ni bullets
-- Ángulo diferente: hacé UNA pregunta sobre su negocio, o mencioná un resultado concreto de otro cliente similar
-- Un solo link integrado en el texto (no en línea sola): ${calcLink}
+  if (esFollowup) {
+    if (abrioEmail) {
+      return `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}". Le escribiste a esta empresa, vieron tu email pero no respondieron. Escribí un segundo contacto muy breve en español rioplatense.
+
+REGLAS ABSOLUTAS (romperlas arruina la entregabilidad):
+- Máximo 35 palabras en el cuerpo (SIN firma) — la brevedad es clave
+- Cero emojis en asunto ni en cuerpo
+- No menciones que "viste que abrieron el email" — no es natural
+- Podés preguntar si llegó bien: "No sé si mi email llegó a la bandeja correcta"
+- Sin presión, sin urgencia, sin "última oportunidad"
+- UNA sola pregunta concreta sobre su negocio o rubro
+- CERO links — no incluyas ningún link en este email
+- Sin palabras spam: ${PALABRAS_SPAM}
+- Asunto: máximo 40 caracteres, sin signos de exclamación, sin interrogación
 - Firma exacta sin modificar:\n${firma}
 
-Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. El cuerpo incluye texto + firma separados por \\n\\n. Texto plano.${estiloRef}`;
+Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo = texto + \\n\\n + firma. Texto plano sin markdown.${estiloRef}`;
+    }
+    return `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}". Le escribiste a esta empresa y no hubo respuesta. Escribí un segundo contacto brevísimo en español rioplatense.
+
+REGLAS ABSOLUTAS:
+- Máximo 40 palabras en el cuerpo (SIN firma)
+- Cero emojis en asunto ni en cuerpo
+- NO menciones el email anterior, empezá de cero como si fuera el primero
+- Ángulo completamente diferente: una observación concreta sobre su industria o ciudad, luego UNA pregunta
+- CERO links — no incluyas ningún link en este follow-up
+- Sin "hacemos seguimiento", "te quería recordar", "en relación a mi email"
+- Sin palabras spam: ${PALABRAS_SPAM}
+- Asunto: máximo 40 caracteres, sin signos de exclamación
+- Firma exacta sin modificar:\n${firma}
+
+Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo = texto + \\n\\n + firma. Texto plano sin markdown.${estiloRef}`;
   }
 
   const serviciosCorto = (cfg.servicios || '').slice(0, 120).split('\n')[0];
-  return `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}" — sistema de gestión para PyMEs argentinas (${serviciosCorto}). Vas a escribirle a una empresa.
+  return `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}" — sistema de gestión para PyMEs argentinas (${serviciosCorto}).
 
-OBJETIVO: Un email que parezca escrito a mano por alguien que investigó el negocio, pase filtros anti-spam y que el dueño quiera responder.
+MISIÓN: Escribir UN email que llegue a la bandeja principal (no a Promociones ni Spam) y que el dueño quiera responder. Tiene que parecer un email de persona a persona, no una campaña.
 
-PERSONALIZACIÓN (MUY IMPORTANTE):
-- En el contexto del prospecto vas a recibir "Datos reales": rating de Google Maps, cantidad de reseñas, dirección. USÁ esa info en Frase 1 de forma natural. Ej: "Vi que tienen 4.3★ en Maps con más de 80 reseñas — eso dice mucho del trabajo que hacen." Solo si tenés datos reales, no inventes.
-- El rubro específico que se te da incluye el dolor principal de esa industria. Conectá ese dolor con lo que hace "${cfg.razon_social}".
+PERSONALIZACIÓN OBLIGATORIA:
+- Recibirás "Datos reales" con rating Google Maps, reseñas, dirección. Usá esa info en la primera oración de forma orgánica. Si no hay datos, usá la localidad o el rubro.
+- El "dolor típico" del rubro es lo que el dueño siente todos los días — conectalo naturalmente con lo que hace "${cfg.razon_social}".
 
-REGLAS DE ENTREGABILIDAD (no las rompas):
-- Máximo 70 palabras en el cuerpo (SIN firma)
-- NINGÚN emoji en el asunto
-- NINGÚN bullet point ni lista en el cuerpo
-- NINGUNA palabra spam: "oferta", "suscripción", "precio", "calculá", "ahorrar", "gratis", "garantía"
-- Un SOLO link externo, integrado en una oración natural (no en línea sola)
-- Sin signos de exclamación en el asunto
-- Sin "espero que estén bien", sin "me dirijo a usted", sin "vimos que manejan"
-- Tono: directo y natural, persona hablándole a persona
+REGLAS DE ENTREGABILIDAD (críticas — cada violación aumenta el score de spam):
+- CUERPO: máximo 65 palabras totales (sin contar firma)
+- ASUNTO: máximo 50 caracteres — sin emojis, sin signos de exclamación, sin mayúsculas seguidas
+- CERO bullets, listas ni guiones como estructura
+- UN SOLO link externo, dentro de una oración (nunca en línea sola): ${calcLink}
+- Cero palabras spam: ${PALABRAS_SPAM}
+- Cero frases corporativas: "espero que estén bien", "me dirijo a ustedes", "adjunto información"
+- Cero presión: no escribas urgencia, plazos ni "última oportunidad"
+- Tono: conversacional, como si le escribieras a un conocido que tiene ese negocio
 
-ESTRUCTURA DEL CUERPO:
-Frase 1: dato concreto de su negocio (rating Maps, o su rubro/localidad) que muestre que lo conocés
-Frase 2: dolor específico de su industria + cómo "${cfg.razon_social}" lo resuelve
-Frase 3: invitación con el link: ${calcLink}
-Firma exacta sin modificar:\n${firma}
+ESTRUCTURA DEL CUERPO (3 oraciones, máx):
+1. Una observación concreta del negocio (dato real de Maps, o rubro + localidad)
+2. Problema específico de esa industria + cómo "${cfg.razon_social}" lo resuelve (en palabras simples)
+3. Llamado a la acción natural con el link integrado
+[salto de línea doble]
+[Firma exacta, no la modifiques:]
+${firma}
 
-ASUNTO — 3 variantes, NINGUNA con emoji ni signos de exclamación:
-asunto_a: nombre de la empresa + tema específico de su rubro (ej: "Du Graty — control de stock")
-asunto_b: pregunta sobre un dolor concreto de su industria (ej: "¿Cómo manejan las cuentas corrientes en Du Graty?")
-asunto_c: súper corto, 3-4 palabras, menciona la empresa (ej: "Para Du Graty")
+ASUNTO — 3 variantes, evaluá cuál suena más personal para ESTA empresa:
+asunto_a: nombre de empresa + tema del rubro (ej: "Farmacia Del Sol — vencimientos y stock")
+asunto_b: mini-pregunta específica del negocio (ej: "¿Cómo manejan los pedidos en Farmacia Del Sol?")
+asunto_c: cortísimo, 2-4 palabras con nombre de empresa (ej: "Para Farmacia Del Sol")
 
-Devolvé SOLO JSON: {"asunto_a":"...","asunto_b":"...","asunto_c":"...","cuerpo":"..."}. Cuerpo incluye texto + \\n\\n + firma. Texto plano, sin markdown.${estiloRef}`;
+Devolvé SOLO JSON válido: {"asunto_a":"...","asunto_b":"...","asunto_c":"...","cuerpo":"..."}
+El cuerpo incluye el texto + \\n\\n + firma. Texto plano, sin markdown, sin backticks.${estiloRef}`;
 }
 
-async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
-  const system = buildEmailSystem(cfg, esFollowup);
+async function generarEmail(cfg, prospecto, esFollowup, emailAnterior, abrioEmail) {
+  const system = buildEmailSystem(cfg, esFollowup, abrioEmail);
   const rubroCtx = getRubroContext(prospecto.rubro);
   const userMsg = esFollowup
     ? `Empresa: ${prospecto.empresa}\nRubro: ${prospecto.rubro || ''} (dolor típico: ${rubroCtx})\nEmail anterior — Asunto: ${emailAnterior.asunto}\nCuerpo: ${emailAnterior.cuerpo}`
@@ -338,10 +376,41 @@ async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
   const parsed = JSON.parse(match[0]);
 
   if (!esFollowup && parsed.asunto_a) {
-    const v = ['a','b','c'][Math.floor(Math.random() * 3)];
+    // Usar el winner A/B 70% del tiempo, explorar el otro 30%
+    let v;
+    const winner = cfg.ab_winner;
+    if (winner && ['a','b','c'].includes(winner) && Math.random() < 0.7) {
+      v = winner;
+    } else {
+      v = ['a','b','c'][Math.floor(Math.random() * 3)];
+    }
     return { asunto: parsed[`asunto_${v}`] || parsed.asunto_a, cuerpo: parsed.cuerpo, variant: v };
   }
   return { asunto: parsed.asunto || '', cuerpo: parsed.cuerpo, variant: null };
+}
+
+// Calcula la variante de asunto con mejor tasa de apertura y la guarda en config
+async function optimizarAB() {
+  try {
+    const rows = await sbGet('rhinos_prospectos?select=ia_subject_variant,ia_abierto&ia_contactado=eq.true&ia_subject_variant=neq.null&limit=5000');
+    const stats = { a: { total: 0, abiertos: 0 }, b: { total: 0, abiertos: 0 }, c: { total: 0, abiertos: 0 } };
+    for (const r of rows) {
+      const v = r.ia_subject_variant;
+      if (!stats[v]) continue;
+      stats[v].total++;
+      if (r.ia_abierto) stats[v].abiertos++;
+    }
+    let winner = null; let bestRate = 0;
+    for (const [v, s] of Object.entries(stats)) {
+      if (s.total < 15) continue; // muestra mínima para ser estadísticamente válido
+      const rate = s.abiertos / s.total;
+      if (rate > bestRate) { bestRate = rate; winner = v; }
+    }
+    if (winner) {
+      await sbReq('POST', 'rhinos_config', [{ key: 'vendedor_ab_winner', value: winner, updated_at: new Date().toISOString() }]);
+    }
+    return { winner, rates: Object.fromEntries(Object.entries(stats).map(([v, s]) => [v, s.total > 0 ? Math.round(s.abiertos / s.total * 100) + '%' : '—'])) };
+  } catch { return null; }
 }
 
 module.exports = async function handler(req, res) {
@@ -357,12 +426,13 @@ module.exports = async function handler(req, res) {
     reengagement_enviados: 0,
     wa_por_apertura: 0,
     wa_followup2: 0,
+    ab_optimizer: null,
     errors: []
   };
 
   try {
     // Cargar config
-    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_activo,vendedor_hora_envio,vendedor_dias_envio,vendedor_delay_min,vendedor_delay_max,vendedor_max_followups,vendedor_calendly,vendedor_wa_greenapi_id,vendedor_wa_greenapi_token)');
+    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_activo,vendedor_hora_envio,vendedor_dias_envio,vendedor_delay_min,vendedor_delay_max,vendedor_max_followups,vendedor_calendly,vendedor_wa_greenapi_id,vendedor_wa_greenapi_token,vendedor_ab_winner,gmail_email)');
     const cfgMap = {};
     cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
 
@@ -398,7 +468,15 @@ module.exports = async function handler(req, res) {
       max_followups:     parseInt(cfgMap.vendedor_max_followups || '2',  10),
       wa_greenapi_id:    cfgMap.vendedor_wa_greenapi_id    || '',
       wa_greenapi_token: cfgMap.vendedor_wa_greenapi_token || '',
+      ab_winner:         cfgMap.vendedor_ab_winner         || null,
+      gmail_email:       cfgMap.gmail_email                || 'comercial@rhinosapp.com',
     };
+
+    // ── A/B optimizer: calcular variante ganadora (solo domingos) ────────
+    if (new Date().getDay() === 0) {
+      summary.ab_optimizer = await optimizarAB();
+      if (summary.ab_optimizer?.winner) cfg.ab_winner = summary.ab_optimizer.winner;
+    }
 
     let token;
     try { token = await getGmailToken(); }
@@ -428,6 +506,30 @@ module.exports = async function handler(req, res) {
       summary.errors.push({ tipo: 'bounce_check', error: e.message });
     }
 
+    // ── SPAM SIGNAL CHECK: auto-pausa si tasa de rebote > 15% esta semana ─
+    try {
+      const semana = new Date(Date.now() - 7 * 86400000).toISOString();
+      const [contactadosSemana, rebotesSemana] = await Promise.all([
+        sbGet(`rhinos_prospectos?select=id&ia_contactado=eq.true&ia_fecha_contacto=gte.${encodeURIComponent(semana)}&limit=500`),
+        sbGet(`rhinos_prospectos?select=id&estado=eq.invalido&updated_at=gte.${encodeURIComponent(semana)}&limit=100`),
+      ]);
+      if (contactadosSemana.length >= 50) {
+        const tasaRebote = rebotesSemana.length / contactadosSemana.length;
+        if (tasaRebote > 0.15) {
+          await sbReq('PATCH', 'rhinos_config?key=eq.vendedor_activo', { value: 'false', updated_at: new Date().toISOString() });
+          return res.json({
+            ok: true, skipped: true, summary,
+            reason: `🚨 Auto-pausado: tasa de rebote ${(tasaRebote * 100).toFixed(0)}% en los últimos 7 días (umbral 15%). Revisá el dominio de envío o limpiá la lista de prospectos.`,
+          });
+        }
+        if (tasaRebote > 0.08) {
+          summary.errors.push({ tipo: 'spam_warning', msg: `⚠️ Tasa de rebote ${(tasaRebote * 100).toFixed(0)}% esta semana — considerá revisar la calidad de los emails.` });
+        }
+      }
+    } catch(e) {
+      summary.errors.push({ tipo: 'spam_check', error: e.message });
+    }
+
     let enviados = 0;
 
     // ── PASO 1: contacto inicial (estado='nuevo', ia_contactado=false) ──
@@ -435,11 +537,23 @@ module.exports = async function handler(req, res) {
       `rhinos_prospectos?estado=eq.nuevo&ia_contactado=eq.false&order=created_at.asc&limit=${cfg.max_dia}`
     );
 
+    const fromDisplay = [cfg.nombre_vendedor, cfg.razon_social].filter(Boolean).join(' de ');
+    const gmailFrom   = cfg.gmail_email;
+
+    const EMAIL_INVALIDO = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@|hola@hola\.|contact@contact\.|nombre@|^tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}/i;
+
     for (const p of enCola) {
       if (enviados >= cfg.max_dia) break;
+      // Anular prospectos con emails falsos/placeholder antes de intentar enviar
+      if (!p.email || EMAIL_INVALIDO.test(p.email) || p.email.split('.').pop().length > 10) {
+        const now = new Date().toISOString();
+        await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, { estado: 'invalido', updated_at: now }).catch(() => {});
+        summary.errors.push({ empresa: p.empresa, tipo: 'email_invalido', error: `Email descartado: ${p.email}` });
+        continue;
+      }
       try {
         const email = await generarEmail(cfg, p, false, null);
-        const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id); // pixel para tracking de aperturas
+        const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id, fromDisplay, gmailFrom);
         const now   = new Date().toISOString();
         await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
           estado: 'contactado', ia_contactado: true, ia_fecha_contacto: now,
@@ -476,8 +590,8 @@ module.exports = async function handler(req, res) {
           continue;
         }
 
-        const email    = await generarEmail(cfg, p, true, { asunto: p.ia_email_asunto, cuerpo: p.ia_email_body });
-        const sent     = await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id);
+        const email    = await generarEmail(cfg, p, true, { asunto: p.ia_email_asunto, cuerpo: p.ia_email_body }, p.ia_abierto || false);
+        const sent     = await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id, fromDisplay, gmailFrom);
         const newCount = (p.ia_followup_count || 0) + 1;
         const estado   = newCount >= cfg.max_followups ? 'frio' : 'follow_up_' + newCount;
 
@@ -510,7 +624,7 @@ module.exports = async function handler(req, res) {
           const match    = raw.match(/\{[\s\S]*\}/);
           if (!match) throw new Error('JSON inválido');
           const email    = JSON.parse(match[0]);
-          await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id);
+          await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id, fromDisplay, gmailFrom);
           await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
             estado: 'reengagement', ia_followup_count: (p.ia_followup_count || 0) + 1,
             ia_followup_fecha: new Date().toISOString(), updated_at: new Date().toISOString(),

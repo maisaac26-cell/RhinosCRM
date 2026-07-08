@@ -245,6 +245,19 @@ Devolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. El cuerpo incluye texto + f
   return JSON.parse(match[0]);
 }
 
+// Notificación push vía /api/push cuando se detecta un lead caliente
+function sendPushAlert(titulo, cuerpo) {
+  const payload = JSON.stringify({ action: 'send', title: titulo, body: cuerpo, tag: 'lead_caliente' });
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'rhinos-crm.vercel.app', path: '/api/push', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+    }, (res) => { res.resume(); res.on('end', resolve); res.on('error', resolve); });
+    req.on('error', () => resolve());
+    req.write(payload); req.end();
+  });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
@@ -254,7 +267,7 @@ module.exports = async function handler(req, res) {
 
   try {
     // Config
-    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_website,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_mensaje_ejemplo,vendedor_reply_modo,vendedor_reply_max)');
+    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_website,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_mensaje_ejemplo,vendedor_reply_modo,vendedor_reply_max,vendedor_calendly)');
     const cfgMap  = {}; cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
     const cfg = {
       razon_social:    cfgMap.vendedor_razon_social    || 'nuestra empresa',
@@ -265,6 +278,7 @@ module.exports = async function handler(req, res) {
       mensaje_ejemplo: cfgMap.vendedor_mensaje_ejemplo || '',
       reply_modo:      cfgMap.vendedor_reply_modo      || 'draft',
       reply_max:       parseInt(cfgMap.vendedor_reply_max || '5', 10),
+      calendly:        cfgMap.vendedor_calendly        || '',
     };
 
     const token   = await getGmailToken();
@@ -354,6 +368,16 @@ module.exports = async function handler(req, res) {
 
         // Cualquier respuesta positiva → crear lead en CRM de inmediato
         await crearLeadSiNoExiste(p);
+
+        // Push notification para leads calientes (fire-and-forget)
+        if (['interesado', 'pide_demo'].includes(intencion)) {
+          const emoji = intencion === 'pide_demo' ? '📅' : '🔥';
+          const intencionLabel = intencion === 'pide_demo' ? 'Pide una demo/reunión' : 'Está interesado';
+          sendPushAlert(
+            `${emoji} Lead caliente — ${p.empresa}`,
+            `${intencionLabel} · ${p.rubro || ''} ${p.localidad ? '· ' + p.localidad : ''}`
+          ).catch(() => {});
+        }
 
         // Generar respuesta con Claude, pasando la intención detectada
         const historial = historialLines.slice(-8).join('\n');

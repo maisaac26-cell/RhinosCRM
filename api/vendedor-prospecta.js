@@ -261,17 +261,13 @@ async function searchMercadoLibre(query, provincia, maxResults) {
 
 const PA_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-async function searchPaginasAmarillas(rubro, provincia, maxResults) {
-  const url = `https://www.paginasamarillas.com.ar/${toSlug(rubro)}/en/${toSlug(provincia)}/p-1`;
-  const html = await fetchHtml(url, PA_UA);
-  if (!html || html.length < 800) return [];
-
+function parsePAHtml(html) {
   const results = [];
 
   // Strategy 1: JSON-LD structured data (más confiable — lo inyectan para SEO)
   const ldRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let m;
-  while ((m = ldRe.exec(html)) !== null && results.length < maxResults) {
+  while ((m = ldRe.exec(html)) !== null) {
     try {
       const obj = JSON.parse(m[1]);
       const items = [];
@@ -279,7 +275,6 @@ async function searchPaginasAmarillas(rubro, provincia, maxResults) {
       else if (obj['@graph']) items.push(...obj['@graph']);
       else items.push(obj);
       for (const item of items) {
-        if (results.length >= maxResults) break;
         const type = [].concat(item['@type'] || []).join(' ');
         if (!/LocalBusiness|FoodEstablishment|Store|AutoRepair|Restaurant|Pharmacy|ProfessionalService|HealthAndBeauty|HomeAndConstruction/i.test(type)) continue;
         if (!item.name || item.name.length < 2) continue;
@@ -303,7 +298,6 @@ async function searchPaginasAmarillas(rubro, provincia, maxResults) {
   if (results.length < 3) {
     const chunks = html.split(/(?=<(?:article|li)[^>]*>)/i).slice(1);
     for (const chunk of chunks) {
-      if (results.length >= maxResults) break;
       const phoneM = chunk.match(/href="tel:([^"]+)"/i);
       const emailM = chunk.match(/href="mailto:([^"@]{1,50}@[^"?]{3,60})"/i);
       const siteM  = chunk.match(/href="(https?:\/\/(?!(?:www\.)?paginasamarillas)[^"?#]{5,80})"/i);
@@ -326,13 +320,38 @@ async function searchPaginasAmarillas(rubro, provincia, maxResults) {
     }
   }
 
-  return results.slice(0, maxResults);
+  return results;
+}
+
+async function searchPaginasAmarillas(rubro, provincia, maxResults) {
+  const base = `https://www.paginasamarillas.com.ar/${toSlug(rubro)}/en/${toSlug(provincia)}`;
+
+  // Fetch 3 pages in parallel — 3x más cobertura con el mismo tiempo
+  const [html1, html2, html3] = await Promise.all([
+    fetchHtml(`${base}/p-1`, PA_UA),
+    fetchHtml(`${base}/p-2`, PA_UA),
+    fetchHtml(`${base}/p-3`, PA_UA),
+  ]);
+
+  const seen = new Set();
+  const results = [];
+  for (const html of [html1, html2, html3]) {
+    if (!html || html.length < 800) continue;
+    for (const r of parsePAHtml(html)) {
+      const key = (r.name || '').toLowerCase().replace(/\s+/g, '').slice(0, 15);
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      results.push(r);
+    }
+  }
+
+  return results.slice(0, maxResults * 2); // entregar más para que el batch tenga más opciones
 }
 
 // ── Email extraction ──────────────────────────────────────────────────────────
 
 const EMAIL_RE   = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
-const SKIP_EMAIL = /noreply|no-reply|donotreply|example\.com|sentry\.|wix\.|wordpress\.|schema\.|googleapis|@2x|\.png|\.jpg|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@|hola@hola\.|contact@contact\./i;
+const SKIP_EMAIL = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|@2x|\.png|\.jpg|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@|hola@hola\.|contact@contact\.|nombre@|tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}/i;
 
 function fetchHtml(pageUrl, ua) {
   return new Promise((resolve) => {
@@ -368,7 +387,13 @@ function fetchHtml(pageUrl, ua) {
 }
 
 function extractEmails(html) {
-  return [...new Set((html.match(EMAIL_RE) || []).filter(e => !SKIP_EMAIL.test(e) && e.includes('.') && e.length < 80))];
+  return [...new Set((html.match(EMAIL_RE) || []).filter(e => {
+    if (SKIP_EMAIL.test(e)) return false;
+    if (e.length >= 80) return false;
+    const tld = e.split('.').pop();
+    if (tld.length > 10) return false; // rechaza TLDs raros como ".defaultKart"
+    return true;
+  }))];
 }
 
 async function findEmailsForSite(website) {
@@ -430,6 +455,17 @@ module.exports = async function handler(req, res) {
     const existentes = await sbGet('rhinos_prospectos?select=email&limit=5000');
     const emailsYaEnPipeline = new Set(existentes.map(r => (r.email || '').toLowerCase().trim()).filter(Boolean));
 
+    // Cargar blacklist (no crítico si la tabla no existe aún)
+    let blacklistDomains = new Set();
+    let blacklistEmpresas = [];
+    try {
+      const bl = await sbGet('rhinos_blacklist?select=dominio,empresa&limit=500');
+      bl.forEach(r => {
+        if (r.dominio) blacklistDomains.add(r.dominio.toLowerCase().trim());
+        if (r.empresa) blacklistEmpresas.push(r.empresa.toLowerCase().trim());
+      });
+    } catch {}
+
     const nuevos = [];
     const startTime  = Date.now();
     const TIME_LIMIT = 240000; // 240s — margen de 60s antes del timeout de 300s
@@ -486,6 +522,12 @@ module.exports = async function handler(req, res) {
             if (nuevos.length >= cantidad) break;
             const emailNorm = email.toLowerCase().trim();
             if (emailsYaEnPipeline.has(emailNorm)) { summary.duplicados++; continue; }
+
+            // Blacklist check por dominio o empresa
+            const domain = emailNorm.split('@')[1] || '';
+            if (blacklistDomains.has(domain)) { summary.duplicados++; continue; }
+            const empresaNorm = (place.name || '').toLowerCase();
+            if (blacklistEmpresas.some(bl => empresaNorm.includes(bl))) { summary.duplicados++; continue; }
 
             emailsYaEnPipeline.add(emailNorm);
             summary.con_email++;
