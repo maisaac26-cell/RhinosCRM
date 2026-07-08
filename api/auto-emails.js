@@ -125,6 +125,22 @@ module.exports = async function handler(req, res) {
         summary.errors.push({ id: em.id, name: em.name, error: e.message });
       }
     }
+    // Keepalive: ping Supabase + guardar TC del día (antes en keepalive.js)
+    try {
+      const tcData = await new Promise((resolve) => {
+        https.get('https://api.bluelytics.com.ar/v2/latest', (r) => {
+          let raw = ''; r.on('data', c => raw += c);
+          r.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+        }).on('error', () => resolve({}));
+      });
+      if (tcData.oficial) {
+        const today2 = new Date().toISOString().slice(0, 10);
+        const tc = JSON.stringify({ fecha: today2, oficial_compra: tcData.oficial.value_buy, oficial_venta: tcData.oficial.value_sell, blue_compra: tcData.blue?.value_buy, blue_venta: tcData.blue?.value_sell, fuente: 'Banco Nación Argentina' });
+        const r2 = https.request({ hostname: new URL(SB_URL).hostname, path: '/rest/v1/rhinos_tc_historico', method: 'POST', headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(tc), 'Prefer': 'resolution=merge-duplicates,return=minimal' } }, () => {});
+        r2.on('error', () => {}); r2.write(tc); r2.end();
+      }
+    } catch {}
+
     return res.status(200).json({ ok: true, summary });
   } catch(e) {
     return res.status(500).json({ ok: false, error: e.message });
