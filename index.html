@@ -3235,12 +3235,13 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
 
     <!-- Stats -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-bottom:16px">
       <div class="metric-card"><div class="m-label">En cola</div><div class="m-val" style="color:var(--amber)" id="via-stat-cola">—</div><div class="m-sub">pendientes</div></div>
       <div class="metric-card"><div class="m-label">Contactados</div><div class="m-val cyan" id="via-stat-contactados">—</div><div class="m-sub" id="via-stat-abiertos-sub" style="color:var(--green);font-size:10px"></div></div>
       <div class="metric-card"><div class="m-label">Respondieron</div><div class="m-val" style="color:var(--green)" id="via-stat-replies">—</div><div class="m-sub">interesados</div></div>
       <div class="metric-card"><div class="m-label">Fríos</div><div class="m-val" style="color:var(--text3)" id="via-stat-frios">—</div><div class="m-sub">sin respuesta</div></div>
       <div class="metric-card"><div class="m-label">Rebotados</div><div class="m-val" style="color:var(--red)" id="via-stat-rebotados">—</div><div class="m-sub" id="via-stat-ab" style="font-size:10px;color:var(--text3)"></div></div>
+      <div class="metric-card"><div class="m-label">WA enviados</div><div class="m-val" style="color:#34d399" id="via-stat-wa">—</div><div class="m-sub" id="via-stat-wa-sub" style="font-size:10px;color:var(--text3)"></div></div>
     </div>
 
     <!-- Acciones rápidas -->
@@ -16706,6 +16707,12 @@ async function loadViaStats() {
       const pct = stats.contactados > 0 ? Math.round(stats.abiertos / stats.contactados * 100) : 0;
       abiSub.textContent = `✉️ ${stats.abiertos} abrieron (${pct}%)`;
     }
+    const waStat = document.getElementById('via-stat-wa');
+    if (waStat) waStat.textContent = stats.wa_enviados ?? '—';
+    const waSub = document.getElementById('via-stat-wa-sub');
+    if (waSub && stats.ab_stats) waSub.textContent = `A:${stats.ab_stats.a} B:${stats.ab_stats.b} C:${stats.ab_stats.c}`;
+    const ab = document.getElementById('via-stat-ab');
+    if (ab) ab.textContent = stats.score_alto != null ? `⭐ ${stats.score_alto} score alto` : '';
   } catch(e) { console.warn('via stats:', e.message); }
 }
 
@@ -16898,12 +16905,16 @@ document.getElementById('btn-via-prospectar')?.addEventListener('click', async f
   const btn = this;
   btn.disabled = true; btn.textContent = '⏳ Buscando...';
   try {
-    const r = await fetch('/api/vendedor-prospecta', { method: 'POST' });
+    const r = await fetch('/api/vendedor-prospecta?force=1', { method: 'POST' });
     const data = await r.json();
     if (data.ok) {
       const s = data.summary || {};
-      showToast(`🔍 ${s.agregados || 0} prospectos agregados (${s.buscados || 0} encontrados, ${s.duplicados || 0} duplicados) — ${s.rubro || ''} · ${s.provincia || ''}`);
-      loadVendedorIA();
+      if (data.skipped) { showToast('⏸ ' + (data.reason || 'sistema pausado')); }
+      else {
+        const rubroStr = (s.rubros || []).slice(0,2).join(', ') || '';
+        showToast(`🔍 ${s.agregados || 0} prospectos agregados (${s.buscados || 0} encontrados, ${s.duplicados || 0} duplicados)${rubroStr ? ' — ' + rubroStr : ''}`);
+        loadVendedorIA();
+      }
     } else {
       showToast('Error: ' + (data.error || 'desconocido'));
     }
@@ -16916,12 +16927,15 @@ document.getElementById('btn-via-enviar')?.addEventListener('click', async funct
   const btn = this;
   btn.disabled = true; btn.textContent = '⏳ Enviando...';
   try {
-    const r = await fetch('/api/vendedor-auto', { method: 'POST' });
+    const r = await fetch('/api/vendedor-auto?force=1', { method: 'POST' });
     const data = await r.json();
     if (data.ok) {
-      const s = data.summary || {};
-      showToast(`📤 ${s.iniciales_enviados || 0} iniciales · ${s.followup_enviados || 0} follow-ups · ${s.respondieron || 0} respondieron · ${s.frios || 0} fríos${s.rebotes ? ` · ❌ ${s.rebotes} rebotes` : ''}`);
-      loadVendedorIA();
+      if (data.skipped) { showToast('⏸ ' + (data.reason || 'sistema pausado')); }
+      else {
+        const s = data.summary || {};
+        showToast(`📤 ${s.iniciales_enviados || 0} iniciales · ${s.followup_enviados || 0} follow-ups · ${s.respondieron || 0} respondieron · ${s.frios || 0} fríos${s.rebotes ? ` · ❌ ${s.rebotes} rebotes` : ''}`);
+        loadVendedorIA();
+      }
     } else {
       showToast('Error: ' + (data.error || 'desconocido'));
     }
@@ -16993,13 +17007,14 @@ document.getElementById('btn-via-save-cfg')?.addEventListener('click', async () 
 async function viaRunNow(target) {
   const btnIds = { auto: 'btn-run-auto', prospecta: 'btn-run-prospecta', whatsapp: 'btn-run-whatsapp' };
   const labels = { auto: '▶ Enviar emails ahora', prospecta: '▶ Buscar prospectos ahora', whatsapp: '▶ Enviar WA ahora' };
-  const endpoints = { auto: '/api/vendedor-auto', prospecta: '/api/vendedor-prospecta', whatsapp: '/api/vendedor-whatsapp' };
+  const endpoints = { auto: '/api/vendedor-auto', prospecta: '/api/vendedor-prospecta', whatsapp: '/api/vendedor?action=send_whatsapp' };
   const btn = document.getElementById(btnIds[target]);
   const status = document.getElementById('via-run-status');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Ejecutando...'; }
   if (status) status.textContent = '';
   try {
-    const r = await fetch(endpoints[target] + '?force=1', { method: 'POST' });
+    const sep = endpoints[target].includes('?') ? '&' : '?';
+    const r = await fetch(endpoints[target] + sep + 'force=1', { method: 'POST' });
     const data = await r.json();
     if (data.skipped) {
       if (status) status.textContent = data.reason || 'Sin cambios';
@@ -17093,11 +17108,12 @@ document.getElementById('btn-auto-pipeline')?.addEventListener('click', async fu
   btn.disabled = true;
   btn.textContent = '⏳ Buscando...';
   try {
-    const r = await fetch('/api/vendedor-prospecta', { method: 'POST' });
+    const r = await fetch('/api/vendedor-prospecta?force=1', { method: 'POST' });
     const data = await r.json();
     if (data.ok) {
       const s = data.summary || {};
-      showToast(`🤖 Auto-pipeline: ${s.agregados || 0} nuevos (${s.buscados || 0} buscados, ${s.duplicados || 0} duplicados) — ${s.rubro || ''} en ${s.provincia || ''}`);
+      if (data.skipped) { showToast('⏸ ' + (data.reason || 'sistema pausado')); }
+      else showToast(`🤖 Auto-pipeline: ${s.agregados || 0} nuevos (${s.buscados || 0} buscados, ${s.duplicados || 0} duplicados)${(s.rubros||[])[0] ? ' — ' + s.rubros[0] : ''}`);
     } else {
       showToast('Error auto-pipeline: ' + (data.error || 'desconocido'));
     }

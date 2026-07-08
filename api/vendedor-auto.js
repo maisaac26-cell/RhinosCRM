@@ -82,7 +82,7 @@ function buildMultipartRaw(to, subject, textBody, prospId) {
     .map(para => `<p style="margin:0 0 14px">${esc(para).replace(/\n/g,'<br>')}</p>`)
     .join('');
   const pixel = prospId
-    ? `<img src="https://rhinos-crm.vercel.app/api/vendedor-track?id=${encodeURIComponent(prospId)}" width="1" height="1" alt="" style="display:none">`
+    ? `<img src="https://rhinos-crm.vercel.app/api/vendedor?action=track&id=${encodeURIComponent(prospId)}" width="1" height="1" alt="" style="display:none">`
     : '';
   const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,Arial,sans-serif;font-size:15px;line-height:1.65;color:#1a1a1a;max-width:580px;padding:24px 20px">${htmlBody}${pixel}</body></html>`;
   return (
