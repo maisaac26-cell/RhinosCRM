@@ -20,8 +20,8 @@
     { "path": "/api/auto-emails",        "schedule": "0 12 * * *" },
     { "path": "/api/keepalive",          "schedule": "0 12 * * *" },
     { "path": "/api/auto-notif",         "schedule": "0 12 * * *" },
-    { "path": "/api/vendedor-auto",      "schedule": "0 * * * 1-5"  },
-    { "path": "/api/vendedor-prospecta", "schedule": "0 * * * *"   },
+    { "path": "/api/vendedor-auto",      "schedule": "0 12 * * 1-5" },
+    { "path": "/api/vendedor-prospecta", "schedule": "0 21 * * *"  },
     { "path": "/api/vendedor-replies",    "schedule": "0 */2 * * *" },
     { "path": "/api/vendedor-whatsapp",  "schedule": "0 13 * * 1-5" }
   ],
