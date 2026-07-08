@@ -155,6 +155,23 @@ function httpGet(url) {
   });
 }
 
+function calcScore(email, website, rating, reviews, phone) {
+  let s = 0;
+  if (website && !/google\.com\/maps|goo\.gl|facebook\.com/i.test(website)) s += 25;
+  if (email && !/@(gmail|hotmail|yahoo|outlook|live)\./i.test(email)) s += 25;
+  if (rating && rating >= 4.0) s += 20;
+  if (reviews && reviews >= 20) s += 15;
+  if (phone) s += 15;
+  return s;
+}
+
+function buildNotas(rating, reviews, address) {
+  const parts = [];
+  if (rating) parts.push(`${rating}★ en Google (${reviews || 0} reseñas)`);
+  if (address) parts.push(address);
+  return parts.join(' · ');
+}
+
 async function searchPlaces(query, location, apiKey) {
   const q = encodeURIComponent(`${query} en ${location} Argentina`);
   const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${q}&type=establishment&language=es&region=ar&key=${apiKey}`;
@@ -166,16 +183,18 @@ async function searchPlaces(query, location, apiKey) {
   const enriched = [];
   for (const place of results.slice(0, 20)) {
     if (!place.place_id) continue;
-    const detUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_phone_number,website,formatted_address&language=es&key=${apiKey}`;
+    const detUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_phone_number,website,formatted_address,rating,user_ratings_total&language=es&key=${apiKey}`;
     const det = await httpGet(detUrl);
     let detail;
     try { detail = JSON.parse(det.body).result || {}; } catch { detail = {}; }
     enriched.push({
-      id:       place.place_id,
-      name:     detail.name || place.name,
-      address:  detail.formatted_address || place.formatted_address || '',
-      phone:    detail.formatted_phone_number || '',
-      website:  detail.website || '',
+      id:      place.place_id,
+      name:    detail.name || place.name,
+      address: detail.formatted_address || place.formatted_address || '',
+      phone:   detail.formatted_phone_number || '',
+      website: detail.website || '',
+      rating:  detail.rating || place.rating || 0,
+      reviews: detail.user_ratings_total || place.user_ratings_total || 0,
     });
     await new Promise(r => setTimeout(r, 200));
   }
@@ -221,7 +240,7 @@ async function searchMercadoLibre(query, provincia, maxResults) {
 // ── Email extraction ──────────────────────────────────────────────────────────
 
 const EMAIL_RE   = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
-const SKIP_EMAIL = /noreply|no-reply|donotreply|example\.com|sentry\.|wix\.|wordpress\.|schema\.|googleapis|@2x|\.png|\.jpg/i;
+const SKIP_EMAIL = /noreply|no-reply|donotreply|example\.com|sentry\.|wix\.|wordpress\.|schema\.|googleapis|@2x|\.png|\.jpg|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@|hola@hola\.|contact@contact\./i;
 
 function fetchHtml(pageUrl) {
   return new Promise((resolve) => {
@@ -286,9 +305,22 @@ module.exports = async function handler(req, res) {
 
   try {
     // Cargar config
-    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_minimo_busqueda,vendedor_fuente_auto)');
+    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_minimo_busqueda,vendedor_fuente_auto,vendedor_activo,vendedor_hora_prospecta)');
     const cfgMap  = {};
     cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
+
+    // Schedule guard — skip unless ?force=1
+    const force = (req.query || {}).force === '1';
+    if (!force) {
+      const activo = cfgMap.vendedor_activo || 'true';
+      // 'solo_prospecta' sigue corriendo — solo se pausan los emails
+      if (activo === 'false') return res.json({ ok: true, skipped: true, reason: 'sistema pausado', summary });
+      const horaProspecta = parseInt(cfgMap.vendedor_hora_prospecta || '21', 10);
+      const horaAR = ((new Date().getUTCHours() - 3) + 24) % 24;
+      if (horaAR !== horaProspecta) {
+        return res.json({ ok: true, skipped: true, reason: `fuera de horario (son las ${horaAR}:00 AR, configurado ${horaProspecta}:00)`, summary });
+      }
+    }
 
     const cantidad        = parseInt(cfgMap.vendedor_cantidad_auto    || '50',  10);
     const minimo          = parseInt(cfgMap.vendedor_minimo_auto      || '10',  10);
@@ -354,11 +386,14 @@ module.exports = async function handler(req, res) {
             website:         place.website || '',
             rubro:           rubro,
             localidad:       provincia,
+            notas:           buildNotas(place.rating, place.reviews, place.address),
+            ia_score:        calcScore(email, place.website, place.rating, place.reviews, place.phone),
             origen:          'auto_prospecta',
             estado:          'nuevo',
             ia_contactado:   false,
             ia_followup_count: 0,
             ia_reply:        false,
+            ia_wa_enviado:   false,
             created_at:      new Date().toISOString(),
             updated_at:      new Date().toISOString(),
           });

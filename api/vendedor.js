@@ -166,7 +166,7 @@ async function claudeChat(systemPrompt, userMsg) {
 }
 
 async function getConfig() {
-  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_minimo_busqueda,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_reply_modo,vendedor_reply_max,vendedor_fuente_auto)');
+  const rows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_rubro_auto,vendedor_provincias_auto,vendedor_cantidad_auto,vendedor_minimo_auto,vendedor_minimo_busqueda,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_reply_modo,vendedor_reply_max,vendedor_fuente_auto,vendedor_activo,vendedor_hora_envio,vendedor_dias_envio,vendedor_hora_prospecta,vendedor_delay_min,vendedor_delay_max,vendedor_max_followups,vendedor_calendly,vendedor_wa_greenapi_id,vendedor_wa_greenapi_token,vendedor_wa_dias)');
   const map = {};
   rows.forEach(r => { map[r.key] = r.value; });
   return {
@@ -187,6 +187,17 @@ async function getConfig() {
     reply_modo:        map.vendedor_reply_modo        || 'draft',
     reply_max:         parseInt(map.vendedor_reply_max || '5', 10),
     fuente_auto:       map.vendedor_fuente_auto       || 'google',
+    activo:            map.vendedor_activo || 'true',
+    hora_envio:        parseInt(map.vendedor_hora_envio    || '12', 10),
+    dias_envio:        map.vendedor_dias_envio             || '1,2,3,4,5',
+    hora_prospecta:    parseInt(map.vendedor_hora_prospecta || '21', 10),
+    delay_min:         parseInt(map.vendedor_delay_min      || '3',  10),
+    delay_max:         parseInt(map.vendedor_delay_max      || '8',  10),
+    max_followups:     parseInt(map.vendedor_max_followups  || '2',  10),
+    calendly:          map.vendedor_calendly                || '',
+    wa_greenapi_id:    map.vendedor_wa_greenapi_id          || '',
+    wa_greenapi_token: map.vendedor_wa_greenapi_token       || '',
+    wa_dias:           parseInt(map.vendedor_wa_dias        || '4',  10),
   };
 }
 
@@ -194,31 +205,51 @@ function buildFirma(cfg) {
   const lines = ['--'];
   if (cfg.nombre_vendedor) lines.push(cfg.nombre_vendedor);
   lines.push(cfg.razon_social || '');
-  if (cfg.whatsapp) lines.push(`💬 WhatsApp: https://wa.me/${cfg.whatsapp}`);
-  if (cfg.website)  lines.push(`🌐 ${cfg.website}`);
+  if (cfg.whatsapp) lines.push(`WhatsApp: https://wa.me/${cfg.whatsapp}`);
+  if (cfg.calendly) lines.push(`Agenda una llamada: ${cfg.calendly}`);
+  if (cfg.website)  lines.push(cfg.website);
   return lines.join('\n');
 }
 
+function getRubroContext(rubro) {
+  const r = (rubro || '').toLowerCase();
+  if (/ferreter/.test(r))                       return 'Miles de referencias de stock, pedidos a proveedores, clientes de cuenta corriente';
+  if (/distribui/.test(r))                      return 'Volumen de remitos, facturas y cuentas corrientes de clientes mayoristas';
+  if (/restaurant|pizzer|hamburgue|bar|caf|gastro|bodeg|parrilla|delivery/.test(r)) return 'Control de insumos, merma, costos de recetas y cierre de caja diario';
+  if (/farmacia/.test(r))                       return 'Vencimientos, stock de medicamentos y trazabilidad';
+  if (/ropa|indument|boutique|calzado|zapat|lencer/.test(r)) return 'Tallas, colores, temporadas y cuentas corrientes de clientes';
+  if (/supermercado|almac|despensa|kiosk/.test(r)) return 'Stock de miles de ítems, proveedores y cajas';
+  if (/electr/.test(r))                         return 'Stock técnico, garantías, reparaciones y órdenes de trabajo';
+  if (/construc|corralo|mader|pintur|sanitar|plomer|cerrajer/.test(r)) return 'Presupuestos de obra, materiales y clientes de cuenta';
+  if (/optic/.test(r))                          return 'Stock de marcos, lentes, pedidos a laboratorio';
+  if (/carnicer|fiambr/.test(r))               return 'Control de cortes, peso y ventas por mostrador';
+  if (/panader|confiter|pasteler/.test(r))      return 'Producción diaria, insumos y control de turnos';
+  if (/veterina/.test(r))                       return 'Fichas de pacientes, stock de medicamentos y turnos';
+  if (/taller|mecanic|automotor/.test(r))       return 'Órdenes de trabajo, repuestos y historial de vehículos';
+  if (/limp|higiene/.test(r))                   return 'Rutinas, stock de productos e historial de clientes';
+  if (/mayorist|cash and carry/.test(r))        return 'Volumen, listas de precio por cliente y facturación masiva';
+  return 'Facturación electrónica AFIP, stock y cuentas corrientes';
+}
+
 async function generarEmail(cfg, prospecto, esFollowup, emailAnterior) {
-  const websiteLinea = cfg.website ? `\n${cfg.website}` : '';
   const ejemploLimpio = cfg.mensaje_ejemplo || '';
   const esEjemploSpam = (ejemploLimpio.match(/[📦🛒💳🧾📊📱✅❌🎯🦏👉]/gu) || []).length > 2
     || (ejemploLimpio.match(/^[•\-\*]/gm) || []).length > 2;
   const estiloRef = (!esEjemploSpam && ejemploLimpio.length > 20)
-    ? `\n\nTONO DE REFERENCIA (solo el tono, NO la estructura ni el contenido):\n"""\n${ejemploLimpio.slice(0, 300)}\n"""`
+    ? `\n\nTONO DE REFERENCIA (solo el tono):\n"""\n${ejemploLimpio.slice(0, 300)}\n"""`
     : '';
 
-  const calcLink = 'https://rhinosapp.vercel.app/#calculadora';
-  const waLink   = cfg.whatsapp ? `https://wa.me/${cfg.whatsapp}` : null;
+  const calcLink = cfg.calendly || 'https://rhinosapp.vercel.app/#calculadora';
   const firma    = buildFirma(cfg);
+  const rubroCtx = getRubroContext(prospecto.rubro);
 
   const system = esFollowup
-    ? `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}". Ya le escribiste a esta empresa y no respondió. Escribí un segundo contacto muy breve en español rioplatense.\n\nREGLAS ANTI-SPAM (críticas):\n- Máximo 45 palabras en el cuerpo (SIN firma)\n- Sin emojis en el asunto ni en el cuerpo\n- Sin "hacemos seguimiento", "te quería recordar", "perdiste mi email"\n- Sin listas ni bullets\n- Ángulo diferente: hacé UNA pregunta sobre su negocio, o mencioná un resultado concreto\n- Un solo link integrado en el texto: ${calcLink}\n- Firma exacta sin modificar:\n${firma}\n\nDevolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo incluye texto + firma separados por \\n\\n. Texto plano.${estiloRef}`
-    : `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}" — sistema de gestión para PyMEs argentinas (${(cfg.servicios || '').slice(0, 120).split('\n')[0]}). Vas a escribirle a una empresa.\n\nOBJETIVO: Un email que parezca escrito a mano, pase filtros anti-spam y que el dueño quiera leer.\n\nREGLAS DE ENTREGABILIDAD (no las rompas):\n- Máximo 70 palabras en el cuerpo (SIN firma)\n- NINGÚN emoji en el asunto\n- NINGÚN bullet point ni lista en el cuerpo\n- NINGUNA palabra spam: "oferta", "suscripción", "precio", "calculá", "ahorrar", "gratis", "garantía"\n- Un SOLO link externo, integrado en una oración natural (no en línea sola)\n- Sin signos de exclamación en el asunto\n- Sin "espero que estén bien", sin "me dirijo a usted", sin "vimos que manejan"\n- Tono: directo y natural, persona hablándole a persona\n\nESTRUCTURA DEL CUERPO:\nFrase 1: algo específico de su rubro que muestre que sabés de su actividad\nFrase 2: qué hace "${cfg.razon_social}" y cómo puede servirles concretamente\nFrase 3: invitación simple con el link: ${calcLink}\nFirma exacta sin modificar:\n${firma}\n\nASUNTO — 3 variantes, NINGUNA con emoji ni signos de exclamación:\nasunto_a: nombre de la empresa + tema específico\nasunto_b: pregunta directa sobre su negocio\nasunto_c: súper corto, 3-4 palabras máximo\n\nDevolvé SOLO JSON: {"asunto_a":"...","asunto_b":"...","asunto_c":"...","cuerpo":"..."}. Cuerpo incluye texto + \\n\\n + firma. Texto plano, sin markdown.${estiloRef}`;
+    ? `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}". Ya le escribiste a esta empresa y no respondió. Escribí un segundo contacto muy breve en español rioplatense.\n\nREGLAS ANTI-SPAM:\n- Máximo 45 palabras en el cuerpo (SIN firma)\n- Sin emojis en el asunto ni en el cuerpo\n- Sin "hacemos seguimiento", "te quería recordar"\n- Sin listas ni bullets\n- Ángulo diferente: UNA pregunta sobre su negocio, o un resultado concreto de otro cliente del mismo rubro\n- Un solo link integrado en el texto: ${calcLink}\n- Firma exacta sin modificar:\n${firma}\n\nDevolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo incluye texto + firma separados por \\n\\n. Texto plano.${estiloRef}`
+    : `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}" — sistema de gestión para PyMEs argentinas (${(cfg.servicios || '').slice(0, 120).split('\n')[0]}). Vas a escribirle a una empresa.\n\nOBJETIVO: Email que parezca escrito a mano por alguien que investigó el negocio. El dueño tiene que querer responder.\n\nPERSONALIZACIÓN (MUY IMPORTANTE):\n- Si recibís "Datos reales" (rating Maps, reseñas), usálo en Frase 1 de forma natural.\n- El "dolor típico" del rubro conectalo con la solución en Frase 2.\n\nREGLAS DE ENTREGABILIDAD:\n- Máximo 70 palabras en el cuerpo (SIN firma)\n- NINGÚN emoji en el asunto\n- NINGÚN bullet point ni lista en el cuerpo\n- NINGUNA palabra spam: "oferta", "suscripción", "precio", "calculá", "ahorrar", "gratis", "garantía"\n- Un SOLO link externo, integrado en una oración natural\n- Sin signos de exclamación en el asunto\n- Sin "espero que estén bien", sin "me dirijo a usted"\n- Tono: directo y natural, persona hablándole a persona\n\nESTRUCTURA:\nFrase 1: dato concreto del negocio (rating Maps o rubro/localidad que muestre que lo conocés)\nFrase 2: dolor típico de su industria + cómo "${cfg.razon_social}" lo resuelve\nFrase 3: invitación con el link: ${calcLink}\nFirma exacta sin modificar:\n${firma}\n\nASUNTO — 3 variantes, NINGUNA con emoji ni exclamación:\nasunto_a: empresa + tema específico del rubro (ej: "Du Graty — control de stock")\nasunto_b: pregunta sobre un dolor concreto de su industria\nasunto_c: súper corto, 3-4 palabras, menciona la empresa\n\nDevolvé SOLO JSON: {"asunto_a":"...","asunto_b":"...","asunto_c":"...","cuerpo":"..."}. Cuerpo = texto + \\n\\n + firma. Texto plano.${estiloRef}`;
 
   const userMsg = esFollowup
-    ? `Empresa: ${prospecto.empresa}\nRubro: ${prospecto.rubro || ''}\nLocalidad: ${prospecto.localidad || ''}\nEmail anterior — Asunto: ${emailAnterior.asunto}\nCuerpo: ${emailAnterior.cuerpo}`
-    : `Empresa: ${prospecto.empresa}\nContacto: ${prospecto.nombre_contacto || ''}\nRubro: ${prospecto.rubro || ''}\nLocalidad: ${prospecto.localidad || ''}`;
+    ? `Empresa: ${prospecto.empresa}\nRubro: ${prospecto.rubro || ''} (dolor típico: ${rubroCtx})\nLocalidad: ${prospecto.localidad || ''}\nEmail anterior — Asunto: ${emailAnterior.asunto}\nCuerpo: ${emailAnterior.cuerpo}`
+    : `Empresa: ${prospecto.empresa}\nContacto: ${prospecto.nombre_contacto || ''}\nRubro: ${prospecto.rubro || ''} (dolor típico: ${rubroCtx})\nLocalidad: ${prospecto.localidad || ''}${prospecto.notas ? '\nDatos reales: ' + prospecto.notas : ''}`;
 
   const raw = await claudeChat(system, userMsg);
   const match = raw.match(/\{[\s\S]*\}/);
@@ -259,6 +290,9 @@ module.exports = async function handler(req, res) {
         'vendedor_rubro_auto', 'vendedor_provincias_auto', 'vendedor_cantidad_auto',
         'vendedor_minimo_auto', 'vendedor_minimo_busqueda', 'vendedor_whatsapp',
         'vendedor_nombre_vendedor', 'vendedor_reply_modo', 'vendedor_reply_max', 'vendedor_fuente_auto',
+        'vendedor_activo', 'vendedor_hora_envio', 'vendedor_dias_envio', 'vendedor_hora_prospecta',
+        'vendedor_delay_min', 'vendedor_delay_max', 'vendedor_max_followups',
+        'vendedor_calendly', 'vendedor_wa_greenapi_id', 'vendedor_wa_greenapi_token', 'vendedor_wa_dias',
       ];
       const rows = keys.filter(k => body[k] !== undefined).map(k => ({ key: k, value: String(body[k]), updated_at: new Date().toISOString() }));
       if (rows.length) await sbReq('POST', 'rhinos_config', rows);
@@ -280,7 +314,7 @@ module.exports = async function handler(req, res) {
 
     // ── get_stats ────────────────────────────────────────────────────
     if (action === 'get_stats') {
-      const rows = await sbGet('rhinos_prospectos?select=estado,ia_contactado,ia_reply,ia_abierto,ia_subject_variant');
+      const rows = await sbGet('rhinos_prospectos?select=estado,ia_contactado,ia_reply,ia_abierto,ia_subject_variant,ia_wa_enviado,ia_score');
       const abiertos = rows.filter(r => r.ia_abierto);
       return res.json({ ok: true, stats: {
         total:       rows.length,
@@ -291,6 +325,8 @@ module.exports = async function handler(req, res) {
         frios:       rows.filter(r => r.estado === 'frio').length,
         rebotados:   rows.filter(r => r.estado === 'invalido').length,
         abiertos:    abiertos.length,
+        wa_enviados: rows.filter(r => r.ia_wa_enviado).length,
+        score_alto:  rows.filter(r => (r.ia_score || 0) >= 60).length,
         ab_stats: {
           a: rows.filter(r => r.ia_subject_variant === 'a').length,
           b: rows.filter(r => r.ia_subject_variant === 'b').length,
@@ -382,14 +418,16 @@ module.exports = async function handler(req, res) {
     if (action === 'run_followups') {
       const cfg = await getConfig();
       const cutoff = new Date(Date.now() - cfg.followup_dias * 86400000).toISOString();
+      const maxFu = cfg.max_followups || 2;
       const pendientes = await sbGet(
-        `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.2&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=not.in.(frio,invalido)&order=ia_fecha_contacto.asc&limit=30`
+        `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.${maxFu}&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=not.in.(frio,invalido)&order=ia_fecha_contacto.asc&limit=30`
       );
 
       if (!pendientes.length) return res.json({ ok: true, procesados: 0, results: [] });
 
       const token = await getGmailToken();
       const results = [];
+      const delayMs = (cfg.delay_min || 3) * 1000;
 
       for (const p of pendientes) {
         try {
@@ -406,7 +444,7 @@ module.exports = async function handler(req, res) {
           const email = await generarEmail(cfg, p, true, { asunto: p.ia_email_asunto, cuerpo: p.ia_email_body });
           const sent = await sendGmail(token, p.email, email.asunto, email.cuerpo);
           const newCount = (p.ia_followup_count || 0) + 1;
-          const nuevoEstado = newCount >= 2 ? 'frio' : 'follow_up_' + newCount;
+          const nuevoEstado = newCount >= maxFu ? 'frio' : 'follow_up_' + newCount;
 
           await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
             ia_followup_count: newCount, ia_followup_fecha: now,
@@ -417,7 +455,7 @@ module.exports = async function handler(req, res) {
         } catch(e) {
           results.push({ empresa: p.empresa, accion: 'error', error: e.message });
         }
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, delayMs));
       }
       return res.json({ ok: true, procesados: results.length, results });
     }

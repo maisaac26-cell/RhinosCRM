@@ -3304,6 +3304,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             <input id="via-cfg-whatsapp" class="inp" placeholder="Ej: 5491156781234"/></div>
           <div class="field"><label>Website / link a incluir en el email</label>
             <input id="via-cfg-website" class="inp" placeholder="rhinosapp.vercel.app"/></div>
+          <div class="field"><label>Link de Calendly / demo <span style="color:var(--text3);font-weight:400">(aparece en la firma del email)</span></label>
+            <input id="via-cfg-calendly" class="inp" placeholder="https://calendly.com/tuusuario/30min"/></div>
           <div class="field" style="grid-column:span 2"><label>Mensaje de referencia de estilo <span style="color:var(--text3);font-weight:400">(pegá un ejemplo de WhatsApp o email tuyo — la IA lo imita)</span></label>
             <textarea id="via-cfg-mensaje" class="inp" rows="6" placeholder="Holaa! Te cuento un poco de..."></textarea></div>
         </div>
@@ -3327,6 +3329,84 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
                 <option value="mercadolibre">Mercado Libre (tiendas oficiales)</option>
                 <option value="ambos">Ambos — máxima cobertura</option>
               </select></div>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+          <div class="card-title" style="margin-bottom:12px">⏰ Automatización y horarios</div>
+          <div class="grid2">
+            <div class="field" style="grid-column:span 2">
+              <label>Estado del sistema</label>
+              <select id="via-cfg-activo" class="inp">
+                <option value="true">✅ Activo — prospecta y envía emails automáticamente</option>
+                <option value="solo_prospecta">🔍 Solo prospección — busca empresas pero NO envía emails</option>
+                <option value="false">⏸ Pausado — no prospecta ni envía nada</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Hora de envío de emails <span style="color:var(--text3);font-weight:400">(hora Argentina)</span></label>
+              <select id="via-cfg-hora-envio" class="inp">
+                <option value="6">6:00 AM</option><option value="7">7:00 AM</option><option value="8">8:00 AM</option>
+                <option value="9">9:00 AM</option><option value="10">10:00 AM</option><option value="11">11:00 AM</option>
+                <option value="12">12:00 PM</option><option value="13">1:00 PM</option><option value="14">2:00 PM</option>
+                <option value="15">3:00 PM</option><option value="16">4:00 PM</option><option value="17">5:00 PM</option>
+                <option value="18">6:00 PM</option><option value="19">7:00 PM</option><option value="20">8:00 PM</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Hora de búsqueda de prospectos <span style="color:var(--text3);font-weight:400">(hora Argentina)</span></label>
+              <select id="via-cfg-hora-prospecta" class="inp">
+                <option value="6">6:00 AM</option><option value="7">7:00 AM</option><option value="8">8:00 AM</option>
+                <option value="9">9:00 AM</option><option value="10">10:00 AM</option><option value="11">11:00 AM</option>
+                <option value="12">12:00 PM</option><option value="13">1:00 PM</option><option value="14">2:00 PM</option>
+                <option value="15">3:00 PM</option><option value="16">4:00 PM</option><option value="17">5:00 PM</option>
+                <option value="18">6:00 PM</option><option value="19">7:00 PM</option><option value="20">8:00 PM</option>
+                <option value="21">9:00 PM</option><option value="22">10:00 PM</option><option value="23">11:00 PM</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Días de envío</label>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="via-cfg-dia-1" value="1" checked> Lun</label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="via-cfg-dia-2" value="2" checked> Mar</label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="via-cfg-dia-3" value="3" checked> Mié</label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="via-cfg-dia-4" value="4" checked> Jue</label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="via-cfg-dia-5" value="5" checked> Vie</label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="via-cfg-dia-6" value="6"> Sáb</label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" id="via-cfg-dia-7" value="7"> Dom</label>
+              </div>
+            </div>
+            <div class="field">
+              <label>Delay mínimo entre emails <span style="color:var(--text3);font-weight:400">(segundos)</span></label>
+              <input id="via-cfg-delay-min" class="inp" type="number" min="1" max="60" placeholder="3"/>
+            </div>
+            <div class="field">
+              <label>Delay máximo entre emails <span style="color:var(--text3);font-weight:400">(segundos)</span></label>
+              <input id="via-cfg-delay-max" class="inp" type="number" min="1" max="120" placeholder="8"/>
+            </div>
+            <div class="field">
+              <label>Máximo de follow-ups por prospecto</label>
+              <input id="via-cfg-max-followups" class="inp" type="number" min="1" max="5" placeholder="2"/>
+            </div>
+          </div>
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+            <div style="font-size:13px;font-weight:500;margin-bottom:10px">WhatsApp (Green API) <span style="font-size:11px;color:var(--text3);font-weight:400">— follow-up automático después del email</span></div>
+            <div class="grid2">
+              <div class="field"><label>Instance ID <span style="color:var(--text3);font-weight:400">(de greenapi.com)</span></label>
+                <input id="via-cfg-wa-id" class="inp" placeholder="1234567890"/></div>
+              <div class="field"><label>API Token</label>
+                <input id="via-cfg-wa-token" class="inp" type="password" placeholder="tu-token-aqui"/></div>
+              <div class="field"><label>Días después del email para mandar WA</label>
+                <input id="via-cfg-wa-dias" class="inp" type="number" min="1" max="14" placeholder="4"/></div>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:6px">Setup: creá cuenta en greenapi.com (gratis hasta 200 msg/mes) → creá instancia → escaneá el QR con tu WhatsApp → pegá el ID y token acá.</div>
+          </div>
+
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn" id="btn-run-auto" style="font-size:13px;padding:6px 14px">▶ Enviar emails ahora</button>
+            <button class="btn" id="btn-run-prospecta" style="font-size:13px;padding:6px 14px">▶ Buscar prospectos ahora</button>
+            <button class="btn" id="btn-run-whatsapp" style="font-size:13px;padding:6px 14px">▶ Enviar WA ahora</button>
+            <span id="via-run-status" style="font-size:12px;color:var(--text3)"></span>
           </div>
         </div>
 
@@ -16655,7 +16735,7 @@ async function loadViaProspectos() {
             const fecha = p.ia_fecha_contacto ? new Date(p.ia_fecha_contacto).toLocaleDateString('es-AR') : '—';
             const followupFecha = p.ia_followup_fecha ? ` · FU: ${new Date(p.ia_followup_fecha).toLocaleDateString('es-AR')}` : '';
             return `<tr style="border-bottom:1px solid var(--border2)" data-pid="${p.id}">
-              <td style="padding:8px 10px;font-weight:500;color:var(--text)">${p.empresa}<br><span style="font-size:11px;color:var(--text3)">${p.email}</span></td>
+              <td style="padding:8px 10px;font-weight:500;color:var(--text)">${p.empresa}${p.ia_score != null ? `<span title="Score de calidad" style="margin-left:6px;font-size:10px;font-weight:700;padding:1px 5px;border-radius:5px;background:${p.ia_score>=60?'rgba(34,197,94,0.15)':p.ia_score>=30?'rgba(245,158,11,0.15)':'rgba(239,68,68,0.1)'};color:${p.ia_score>=60?'var(--green)':p.ia_score>=30?'var(--amber)':'var(--red)'}">${p.ia_score}</span>` : ''}<br><span style="font-size:11px;color:var(--text3)">${p.email}</span></td>
               <td style="padding:8px 6px;color:var(--text2)">${p.rubro || '—'}</td>
               <td style="padding:8px 6px;color:var(--text2)">${p.localidad || '—'}</td>
               <td style="padding:8px 6px">
@@ -16664,6 +16744,7 @@ async function loadViaProspectos() {
                 ${p.ia_pausado ? '<span style="margin-left:4px;font-size:10px;background:rgba(245,158,11,0.15);color:var(--amber);padding:1px 5px;border-radius:6px">⏸ Pausada</span>' : ''}
                 ${p.ia_draft_id ? '<span style="margin-left:4px;font-size:10px;background:rgba(16,185,129,0.15);color:#34d399;padding:1px 5px;border-radius:6px">📋 Borrador</span>' : ''}
                 ${p.ia_abierto ? '<span style="margin-left:4px;font-size:10px;background:rgba(34,197,94,0.1);color:var(--green);padding:1px 5px;border-radius:6px">✉️ Abierto</span>' : ''}
+                ${p.ia_wa_enviado ? '<span style="margin-left:4px;font-size:10px;background:rgba(34,197,94,0.12);color:var(--green);padding:1px 5px;border-radius:6px">💬 WA</span>' : ''}
                 ${p.ia_subject_variant ? `<span style="margin-left:4px;font-size:9px;background:rgba(0,229,204,0.08);color:var(--cyan);padding:1px 4px;border-radius:4px;font-weight:700">${p.ia_subject_variant.toUpperCase()}</span>` : ''}
               </td>
               <td style="padding:8px 6px;color:var(--text3)">${fecha}${followupFecha}</td>
@@ -16772,12 +16853,28 @@ async function loadViaCfg() {
     if (config.reply_max)       document.getElementById('via-cfg-reply-max').value = config.reply_max;
     if (config.website)         document.getElementById('via-cfg-website').value = config.website;
     if (config.mensaje_ejemplo) document.getElementById('via-cfg-mensaje').value = config.mensaje_ejemplo;
+    if (config.calendly)        document.getElementById('via-cfg-calendly').value = config.calendly;
+    if (config.wa_greenapi_id)    document.getElementById('via-cfg-wa-id').value = config.wa_greenapi_id;
+    if (config.wa_greenapi_token) document.getElementById('via-cfg-wa-token').value = config.wa_greenapi_token;
+    if (config.wa_dias)           document.getElementById('via-cfg-wa-dias').value = config.wa_dias;
     if (config.rubro_auto)      document.getElementById('via-cfg-rubro-auto').value = config.rubro_auto;
     if (config.provincias_auto) document.getElementById('via-cfg-provincias-auto').value = config.provincias_auto;
     if (config.cantidad_auto)   document.getElementById('via-cfg-cantidad-auto').value = config.cantidad_auto;
     if (config.minimo_auto)      document.getElementById('via-cfg-minimo-auto').value = config.minimo_auto;
     if (config.minimo_busqueda) document.getElementById('via-cfg-minimo-busqueda').value = config.minimo_busqueda;
     if (config.fuente_auto)     document.getElementById('via-cfg-fuente-auto').value = config.fuente_auto;
+    // Automatización
+    document.getElementById('via-cfg-activo').value = config.activo || 'true';
+    document.getElementById('via-cfg-hora-envio').value = String(config.hora_envio ?? 12);
+    document.getElementById('via-cfg-hora-prospecta').value = String(config.hora_prospecta ?? 21);
+    document.getElementById('via-cfg-delay-min').value = config.delay_min ?? 3;
+    document.getElementById('via-cfg-delay-max').value = config.delay_max ?? 8;
+    document.getElementById('via-cfg-max-followups').value = config.max_followups ?? 2;
+    const diasActivos = (config.dias_envio || '1,2,3,4,5').split(',').map(Number);
+    [1,2,3,4,5,6,7].forEach(d => {
+      const cb = document.getElementById('via-cfg-dia-' + d);
+      if (cb) cb.checked = diasActivos.includes(d);
+    });
   } catch(e) { console.warn('via cfg:', e.message); }
 }
 
@@ -16872,11 +16969,62 @@ document.getElementById('btn-via-save-cfg')?.addEventListener('click', async () 
       vendedor_minimo_auto:     document.getElementById('via-cfg-minimo-auto').value || '10',
       vendedor_minimo_busqueda: document.getElementById('via-cfg-minimo-busqueda').value || '2',
       vendedor_fuente_auto:     document.getElementById('via-cfg-fuente-auto').value || 'google',
+      // Automatización
+      vendedor_activo:          document.getElementById('via-cfg-activo').value,
+      vendedor_hora_envio:      document.getElementById('via-cfg-hora-envio').value || '12',
+      vendedor_hora_prospecta:  document.getElementById('via-cfg-hora-prospecta').value || '21',
+      vendedor_delay_min:       document.getElementById('via-cfg-delay-min').value || '3',
+      vendedor_delay_max:       document.getElementById('via-cfg-delay-max').value || '8',
+      vendedor_max_followups:   document.getElementById('via-cfg-max-followups').value || '2',
+      vendedor_dias_envio:         [1,2,3,4,5,6,7].filter(d => document.getElementById('via-cfg-dia-'+d)?.checked).join(',') || '1,2,3,4,5',
+      vendedor_calendly:           document.getElementById('via-cfg-calendly').value.trim(),
+      vendedor_wa_greenapi_id:     document.getElementById('via-cfg-wa-id').value.trim(),
+      vendedor_wa_greenapi_token:  document.getElementById('via-cfg-wa-token').value.trim(),
+      vendedor_wa_dias:            document.getElementById('via-cfg-wa-dias').value || '4',
     });
     const ok = document.getElementById('via-cfg-ok');
     if (ok) { ok.style.display = 'inline'; setTimeout(() => { ok.style.display = 'none'; }, 2500); }
   } catch(e) { showToast('Error guardando config: ' + e.message); }
   btn.disabled = false;
+});
+
+// Run-now buttons
+async function viaRunNow(target) {
+  const btnIds = { auto: 'btn-run-auto', prospecta: 'btn-run-prospecta', whatsapp: 'btn-run-whatsapp' };
+  const labels = { auto: '▶ Enviar emails ahora', prospecta: '▶ Buscar prospectos ahora', whatsapp: '▶ Enviar WA ahora' };
+  const endpoints = { auto: '/api/vendedor-auto', prospecta: '/api/vendedor-prospecta', whatsapp: '/api/vendedor-whatsapp' };
+  const btn = document.getElementById(btnIds[target]);
+  const status = document.getElementById('via-run-status');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Ejecutando...'; }
+  if (status) status.textContent = '';
+  try {
+    const r = await fetch(endpoints[target] + '?force=1', { method: 'POST' });
+    const data = await r.json();
+    if (data.skipped) {
+      if (status) status.textContent = data.reason || 'Sin cambios';
+    } else if (data.ok && data.summary) {
+      const s = data.summary;
+      let msg;
+      if (target === 'whatsapp') msg = `✓ WA enviados: ${s.enviados||0} | Sin teléfono: ${s.sin_telefono||0}`;
+      else msg = `✓ Enviados: ${s.iniciales_enviados||0} | Follow-ups: ${s.followup_enviados||0} | Rebotes: ${s.rebotes||0}`;
+      if (status) status.textContent = msg;
+      showToast(msg);
+    } else if (data.ok) {
+      const msg = `✓ ${target} completado`;
+      if (status) status.textContent = msg;
+      showToast(msg);
+    } else {
+      if (status) status.textContent = 'Error: ' + (data.error || 'desconocido');
+    }
+  } catch(e) {
+    if (status) status.textContent = target === 'prospecta' ? 'Iniciado en segundo plano (puede tardar minutos)' : 'Error: ' + e.message;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = labels[target]; }
+}
+document.addEventListener('click', e => {
+  if (e.target.id === 'btn-run-auto')       viaRunNow('auto');
+  if (e.target.id === 'btn-run-prospecta')  viaRunNow('prospecta');
+  if (e.target.id === 'btn-run-whatsapp')   viaRunNow('whatsapp');
 });
 
 // Nav click
