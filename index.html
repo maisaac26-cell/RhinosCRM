@@ -3248,6 +3248,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div class="metric-card"><div class="m-label">WA enviados</div><div class="m-val" style="color:#34d399" id="via-stat-wa">—</div><div class="m-sub" id="via-stat-wa-sub" style="font-size:10px;color:var(--text3)"></div></div>
     </div>
 
+    <!-- Funnel de conversión -->
+    <div id="via-funnel" style="margin-bottom:16px;display:none"></div>
+
     <!-- Acciones rápidas -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
       <button class="btn" id="btn-via-prospectar" style="background:rgba(16,185,129,0.15);color:#34d399;border-color:rgba(16,185,129,0.3);gap:6px" title="Busca nuevos prospectos con email en Google Places y los agrega al pipeline">🔍 Prospectar ahora</button>
@@ -3269,12 +3272,18 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <!-- Tabs: Pipeline / Config -->
     <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:0">
       <button class="tab-btn active" data-via-tab="pipeline" style="font-size:12px">📋 Pipeline</button>
+      <button class="tab-btn" data-via-tab="metricas" style="font-size:12px">📊 Métricas</button>
       <button class="tab-btn" data-via-tab="config" style="font-size:12px">⚙️ Configuración</button>
     </div>
 
     <!-- Tab Pipeline -->
     <div id="via-tab-pipeline">
       <div id="via-prospectos-list"><div class="empty">Cargando...</div></div>
+    </div>
+
+    <!-- Tab Métricas -->
+    <div id="via-tab-metricas" style="display:none">
+      <div id="via-daily-stats"><div class="loader" style="margin:20px auto"></div></div>
     </div>
 
     <!-- Tab Config -->
@@ -16762,20 +16771,52 @@ async function loadViaStats() {
     const waStat = document.getElementById('via-stat-wa');
     if (waStat) waStat.textContent = stats.wa_enviados ?? '—';
     const waSub = document.getElementById('via-stat-wa-sub');
-    if (waSub && stats.ab_stats) waSub.textContent = `A:${stats.ab_stats.a} B:${stats.ab_stats.b} C:${stats.ab_stats.c}`;
+    if (waSub && stats.ab_stats) {
+      const winner = stats.ab_winner;
+      waSub.textContent = `A:${stats.ab_stats.a} B:${stats.ab_stats.b} C:${stats.ab_stats.c}${winner ? ' · winner:' + winner.toUpperCase() : ''}`;
+    }
     const abEl = document.getElementById('via-stat-ab');
     if (abEl) abEl.textContent = stats.score_alto != null ? `⭐ ${stats.score_alto} score alto` : '';
+
+    // Funnel de conversión
+    const funnelEl = document.getElementById('via-funnel');
+    if (funnelEl && stats.contactados > 0) {
+      const steps = [
+        { label: 'En pipeline', val: stats.total,       color: 'var(--cyan)',    pct: 100 },
+        { label: 'Contactados', val: stats.contactados, color: '#818cf8',        pct: stats.total > 0 ? Math.round(stats.contactados/stats.total*100) : 0 },
+        { label: 'Abrieron',    val: stats.abiertos,    color: 'var(--amber)',   pct: stats.contactados > 0 ? Math.round(stats.abiertos/stats.contactados*100) : 0 },
+        { label: 'Respondieron',val: stats.replies,     color: 'var(--green)',   pct: stats.abiertos > 0 ? Math.round(stats.replies/stats.abiertos*100) : 0 },
+        { label: 'Leads CRM',   val: stats.leads || 0,  color: '#f472b6',       pct: stats.replies > 0 ? Math.round((stats.leads||0)/stats.replies*100) : 0 },
+      ];
+      funnelEl.style.display = '';
+      funnelEl.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;margin-bottom:10px">FUNNEL DE CONVERSIÓN</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${steps.map((s, i) => `
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:90px;font-size:11px;color:var(--text2);text-align:right;flex-shrink:0">${s.label}</div>
+              <div style="flex:1;background:var(--surface);border-radius:4px;height:18px;overflow:hidden">
+                <div style="height:100%;width:${Math.max(s.pct,2)}%;background:${s.color};opacity:.8;border-radius:4px;transition:width .4s;display:flex;align-items:center;padding:0 6px;box-sizing:border-box">
+                  ${s.val > 0 ? `<span style="font-size:10px;font-weight:700;color:#fff;white-space:nowrap">${s.val}</span>` : ''}
+                </div>
+              </div>
+              <div style="width:36px;font-size:10px;color:var(--text3);text-align:right;flex-shrink:0">${i === 0 ? '' : s.pct + '%'}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    }
   } catch(e) { console.warn('via stats:', e.message); }
 }
 
+let viaPage = 0;
 async function loadViaProspectos() {
   const list = document.getElementById('via-prospectos-list');
   if (!list) return;
   list.innerHTML = '<div class="loader" style="margin:20px auto"></div>';
   try {
     const estado = document.getElementById('via-filtro-estado')?.value || 'todos';
-    const { prospectos } = await callVendedorAPI('get_prospectos', { estado, limit: 100 });
-    if (!prospectos.length) { list.innerHTML = '<div class="empty">Sin prospectos en el pipeline todavía.<br><small>Buscá prospectos en la sección Prospectos y contactalos con el botón "🎯 Vendedor IA".</small></div>'; return; }
+    const { prospectos, hasMore } = await callVendedorAPI('get_prospectos', { estado, limit: 50, offset: viaPage * 50 });
+    if (!prospectos.length && viaPage === 0) { list.innerHTML = '<div class="empty">Sin prospectos en el pipeline todavía.<br><small>Buscá prospectos en la sección Prospectos y contactalos con el botón "🎯 Vendedor IA".</small></div>'; return; }
     list.innerHTML = `
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -16821,7 +16862,15 @@ async function loadViaProspectos() {
           }).join('')}
           </tbody>
         </table>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;align-items:center;margin-top:12px;padding:8px 0">
+        <button id="via-prev-page" class="btn btn-sm" style="font-size:12px" ${viaPage === 0 ? 'disabled' : ''}>◀ Anterior</button>
+        <span style="font-size:12px;color:var(--text3)">Página ${viaPage + 1}</span>
+        <button id="via-next-page" class="btn btn-sm" style="font-size:12px" ${!hasMore ? 'disabled' : ''}>Siguiente ▶</button>
       </div>`;
+
+    document.getElementById('via-prev-page')?.addEventListener('click', () => { viaPage--; loadViaProspectos(); });
+    document.getElementById('via-next-page')?.addEventListener('click', () => { viaPage++; loadViaProspectos(); });
 
     list.querySelectorAll('.via-btn-ver').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -16899,6 +16948,55 @@ async function loadViaProspectos() {
   }
 }
 
+async function loadViaMetrics() {
+  const el = document.getElementById('via-daily-stats');
+  if (!el) return;
+  el.innerHTML = '<div class="loader" style="margin:20px auto"></div>';
+  try {
+    const { daily } = await callVendedorAPI('get_daily_stats');
+    if (!daily || !daily.length) { el.innerHTML = '<div class="empty">Sin datos de envíos todavía — los datos aparecen cuando el sistema empiece a contactar prospectos.</div>'; return; }
+    const totalEnv = daily.reduce((s, d) => s + d.enviados, 0);
+    const totalAbi = daily.reduce((s, d) => s + d.abiertos, 0);
+    const totalResp = daily.reduce((s, d) => s + d.respondieron, 0);
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+        <div class="metric-card"><div class="m-label">Total enviados</div><div class="m-val cyan">${totalEnv}</div><div class="m-sub">últimos 30 días</div></div>
+        <div class="metric-card"><div class="m-label">Abrieron</div><div class="m-val" style="color:var(--amber)">${totalAbi}</div><div class="m-sub">${totalEnv > 0 ? Math.round(totalAbi/totalEnv*100) : 0}% apertura</div></div>
+        <div class="metric-card"><div class="m-label">Respondieron</div><div class="m-val" style="color:var(--green)">${totalResp}</div><div class="m-sub">${totalEnv > 0 ? Math.round(totalResp/totalEnv*100) : 0}% respuesta</div></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);color:var(--text3);text-align:left">
+              <th style="padding:8px 10px">Fecha</th>
+              <th style="padding:8px 8px;text-align:center">Enviados</th>
+              <th style="padding:8px 8px;text-align:center">Abrieron</th>
+              <th style="padding:8px 8px;text-align:center">% apertura</th>
+              <th style="padding:8px 8px;text-align:center">Respondieron</th>
+              <th style="padding:8px 8px;text-align:center">% respuesta</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${daily.map(d => {
+              const pctAbi  = d.enviados > 0 ? Math.round(d.abiertos     / d.enviados * 100) : 0;
+              const pctResp = d.enviados > 0 ? Math.round(d.respondieron / d.enviados * 100) : 0;
+              const [y, m, dd] = d.dia.split('-');
+              const fechaFmt = `${dd}/${m}/${y}`;
+              return `<tr style="border-bottom:1px solid var(--border2)">
+                <td style="padding:8px 10px;color:var(--text);font-weight:500">${fechaFmt}</td>
+                <td style="padding:8px 8px;text-align:center;font-weight:700;color:var(--cyan)">${d.enviados}</td>
+                <td style="padding:8px 8px;text-align:center;color:var(--amber)">${d.abiertos}</td>
+                <td style="padding:8px 8px;text-align:center;color:var(--amber)">${pctAbi > 0 ? pctAbi + '%' : '—'}</td>
+                <td style="padding:8px 8px;text-align:center;color:var(--green)">${d.respondieron}</td>
+                <td style="padding:8px 8px;text-align:center;color:var(--green)">${pctResp > 0 ? pctResp + '%' : '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(e) { el.innerHTML = `<div class="empty" style="color:var(--red)">Error cargando métricas: ${e.message}</div>`; }
+}
+
 async function loadViaCfg() {
   try {
     const { config } = await callVendedorAPI('get_config');
@@ -16944,12 +17042,14 @@ document.querySelectorAll('[data-via-tab]').forEach(btn => {
     document.querySelectorAll('[data-via-tab]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('via-tab-pipeline').style.display = btn.dataset.viaTab === 'pipeline' ? 'block' : 'none';
+    document.getElementById('via-tab-metricas').style.display = btn.dataset.viaTab === 'metricas' ? 'block' : 'none';
     document.getElementById('via-tab-config').style.display = btn.dataset.viaTab === 'config' ? 'block' : 'none';
+    if (btn.dataset.viaTab === 'metricas') loadViaMetrics();
   });
 });
 
 // Filtro estado
-document.getElementById('via-filtro-estado')?.addEventListener('change', loadViaProspectos);
+document.getElementById('via-filtro-estado')?.addEventListener('change', () => { viaPage = 0; loadViaProspectos(); });
 
 // Follow-ups
 // Prospectar ahora — dispara vendedor-prospecta
