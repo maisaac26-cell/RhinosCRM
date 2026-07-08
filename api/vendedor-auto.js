@@ -514,7 +514,8 @@ module.exports = async function handler(req, res) {
     }
 
     // ── SPAM SIGNAL CHECK: auto-pausa si tasa de rebote > 15% esta semana ─
-    try {
+    // Con force=1 (envío manual) se omite para no bloquear pruebas del usuario
+    if (!force) try {
       const semana = new Date(Date.now() - 7 * 86400000).toISOString();
       const [contactadosSemana, rebotesSemana] = await Promise.all([
         sbGet(`rhinos_prospectos?select=id&ia_contactado=eq.true&ia_fecha_contacto=gte.${encodeURIComponent(semana)}&limit=500`),
