@@ -163,6 +163,40 @@ async function claudeChat(system, userMsg) {
   });
 }
 
+// Clasifica la intención del reply usando Claude Haiku (rápido y barato)
+async function clasificarIntencion(texto) {
+  const payload = JSON.stringify({
+    model: 'claude-haiku-4-5-20251001', max_tokens: 60,
+    system: `Clasificá la intención de esta respuesta de un prospecto que recibió un email comercial.
+Devolvé SOLO una de estas palabras (nada más, sin explicación):
+- interesado: quiere saber más, responde positivamente, hace preguntas generales
+- pide_demo: quiere una demo, una llamada, una reunión, ver cómo funciona
+- pide_precio: pregunta específicamente el precio, costo, planes o suscripción
+- rechazado: no le interesa, ya tiene solución, pide que no lo contacten más
+- fuera_oficina: respuesta automática de vacaciones o fuera de oficina
+- empleado: quien responde no es el dueño/decisor, lo deriva al dueño
+- otras: cualquier otra cosa`,
+    messages: [{ role: 'user', content: (texto || '').slice(0, 600) }]
+  });
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
+        'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' }
+    }, (res) => {
+      let raw = ''; res.on('data', c => raw += c);
+      res.on('end', () => {
+        try {
+          const t = (JSON.parse(raw).content?.[0]?.text || '').trim().toLowerCase().replace(/[^a-z_]/g, '');
+          const VALID = ['interesado','pide_demo','pide_precio','rechazado','fuera_oficina','empleado','otras'];
+          resolve(VALID.includes(t) ? t : 'otras');
+        } catch { resolve('otras'); }
+      });
+    });
+    req.on('error', () => resolve('otras')); req.write(payload); req.end();
+  });
+}
+
 function buildFirma(cfg) {
   const lines = ['--'];
   if (cfg.nombre_vendedor) lines.push(cfg.nombre_vendedor);
@@ -172,26 +206,32 @@ function buildFirma(cfg) {
   return lines.join('\n');
 }
 
-async function generarRespuesta(cfg, prospecto, historial, ultimoReply) {
+async function generarRespuesta(cfg, prospecto, historial, ultimoReply, intencion) {
   const firma     = buildFirma(cfg);
-  const calcLink  = 'https://rhinosapp.vercel.app/#calculadora';
+  const calcLink  = cfg.calendly || 'https://rhinosapp.vercel.app/#calculadora';
   const estiloRef = cfg.mensaje_ejemplo
     ? `\n\nESTILO DE REFERENCIA (adoptá este tono, NO copies el texto):\n"""\n${cfg.mensaje_ejemplo.slice(0,500)}\n"""`
+    : '';
+
+  // Instrucción específica según intención detectada
+  const intentoCtx = intencion === 'pide_demo'
+    ? `\nINTENCIÓN DETECTADA — DEMO/LLAMADA: Proponé un horario concreto o mandá el link de Calendly directamente: ${cfg.calendly || 'contactanos por WhatsApp'}. Sé directo, no hagas preguntas adicionales.`
+    : intencion === 'pide_precio'
+    ? `\nINTENCIÓN DETECTADA — PRECIO: Explicá que es suscripción mensual en pesos, todo incluido. Invitá a ver la calculadora de ahorro o agendar una llamada de 15 min para un precio personalizado según sus módulos.`
+    : intencion === 'empleado'
+    ? `\nINTENCIÓN DETECTADA — EMPLEADO: Quien respondió no es el decisor. Pedí amablemente el nombre y email/WhatsApp del dueño o gerente para enviarle la información directamente.`
     : '';
 
   const system = `Sos ${cfg.nombre_vendedor || 'del equipo comercial'} de "${cfg.razon_social}". Estás respondiendo una conversación de ventas por email con ${prospecto.empresa} (${prospecto.rubro || 'empresa'}, ${prospecto.localidad || 'Argentina'}).
 
 PRODUCTO/SERVICIOS: ${cfg.servicios || ''}
-CALCULADORA DE AHORRO: ${calcLink}${cfg.website ? `\nWEBSITE: ${cfg.website}` : ''}
-
+LINK DE CONTACTO/DEMO: ${calcLink}${cfg.website ? `\nWEBSITE: ${cfg.website}` : ''}
+${intentoCtx}
 REGLAS ESTRICTAS:
 - Español argentino, tono humano, directo y cálido — no suenes a robot ni a template
 - Máximo 120 palabras en el cuerpo (sin contar firma)
-- Si preguntan precio → suscripción mensual en pesos, todo incluido, sin sorpresas
-- Si piden demo → proponé 30 min sin compromiso, pedí que elijan un horario
 - Si ya están muy interesados o piden hablar → pedí su número de WhatsApp para coordinar
-- Si la consulta es muy técnica o específica → "ya le paso tu consulta al equipo, te contactan directo"
-- NO menciones la calculadora si ya la mencionaron antes en el hilo
+- Si la consulta es muy técnica → "ya le paso tu consulta al equipo, te contactan directo"
 - Terminá siempre con esta firma exacta (copiala tal cual, no la modifiques):
 ${firma}
 
@@ -281,10 +321,43 @@ module.exports = async function handler(req, res) {
         // ¿Ya respondimos a este mensaje?
         if (p.ia_last_msg_id === latestProspectMsgId) { summary.sin_novedad++; continue; }
 
-        // Generar respuesta con Claude
+        // Clasificar intención del reply con Claude Haiku
+        const intencion = await clasificarIntencion(latestProspectText);
+        const now = new Date().toISOString();
+
+        // Guardar intención (no crítico si el campo no existe en DB)
+        sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, { ia_intencion: intencion, updated_at: now }).catch(() => {});
+
+        // Rechazado → marcar, pausar, no responder
+        if (intencion === 'rechazado') {
+          await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+            estado: 'rechazado', ia_pausado: true,
+            ia_last_msg_id: latestProspectMsgId,
+            notas: `🚫 Rechazó el contacto (${now.slice(0,10)}).`,
+            updated_at: now,
+          });
+          summary.pausados++;
+          continue;
+        }
+
+        // Fuera de oficina → reprogramar contacto en 10 días, no responder
+        if (intencion === 'fuera_oficina') {
+          const recontactar = new Date(Date.now() + 10 * 86400000).toISOString();
+          await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+            ia_last_msg_id: latestProspectMsgId,
+            ia_fecha_contacto: recontactar,
+            updated_at: now,
+          });
+          summary.sin_novedad++;
+          continue;
+        }
+
+        // Cualquier respuesta positiva → crear lead en CRM de inmediato
+        await crearLeadSiNoExiste(p);
+
+        // Generar respuesta con Claude, pasando la intención detectada
         const historial = historialLines.slice(-8).join('\n');
-        const email     = await generarRespuesta(cfg, p, historial, latestProspectText);
-        const now       = new Date().toISOString();
+        const email     = await generarRespuesta(cfg, p, historial, latestProspectText, intencion);
 
         if (cfg.reply_modo === 'auto') {
           await sendReply(token, p.email, email.asunto, email.cuerpo, p.ia_gmail_thread_id, latestProspectHdrId);
@@ -300,7 +373,6 @@ module.exports = async function handler(req, res) {
           ia_last_msg_id:      latestProspectMsgId,
           updated_at:          now,
         });
-        if (currentCount === 0) await crearLeadSiNoExiste(p);
 
       } catch(e) {
         summary.errors.push({ empresa: p.empresa, error: e.message });

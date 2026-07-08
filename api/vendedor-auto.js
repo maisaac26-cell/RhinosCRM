@@ -220,6 +220,31 @@ function buildFirma(cfg) {
   return lines.join('\n');
 }
 
+function normalizePhone(phone) {
+  if (!phone) return null;
+  let p = phone.replace(/\D/g, '');
+  if (p.startsWith('0')) p = p.slice(1);
+  if (!p.startsWith('54')) p = '54' + p;
+  if (p.length < 10 || p.length > 15) return null;
+  return p + '@c.us';
+}
+
+function sendWhatsAppMsgLocal(instanceId, token, chatId, message) {
+  const payload = JSON.stringify({ chatId, message });
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'api.green-api.com',
+      path: `/waInstance${instanceId}/sendMessage/${token}`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+    }, (res) => {
+      let raw = ''; res.on('data', c => raw += c);
+      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+    });
+    req.on('error', () => resolve({ error: 'network' })); req.write(payload); req.end();
+  });
+}
+
 function getRubroContext(rubro) {
   const r = (rubro || '').toLowerCase();
   if (/ferreter/.test(r))                       return 'Miles de referencias de stock, pedidos a proveedores, clientes de cuenta corriente';
@@ -329,12 +354,15 @@ module.exports = async function handler(req, res) {
     respondieron: 0,
     frios: 0,
     rebotes: 0,
+    reengagement_enviados: 0,
+    wa_por_apertura: 0,
+    wa_followup2: 0,
     errors: []
   };
 
   try {
     // Cargar config
-    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_activo,vendedor_hora_envio,vendedor_dias_envio,vendedor_delay_min,vendedor_delay_max,vendedor_max_followups,vendedor_calendly)');
+    const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_activo,vendedor_hora_envio,vendedor_dias_envio,vendedor_delay_min,vendedor_delay_max,vendedor_max_followups,vendedor_calendly,vendedor_wa_greenapi_id,vendedor_wa_greenapi_token)');
     const cfgMap = {};
     cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
 
@@ -355,19 +383,21 @@ module.exports = async function handler(req, res) {
     }
 
     const cfg = {
-      razon_social:    cfgMap.vendedor_razon_social || 'nuestra empresa',
-      servicios:       cfgMap.vendedor_servicios    || 'servicios de gestión comercial',
-      tono:            cfgMap.vendedor_tono         || 'profesional',
-      followup_dias:   parseInt(cfgMap.vendedor_followup_dias || '3', 10),
-      max_dia:         parseInt(cfgMap.vendedor_max_dia       || '20', 10),
-      mensaje_ejemplo: cfgMap.vendedor_mensaje_ejemplo || '',
-      website:         cfgMap.vendedor_website         || '',
-      whatsapp:        cfgMap.vendedor_whatsapp        || '',
-      nombre_vendedor: cfgMap.vendedor_nombre_vendedor || '',
-      calendly:        cfgMap.vendedor_calendly        || '',
-      delay_min:       parseInt(cfgMap.vendedor_delay_min     || '3',  10),
-      delay_max:       parseInt(cfgMap.vendedor_delay_max     || '8',  10),
-      max_followups:   parseInt(cfgMap.vendedor_max_followups || '2',  10),
+      razon_social:      cfgMap.vendedor_razon_social || 'nuestra empresa',
+      servicios:         cfgMap.vendedor_servicios    || 'servicios de gestión comercial',
+      tono:              cfgMap.vendedor_tono         || 'profesional',
+      followup_dias:     parseInt(cfgMap.vendedor_followup_dias || '3', 10),
+      max_dia:           parseInt(cfgMap.vendedor_max_dia       || '20', 10),
+      mensaje_ejemplo:   cfgMap.vendedor_mensaje_ejemplo || '',
+      website:           cfgMap.vendedor_website         || '',
+      whatsapp:          cfgMap.vendedor_whatsapp        || '',
+      nombre_vendedor:   cfgMap.vendedor_nombre_vendedor || '',
+      calendly:          cfgMap.vendedor_calendly        || '',
+      delay_min:         parseInt(cfgMap.vendedor_delay_min     || '3',  10),
+      delay_max:         parseInt(cfgMap.vendedor_delay_max     || '8',  10),
+      max_followups:     parseInt(cfgMap.vendedor_max_followups || '2',  10),
+      wa_greenapi_id:    cfgMap.vendedor_wa_greenapi_id    || '',
+      wa_greenapi_token: cfgMap.vendedor_wa_greenapi_token || '',
     };
 
     let token;
@@ -409,7 +439,7 @@ module.exports = async function handler(req, res) {
       if (enviados >= cfg.max_dia) break;
       try {
         const email = await generarEmail(cfg, p, false, null);
-        const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo, null); // sin pixel en primer email
+        const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id); // pixel para tracking de aperturas
         const now   = new Date().toISOString();
         await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
           estado: 'contactado', ia_contactado: true, ia_fecha_contacto: now,
@@ -447,7 +477,7 @@ module.exports = async function handler(req, res) {
         }
 
         const email    = await generarEmail(cfg, p, true, { asunto: p.ia_email_asunto, cuerpo: p.ia_email_body });
-        const sent     = await sendGmail(token, p.email, email.asunto, email.cuerpo);
+        const sent     = await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id);
         const newCount = (p.ia_followup_count || 0) + 1;
         const estado   = newCount >= cfg.max_followups ? 'frio' : 'follow_up_' + newCount;
 
@@ -461,6 +491,104 @@ module.exports = async function handler(req, res) {
         summary.errors.push({ empresa: p.empresa, tipo: 'followup', error: e.message });
       }
       await new Promise(r => setTimeout(r, cfg.delay_min * 1000 + Math.random() * (cfg.delay_max - cfg.delay_min) * 1000));
+    }
+
+    // ── PASO 3: re-engagement — prospectos 'frio' de hace 30+ días ──────
+    try {
+      const cutoff30 = new Date(Date.now() - 30 * 86400000).toISOString();
+      const frios = await sbGet(
+        `rhinos_prospectos?estado=eq.frio&ia_followup_fecha=lt.${encodeURIComponent(cutoff30)}&order=ia_followup_fecha.asc&limit=5`
+      );
+      for (const p of frios) {
+        try {
+          const rubroCtx = getRubroContext(p.rubro);
+          const firma    = buildFirma(cfg);
+          const link     = cfg.calendly || cfg.website || '';
+          const system   = `Sos ${cfg.nombre_vendedor || 'del equipo'} de "${cfg.razon_social}". Le escribiste a esta empresa hace más de 30 días y no hubo respuesta. Es el último intento, con ángulo completamente diferente. Español rioplatense, casual, sin presión.\n\nENFOQUE: NO hagas seguimiento del email anterior. Empezá de cero: mencioná un resultado concreto de una empresa similar, o hacé UNA pregunta directa sobre un problema específico de su industria.\n\nREGLAS:\n- Máximo 50 palabras en el cuerpo (SIN firma)\n- Sin emojis en el asunto\n- Sin "sé que estás ocupado", "solo quería seguir", "última vez que te escribo"\n${link ? '- Un solo link al final: ' + link : ''}\n- Firma exacta:\n${firma}\n\nDevolvé SOLO JSON: {"asunto":"...","cuerpo":"..."}. Cuerpo = texto + \\n\\n + firma. Texto plano.`;
+          const userMsg  = `Empresa: ${p.empresa}\nRubro: ${p.rubro || ''} (dolor típico: ${rubroCtx})\nLocalidad: ${p.localidad || ''}`;
+          const raw      = await claudeChat(system, userMsg);
+          const match    = raw.match(/\{[\s\S]*\}/);
+          if (!match) throw new Error('JSON inválido');
+          const email    = JSON.parse(match[0]);
+          await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id);
+          await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+            estado: 'reengagement', ia_followup_count: (p.ia_followup_count || 0) + 1,
+            ia_followup_fecha: new Date().toISOString(), updated_at: new Date().toISOString(),
+          });
+          summary.reengagement_enviados++;
+        } catch(e) {
+          summary.errors.push({ empresa: p.empresa, tipo: 're-engagement', error: e.message });
+        }
+        await new Promise(r => setTimeout(r, cfg.delay_min * 1000 + Math.random() * (cfg.delay_max - cfg.delay_min) * 1000));
+      }
+    } catch(e) {
+      summary.errors.push({ tipo: 'reengagement_check', error: e.message });
+    }
+
+    // ── PASO 4: abrieron el email pero no respondieron → trigger WA ─────
+    if (cfg.wa_greenapi_id && cfg.wa_greenapi_token) {
+      try {
+        const abiertos = await sbGet(
+          `rhinos_prospectos?ia_abierto=eq.true&ia_reply=eq.false&ia_wa_enviado=eq.false&estado=not.in.(frio,invalido,rechazado,reengagement)&order=ia_ultima_apertura.desc&limit=15`
+        );
+        for (const p of abiertos) {
+          if (!p.telefono) continue;
+          const chatId = normalizePhone(p.telefono);
+          if (!chatId) continue;
+          try {
+            const nombre  = cfg.nombre_vendedor || 'el equipo';
+            const empresa = cfg.razon_social || 'nuestra empresa';
+            const link    = cfg.calendly || cfg.website || '';
+            const msg     = `Hola! Soy ${nombre} de ${empresa}.\n\nTe mandé un email sobre cómo podemos ayudar con la gestión de ${p.empresa}. Vi que lo viste pero quizás no tuviste tiempo de responder.\n\n¿Tenés 5 minutos esta semana para que te cuente cómo le funcionó a otras ${p.rubro || 'empresas'} de tu rubro?${link ? '\n\nPodés agendar directo acá: ' + link : ''}`;
+            const result  = await sendWhatsAppMsgLocal(cfg.wa_greenapi_id, cfg.wa_greenapi_token, chatId, msg);
+            if (result.idMessage) {
+              await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+                ia_wa_enviado: true, ia_wa_fecha: new Date().toISOString(),
+                ia_wa_msg_id: result.idMessage, updated_at: new Date().toISOString(),
+              });
+              summary.wa_por_apertura++;
+            }
+          } catch(e) {
+            summary.errors.push({ empresa: p.empresa, tipo: 'wa_apertura', error: e.message });
+          }
+          await new Promise(r => setTimeout(r, 3000 + Math.random() * 2000));
+        }
+      } catch(e) {
+        summary.errors.push({ tipo: 'wa_apertura_check', error: e.message });
+      }
+
+      // ── PASO 5: WA follow-up día 3 — no respondieron al primer WA ────
+      try {
+        const cutoffWa = new Date(Date.now() - 3 * 86400000).toISOString();
+        const waEnviados = await sbGet(
+          `rhinos_prospectos?ia_wa_enviado=eq.true&ia_reply=eq.false&ia_wa_fecha=lt.${encodeURIComponent(cutoffWa)}&estado=not.in.(frio,invalido,rechazado)&order=ia_wa_fecha.asc&limit=10`
+        );
+        for (const p of waEnviados) {
+          if (!p.telefono) continue;
+          const chatId = normalizePhone(p.telefono);
+          if (!chatId) continue;
+          // Solo un follow-up WA (evitar spam): si ya tiene ia_wa_2_enviado, skip
+          if (p.ia_wa_2_enviado) continue;
+          try {
+            const nombre  = cfg.nombre_vendedor || 'el equipo';
+            const empresa = cfg.razon_social || 'nuestra empresa';
+            const link    = cfg.calendly || cfg.website || '';
+            const msg     = `Hola de nuevo! Soy ${nombre} de ${empresa}.\n\nQuería saber si llegaste a revisar lo que te mandé. Una ${p.rubro || 'empresa'} de ${p.localidad || 'tu zona'} similar a ${p.empresa} redujo el tiempo de gestión a la mitad con nuestro sistema.\n\n¿Puedo mandarte los detalles?${link ? ' ' + link : ''}`;
+            const result  = await sendWhatsAppMsgLocal(cfg.wa_greenapi_id, cfg.wa_greenapi_token, chatId, msg);
+            if (result.idMessage) {
+              await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+                ia_wa_2_enviado: true, updated_at: new Date().toISOString(),
+              }).catch(() => {});
+              summary.wa_followup2++;
+            }
+          } catch(e) {
+            summary.errors.push({ empresa: p.empresa, tipo: 'wa_followup2', error: e.message });
+          }
+          await new Promise(r => setTimeout(r, 3000 + Math.random() * 2000));
+        }
+      } catch(e) {
+        summary.errors.push({ tipo: 'wa_followup2_check', error: e.message });
+      }
     }
 
     return res.json({ ok: true, summary });

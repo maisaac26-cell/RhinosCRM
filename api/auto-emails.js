@@ -105,15 +105,70 @@ module.exports = async function handler(req, res) {
   const todayDow = new Date().getDay();   // 0=Dom, 1=Lun, ..., 6=Sáb
   const todayDom = new Date().getDate();  // 1-31
 
-  const summary = { sent: [], skipped: [], errors: [] };
+  const summary = { sent: [], skipped: [], errors: [], digest: null };
 
   try {
-    const emails = await sbReq('GET', 'rhinos_auto_emails?active=eq.true&order=created_at.asc');
-    if (!Array.isArray(emails) || !emails.length) return res.status(200).json({ ok: true, summary });
-
     let accessToken;
     try { accessToken = await getGmailToken(); }
     catch(e) { return res.status(200).json({ ok: false, error: 'Token Gmail: ' + e.message, summary }); }
+
+    // ── Digest diario — lun-vie, ventana 8-10hs AR ────────────────────────
+    try {
+      const horaAR = ((new Date().getUTCHours() - 3) + 24) % 24;
+      if ([1,2,3,4,5].includes(todayDow) && horaAR >= 8 && horaAR <= 10) {
+        const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const [prospNuevos, todosProsp, leadsNuevos, todosLeads, clientes, abiertosAyer, repliesAyer, wasAyer] =
+          await Promise.all([
+            sbReq('GET', `rhinos_prospectos?select=id&created_at=gte.${ayer}T03:00:00Z&created_at=lt.${today}T03:00:00Z`),
+            sbReq('GET', 'rhinos_prospectos?select=estado'),
+            sbReq('GET', `rhinos_leads?select=id&created_at=gte.${ayer}T03:00:00Z`),
+            sbReq('GET', 'rhinos_leads?select=status'),
+            sbReq('GET', 'rhinos_clientes?select=id&activo=eq.true'),
+            sbReq('GET', `rhinos_prospectos?select=id&ia_abierto=eq.true&ia_ultima_apertura=gte.${ayer}T03:00:00Z`),
+            sbReq('GET', `rhinos_prospectos?select=id&ia_reply=eq.true&ia_reply_fecha=gte.${ayer}T03:00:00Z`),
+            sbReq('GET', `rhinos_prospectos?select=id&ia_wa_enviado=eq.true&ia_wa_fecha=gte.${ayer}T03:00:00Z`),
+          ]).catch(() => [[],[],[],[],[],[],[],[]]);
+
+        const arr = a => Array.isArray(a) ? a : [];
+        const en_cola  = arr(todosProsp).filter(r => r.estado === 'nuevo').length;
+        const frios    = arr(todosProsp).filter(r => r.estado === 'frio').length;
+        const pipeline = arr(todosLeads).filter(r => !['perdido','imposible'].includes(r.status)).length;
+        const demos    = arr(todosLeads).filter(r => ['demo_agendada','demo'].includes(r.status)).length;
+
+        const cfgD   = await sbReq('GET', 'rhinos_config?key=in.(vendedor_nombre_vendedor,vendedor_razon_social,gmail_email)');
+        const cfgDm  = {}; arr(cfgD).forEach(r => { cfgDm[r.key] = r.value; });
+        const nombre = cfgDm.vendedor_nombre_vendedor || 'Equipo';
+        const razon  = cfgDm.vendedor_razon_social    || 'RhinosCRM';
+        const destino = cfgDm.gmail_email             || 'comercial@rhinosapp.com';
+
+        const cuerpo = [
+          `Buenos días, ${nombre}! Acá el resumen de ayer (${ayer}):`,
+          '',
+          `📥  Prospectos nuevos ayer:   ${arr(prospNuevos).length}`,
+          `👁️  Emails abiertos ayer:     ${arr(abiertosAyer).length}`,
+          `💬  Replies recibidos ayer:   ${arr(repliesAyer).length}`,
+          `📲  WA enviados ayer:         ${arr(wasAyer).length}`,
+          `🆕  Leads nuevos ayer:        ${arr(leadsNuevos).length}`,
+          '',
+          `Estado general:`,
+          `  • En cola (sin contactar): ${en_cola}`,
+          `  • Prospectos fríos:        ${frios}`,
+          `  • Pipeline activo (leads): ${pipeline}`,
+          `  • Demos agendadas:         ${demos}`,
+          `  • Clientes activos:        ${arr(clientes).length}`,
+          '',
+          `-- ${razon} · Digest automático`,
+        ].join('\n');
+
+        await sendGmail(accessToken, destino, `📊 Digest ${razon} — ${ayer}`, cuerpo);
+        summary.digest = { ok: true, fecha: ayer, destino };
+      }
+    } catch(e) {
+      summary.errors.push({ tipo: 'digest', error: e.message });
+    }
+
+    const emails = await sbReq('GET', 'rhinos_auto_emails?active=eq.true&order=created_at.asc');
+    if (!Array.isArray(emails) || !emails.length) return res.status(200).json({ ok: true, summary });
 
     for (const em of emails) {
       if (!isDue(em, today, todayDow, todayDom)) { summary.skipped.push(em.id); continue; }
