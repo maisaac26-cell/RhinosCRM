@@ -1341,7 +1341,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-title">CLIEN<span>TES</span></div>
         <div class="page-sub">Todos los clientes activos de RhinosApp.</div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <button onclick="startModuleGuide('clientes-comercial')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
         <button class="btn btn-sm" id="btn-export-clientes" style="color:var(--text2)">⬇ CSV</button>
         <button class="btn btn-sm" id="btn-cc-refresh" style="color:var(--text2)">↻ Actualizar</button>
       </div>
@@ -3019,6 +3020,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <span id="notif-subs-count" style="font-size:12px;color:var(--text3)"></span>
+        <button onclick="startModuleGuide('notificaciones')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
         <button class="btn btn-sm" id="btn-notif-refresh" style="color:var(--text2)">↻ Actualizar</button>
       </div>
     </div>
@@ -3089,6 +3091,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-sub">Tickets de clientes · sincronizado con Jira (proyecto RHI)</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="startModuleGuide('soporte')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
         <a href="/soporte.html" target="_blank" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);text-decoration:none">🔗 Formulario público</a>
         <button class="btn btn-sm" id="btn-soporte-refresh" style="color:var(--text2)">↻ Actualizar</button>
       </div>
@@ -3232,6 +3235,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
       <div><div class="page-title">VEND<span>EDOR IA</span></div>
       <div class="page-sub">Prospección + contacto automático + follow-up solo para contactos de la IA.</div></div>
+      <button onclick="startModuleGuide('vendedor-ia')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
     </div>
 
     <!-- Stats -->
@@ -3687,7 +3691,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-title">REPO<span>RTES</span></div>
         <div class="page-sub">Dashboard ejecutivo · analytics completos del negocio</div>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="startModuleGuide('reportes')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
         <button class="btn btn-sm" id="btn-enviar-reporte" style="color:#818cf8;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08)">📧 Enviar reporte</button>
         <button class="btn btn-sm" id="btn-rep-refresh" style="color:var(--text2)">↻ Actualizar todo</button>
       </div>
@@ -3946,7 +3951,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-title">PROVEE<span>DORES</span></div>
         <div class="page-sub">Gestión de proveedores y facturas a pagar.</div>
       </div>
-      <button class="btn btn-sm" id="btn-prov-refresh" style="color:var(--text2)">↻ Actualizar</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="startModuleGuide('proveedores')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
+        <button class="btn btn-sm" id="btn-prov-refresh" style="color:var(--text2)">↻ Actualizar</button>
+      </div>
     </div>
 
     <div class="metrics-row" style="grid-template-columns:repeat(4,1fr)">
@@ -15608,6 +15616,52 @@ const GUIDE_STEPS = [
     desc: 'Generador de respuestas para DMs entrantes. Pegás el mensaje recibido, elegís el objetivo (precio, demo, objeción) y la IA escribe la respuesta perfecta.<br><br>Ideal para responder de forma consistente y rápida a los DMs de ventas sin perder el tono de marca.' },
   { module: 'contenido', title: '🎨 Contenido IG — Generador', target: '[data-sec="contenido"]',
     desc: 'Generá captions, hashtags e ideas visuales para Instagram con IA. También genera imágenes con DALL-E con la identidad visual de RhinosApp.<br><br>Formatos disponibles: post estático, carrusel, Reel, Story. La IA adapta el tono según el objetivo: engagement, educacional, comercial.' },
+
+  // ── Clientes ──
+  { module: 'clientes-comercial', title: '👥 Clientes — Base de clientes activos', target: '[data-sec="clientes-comercial"]',
+    desc: 'Lista completa de todos los clientes activos de RhinosApp. Cada fila muestra empresa, contacto, plan contratado, MRR y fecha de alta.<br><br>Los clientes se crean automáticamente cuando un lead cambia su estado a <strong>"Cliente"</strong> desde el módulo de Leads. No es necesario cargarlos manualmente.' },
+  { module: 'clientes-comercial', title: '👥 Clientes — Métricas y filtros', target: '[data-sec="clientes-comercial"]',
+    desc: '<strong>Total clientes:</strong> clientes activos en este momento.<br><strong>Nuevos este mes:</strong> incorporados en el mes en curso.<br><br>Podés exportar toda la lista como <strong>CSV</strong> con el botón ⬇ para trabajar en Excel o importar en otras herramientas. La búsqueda filtra por nombre, empresa o email en tiempo real.' },
+
+  // ── Notificaciones ──
+  { module: 'notificaciones', title: '🔔 Notificaciones — Push a dispositivos', target: '[data-sec="notificaciones"]',
+    desc: 'Enviá <strong>notificaciones push</strong> a todos los dispositivos que se suscribieron a la app (celulares y computadoras). Se usan para comunicados urgentes, lanzamientos o recordatorios al equipo.<br><br>El contador superior muestra cuántos dispositivos están suscritos en este momento.' },
+  { module: 'notificaciones', title: '🔔 Notificaciones — Cómo suscribirse', target: '[data-sec="notificaciones"]',
+    desc: 'Para recibir push en un dispositivo: abrí el CRM en ese dispositivo y aceptá el permiso de notificaciones que pide el browser.<br><br>Las notificaciones funcionan en Chrome, Edge y Firefox (desktop y Android). Safari en iOS también las soporta desde iOS 16.4 si la app se agrega al Home Screen.' },
+
+  // ── Soporte ──
+  { module: 'soporte', title: '🎫 Soporte — Tickets de clientes', target: '[data-sec="soporte"]',
+    desc: 'Gestión de tickets sincronizada con <strong>Jira proyecto RHI</strong>. Cada ticket muestra: título, estado (abierto / en progreso / resuelto), prioridad, cliente asignado y fecha.<br><br>Cuando un cliente crea un ticket desde el formulario público, aparece automáticamente en Jira y acá.' },
+  { module: 'soporte', title: '🎫 Soporte — Formulario público', target: '[data-sec="soporte"]',
+    desc: 'El botón <strong>🔗 Formulario público</strong> abre <code>/soporte.html</code> — la página que reciben tus clientes para reportar problemas sin necesidad de acceder al CRM.<br><br>El cliente llena nombre, empresa, descripción del problema y prioridad. El ticket se crea automáticamente en Jira y aparece en esta sección.' },
+
+  // ── Vendedor IA ──
+  { module: 'vendedor-ia', title: '🤖 Vendedor IA — Ciclo completo automático', target: '[data-sec="vendedor-ia"]',
+    desc: 'El módulo más poderoso del CRM: automatiza las <strong>tres etapas del ciclo comercial</strong> para prospectos captados con IA:<br><br>1. <strong>🔍 Prospecta:</strong> busca empresas en Google, Páginas Amarillas y MercadoLibre según el rubro configurado<br>2. <strong>📧 Envía emails:</strong> primer contacto + follow-up automático si no hay respuesta<br>3. <strong>💬 WhatsApp:</strong> mensaje WA a los que tienen teléfono móvil AR' },
+  { module: 'vendedor-ia', title: '🤖 Vendedor IA — Configuración inicial', target: '[data-sec="vendedor-ia"]',
+    desc: 'En la pestaña <strong>Configuración</strong>:<br>• <strong>Rubro:</strong> qué tipo de empresa buscar (ej: "distribuidora de alimentos")<br>• <strong>Provincia:</strong> dónde buscar<br>• <strong>Hora de envío:</strong> a qué hora se disparan los emails automáticos<br>• <strong>Green API:</strong> instanceId + token para WhatsApp (conseguilo en greenapi.com, plan gratuito 200 msg/mes)<br>• <strong>Calendly URL:</strong> link de agenda para el CTA de los emails' },
+  { module: 'vendedor-ia', title: '🤖 Vendedor IA — Prospección automática', target: '[data-sec="vendedor-ia"]',
+    desc: 'El cron de prospección corre <strong>todos los días a las 18hs AR</strong>. Alterna entre tres fuentes para no saturar ninguna: Google Places (1 de cada 3), Páginas Amarillas (1 de cada 3) y MercadoLibre (1 de cada 3).<br><br>Solo guarda teléfonos que son <strong>móviles argentinos válidos</strong> (WhatsApp-compatible). Descarta líneas fijas, 0800 y 810.' },
+  { module: 'vendedor-ia', title: '🤖 Vendedor IA — Emails automáticos', target: '[data-sec="vendedor-ia"]',
+    desc: 'El cron de emails corre <strong>lunes a viernes a las 9hs AR</strong>.<br><br><strong>PASO 0 — Rebotes:</strong> detecta emails rechazados en Gmail y marca esos prospectos como inválidos.<br><strong>PASO 1 — Primer contacto:</strong> envía a los prospectos nuevos que aún no fueron contactados.<br><strong>PASO 2 — Follow-up:</strong> si después de N días no hubo respuesta, envía un segundo email de seguimiento automático.' },
+  { module: 'vendedor-ia', title: '🤖 Vendedor IA — Respuestas automáticas', target: '[data-sec="vendedor-ia"]',
+    desc: 'Cuando un prospecto responde el email, el sistema detecta la respuesta y puede contestar con IA automáticamente.<br><br>Modos configurables:<br>• <strong>Draft:</strong> genera el borrador en Gmail para que lo revises antes de enviar<br>• <strong>Auto:</strong> envía directo sin intervención humana<br><br>El sistema se auto-pausa después de <em>N</em> respuestas para evitar chains infinitas.' },
+  { module: 'vendedor-ia', title: '🤖 Vendedor IA — WhatsApp automático', target: '[data-sec="vendedor-ia"]',
+    desc: 'Cron de WhatsApp: <strong>lunes a viernes a las 10hs AR</strong>. Envía un mensaje WA por primera vez a los prospectos con teléfono móvil válido que aún no recibieron WA (<code>ia_wa_enviado = false</code>).<br><br>Usa <strong>Green API</strong> (gratuito, 200 mensajes/mes). El mensaje incluye el nombre del contacto y el link de Calendly para agendar una demo.' },
+  { module: 'vendedor-ia', title: '🤖 Vendedor IA — Botones manuales', target: '[data-sec="vendedor-ia"]',
+    desc: 'Podés ejecutar cualquier paso manualmente sin esperar el cron:<br>• <strong>🔍 Prospectar ahora:</strong> lanza la búsqueda de empresas inmediatamente<br>• <strong>📧 Enviar emails:</strong> procesa los emails pendientes ahora<br>• <strong>💬 Enviar WA:</strong> procesa los WhatsApp pendientes ahora<br><br>Todos los botones manuales pasan <code>?force=1</code> para saltear el guard de horario del cron.' },
+
+  // ── Reportes ──
+  { module: 'reportes', title: '📊 Reportes — Dashboard ejecutivo', target: '[data-sec="reportes"]',
+    desc: 'Vista consolidada de todas las métricas del negocio en un solo lugar: comercial (leads, pipeline, conversiones), financiero (MRR, ingresos, gastos), Instagram (seguidores, engagement) y web (tráfico, sesiones).<br><br>Ideal para la reunión semanal o para tomar decisiones estratégicas rápidas.' },
+  { module: 'reportes', title: '📊 Reportes — Enviar por email', target: '[data-sec="reportes"]',
+    desc: 'El botón <strong>📧 Enviar reporte</strong> genera un email ejecutivo con las métricas clave del mes y lo envía a la dirección configurada (por defecto: tu email de Gmail conectado).<br><br>El cron de reportes lo hace automáticamente <strong>todos los lunes a las 10hs AR</strong>. El botón manual sirve para generarlo en cualquier momento.' },
+
+  // ── Proveedores ──
+  { module: 'proveedores', title: '🏭 Proveedores — Nómina de proveedores', target: '[data-sec="proveedores"]',
+    desc: 'Registrá todos los proveedores del negocio: nombre, categoría, contacto, CUIT y condición de pago. Las métricas superiores muestran el <strong>gasto mensual total estimado</strong> en ARS y USD.<br><br>Los proveedores tecnológicos recurrentes (Vercel, Supabase, OpenAI, etc.) se cargan acá para tener visibilidad del costo operativo mensual.' },
+  { module: 'proveedores', title: '🏭 Proveedores — Facturas a pagar', target: '[data-sec="proveedores"]',
+    desc: 'En la pestaña <strong>Facturas</strong> registrás las facturas pendientes de pago: proveedor, importe, vencimiento y estado (pendiente / pagado).<br><br>Las facturas vencidas se marcan en rojo automáticamente. Cuando pagás una, cambiá el estado a "pagado" para que salga del listado de pendientes y se registre como gasto en Finanzas.' },
 
   // ── Final ──
   { module: null, title: '¡Tour completo! 🦏', target: null,
