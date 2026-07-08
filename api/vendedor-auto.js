@@ -541,9 +541,24 @@ module.exports = async function handler(req, res) {
     let enviados = 0;
 
     // ── PASO 1: contacto inicial (estado='nuevo', ia_contactado=false) ──
-    const enCola = await sbGet(
-      `rhinos_prospectos?estado=eq.nuevo&ia_contactado=eq.false&order=created_at.asc&limit=${cfg.max_dia}`
+    // Traemos más de los necesarios para poder deduplicar por empresa
+    const enColaRaw = await sbGet(
+      `rhinos_prospectos?estado=eq.nuevo&ia_contactado=eq.false&order=created_at.asc&limit=${cfg.max_dia * 5}`
     );
+
+    // Empresas que ya tienen al menos un contacto previo (cualquier run anterior)
+    const yaContactadasRows = await sbGet('rhinos_prospectos?select=empresa&ia_contactado=eq.true&limit=5000');
+    const empresasYaContactadas = new Set(yaContactadasRows.map(r => (r.empresa || '').toLowerCase().trim()));
+
+    // Deduplicar: 1 solo email por empresa por run, saltando empresas ya contactadas antes
+    const empresasEsteRun = new Set();
+    const enCola = enColaRaw.filter(p => {
+      const k = (p.empresa || '').toLowerCase().trim();
+      if (empresasYaContactadas.has(k)) return false;
+      if (empresasEsteRun.has(k)) return false;
+      empresasEsteRun.add(k);
+      return true;
+    }).slice(0, cfg.max_dia);
 
     const fromDisplay = [cfg.nombre_vendedor, cfg.razon_social].filter(Boolean).join(' de ');
     const gmailFrom   = cfg.gmail_email;

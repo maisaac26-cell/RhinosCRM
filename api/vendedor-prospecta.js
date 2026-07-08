@@ -451,9 +451,10 @@ module.exports = async function handler(req, res) {
     const rubroFijo      = (cfgMap.vendedor_rubro_auto || '').trim();
     const provinciasConf = (cfgMap.vendedor_provincias_auto || '').split(',').map(s => s.trim()).filter(Boolean);
 
-    // Obtener emails ya en el pipeline para deduplicar
-    const existentes = await sbGet('rhinos_prospectos?select=email&limit=5000');
-    const emailsYaEnPipeline = new Set(existentes.map(r => (r.email || '').toLowerCase().trim()).filter(Boolean));
+    // Obtener emails y empresas ya en el pipeline para deduplicar
+    const existentes = await sbGet('rhinos_prospectos?select=email,empresa&limit=5000');
+    const emailsYaEnPipeline   = new Set(existentes.map(r => (r.email   || '').toLowerCase().trim()).filter(Boolean));
+    const empresasYaEnPipeline = new Set(existentes.map(r => (r.empresa || '').toLowerCase().trim()).filter(Boolean));
 
     // Cargar blacklist (no crítico si la tabla no existe aún)
     let blacklistDomains = new Set();
@@ -518,18 +519,22 @@ module.exports = async function handler(req, res) {
           // Teléfono: solo guardar si es móvil argentino (compatible con WhatsApp)
           const telGuardar = isMobileAR(place.phone) ? (place.phone || '') : '';
 
+          const empresaNorm = (place.name || '').toLowerCase().trim();
+          // 1 solo prospecto por empresa — si ya está en el pipeline, skip toda la empresa
+          if (empresasYaEnPipeline.has(empresaNorm)) { summary.duplicados++; continue; }
+          if (blacklistEmpresas.some(bl => empresaNorm.includes(bl))) { summary.duplicados++; continue; }
+
           for (const email of emails) {
             if (nuevos.length >= cantidad) break;
             const emailNorm = email.toLowerCase().trim();
             if (emailsYaEnPipeline.has(emailNorm)) { summary.duplicados++; continue; }
 
-            // Blacklist check por dominio o empresa
+            // Blacklist check por dominio
             const domain = emailNorm.split('@')[1] || '';
             if (blacklistDomains.has(domain)) { summary.duplicados++; continue; }
-            const empresaNorm = (place.name || '').toLowerCase();
-            if (blacklistEmpresas.some(bl => empresaNorm.includes(bl))) { summary.duplicados++; continue; }
 
             emailsYaEnPipeline.add(emailNorm);
+            empresasYaEnPipeline.add(empresaNorm); // evitar 2do email de la misma empresa en este run
             summary.con_email++;
             encontradosEnEstaIteracion++;
 
@@ -553,6 +558,7 @@ module.exports = async function handler(req, res) {
               created_at:      new Date().toISOString(),
               updated_at:      new Date().toISOString(),
             });
+            break; // 1 solo email por empresa
           }
         }
       }
