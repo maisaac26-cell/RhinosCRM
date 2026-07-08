@@ -336,7 +336,7 @@ const SKIP_EMAIL = /noreply|no-reply|donotreply|example\.com|sentry\.|wix\.|word
 
 function fetchHtml(pageUrl, ua) {
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(''), 6000);
+    const timeout = setTimeout(() => resolve(''), 3500);
     try {
       const u = new URL(pageUrl.startsWith('http') ? pageUrl : 'https://' + pageUrl);
       const lib = u.protocol === 'https:' ? https : http;
@@ -347,7 +347,7 @@ function fetchHtml(pageUrl, ua) {
           'Accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'es-AR,es;q=0.9',
         },
-        timeout: 5000,
+        timeout: 3000,
       }, (res) => {
         if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
           clearTimeout(timeout);
@@ -458,57 +458,63 @@ module.exports = async function handler(req, res) {
 
       let encontradosEnEstaIteracion = 0;
 
-      for (const place of places) {
-        if (nuevos.length >= cantidad) break;
-        if ((Date.now() - startTime) >= TIME_LIMIT) break;
+      // Paralelizar scraping en batches de 5 para no bloquear todo el tiempo en secuencial
+      const BATCH = 5;
+      for (let bi = 0; bi < places.length; bi += BATCH) {
+        if (nuevos.length >= cantidad || (Date.now() - startTime) >= TIME_LIMIT) break;
 
-        // Email: si el resultado ya trae email directo (PA), no hace falta scraping
-        let emails = [];
-        const isPAResult = (place.id || '').startsWith('pa_');
-        if (place.email && !SKIP_EMAIL.test(place.email)) {
-          emails = [place.email];
-        } else if (place.website) {
-          emails = await findEmailsForSite(place.website);
-        }
-        if (!emails.length) continue;
+        const batch = places.slice(bi, bi + BATCH);
+        const enriched = await Promise.all(batch.map(async (place) => {
+          const isPAResult = (place.id || '').startsWith('pa_');
+          let emails = [];
+          if (place.email && !SKIP_EMAIL.test(place.email)) {
+            emails = [place.email];
+          } else if (place.website) {
+            emails = await findEmailsForSite(place.website);
+          }
+          return { place, emails, isPAResult };
+        }));
 
-        // Teléfono: solo guardar si es móvil argentino (compatible con WhatsApp)
-        const telGuardar = isMobileAR(place.phone) ? (place.phone || '') : '';
-
-        for (const email of emails) {
+        for (const { place, emails, isPAResult } of enriched) {
           if (nuevos.length >= cantidad) break;
-          const emailNorm = email.toLowerCase().trim();
-          if (emailsYaEnPipeline.has(emailNorm)) { summary.duplicados++; continue; }
+          if (!emails.length) continue;
 
-          emailsYaEnPipeline.add(emailNorm);
-          summary.con_email++;
-          encontradosEnEstaIteracion++;
+          // Teléfono: solo guardar si es móvil argentino (compatible con WhatsApp)
+          const telGuardar = isMobileAR(place.phone) ? (place.phone || '') : '';
 
-          nuevos.push({
-            id:              place.id + '_' + emailNorm.replace(/[^a-z0-9]/g, '').slice(0, 30) + '_' + Date.now().toString(36),
-            empresa:         place.name,
-            nombre_contacto: '',
-            email:           email,
-            telefono:        telGuardar,
-            website:         place.website || '',
-            rubro:           rubro,
-            localidad:       provincia,
-            notas:           buildNotas(place.rating, place.reviews, place.address, isPAResult ? 'pa' : ''),
-            ia_score:        calcScore(email, place.website, place.rating, place.reviews, telGuardar),
-            origen:          isPAResult ? 'auto_pa' : (place.id || '').startsWith('ml_') ? 'auto_ml' : 'auto_google',
-            estado:          'nuevo',
-            ia_contactado:   false,
-            ia_followup_count: 0,
-            ia_reply:        false,
-            ia_wa_enviado:   false,
-            created_at:      new Date().toISOString(),
-            updated_at:      new Date().toISOString(),
-          });
+          for (const email of emails) {
+            if (nuevos.length >= cantidad) break;
+            const emailNorm = email.toLowerCase().trim();
+            if (emailsYaEnPipeline.has(emailNorm)) { summary.duplicados++; continue; }
+
+            emailsYaEnPipeline.add(emailNorm);
+            summary.con_email++;
+            encontradosEnEstaIteracion++;
+
+            nuevos.push({
+              id:              place.id + '_' + emailNorm.replace(/[^a-z0-9]/g, '').slice(0, 30) + '_' + Date.now().toString(36),
+              empresa:         place.name,
+              nombre_contacto: '',
+              email:           email,
+              telefono:        telGuardar,
+              website:         place.website || '',
+              rubro:           rubro,
+              localidad:       provincia,
+              notas:           buildNotas(place.rating, place.reviews, place.address, isPAResult ? 'pa' : ''),
+              ia_score:        calcScore(email, place.website, place.rating, place.reviews, telGuardar),
+              origen:          isPAResult ? 'auto_pa' : (place.id || '').startsWith('ml_') ? 'auto_ml' : 'auto_google',
+              estado:          'nuevo',
+              ia_contactado:   false,
+              ia_followup_count: 0,
+              ia_reply:        false,
+              ia_wa_enviado:   false,
+              created_at:      new Date().toISOString(),
+              updated_at:      new Date().toISOString(),
+            });
+          }
         }
       }
 
-      // Si esta iteración rindió menos que el mínimo por búsqueda Y todavía no llegamos
-      // al mínimo total, seguimos con otro rubro/provincia sin contar como "intento fallido".
       summary.errors.push({ iteracion: summary.intentos, rubro, provincia, encontrados: encontradosEnEstaIteracion });
     }
 
