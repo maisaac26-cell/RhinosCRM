@@ -165,11 +165,31 @@ function calcScore(email, website, rating, reviews, phone) {
   return s;
 }
 
-function buildNotas(rating, reviews, address) {
+function buildNotas(rating, reviews, address, fuente) {
   const parts = [];
   if (rating) parts.push(`${rating}★ en Google (${reviews || 0} reseñas)`);
   if (address) parts.push(address);
+  if (fuente === 'pa') parts.push('Páginas Amarillas');
   return parts.join(' · ');
+}
+
+// Retorna true solo si el número parece móvil argentino (WhatsApp-compatible)
+function isMobileAR(phone) {
+  if (!phone) return false;
+  let p = phone.replace(/\D/g, '');
+  if (p.startsWith('549')) p = p.slice(3);
+  else if (p.startsWith('54')) p = p.slice(2);
+  if (p.startsWith('0')) p = p.slice(1);
+  if (p.length < 9 || p.length > 10) return false;
+  if (/^(800|810|610)/.test(p)) return false;           // líneas 0800
+  if (p.startsWith('11') && p[2] === '4') return false; // fijos CABA: 114xxx-xxxx
+  return true;
+}
+
+function toSlug(s) {
+  return (s || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
 async function searchPlaces(query, location, apiKey) {
@@ -237,12 +257,84 @@ async function searchMercadoLibre(query, provincia, maxResults) {
   } catch { return []; }
 }
 
+// ── Páginas Amarillas AR ──────────────────────────────────────────────────────
+
+const PA_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+async function searchPaginasAmarillas(rubro, provincia, maxResults) {
+  const url = `https://www.paginasamarillas.com.ar/${toSlug(rubro)}/en/${toSlug(provincia)}/p-1`;
+  const html = await fetchHtml(url, PA_UA);
+  if (!html || html.length < 800) return [];
+
+  const results = [];
+
+  // Strategy 1: JSON-LD structured data (más confiable — lo inyectan para SEO)
+  const ldRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = ldRe.exec(html)) !== null && results.length < maxResults) {
+    try {
+      const obj = JSON.parse(m[1]);
+      const items = [];
+      if (Array.isArray(obj)) items.push(...obj);
+      else if (obj['@graph']) items.push(...obj['@graph']);
+      else items.push(obj);
+      for (const item of items) {
+        if (results.length >= maxResults) break;
+        const type = [].concat(item['@type'] || []).join(' ');
+        if (!/LocalBusiness|FoodEstablishment|Store|AutoRepair|Restaurant|Pharmacy|ProfessionalService|HealthAndBeauty|HomeAndConstruction/i.test(type)) continue;
+        if (!item.name || item.name.length < 2) continue;
+        const addr = typeof item.address === 'string' ? item.address
+          : [item.address?.streetAddress, item.address?.addressLocality].filter(Boolean).join(', ');
+        results.push({
+          id:      'pa_' + toSlug(item.name).slice(0, 20) + '_' + Math.random().toString(36).slice(2, 6),
+          name:    item.name.trim(),
+          phone:   (item.telephone || '').replace(/[()]/g, '').trim(),
+          email:   item.email || '',
+          website: item.url || '',
+          address: addr,
+          rating:  parseFloat(item.aggregateRating?.ratingValue) || 0,
+          reviews: parseInt(item.aggregateRating?.reviewCount)   || 0,
+        });
+      }
+    } catch {}
+  }
+
+  // Strategy 2: tel:/mailto: links + nombre en heading cercano
+  if (results.length < 3) {
+    const chunks = html.split(/(?=<(?:article|li)[^>]*>)/i).slice(1);
+    for (const chunk of chunks) {
+      if (results.length >= maxResults) break;
+      const phoneM = chunk.match(/href="tel:([^"]+)"/i);
+      const emailM = chunk.match(/href="mailto:([^"@]{1,50}@[^"?]{3,60})"/i);
+      const siteM  = chunk.match(/href="(https?:\/\/(?!(?:www\.)?paginasamarillas)[^"?#]{5,80})"/i);
+      const nameM  = chunk.match(/<h[2-4][^>]*>([^<]{2,80})<\/h[2-4]>/i)
+        || chunk.match(/class="[^"]*(?:name|empresa|title|heading|razon)[^"]*"[^>]*>([^<]{2,80})</i);
+      const name = nameM ? nameM[1].replace(/<[^>]+>/g, '').trim() : '';
+      if (name.length < 3) continue;
+      const email = emailM ? emailM[1].trim() : '';
+      if (!email && !siteM && !phoneM) continue;
+      results.push({
+        id:      'pa_' + toSlug(name).slice(0, 20) + '_' + Math.random().toString(36).slice(2, 6),
+        name,
+        phone:   phoneM ? phoneM[1].trim() : '',
+        email:   SKIP_EMAIL.test(email) ? '' : email,
+        website: siteM ? siteM[1] : '',
+        address: '',
+        rating:  0,
+        reviews: 0,
+      });
+    }
+  }
+
+  return results.slice(0, maxResults);
+}
+
 // ── Email extraction ──────────────────────────────────────────────────────────
 
 const EMAIL_RE   = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
 const SKIP_EMAIL = /noreply|no-reply|donotreply|example\.com|sentry\.|wix\.|wordpress\.|schema\.|googleapis|@2x|\.png|\.jpg|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@|hola@hola\.|contact@contact\./i;
 
-function fetchHtml(pageUrl) {
+function fetchHtml(pageUrl, ua) {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(''), 6000);
     try {
@@ -250,13 +342,17 @@ function fetchHtml(pageUrl) {
       const lib = u.protocol === 'https:' ? https : http;
       const req = lib.request({
         hostname: u.hostname, path: u.pathname + (u.search || ''), method: 'GET',
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)', 'Accept': 'text/html' },
+        headers: {
+          'User-Agent': ua || 'Mozilla/5.0 (compatible; Googlebot/2.1)',
+          'Accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'es-AR,es;q=0.9',
+        },
         timeout: 5000,
       }, (res) => {
         if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
           clearTimeout(timeout);
           const loc = res.headers.location.startsWith('http') ? res.headers.location : `https://${u.hostname}${res.headers.location}`;
-          fetchHtml(loc).then(resolve);
+          fetchHtml(loc, ua).then(resolve);
           return;
         }
         let html = '';
@@ -349,12 +445,14 @@ module.exports = async function handler(req, res) {
       if (!summary.rubros.includes(rubro))         summary.rubros.push(rubro);
       if (!summary.provincias.includes(provincia)) summary.provincias.push(provincia);
 
-      // Elegir fuente: Google Places, Mercado Libre o ambos alternando
-      const usarML     = fuente === 'mercadolibre' || (fuente === 'ambos' && summary.intentos % 2 === 0);
-      const usarGoogle = fuente === 'google'       || (fuente === 'ambos' && summary.intentos % 2 !== 0);
+      // Elegir fuente: alternancia 3-vías (Google / PA / ML)
+      const usarPA     = fuente === 'paginas_amarillas' || (fuente === 'ambos' && summary.intentos % 3 === 2);
+      const usarML     = fuente === 'mercadolibre'      || (fuente === 'ambos' && summary.intentos % 3 === 1);
+      const usarGoogle = fuente === 'google'            || (fuente === 'ambos' && summary.intentos % 3 === 0);
 
       let places = [];
       if (usarGoogle) places = await searchPlaces(rubro, provincia, PLACES_KEY);
+      if (usarPA)     places = [...places, ...(await searchPaginasAmarillas(rubro, provincia, 15))];
       if (usarML)     places = [...places, ...(await searchMercadoLibre(rubro, provincia, 5))];
       summary.buscados += places.length;
 
@@ -363,10 +461,19 @@ module.exports = async function handler(req, res) {
       for (const place of places) {
         if (nuevos.length >= cantidad) break;
         if ((Date.now() - startTime) >= TIME_LIMIT) break;
-        if (!place.website) continue;
 
-        const emails = await findEmailsForSite(place.website);
+        // Email: si el resultado ya trae email directo (PA), no hace falta scraping
+        let emails = [];
+        const isPAResult = (place.id || '').startsWith('pa_');
+        if (place.email && !SKIP_EMAIL.test(place.email)) {
+          emails = [place.email];
+        } else if (place.website) {
+          emails = await findEmailsForSite(place.website);
+        }
         if (!emails.length) continue;
+
+        // Teléfono: solo guardar si es móvil argentino (compatible con WhatsApp)
+        const telGuardar = isMobileAR(place.phone) ? (place.phone || '') : '';
 
         for (const email of emails) {
           if (nuevos.length >= cantidad) break;
@@ -382,13 +489,13 @@ module.exports = async function handler(req, res) {
             empresa:         place.name,
             nombre_contacto: '',
             email:           email,
-            telefono:        place.phone || '',
+            telefono:        telGuardar,
             website:         place.website || '',
             rubro:           rubro,
             localidad:       provincia,
-            notas:           buildNotas(place.rating, place.reviews, place.address),
-            ia_score:        calcScore(email, place.website, place.rating, place.reviews, place.phone),
-            origen:          'auto_prospecta',
+            notas:           buildNotas(place.rating, place.reviews, place.address, isPAResult ? 'pa' : ''),
+            ia_score:        calcScore(email, place.website, place.rating, place.reviews, telGuardar),
+            origen:          isPAResult ? 'auto_pa' : (place.id || '').startsWith('ml_') ? 'auto_ml' : 'auto_google',
             estado:          'nuevo',
             ia_contactado:   false,
             ia_followup_count: 0,
