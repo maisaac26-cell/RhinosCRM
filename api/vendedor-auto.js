@@ -219,7 +219,14 @@ async function claudeChat(system, userMsg) {
         'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' }
     }, (res) => {
       let raw = ''; res.on('data', c => raw += c);
-      res.on('end', () => { try { resolve(JSON.parse(raw).content?.[0]?.text || ''); } catch { reject(new Error('Claude error')); } });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(raw);
+          const text = parsed.content?.[0]?.text;
+          if (!text) reject(new Error(`Claude API: ${parsed.error?.message || parsed.type || raw.slice(0, 120)}`));
+          else resolve(text);
+        } catch { reject(new Error('Claude parse error: ' + raw.slice(0, 120))); }
+      });
     });
     req.on('error', reject); req.write(payload); req.end();
   });

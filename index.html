@@ -17085,7 +17085,8 @@ document.getElementById('btn-via-enviar')?.addEventListener('click', async funct
       if (data.skipped) { showToast('⏸ ' + (data.reason || 'sistema pausado')); }
       else {
         const s = data.summary || {};
-        showToast(`📤 ${s.iniciales_enviados || 0} iniciales · ${s.followup_enviados || 0} follow-ups · ${s.respondieron || 0} respondieron · ${s.frios || 0} fríos${s.rebotes ? ` · ❌ ${s.rebotes} rebotes` : ''}`);
+        const errMsg = (!s.iniciales_enviados && s.errors?.length) ? ` · ⚠️ ${s.errors[0]?.error || s.errors[0]?.tipo}` : '';
+        showToast(`📤 ${s.iniciales_enviados || 0} iniciales · ${s.followup_enviados || 0} follow-ups · ${s.respondieron || 0} respondieron · ${s.frios || 0} fríos${s.rebotes ? ` · ❌ ${s.rebotes} rebotes` : ''}${errMsg}`);
         loadVendedorIA();
       }
     } else {
