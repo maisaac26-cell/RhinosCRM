@@ -16700,8 +16700,6 @@ async function loadViaStats() {
     document.getElementById('via-stat-replies').textContent = stats.interesados;
     document.getElementById('via-stat-frios').textContent = stats.frios;
     document.getElementById('via-stat-rebotados').textContent = stats.rebotados || 0;
-    const ab = document.getElementById('via-stat-ab');
-    if (ab && stats.ab_stats) ab.textContent = `A:${stats.ab_stats.a} B:${stats.ab_stats.b} C:${stats.ab_stats.c}`;
     const abiSub = document.getElementById('via-stat-abiertos-sub');
     if (abiSub && stats.abiertos != null) {
       const pct = stats.contactados > 0 ? Math.round(stats.abiertos / stats.contactados * 100) : 0;
@@ -16711,8 +16709,8 @@ async function loadViaStats() {
     if (waStat) waStat.textContent = stats.wa_enviados ?? '—';
     const waSub = document.getElementById('via-stat-wa-sub');
     if (waSub && stats.ab_stats) waSub.textContent = `A:${stats.ab_stats.a} B:${stats.ab_stats.b} C:${stats.ab_stats.c}`;
-    const ab = document.getElementById('via-stat-ab');
-    if (ab) ab.textContent = stats.score_alto != null ? `⭐ ${stats.score_alto} score alto` : '';
+    const abEl = document.getElementById('via-stat-ab');
+    if (abEl) abEl.textContent = stats.score_alto != null ? `⭐ ${stats.score_alto} score alto` : '';
   } catch(e) { console.warn('via stats:', e.message); }
 }
 
