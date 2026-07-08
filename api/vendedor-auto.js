@@ -518,7 +518,7 @@ module.exports = async function handler(req, res) {
       const semana = new Date(Date.now() - 7 * 86400000).toISOString();
       const [contactadosSemana, rebotesSemana] = await Promise.all([
         sbGet(`rhinos_prospectos?select=id&ia_contactado=eq.true&ia_fecha_contacto=gte.${encodeURIComponent(semana)}&limit=500`),
-        sbGet(`rhinos_prospectos?select=id&estado=eq.invalido&updated_at=gte.${encodeURIComponent(semana)}&limit=100`),
+        sbGet(`rhinos_prospectos?select=id&estado=eq.invalido&ia_contactado=eq.true&updated_at=gte.${encodeURIComponent(semana)}&limit=100`),
       ]);
       if (contactadosSemana.length >= 50) {
         const tasaRebote = rebotesSemana.length / contactadosSemana.length;
