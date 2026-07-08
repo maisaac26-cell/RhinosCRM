@@ -9,7 +9,7 @@
     "api/auto-notif.js":         { "maxDuration": 30  },
     "api/web-content.js":        { "maxDuration": 15  },
     "api/vendedor.js":           { "maxDuration": 60  },
-    "api/vendedor-auto.js":      { "maxDuration": 60  },
+    "api/vendedor-auto.js":      { "maxDuration": 300 },
     "api/vendedor-prospecta.js": { "maxDuration": 300 },
     "api/vendedor-replies.js":   { "maxDuration": 60  }
   },
