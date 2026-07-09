@@ -437,6 +437,22 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, daily });
     }
 
+    // ── get_daily_prospecta ──────────────────────────────────────────
+    if (action === 'get_daily_prospecta') {
+      const rows = await sbGet('rhinos_prospectos?select=created_at&order=created_at.desc&limit=5000');
+      const byDay = {};
+      for (const r of rows) {
+        const dia = (r.created_at || '').slice(0, 10);
+        if (!dia) continue;
+        byDay[dia] = (byDay[dia] || 0) + 1;
+      }
+      const daily = Object.entries(byDay)
+        .map(([dia, cantidad]) => ({ dia, cantidad }))
+        .sort((a, b) => b.dia.localeCompare(a.dia))
+        .slice(0, 30);
+      return res.json({ ok: true, daily });
+    }
+
     // ── get_stats ────────────────────────────────────────────────────
     if (action === 'get_stats') {
       const [rows, leadsRows, cfgAB] = await Promise.all([

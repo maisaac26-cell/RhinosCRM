@@ -16954,13 +16954,20 @@ async function loadViaMetrics() {
   if (!el) return;
   el.innerHTML = '<div class="loader" style="margin:20px auto"></div>';
   try {
-    const { daily } = await callVendedorAPI('get_daily_stats');
+    const [{ daily }, { daily: prosDays }] = await Promise.all([
+      callVendedorAPI('get_daily_stats'),
+      callVendedorAPI('get_daily_prospecta'),
+    ]);
     if (!daily || !daily.length) { el.innerHTML = '<div class="empty">Sin datos de envíos todavía — los datos aparecen cuando el sistema empiece a contactar prospectos.</div>'; return; }
-    const totalEnv = daily.reduce((s, d) => s + d.enviados, 0);
-    const totalAbi = daily.reduce((s, d) => s + d.abiertos, 0);
+    const prosMap = {};
+    (prosDays || []).forEach(d => { prosMap[d.dia] = d.cantidad; });
+    const totalEnv  = daily.reduce((s, d) => s + d.enviados, 0);
+    const totalAbi  = daily.reduce((s, d) => s + d.abiertos, 0);
     const totalResp = daily.reduce((s, d) => s + d.respondieron, 0);
+    const totalPros = (prosDays || []).reduce((s, d) => s + d.cantidad, 0);
     el.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+        <div class="metric-card"><div class="m-label">Prospectados</div><div class="m-val" style="color:var(--purple,#a78bfa)">${totalPros}</div><div class="m-sub">últimos 30 días</div></div>
         <div class="metric-card"><div class="m-label">Total enviados</div><div class="m-val cyan">${totalEnv}</div><div class="m-sub">últimos 30 días</div></div>
         <div class="metric-card"><div class="m-label">Abrieron</div><div class="m-val" style="color:var(--amber)">${totalAbi}</div><div class="m-sub">${totalEnv > 0 ? Math.round(totalAbi/totalEnv*100) : 0}% apertura</div></div>
         <div class="metric-card"><div class="m-label">Respondieron</div><div class="m-val" style="color:var(--green)">${totalResp}</div><div class="m-sub">${totalEnv > 0 ? Math.round(totalResp/totalEnv*100) : 0}% respuesta</div></div>
@@ -16970,6 +16977,7 @@ async function loadViaMetrics() {
           <thead>
             <tr style="border-bottom:1px solid var(--border);color:var(--text3);text-align:left">
               <th style="padding:8px 10px">Fecha</th>
+              <th style="padding:8px 8px;text-align:center">Prospectados</th>
               <th style="padding:8px 8px;text-align:center">Enviados</th>
               <th style="padding:8px 8px;text-align:center">Abrieron</th>
               <th style="padding:8px 8px;text-align:center">% apertura</th>
@@ -16983,8 +16991,10 @@ async function loadViaMetrics() {
               const pctResp = d.enviados > 0 ? Math.round(d.respondieron / d.enviados * 100) : 0;
               const [y, m, dd] = d.dia.split('-');
               const fechaFmt = `${dd}/${m}/${y}`;
+              const pros = prosMap[d.dia] || 0;
               return `<tr style="border-bottom:1px solid var(--border2)">
                 <td style="padding:8px 10px;color:var(--text);font-weight:500">${fechaFmt}</td>
+                <td style="padding:8px 8px;text-align:center;color:var(--purple,#a78bfa)">${pros > 0 ? pros : '—'}</td>
                 <td style="padding:8px 8px;text-align:center;font-weight:700;color:var(--cyan)">${d.enviados}</td>
                 <td style="padding:8px 8px;text-align:center;color:var(--amber)">${d.abiertos}</td>
                 <td style="padding:8px 8px;text-align:center;color:var(--amber)">${pctAbi > 0 ? pctAbi + '%' : '—'}</td>
