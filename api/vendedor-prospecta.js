@@ -186,6 +186,24 @@ function isMobileAR(phone) {
   return true;
 }
 
+// Busca número de WhatsApp/móvil AR en el HTML de un sitio web
+function extractMobileAR(html) {
+  if (!html) return '';
+  // wa.me/NUMERO — el indicador más confiable
+  const waM = html.match(/wa\.me\/(\d{6,15})/i);
+  if (waM && isMobileAR(waM[1])) return waM[1];
+  // api.whatsapp.com/send?phone=NUMERO
+  const wsM = html.match(/api\.whatsapp\.com\/send[^"'<\s]*phone=(\d{6,15})/i);
+  if (wsM && isMobileAR(wsM[1])) return wsM[1];
+  // tel: links con número móvil AR
+  const telRe = /href=["']tel:([+\d\s\-().]{7,20})["']/gi;
+  let m;
+  while ((m = telRe.exec(html)) !== null) {
+    if (isMobileAR(m[1])) return m[1];
+  }
+  return '';
+}
+
 function toSlug(s) {
   return (s || '').toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -396,8 +414,8 @@ function extractEmails(html) {
   }))];
 }
 
-async function findEmailsForSite(website) {
-  if (!website) return [];
+async function findEmailsAndPhoneForSite(website) {
+  if (!website) return { emails: [], phone: '' };
   try {
     const base = website.startsWith('http') ? new URL(website).origin : 'https://' + website;
     const [mainHtml, contactHtml] = await Promise.all([
@@ -405,12 +423,14 @@ async function findEmailsForSite(website) {
       fetchHtml(base + '/contacto').catch(() => ''),
     ]);
     let emails = [...new Set([...extractEmails(mainHtml), ...extractEmails(contactHtml)])];
-    if (!emails.length) {
+    let phone = extractMobileAR(mainHtml) || extractMobileAR(contactHtml);
+    if (!emails.length || !phone) {
       const en = await fetchHtml(base + '/contact').catch(() => '');
-      emails = extractEmails(en);
+      if (!emails.length) emails = extractEmails(en);
+      if (!phone) phone = extractMobileAR(en);
     }
-    return emails.slice(0, 5); // máximo 5 emails por sitio
-  } catch { return []; }
+    return { emails: emails.slice(0, 5), phone };
+  } catch { return { emails: [], phone: '' }; }
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -504,20 +524,28 @@ module.exports = async function handler(req, res) {
         const enriched = await Promise.all(batch.map(async (place) => {
           const isPAResult = (place.id || '').startsWith('pa_');
           let emails = [];
+          let sitePhone = '';
           if (place.email && !SKIP_EMAIL.test(place.email)) {
             emails = [place.email];
+            // Si el teléfono de la fuente no es móvil, buscar WA en el sitio web
+            if (place.website && !isMobileAR(place.phone)) {
+              const r = await findEmailsAndPhoneForSite(place.website);
+              sitePhone = r.phone;
+            }
           } else if (place.website) {
-            emails = await findEmailsForSite(place.website);
+            const r = await findEmailsAndPhoneForSite(place.website);
+            emails = r.emails;
+            sitePhone = r.phone;
           }
-          return { place, emails, isPAResult };
+          return { place, emails, sitePhone, isPAResult };
         }));
 
-        for (const { place, emails, isPAResult } of enriched) {
+        for (const { place, emails, sitePhone, isPAResult } of enriched) {
           if (nuevos.length >= cantidad) break;
           if (!emails.length) continue;
 
-          // Teléfono: solo guardar si es móvil argentino (compatible con WhatsApp)
-          const telGuardar = isMobileAR(place.phone) ? (place.phone || '') : '';
+          // Teléfono: priorizar móvil de Google/PA, si no hay buscar en sitio web
+          const telGuardar = isMobileAR(place.phone) ? (place.phone || '') : (sitePhone || '');
 
           const empresaNorm = (place.name || '').toLowerCase().trim();
           // 1 solo prospecto por empresa — si ya está en el pipeline, skip toda la empresa
