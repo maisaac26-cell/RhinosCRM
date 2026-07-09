@@ -523,7 +523,7 @@ module.exports = async function handler(req, res) {
       ]);
       if (contactadosSemana.length >= 50) {
         const tasaRebote = rebotesSemana.length / contactadosSemana.length;
-        if (tasaRebote > 0.15) {
+        if (tasaRebote > 0.25) {
           await sbReq('PATCH', 'rhinos_config?key=eq.vendedor_activo', { value: 'false', updated_at: new Date().toISOString() });
           return res.json({
             ok: true, skipped: true, summary,

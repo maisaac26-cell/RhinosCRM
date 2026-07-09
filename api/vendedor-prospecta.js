@@ -571,6 +571,23 @@ module.exports = async function handler(req, res) {
       summary.agregados = nuevos.length;
     }
 
+    // Reporte automático vía push notification
+    if (summary.agregados > 0) {
+      const rubros = summary.rubros.slice(0, 3).join(', ');
+      const pushPayload = JSON.stringify({
+        action: 'send',
+        title: `🔍 ${summary.agregados} prospectos nuevos`,
+        body: `Rubros: ${rubros}. ${summary.con_email} con email · ${summary.duplicados} duplicados saltados`,
+        tag: 'prospeccion',
+      });
+      const pushReq = https.request({
+        hostname: 'rhinos-crm.vercel.app', path: '/api/push', method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(pushPayload) },
+      }, r => { r.resume(); });
+      pushReq.on('error', () => {});
+      pushReq.write(pushPayload); pushReq.end();
+    }
+
     return res.json({ ok: true, summary });
   } catch(e) {
     return res.status(500).json({ ok: false, error: e.message, summary });
