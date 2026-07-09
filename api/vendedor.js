@@ -414,7 +414,8 @@ module.exports = async function handler(req, res) {
     if (action === 'get_prospectos') {
       const { estado, limit = 50, offset = 0 } = body;
       let path = `rhinos_prospectos?order=created_at.desc&limit=${limit + 1}&offset=${offset}`;
-      if (estado && estado !== 'todos') path += `&estado=eq.${estado}`;
+      if (estado === 'abrieron') path += `&ia_abierto=eq.true`;
+      else if (estado && estado !== 'todos') path += `&estado=eq.${estado}`;
       const rows = await sbGet(path);
       const hasMore = rows.length > limit;
       return res.json({ ok: true, prospectos: rows.slice(0, limit), hasMore });
