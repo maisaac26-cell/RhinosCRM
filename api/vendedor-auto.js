@@ -213,6 +213,7 @@ async function claudeChat(system, userMsg) {
     system, messages: [{ role: 'user', content: userMsg }]
   });
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { req.destroy(); reject(new Error('Claude API timeout (30s)')); }, 30000);
     const req = https.request({
       hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
@@ -220,6 +221,7 @@ async function claudeChat(system, userMsg) {
     }, (res) => {
       let raw = ''; res.on('data', c => raw += c);
       res.on('end', () => {
+        clearTimeout(timer);
         try {
           const parsed = JSON.parse(raw);
           const text = parsed.content?.[0]?.text;
@@ -228,7 +230,8 @@ async function claudeChat(system, userMsg) {
         } catch { reject(new Error('Claude parse error: ' + raw.slice(0, 120))); }
       });
     });
-    req.on('error', reject); req.write(payload); req.end();
+    req.on('error', (e) => { clearTimeout(timer); reject(e); });
+    req.write(payload); req.end();
   });
 }
 
@@ -539,6 +542,7 @@ module.exports = async function handler(req, res) {
     }
 
     let enviados = 0;
+    const paso1Start = Date.now();
 
     // ── PASO 1: contacto inicial (estado='nuevo', ia_contactado=false) ──
     // Traemos más de los necesarios para poder deduplicar por empresa
@@ -567,6 +571,7 @@ module.exports = async function handler(req, res) {
 
     for (const p of enCola) {
       if (enviados >= cfg.max_dia) break;
+      if (Date.now() - paso1Start > 120000) break; // 120s máx para PASO 1, deja margen para follow-ups
       // Anular prospectos con emails falsos/placeholder antes de intentar enviar
       if (!p.email || EMAIL_INVALIDO.test(p.email) || p.email.split('.').pop().length > 10) {
         const now = new Date().toISOString();
