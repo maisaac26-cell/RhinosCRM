@@ -800,7 +800,7 @@ module.exports = async function handler(req, res) {
 
     mark('done');
     clearTimeout(killTimer);
-    return res.json({ ok: true, summary });
+    return res.json({ ok: true, summary, _v: 'auto-v4' });
   } catch(e) {
     clearTimeout(killTimer);
     return res.status(500).json({ ok: false, error: e.message, summary });
