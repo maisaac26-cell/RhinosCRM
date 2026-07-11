@@ -10,6 +10,7 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 function sbReq(method, path, body) {
   const payload = body ? JSON.stringify(body) : null;
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { req.destroy(); resolve({}); }, 10000);
     const req = https.request({
       hostname: new URL(SB_URL).hostname,
       path: '/rest/v1/' + path, method,
@@ -20,9 +21,9 @@ function sbReq(method, path, body) {
       }
     }, (res) => {
       let raw = ''; res.on('data', c => raw += c);
-      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+      res.on('end', () => { clearTimeout(timer); try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
     });
-    req.on('error', reject);
+    req.on('error', (e) => { clearTimeout(timer); reject(e); });
     if (payload) req.write(payload);
     req.end();
   });
@@ -49,14 +50,15 @@ async function getGmailToken() {
     grant_type: 'refresh_token'
   }).toString();
   const refreshed = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { req.destroy(); reject(new Error('Token refresh timeout (10s)')); }, 10000);
     const req = https.request({
       hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(rPayload) }
     }, (res) => {
       let raw = ''; res.on('data', c => raw += c);
-      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+      res.on('end', () => { clearTimeout(timer); try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
     });
-    req.on('error', reject); req.write(rPayload); req.end();
+    req.on('error', (e) => { clearTimeout(timer); reject(e); }); req.write(rPayload); req.end();
   });
   if (!refreshed.access_token) throw new Error('No se pudo refrescar el token de Gmail');
 
@@ -114,14 +116,15 @@ async function sendGmail(token, to, subject, bodyText, prospId, fromDisplay, gma
     .toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   const payload = JSON.stringify({ raw: encoded });
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { req.destroy(); reject(new Error('Gmail send timeout (15s)')); }, 15000);
     const req = https.request({
       hostname: 'gmail.googleapis.com', path: '/gmail/v1/users/me/messages/send', method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
     }, (res) => {
       let raw2 = ''; res.on('data', c => raw2 += c);
-      res.on('end', () => { try { resolve(JSON.parse(raw2)); } catch { resolve({}); } });
+      res.on('end', () => { clearTimeout(timer); try { resolve(JSON.parse(raw2)); } catch { resolve({}); } });
     });
-    req.on('error', reject); req.write(payload); req.end();
+    req.on('error', (e) => { clearTimeout(timer); reject(e); }); req.write(payload); req.end();
   });
 }
 
