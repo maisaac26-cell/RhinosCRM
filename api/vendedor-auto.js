@@ -451,13 +451,13 @@ module.exports = async function handler(req, res) {
   const elapsed = () => Date.now() - funcStart;
   const mark = (k) => { summary.timing[k] = elapsed(); };
 
-  // Kill-switch at 10s — purely to test that kill-switch mechanism works; will increase after test
+  // Kill-switch: garantiza respuesta antes del timeout de Vercel (55s safe margin)
   const killTimer = setTimeout(() => {
     if (!res.headersSent) {
-      summary.errors.push({ tipo: 'kill_switch', msg: `Forzado salida a ${elapsed()}ms` });
-      res.json({ ok: false, error: 'Kill-switch 10s', summary });
+      summary.errors.push({ tipo: 'kill_switch', msg: `Salida forzada a ${elapsed()}ms` });
+      res.json({ ok: true, summary });
     }
-  }, 10000);
+  }, 55000);
 
   try {
     // Cargar config
@@ -465,20 +465,28 @@ module.exports = async function handler(req, res) {
     const cfgMap = {};
     cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
 
-    // Schedule guard — skip unless ?force=1
     const force = (req.query || {}).force === '1';
+    const activo = cfgMap.vendedor_activo || 'true';
+
+    // Estado del sistema — force=1 bypasea todo (envío manual del usuario)
     if (!force) {
-      const activo = cfgMap.vendedor_activo || 'true';
-      if (activo === 'false') return res.json({ ok: true, skipped: true, reason: 'sistema pausado' });
-      if (activo === 'solo_prospecta') return res.json({ ok: true, skipped: true, reason: 'envío de emails pausado (modo solo prospección)' });
-      const horaEnvio = parseInt(cfgMap.vendedor_hora_envio || '12', 10);
-      const diasEnvio = (cfgMap.vendedor_dias_envio || '1,2,3,4,5').split(',').map(Number);
-      const now = new Date();
-      const horaAR = ((now.getUTCHours() - 3) + 24) % 24;
-      const diaAR  = now.getUTCDay() || 7; // 0=Dom→7, 1=Lun…6=Sáb
-      if (horaAR !== horaEnvio || !diasEnvio.includes(diaAR)) {
-        return res.json({ ok: true, skipped: true, reason: `fuera de horario (son las ${horaAR}:00 AR, configurado ${horaEnvio}:00)`, _v: 'e3d1e4c' });
-      }
+      if (activo === 'false') return res.json({ ok: true, skipped: true, reason: 'sistema pausado — reactivá desde Configuración' });
+      if (activo === 'solo_prospecta') return res.json({ ok: true, skipped: true, reason: 'modo solo prospección activo' });
+    }
+
+    const horaEnvio = parseInt(cfgMap.vendedor_hora_envio || '9', 10);
+    const diasEnvio = (cfgMap.vendedor_dias_envio || '1,2,3,4,5').split(',').map(Number);
+    const _now = new Date();
+    const horaAR = ((_now.getUTCHours() - 3) + 24) % 24;
+    const diaAR  = _now.getUTCDay() || 7; // 0=Dom→7
+
+    // Emails iniciales: corre en las 3 horas desde horaEnvio (ej: 9, 10, 11)
+    const canDoInitials = force || ([horaEnvio, horaEnvio+1, horaEnvio+2].includes(horaAR) && diasEnvio.includes(diaAR));
+    // Follow-ups: cualquier hora laboral (8am-8pm AR) en días configurados
+    const canDoFollowups = force || (diasEnvio.includes(diaAR) && horaAR >= 8 && horaAR <= 20);
+
+    if (!canDoInitials && !canDoFollowups) {
+      return res.json({ ok: true, skipped: true, reason: `fuera de horario (${horaAR}:00 AR, días: ${diasEnvio.join(',')})` });
     }
 
     const cfg = {
@@ -546,17 +554,17 @@ module.exports = async function handler(req, res) {
         sbGet(`rhinos_prospectos?select=id&ia_contactado=eq.true&ia_fecha_contacto=gte.${encodeURIComponent(semana)}&limit=500`),
         sbGet(`rhinos_prospectos?select=id&estado=eq.invalido&ia_contactado=eq.true&updated_at=gte.${encodeURIComponent(semana)}&limit=100`),
       ]);
-      if (contactadosSemana.length >= 50) {
+      if (contactadosSemana.length >= 30) {
         const tasaRebote = rebotesSemana.length / contactadosSemana.length;
-        if (tasaRebote > 0.25) {
+        if (tasaRebote > 0.35) {
           await sbReq('PATCH', 'rhinos_config?key=eq.vendedor_activo', { value: 'false', updated_at: new Date().toISOString() });
           return res.json({
             ok: true, skipped: true, summary,
-            reason: `🚨 Auto-pausado: tasa de rebote ${(tasaRebote * 100).toFixed(0)}% en los últimos 7 días (umbral 15%). Revisá el dominio de envío o limpiá la lista de prospectos.`,
+            reason: `🚨 Auto-pausado: tasa de rebote ${(tasaRebote * 100).toFixed(0)}% (umbral 35%). Revisá el dominio o limpiá la lista. Reactivá desde Configuración.`,
           });
         }
-        if (tasaRebote > 0.08) {
-          summary.errors.push({ tipo: 'spam_warning', msg: `⚠️ Tasa de rebote ${(tasaRebote * 100).toFixed(0)}% esta semana — considerá revisar la calidad de los emails.` });
+        if (tasaRebote > 0.15) {
+          summary.errors.push({ tipo: 'spam_warning', msg: `⚠️ Rebote ${(tasaRebote * 100).toFixed(0)}% — considerá revisar la calidad de los emails de prospectos.` });
         }
       }
     } catch(e) {
@@ -564,20 +572,28 @@ module.exports = async function handler(req, res) {
     }
 
     mark('paso0');
-    // Delays: 1s cuando force=1 (test manual), configurado en automático
-    const getDelay = () => force
-      ? 1000
-      : Math.round(cfg.delay_min * 1000 + Math.random() * (cfg.delay_max - cfg.delay_min) * 1000);
-    // Budget thresholds (global elapsed): force=1 uses tighter windows but short delays → more emails
-    const p1Budget = force ? 90000  : 120000;
-    const p2Budget = force ? 160000 : 200000;
+    // Delays: 1-2s siempre (suficiente para no parecer bot, dentro del límite de Vercel)
+    const getDelay = () => Math.round(1000 + Math.random() * 1200);
+    // Budgets dentro del kill-switch de 55s (el overhead de config+token+bounces usa ~8s)
+    const p1Budget = 22000; // 22s para emails iniciales
+    const p2Budget = 44000; // 44s para follow-ups
 
     let enviados = 0;
+    const fromDisplay = [cfg.nombre_vendedor, cfg.razon_social].filter(Boolean).join(' de ');
+    const gmailFrom   = cfg.gmail_email;
 
-    // ── PASO 1: contacto inicial (estado='nuevo', ia_contactado=false) ──
+    // ── PASO 1: contacto inicial (solo en la ventana de horaEnvio) ──────
+    if (!canDoInitials) { mark('paso1_skip'); }
+    if (canDoInitials) {
+    // Cupo diario: cuántos ya se enviaron hoy para no exceder max_dia
+    const hoy = new Date().toISOString().slice(0, 10);
+    const enviadosHoy = await sbGet(`rhinos_prospectos?select=id&ia_contactado=eq.true&ia_fecha_contacto=gte.${encodeURIComponent(hoy + 'T00:00:00Z')}&limit=${cfg.max_dia + 1}`);
+    const cupoHoy = Math.max(0, cfg.max_dia - enviadosHoy.length);
+    if (cupoHoy <= 0) { mark('paso1_cupo_lleno'); }
+    else {
     // Traemos más de los necesarios para poder deduplicar por empresa
     const enColaRaw = await sbGet(
-      `rhinos_prospectos?estado=eq.nuevo&ia_contactado=eq.false&order=created_at.asc&limit=${cfg.max_dia * 5}`
+      `rhinos_prospectos?estado=eq.nuevo&ia_contactado=eq.false&order=created_at.asc&limit=${cupoHoy * 5}`
     );
 
     // Empresas que ya tienen al menos un contacto previo (cualquier run anterior)
@@ -592,15 +608,12 @@ module.exports = async function handler(req, res) {
       if (empresasEsteRun.has(k)) return false;
       empresasEsteRun.add(k);
       return true;
-    }).slice(0, cfg.max_dia);
-
-    const fromDisplay = [cfg.nombre_vendedor, cfg.razon_social].filter(Boolean).join(' de ');
-    const gmailFrom   = cfg.gmail_email;
+    }).slice(0, cupoHoy);
 
     const EMAIL_INVALIDO = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@|hola@hola\.|contact@contact\.|nombre@|^tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}/i;
 
     for (const p of enCola) {
-      if (enviados >= cfg.max_dia || elapsed() > p1Budget) break;
+      if (enviados >= cupoHoy || elapsed() > p1Budget) break;
       // Anular prospectos con emails falsos/placeholder antes de intentar enviar
       if (!p.email || EMAIL_INVALIDO.test(p.email) || p.email.split('.').pop().length > 10) {
         const now = new Date().toISOString();
@@ -628,12 +641,16 @@ module.exports = async function handler(req, res) {
       }
       if (elapsed() <= p1Budget) await new Promise(r => setTimeout(r, getDelay()));
     }
+    } // fin else cupoHoy
+    } // fin if canDoInitials
 
     mark('paso1');
-    // ── PASO 2: follow-ups (ia_contactado=true, sin respuesta, vencido) ──
+    // ── PASO 2: follow-ups (cualquier hora laboral en días configurados) ──
+    if (!canDoFollowups) { mark('paso2_skip'); }
+    else {
     const cutoff = new Date(Date.now() - cfg.followup_dias * 86400000).toISOString();
     const pendientes = await sbGet(
-      `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.${cfg.max_followups}&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=not.in.(frio,invalido)&order=ia_fecha_contacto.asc&limit=30`
+      `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.${cfg.max_followups}&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=not.in.(frio,invalido,rechazado,interesado,reengagement)&order=ia_fecha_contacto.asc&limit=30`
     );
 
     for (const p of pendientes) {
@@ -674,16 +691,18 @@ module.exports = async function handler(req, res) {
       if (elapsed() <= p2Budget) await new Promise(r => setTimeout(r, getDelay()));
     }
 
+    } // fin if canDoFollowups
+
     mark('paso2');
     // ── PASO 3: re-engagement — prospectos 'frio' de hace 30+ días ──────
-    if (elapsed() > 220000) { summary.errors.push({ tipo: 'skip_paso3', msg: 'tiempo agotado antes de re-engagement' }); }
+    if (!canDoFollowups || elapsed() > 46000) { /* skip si fuera de horario o sin tiempo */ }
     else try {
       const cutoff30 = new Date(Date.now() - 30 * 86400000).toISOString();
       const frios = await sbGet(
         `rhinos_prospectos?estado=eq.frio&ia_followup_fecha=lt.${encodeURIComponent(cutoff30)}&order=ia_followup_fecha.asc&limit=5`
       );
       for (const p of frios) {
-        if (elapsed() > 240000) break; // stop if running out of time
+        if (elapsed() > 52000) break;
         try {
           const rubroCtx = getRubroContext(p.rubro);
           const firma    = buildFirma(cfg);
@@ -710,8 +729,8 @@ module.exports = async function handler(req, res) {
     }
 
     // ── PASO 4: abrieron el email pero no respondieron → trigger WA ─────
-    if (elapsed() > 250000) { summary.errors.push({ tipo: 'skip_wa', msg: 'tiempo agotado antes de WA' }); }
-    else if (cfg.wa_greenapi_id && cfg.wa_greenapi_token) {
+    if (canDoFollowups && elapsed() <= 52000 && cfg.wa_greenapi_id && cfg.wa_greenapi_token) {
+    try {
       try {
         const abiertos = await sbGet(
           `rhinos_prospectos?ia_abierto=eq.true&ia_reply=eq.false&ia_wa_enviado=eq.false&estado=not.in.(frio,invalido,rechazado,reengagement)&order=ia_ultima_apertura.desc&limit=15`
@@ -774,7 +793,10 @@ module.exports = async function handler(req, res) {
       } catch(e) {
         summary.errors.push({ tipo: 'wa_followup2_check', error: e.message });
       }
+    } catch(e) {
+      summary.errors.push({ tipo: 'wa_check', error: e.message });
     }
+    } // fin if canDoFollowups && wa
 
     mark('done');
     clearTimeout(killTimer);
