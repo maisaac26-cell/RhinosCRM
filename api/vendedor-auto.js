@@ -479,6 +479,7 @@ module.exports = async function handler(req, res) {
     respondieron: 0,
     frios: 0,
     rebotes: 0,
+    mx_descartados: 0,
     reengagement_enviados: 0,
     wa_por_apertura: 0,
     wa_followup2: 0,
@@ -636,6 +637,32 @@ module.exports = async function handler(req, res) {
       }
     } catch(e) {
       summary.errors.push({ tipo: 'spam_check', error: e.message });
+    }
+
+    // ── LIMPIEZA MASIVA MX (solo con force=1 o primera hora del día) ────────
+    // Escanea hasta 200 prospectos pendientes y descarta dominios sin MX en paralelo
+    // Esto hace la limpieza "en caliente" antes de que lleguen al loop de envío
+    try {
+      const sinRevisar = await sbGet('rhinos_prospectos?estado=eq.nuevo&ia_contactado=eq.false&select=id,email,empresa&order=created_at.asc&limit=200');
+      const DOMINIOS_PUBLICOS_MX = /gmail\.com|hotmail\.com|outlook\.com|yahoo\.com|live\.com|icloud\.com|msn\.com|protonmail\.com|zoho\.com|aol\.com|fibertel\.com\.ar|arnet\.com\.ar|speedy\.com\.ar|ciudad\.com\.ar/i;
+      // Solo revisar dominios custom (los públicos ya sabemos que tienen MX)
+      const aRevisar = sinRevisar.filter(p => p.email && !DOMINIOS_PUBLICOS_MX.test(p.email));
+      if (aRevisar.length > 0) {
+        const mxBulk = await Promise.all(
+          aRevisar.map(p => dominioTieneMX(p.email).then(ok => ({ p, ok })))
+        );
+        const sinMX = mxBulk.filter(r => !r.ok);
+        summary.mx_descartados = sinMX.length;
+        // Marcar como inválidos en paralelo (fire-and-forget)
+        await Promise.all(sinMX.map(({ p }) =>
+          sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+            estado: 'invalido', notas: '❌ Dominio sin servidor de correo (MX)',
+            updated_at: new Date().toISOString(),
+          }).catch(() => {})
+        ));
+      }
+    } catch(e) {
+      summary.errors.push({ tipo: 'mx_bulk', error: e.message });
     }
 
     mark('paso0');

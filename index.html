@@ -17113,7 +17113,7 @@ document.getElementById('btn-via-enviar')?.addEventListener('click', async funct
       else {
         const s = data.summary || {};
         const errMsg = (!s.iniciales_enviados && s.errors?.length) ? ` · ⚠️ ${s.errors[0]?.error || s.errors[0]?.tipo}` : '';
-        showToast(`📤 ${s.iniciales_enviados || 0} iniciales · ${s.followup_enviados || 0} follow-ups · ${s.respondieron || 0} respondieron · ${s.frios || 0} fríos${s.rebotes ? ` · ❌ ${s.rebotes} rebotes` : ''}${errMsg}`);
+        showToast(`📤 ${s.iniciales_enviados || 0} iniciales · ${s.followup_enviados || 0} follow-ups · ${s.respondieron || 0} respondieron · ${s.frios || 0} fríos${s.rebotes ? ` · ❌ ${s.rebotes} rebotes` : ''}${s.mx_descartados ? ` · 🚫 ${s.mx_descartados} sin MX` : ''}${errMsg}`);
         loadVendedorIA();
       }
     } else {
