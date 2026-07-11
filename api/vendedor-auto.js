@@ -3,6 +3,7 @@
 // 2. Envía follow-ups a contactados sin respuesta pasados followup_dias días.
 'use strict';
 const https = require('https');
+const dns   = require('dns').promises;
 
 const SB_URL = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
@@ -169,13 +170,32 @@ function extractBodyText(parts) {
   return text;
 }
 
+// Cache MX por dominio — evita lookups repetidos en el mismo run
+const _mxCache = new Map();
+async function dominioTieneMX(email) {
+  const domain = (email.split('@')[1] || '').toLowerCase().trim();
+  if (!domain) return false;
+  if (_mxCache.has(domain)) return _mxCache.get(domain);
+  try {
+    const records = await Promise.race([
+      dns.resolveMx(domain),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000)),
+    ]);
+    const ok = Array.isArray(records) && records.length > 0;
+    _mxCache.set(domain, ok);
+    return ok;
+  } catch {
+    _mxCache.set(domain, false);
+    return false; // NXDOMAIN o timeout → dominio no puede recibir correo
+  }
+}
+
 async function checkBounces(token) {
   const EMAIL_RE   = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
   const SKIP_HOSTS = /mailer-daemon|postmaster|google|noreply|bounce|example\.com/i;
 
   const q    = encodeURIComponent('from:mailer-daemon newer_than:2d');
   const list = await gmailGet(token, `/gmail/v1/users/me/messages?q=${q}&maxResults=20`);
-  // Limit to 10 and run in parallel — avoids 30 × 8s = 240s sequential worst-case
   const msgs = (list.messages || []).slice(0, 10);
 
   const bounced = new Map(); // email → razon
@@ -183,7 +203,7 @@ async function checkBounces(token) {
   await Promise.all(msgs.map(async (msg) => {
     const full   = await gmailGet(token, `/gmail/v1/users/me/messages/${msg.id}?format=full`);
     const body   = extractBodyText(full.payload?.parts || [full.payload]) + ' ' + (full.snippet || '');
-    const isSpam = /5\.7\.|spam|calificado|filtro|blocked|blacklist/i.test(body);
+    const isSpam = /5\.7\.|spam|calificado|filtro|blocked|blacklist|rejected|policy|dmarc|spf|dkim|554|550 5/i.test(body);
     const razon  = isSpam
       ? '🚫 Servidor rechazó como spam — revisar contenido del email o dominio de envío'
       : '❌ Email rebotado — dirección no existe o buzón lleno';
@@ -548,15 +568,42 @@ module.exports = async function handler(req, res) {
         const prospMap = {};
         todos.forEach(p => { if (p.email) prospMap[p.email.toLowerCase().trim()] = p.id; });
 
+        // Dominios de grandes proveedores — no blacklistear el dominio entero
+        const DOMINIOS_PUBLICOS = /gmail\.com|hotmail\.com|outlook\.com|yahoo\.com|live\.com|icloud\.com|msn\.com|protonmail\.com|zoho\.com|aol\.com/i;
+
+        const dominiosRebotados = new Set();
         for (const { email, razon } of bouncedEmails) {
           const id = prospMap[email];
-          if (!id) continue;
-          await sbReq('PATCH', `rhinos_prospectos?id=eq.${id}`, {
-            estado:      'invalido',
-            notas:       razon,
-            updated_at:  new Date().toISOString(),
-          });
-          summary.rebotes++;
+          if (id) {
+            await sbReq('PATCH', `rhinos_prospectos?id=eq.${id}`, {
+              estado: 'invalido', notas: razon, updated_at: new Date().toISOString(),
+            });
+            summary.rebotes++;
+          }
+          // Acumular dominios custom que rebotaron para pre-cargar en MX cache
+          const dom = (email.split('@')[1] || '').toLowerCase();
+          if (dom && !DOMINIOS_PUBLICOS.test(dom)) dominiosRebotados.add(dom);
+        }
+
+        // Invalidar prospectos pendientes con dominios que rebotaron (sin MX real)
+        if (dominiosRebotados.size > 0) {
+          const mxChecks = await Promise.all([...dominiosRebotados].map(async dom => {
+            const ok = await dominioTieneMX(`x@${dom}`);
+            return { dom, ok };
+          }));
+          const dominiosSinMX = new Set(mxChecks.filter(r => !r.ok).map(r => r.dom));
+          if (dominiosSinMX.size > 0) {
+            const pendientesDom = await sbGet('rhinos_prospectos?estado=eq.nuevo&ia_contactado=eq.false&select=id,email&limit=3000');
+            for (const p of pendientesDom) {
+              const dom = (p.email || '').split('@')[1]?.toLowerCase();
+              if (dom && dominiosSinMX.has(dom)) {
+                await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+                  estado: 'invalido', notas: '❌ Dominio sin servidor de correo (MX)', updated_at: new Date().toISOString(),
+                }).catch(() => {});
+                summary.rebotes++;
+              }
+            }
+          }
         }
       }
     } catch(e) {
@@ -627,7 +674,25 @@ module.exports = async function handler(req, res) {
       return true;
     }).slice(0, cupoHoy);
 
-    const EMAIL_INVALIDO = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@|hola@hola\.|contact@contact\.|nombre@|^tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}/i;
+    const EMAIL_INVALIDO = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@demosite\.|hola@hola\.|contact@contact\.|nombre@|^tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}|correo@correo\.|mail@mail\.|empresa@empresa\.|negocio@negocio\.|local@local\.|webmaster@webmaster\.|[a-z]@[a-zA-Z0-9.\-]+\.[a-z]{2,}$/i;
+
+    // Validación MX en paralelo para todos los prospectos del batch (antes del loop)
+    const mxResultados = await Promise.all(
+      enCola.map(p => p.email
+        ? dominioTieneMX(p.email).then(ok => ({ id: p.id, ok }))
+        : Promise.resolve({ id: p.id, ok: false })
+      )
+    );
+    const mxValidos = new Set(mxResultados.filter(r => r.ok).map(r => r.id));
+    // Marcar inválidos sin MX en paralelo (fire-and-forget)
+    mxResultados.filter(r => !r.ok).forEach(r => {
+      const p = enCola.find(x => x.id === r.id);
+      if (!p) return;
+      sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+        estado: 'invalido', notas: '❌ Dominio sin servidor de correo (MX)', updated_at: new Date().toISOString(),
+      }).catch(() => {});
+      summary.errors.push({ empresa: p.empresa, tipo: 'sin_mx', error: `Sin registros MX: ${(p.email||'').split('@')[1]}` });
+    });
 
     for (const p of enCola) {
       if (enviados >= cupoHoy || elapsed() > p1Budget) break;
@@ -638,6 +703,8 @@ module.exports = async function handler(req, res) {
         summary.errors.push({ empresa: p.empresa, tipo: 'email_invalido', error: `Email descartado: ${p.email}` });
         continue;
       }
+      // Skip si el MX check falló
+      if (!mxValidos.has(p.id)) continue;
       try {
         const email = await generarEmail(cfg, p, false, null);
         const sent  = await sendGmail(token, p.email, email.asunto, email.cuerpo, p.id, fromDisplay, gmailFrom);
