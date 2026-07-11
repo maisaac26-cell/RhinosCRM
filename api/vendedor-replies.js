@@ -333,7 +333,17 @@ module.exports = async function handler(req, res) {
         if (!latestProspectMsgId) { summary.sin_novedad++; continue; }
 
         // ¿Ya respondimos a este mensaje?
-        if (p.ia_last_msg_id === latestProspectMsgId) { summary.sin_novedad++; continue; }
+        if (p.ia_last_msg_id === latestProspectMsgId) {
+          // Backfill snippet si todavía no lo tenemos (prospectos procesados antes de la feature)
+          if (!p.ia_reply_snippet && latestProspectText) {
+            sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+              ia_reply_snippet: latestProspectText.slice(0, 280),
+              ia_intencion:     p.ia_intencion || await clasificarIntencion(latestProspectText),
+            }).catch(() => {});
+          }
+          summary.sin_novedad++;
+          continue;
+        }
 
         // Clasificar intención del reply con Claude Haiku
         const intencion = await clasificarIntencion(latestProspectText);
