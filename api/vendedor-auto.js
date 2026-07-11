@@ -643,8 +643,9 @@ module.exports = async function handler(req, res) {
         const replied = await hasReply(token, p.ia_gmail_thread_id);
 
         if (replied) {
-          await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, { ia_reply: true, ia_reply_fecha: now, estado: 'interesado', updated_at: now });
-          await crearLeadSiNoExiste(p);
+          // Solo marcar que hay reply — vendedor-replies clasifica la intención
+          // y decide si crear lead o marcar como interesado (evita falsos positivos por auto-respuestas)
+          await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, { ia_reply: true, ia_reply_fecha: now, updated_at: now });
           summary.respondieron++;
           continue;
         }

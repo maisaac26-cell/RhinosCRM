@@ -380,7 +380,8 @@ module.exports = async function handler(req, res) {
           continue;
         }
 
-        // Cualquier respuesta positiva → crear lead en CRM de inmediato
+        // Respuesta positiva → marcar interesado + crear lead en CRM
+        await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, { estado: 'interesado', updated_at: now });
         await crearLeadSiNoExiste(p);
 
         // Push notification para leads calientes (fire-and-forget)
