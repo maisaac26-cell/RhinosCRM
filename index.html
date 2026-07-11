@@ -10049,7 +10049,7 @@ document.addEventListener('click', function(e) {
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+  setTimeout(() => t.classList.remove('show'), 10000);
 }
 
 // Muestra un cartel de auditoría cuando una acción impacta en otros módulos.
