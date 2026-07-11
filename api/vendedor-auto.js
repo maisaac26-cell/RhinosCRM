@@ -143,14 +143,15 @@ async function crearLeadSiNoExiste(prospecto) {
 
 function gmailGet(token, path) {
   return new Promise((resolve) => {
+    const timer = setTimeout(() => { req.destroy(); resolve({}); }, 8000);
     const req = https.request({
       hostname: 'gmail.googleapis.com', path, method: 'GET',
       headers: { 'Authorization': 'Bearer ' + token }
     }, (res) => {
       let raw = ''; res.on('data', c => raw += c);
-      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+      res.on('end', () => { clearTimeout(timer); try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
     });
-    req.on('error', () => resolve({})); req.end();
+    req.on('error', () => { clearTimeout(timer); resolve({}); }); req.end();
   });
 }
 
@@ -601,12 +602,14 @@ module.exports = async function handler(req, res) {
     }
 
     // ── PASO 2: follow-ups (ia_contactado=true, sin respuesta, vencido) ──
+    const paso2Start = Date.now();
     const cutoff = new Date(Date.now() - cfg.followup_dias * 86400000).toISOString();
     const pendientes = await sbGet(
       `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.${cfg.max_followups}&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=not.in.(frio,invalido)&order=ia_fecha_contacto.asc&limit=30`
     );
 
     for (const p of pendientes) {
+      if (Date.now() - paso2Start > 100000) break; // 100s máx para PASO 2
       try {
         const now     = new Date().toISOString();
         const replied = await hasReply(token, p.ia_gmail_thread_id);
