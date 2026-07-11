@@ -575,7 +575,8 @@ module.exports = async function handler(req, res) {
         // Dominios de grandes proveedores — no blacklistear el dominio entero
         const DOMINIOS_PUBLICOS = /gmail\.com|hotmail\.com|outlook\.com|yahoo\.com|live\.com|icloud\.com|msn\.com|protonmail\.com|zoho\.com|aol\.com/i;
 
-        const dominiosRebotados = new Set();
+        const dominiosSpam = new Set();      // rechazados como spam → bloquear dominio completo
+        const dominiosRebotados = new Set(); // hard bounce → verificar MX
         for (const { email, razon } of bouncedEmails) {
           const id = prospMap[email];
           if (id) {
@@ -584,9 +585,23 @@ module.exports = async function handler(req, res) {
             });
             summary.rebotes++;
           }
-          // Acumular dominios custom que rebotaron para pre-cargar en MX cache
           const dom = (email.split('@')[1] || '').toLowerCase();
-          if (dom && !DOMINIOS_PUBLICOS.test(dom)) dominiosRebotados.add(dom);
+          if (dom && !DOMINIOS_PUBLICOS.test(dom)) {
+            if (razon.startsWith('🚫')) dominiosSpam.add(dom);
+            else dominiosRebotados.add(dom);
+          }
+        }
+
+        // Bloquear prospectos pendientes en dominios que rechazaron como spam
+        if (dominiosSpam.size > 0) {
+          const pendientesSpam = await sbGet('rhinos_prospectos?estado=eq.nuevo&ia_contactado=eq.false&select=id,email&limit=3000');
+          await Promise.all(pendientesSpam
+            .filter(p => { const d = (p.email||'').split('@')[1]?.toLowerCase(); return d && dominiosSpam.has(d); })
+            .map(p => sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+              estado: 'invalido', notas: '🚫 Dominio ya rechazó como spam — no reenviar',
+              updated_at: new Date().toISOString(),
+            }).catch(() => {}))
+          );
         }
 
         // Invalidar prospectos pendientes con dominios que rebotaron (sin MX real)
@@ -704,7 +719,7 @@ module.exports = async function handler(req, res) {
       return true;
     }).slice(0, cupoHoy);
 
-    const EMAIL_INVALIDO = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@demosite\.|hola@hola\.|contact@contact\.|nombre@|^tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}|^correo@correo\.|^mail@mail\.|^empresa@empresa\.|^negocio@negocio\.|^webmaster@webmaster\./i;
+    const EMAIL_INVALIDO = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@demosite\.|hola@hola\.|contact@contact\.|nombre@|^tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}|^correo@correo\.|^mail@mail\.|^empresa@empresa\.|^negocio@negocio\.|^webmaster@webmaster\.|@domain\.com$|^example@/i;
 
     // Validación MX en paralelo para todos los prospectos del batch (antes del loop)
     const mxResultados = await Promise.all(
@@ -914,7 +929,7 @@ module.exports = async function handler(req, res) {
 
     mark('done');
     clearTimeout(killTimer);
-    return res.json({ ok: true, summary, _v: 'auto-v4' });
+    return res.json({ ok: true, summary, _v: 'auto-v5' });
   } catch(e) {
     clearTimeout(killTimer);
     return res.status(500).json({ ok: false, error: e.message, summary });
