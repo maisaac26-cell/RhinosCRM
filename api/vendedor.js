@@ -423,15 +423,25 @@ module.exports = async function handler(req, res) {
 
     // ── get_daily_stats ──────────────────────────────────────────────
     if (action === 'get_daily_stats') {
-      const rows = await sbGet('rhinos_prospectos?select=ia_fecha_contacto,ia_abierto,ia_reply&ia_contactado=eq.true&ia_fecha_contacto=not.is.null&order=ia_fecha_contacto.desc&limit=2000');
+      const today = new Date().toISOString().slice(0, 10);
+      const [rows, fuRows] = await Promise.all([
+        sbGet('rhinos_prospectos?select=ia_fecha_contacto,ia_abierto,ia_reply&ia_contactado=eq.true&ia_fecha_contacto=not.is.null&order=ia_fecha_contacto.desc&limit=2000'),
+        sbGet('rhinos_prospectos?select=ia_followup_fecha,ia_followup_count&ia_contactado=eq.true&ia_followup_fecha=not.is.null&limit=2000'),
+      ]);
       const byDay = {};
       for (const r of rows) {
         const dia = (r.ia_fecha_contacto || '').slice(0, 10);
-        if (!dia) continue;
-        if (!byDay[dia]) byDay[dia] = { dia, enviados: 0, abiertos: 0, respondieron: 0 };
+        if (!dia || dia > today) continue; // ignorar fechas futuras (fuera_oficina corrupto, etc.)
+        if (!byDay[dia]) byDay[dia] = { dia, enviados: 0, followups: 0, abiertos: 0, respondieron: 0 };
         byDay[dia].enviados++;
         if (r.ia_abierto) byDay[dia].abiertos++;
         if (r.ia_reply) byDay[dia].respondieron++;
+      }
+      for (const r of fuRows) {
+        const dia = (r.ia_followup_fecha || '').slice(0, 10);
+        if (!dia || dia > today) continue;
+        if (!byDay[dia]) byDay[dia] = { dia, enviados: 0, followups: 0, abiertos: 0, respondieron: 0 };
+        byDay[dia].followups += (r.ia_followup_count || 1); // sumamos los follow-ups de ese día
       }
       const daily = Object.values(byDay).sort((a, b) => b.dia.localeCompare(a.dia)).slice(0, 30);
       return res.json({ ok: true, daily });

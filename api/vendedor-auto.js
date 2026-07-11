@@ -640,6 +640,13 @@ module.exports = async function handler(req, res) {
       if (elapsed() > p2Budget) break;
       try {
         const now     = new Date().toISOString();
+
+        // Respetar la pausa de ia_followup_fecha (ej: fuera_oficina programa recontacto futuro)
+        if (p.ia_followup_fecha && new Date(p.ia_followup_fecha) > Date.now()) {
+          summary.sin_novedad = (summary.sin_novedad || 0) + 1;
+          continue;
+        }
+
         const replied = await hasReply(token, p.ia_gmail_thread_id);
 
         if (replied) {

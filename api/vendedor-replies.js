@@ -368,13 +368,13 @@ module.exports = async function handler(req, res) {
           continue;
         }
 
-        // Fuera de oficina → reprogramar contacto en 10 días, no responder
+        // Fuera de oficina → reprogramar en ia_followup_fecha (NO tocar ia_fecha_contacto histórico)
         if (intencion === 'fuera_oficina') {
           const recontactar = new Date(Date.now() + 10 * 86400000).toISOString();
           await sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
-            ia_last_msg_id: latestProspectMsgId,
-            ia_fecha_contacto: recontactar,
-            updated_at: now,
+            ia_last_msg_id:   latestProspectMsgId,
+            ia_followup_fecha: recontactar,
+            updated_at:       now,
           });
           summary.sin_novedad++;
           continue;
