@@ -179,14 +179,17 @@ async function dominioTieneMX(email) {
   try {
     const records = await Promise.race([
       dns.resolveMx(domain),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000)),
+      new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { code: 'ETIMEOUT' })), 3500)),
     ]);
     const ok = Array.isArray(records) && records.length > 0;
     _mxCache.set(domain, ok);
     return ok;
-  } catch {
-    _mxCache.set(domain, false);
-    return false; // NXDOMAIN o timeout → dominio no puede recibir correo
+  } catch (e) {
+    // Solo bloquear si el dominio DEFINITIVAMENTE no existe (NXDOMAIN / sin registros MX)
+    // Timeouts y errores de red → dejar pasar (evitar falsos negativos)
+    const sinDuda = e.code === 'ENOTFOUND' || e.code === 'ENODATA';
+    _mxCache.set(domain, !sinDuda);
+    return !sinDuda;
   }
 }
 
@@ -674,7 +677,7 @@ module.exports = async function handler(req, res) {
       return true;
     }).slice(0, cupoHoy);
 
-    const EMAIL_INVALIDO = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@demosite\.|hola@hola\.|contact@contact\.|nombre@|^tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}|correo@correo\.|mail@mail\.|empresa@empresa\.|negocio@negocio\.|local@local\.|webmaster@webmaster\.|[a-z]@[a-zA-Z0-9.\-]+\.[a-z]{2,}$/i;
+    const EMAIL_INVALIDO = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@demosite\.|hola@hola\.|contact@contact\.|nombre@|^tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}|^correo@correo\.|^mail@mail\.|^empresa@empresa\.|^negocio@negocio\.|^webmaster@webmaster\./i;
 
     // Validación MX en paralelo para todos los prospectos del batch (antes del loop)
     const mxResultados = await Promise.all(
