@@ -339,8 +339,12 @@ module.exports = async function handler(req, res) {
         const intencion = await clasificarIntencion(latestProspectText);
         const now = new Date().toISOString();
 
-        // Guardar intención (no crítico si el campo no existe en DB)
-        sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, { ia_intencion: intencion, updated_at: now }).catch(() => {});
+        // Guardar intención y snippet de la respuesta del prospecto
+        sbReq('PATCH', `rhinos_prospectos?id=eq.${p.id}`, {
+          ia_intencion:     intencion,
+          ia_reply_snippet: latestProspectText.slice(0, 280),
+          updated_at:       now,
+        }).catch(() => {});
 
         // Rechazado → marcar, pausar, no responder
         if (intencion === 'rechazado') {
