@@ -214,9 +214,10 @@ function hasReply(token, threadId) {
 }
 
 async function claudeChat(system, userMsg) {
+  // safeStr aplicado aquí cubre tanto system prompt como user message
   const payload = JSON.stringify({
     model: 'claude-haiku-4-5-20251001', max_tokens: 700,
-    system, messages: [{ role: 'user', content: userMsg }]
+    system: safeStr(system), messages: [{ role: 'user', content: safeStr(userMsg) }]
   });
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => { req.destroy(); reject(new Error('Claude API timeout (30s)')); }, 30000);
