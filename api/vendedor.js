@@ -441,7 +441,7 @@ module.exports = async function handler(req, res) {
         const dia = (r.ia_followup_fecha || '').slice(0, 10);
         if (!dia || dia > today) continue;
         if (!byDay[dia]) byDay[dia] = { dia, enviados: 0, followups: 0, abiertos: 0, respondieron: 0 };
-        byDay[dia].followups += (r.ia_followup_count || 1); // sumamos los follow-ups de ese día
+        byDay[dia].followups += 1; // 1 follow-up enviado ese día para este prospecto
       }
       const daily = Object.values(byDay).sort((a, b) => b.dia.localeCompare(a.dia)).slice(0, 30);
       return res.json({ ok: true, daily });
