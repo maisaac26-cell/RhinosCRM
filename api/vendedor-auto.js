@@ -477,7 +477,7 @@ module.exports = async function handler(req, res) {
       const horaAR = ((now.getUTCHours() - 3) + 24) % 24;
       const diaAR  = now.getUTCDay() || 7; // 0=Dom→7, 1=Lun…6=Sáb
       if (horaAR !== horaEnvio || !diasEnvio.includes(diaAR)) {
-        return res.json({ ok: true, skipped: true, reason: `fuera de horario (son las ${horaAR}:00 AR, configurado ${horaEnvio}:00)` });
+        return res.json({ ok: true, skipped: true, reason: `fuera de horario (son las ${horaAR}:00 AR, configurado ${horaEnvio}:00)`, _v: 'e3d1e4c' });
       }
     }
 
