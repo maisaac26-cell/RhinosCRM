@@ -451,13 +451,13 @@ module.exports = async function handler(req, res) {
   const elapsed = () => Date.now() - funcStart;
   const mark = (k) => { summary.timing[k] = elapsed(); };
 
-  // Kill-switch: if still running at 280s, return whatever we have so Vercel doesn't FUNCTION_INVOCATION_TIMEOUT
+  // Kill-switch at 10s — purely to test that kill-switch mechanism works; will increase after test
   const killTimer = setTimeout(() => {
     if (!res.headersSent) {
       summary.errors.push({ tipo: 'kill_switch', msg: `Forzado salida a ${elapsed()}ms` });
-      res.json({ ok: false, error: 'Kill-switch 280s', summary });
+      res.json({ ok: false, error: 'Kill-switch 10s', summary });
     }
-  }, 280000);
+  }, 10000);
 
   try {
     // Cargar config
