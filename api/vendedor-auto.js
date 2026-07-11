@@ -171,12 +171,13 @@ async function checkBounces(token) {
   const SKIP_HOSTS = /mailer-daemon|postmaster|google|noreply|bounce|example\.com/i;
 
   const q    = encodeURIComponent('from:mailer-daemon newer_than:2d');
-  const list = await gmailGet(token, `/gmail/v1/users/me/messages?q=${q}&maxResults=50`);
-  const msgs = (list.messages || []).slice(0, 30);
+  const list = await gmailGet(token, `/gmail/v1/users/me/messages?q=${q}&maxResults=20`);
+  // Limit to 10 and run in parallel — avoids 30 × 8s = 240s sequential worst-case
+  const msgs = (list.messages || []).slice(0, 10);
 
   const bounced = new Map(); // email → razon
 
-  for (const msg of msgs) {
+  await Promise.all(msgs.map(async (msg) => {
     const full   = await gmailGet(token, `/gmail/v1/users/me/messages/${msg.id}?format=full`);
     const body   = extractBodyText(full.payload?.parts || [full.payload]) + ' ' + (full.snippet || '');
     const isSpam = /5\.7\.|spam|calificado|filtro|blocked|blacklist/i.test(body);
@@ -188,23 +189,24 @@ async function checkBounces(token) {
       const norm = e.toLowerCase();
       if (!SKIP_HOSTS.test(norm.split('@')[1] || '')) bounced.set(norm, razon);
     });
-  }
+  }));
 
   return [...bounced.entries()].map(([email, razon]) => ({ email, razon }));
 }
 
-async function hasReply(token, threadId) {
-  if (!threadId) return false;
+function hasReply(token, threadId) {
+  if (!threadId) return Promise.resolve(false);
   return new Promise((resolve) => {
+    const timer = setTimeout(() => { req.destroy(); resolve(false); }, 8000);
     const req = https.request({
       hostname: 'gmail.googleapis.com',
       path: `/gmail/v1/users/me/threads/${threadId}?format=minimal`,
       method: 'GET', headers: { 'Authorization': 'Bearer ' + token }
     }, (res) => {
       let raw = ''; res.on('data', c => raw += c);
-      res.on('end', () => { try { resolve((JSON.parse(raw).messages || []).length > 1); } catch { resolve(false); } });
+      res.on('end', () => { clearTimeout(timer); try { resolve((JSON.parse(raw).messages || []).length > 1); } catch { resolve(false); } });
     });
-    req.on('error', () => resolve(false)); req.end();
+    req.on('error', () => { clearTimeout(timer); resolve(false); }); req.end();
   });
 }
 
@@ -441,6 +443,9 @@ module.exports = async function handler(req, res) {
     errors: []
   };
 
+  const funcStart = Date.now();
+  const elapsed = () => Date.now() - funcStart;
+
   try {
     // Cargar config
     const cfgRows = await sbGet('rhinos_config?key=in.(vendedor_razon_social,vendedor_servicios,vendedor_tono,vendedor_followup_dias,vendedor_max_dia,vendedor_mensaje_ejemplo,vendedor_website,vendedor_whatsapp,vendedor_nombre_vendedor,vendedor_activo,vendedor_hora_envio,vendedor_dias_envio,vendedor_delay_min,vendedor_delay_max,vendedor_max_followups,vendedor_calendly,vendedor_wa_greenapi_id,vendedor_wa_greenapi_token,vendedor_ab_winner,gmail_email)');
@@ -639,12 +644,14 @@ module.exports = async function handler(req, res) {
     }
 
     // ── PASO 3: re-engagement — prospectos 'frio' de hace 30+ días ──────
-    try {
+    if (elapsed() > 220000) { summary.errors.push({ tipo: 'skip_paso3', msg: 'tiempo agotado antes de re-engagement' }); }
+    else try {
       const cutoff30 = new Date(Date.now() - 30 * 86400000).toISOString();
       const frios = await sbGet(
         `rhinos_prospectos?estado=eq.frio&ia_followup_fecha=lt.${encodeURIComponent(cutoff30)}&order=ia_followup_fecha.asc&limit=5`
       );
       for (const p of frios) {
+        if (elapsed() > 240000) break; // stop if running out of time
         try {
           const rubroCtx = getRubroContext(p.rubro);
           const firma    = buildFirma(cfg);
@@ -671,7 +678,8 @@ module.exports = async function handler(req, res) {
     }
 
     // ── PASO 4: abrieron el email pero no respondieron → trigger WA ─────
-    if (cfg.wa_greenapi_id && cfg.wa_greenapi_token) {
+    if (elapsed() > 250000) { summary.errors.push({ tipo: 'skip_wa', msg: 'tiempo agotado antes de WA' }); }
+    else if (cfg.wa_greenapi_id && cfg.wa_greenapi_token) {
       try {
         const abiertos = await sbGet(
           `rhinos_prospectos?ia_abierto=eq.true&ia_reply=eq.false&ia_wa_enviado=eq.false&estado=not.in.(frio,invalido,rechazado,reengagement)&order=ia_ultima_apertura.desc&limit=15`
