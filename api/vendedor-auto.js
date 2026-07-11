@@ -547,8 +547,15 @@ module.exports = async function handler(req, res) {
       summary.errors.push({ tipo: 'spam_check', error: e.message });
     }
 
+    // Delays: 1s cuando force=1 (test manual), configurado en automático
+    const getDelay = () => force
+      ? 1000
+      : Math.round(cfg.delay_min * 1000 + Math.random() * (cfg.delay_max - cfg.delay_min) * 1000);
+    // Budget thresholds (global elapsed): force=1 uses tighter windows but short delays → more emails
+    const p1Budget = force ? 90000  : 120000;
+    const p2Budget = force ? 160000 : 200000;
+
     let enviados = 0;
-    const paso1Start = Date.now();
 
     // ── PASO 1: contacto inicial (estado='nuevo', ia_contactado=false) ──
     // Traemos más de los necesarios para poder deduplicar por empresa
@@ -576,8 +583,7 @@ module.exports = async function handler(req, res) {
     const EMAIL_INVALIDO = /noreply|no-reply|donotreply|example\.com|ejemplo\.|sentry\.|wix\.|wordpress\.|schema\.|googleapis|tuemail@|youremail@|yourmail@|email@email|@email\.com|yourstore\.|yourdomain\.|miempresa\.|tuempresa\.|yoursite\.|mysite\.|info@info\.|test@test\.|demo@|hola@hola\.|contact@contact\.|nombre@|^tu@|returns@|unsubscribe@|bounce@|mailer-daemon@|postmaster@|spam@|abuse@|%[0-9a-f]{2}/i;
 
     for (const p of enCola) {
-      if (enviados >= cfg.max_dia) break;
-      if (Date.now() - paso1Start > 120000) break; // 120s máx para PASO 1, deja margen para follow-ups
+      if (enviados >= cfg.max_dia || elapsed() > p1Budget) break;
       // Anular prospectos con emails falsos/placeholder antes de intentar enviar
       if (!p.email || EMAIL_INVALIDO.test(p.email) || p.email.split('.').pop().length > 10) {
         const now = new Date().toISOString();
@@ -603,18 +609,17 @@ module.exports = async function handler(req, res) {
       } catch(e) {
         summary.errors.push({ empresa: p.empresa, tipo: 'inicial', error: e.message });
       }
-      await new Promise(r => setTimeout(r, cfg.delay_min * 1000 + Math.random() * (cfg.delay_max - cfg.delay_min) * 1000));
+      if (elapsed() <= p1Budget) await new Promise(r => setTimeout(r, getDelay()));
     }
 
     // ── PASO 2: follow-ups (ia_contactado=true, sin respuesta, vencido) ──
-    const paso2Start = Date.now();
     const cutoff = new Date(Date.now() - cfg.followup_dias * 86400000).toISOString();
     const pendientes = await sbGet(
       `rhinos_prospectos?ia_contactado=eq.true&ia_reply=eq.false&ia_followup_count=lt.${cfg.max_followups}&ia_fecha_contacto=lt.${encodeURIComponent(cutoff)}&estado=not.in.(frio,invalido)&order=ia_fecha_contacto.asc&limit=30`
     );
 
     for (const p of pendientes) {
-      if (Date.now() - paso2Start > 100000) break; // 100s máx para PASO 2
+      if (elapsed() > p2Budget) break;
       try {
         const now     = new Date().toISOString();
         const replied = await hasReply(token, p.ia_gmail_thread_id);
@@ -640,7 +645,7 @@ module.exports = async function handler(req, res) {
       } catch(e) {
         summary.errors.push({ empresa: p.empresa, tipo: 'followup', error: e.message });
       }
-      await new Promise(r => setTimeout(r, cfg.delay_min * 1000 + Math.random() * (cfg.delay_max - cfg.delay_min) * 1000));
+      if (elapsed() <= p2Budget) await new Promise(r => setTimeout(r, getDelay()));
     }
 
     // ── PASO 3: re-engagement — prospectos 'frio' de hace 30+ días ──────
@@ -671,7 +676,7 @@ module.exports = async function handler(req, res) {
         } catch(e) {
           summary.errors.push({ empresa: p.empresa, tipo: 're-engagement', error: e.message });
         }
-        await new Promise(r => setTimeout(r, cfg.delay_min * 1000 + Math.random() * (cfg.delay_max - cfg.delay_min) * 1000));
+        await new Promise(r => setTimeout(r, getDelay()));
       }
     } catch(e) {
       summary.errors.push({ tipo: 'reengagement_check', error: e.message });
@@ -704,7 +709,7 @@ module.exports = async function handler(req, res) {
           } catch(e) {
             summary.errors.push({ empresa: p.empresa, tipo: 'wa_apertura', error: e.message });
           }
-          await new Promise(r => setTimeout(r, 3000 + Math.random() * 2000));
+          await new Promise(r => setTimeout(r, getDelay()));
         }
       } catch(e) {
         summary.errors.push({ tipo: 'wa_apertura_check', error: e.message });
@@ -737,7 +742,7 @@ module.exports = async function handler(req, res) {
           } catch(e) {
             summary.errors.push({ empresa: p.empresa, tipo: 'wa_followup2', error: e.message });
           }
-          await new Promise(r => setTimeout(r, 3000 + Math.random() * 2000));
+          await new Promise(r => setTimeout(r, getDelay()));
         }
       } catch(e) {
         summary.errors.push({ tipo: 'wa_followup2_check', error: e.message });
