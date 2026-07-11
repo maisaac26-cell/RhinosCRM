@@ -443,11 +443,21 @@ module.exports = async function handler(req, res) {
     wa_por_apertura: 0,
     wa_followup2: 0,
     ab_optimizer: null,
+    timing: {},
     errors: []
   };
 
   const funcStart = Date.now();
   const elapsed = () => Date.now() - funcStart;
+  const mark = (k) => { summary.timing[k] = elapsed(); };
+
+  // Kill-switch: if still running at 280s, return whatever we have so Vercel doesn't FUNCTION_INVOCATION_TIMEOUT
+  const killTimer = setTimeout(() => {
+    if (!res.headersSent) {
+      summary.errors.push({ tipo: 'kill_switch', msg: `Forzado salida a ${elapsed()}ms` });
+      res.json({ ok: false, error: 'Kill-switch 280s', summary });
+    }
+  }, 280000);
 
   try {
     // Cargar config
@@ -497,13 +507,16 @@ module.exports = async function handler(req, res) {
       if (summary.ab_optimizer?.winner) cfg.ab_winner = summary.ab_optimizer.winner;
     }
 
+    mark('config');
     let token;
     try { token = await getGmailToken(); }
-    catch(e) { return res.json({ ok: false, error: 'Gmail: ' + e.message, summary }); }
+    catch(e) { clearTimeout(killTimer); return res.json({ ok: false, error: 'Gmail: ' + e.message, summary }); }
 
+    mark('token');
     // ── PASO 0: detectar y limpiar rebotes de las últimas 48hs ──────────
     try {
       const bouncedEmails = await checkBounces(token);
+      mark('bounces');
       if (bouncedEmails.length) {
         // Cargar prospectos que tengan esos emails para cruzar
         const todos = await sbGet('rhinos_prospectos?select=id,email&ia_contactado=eq.true&limit=5000');
@@ -550,6 +563,7 @@ module.exports = async function handler(req, res) {
       summary.errors.push({ tipo: 'spam_check', error: e.message });
     }
 
+    mark('paso0');
     // Delays: 1s cuando force=1 (test manual), configurado en automático
     const getDelay = () => force
       ? 1000
@@ -615,6 +629,7 @@ module.exports = async function handler(req, res) {
       if (elapsed() <= p1Budget) await new Promise(r => setTimeout(r, getDelay()));
     }
 
+    mark('paso1');
     // ── PASO 2: follow-ups (ia_contactado=true, sin respuesta, vencido) ──
     const cutoff = new Date(Date.now() - cfg.followup_dias * 86400000).toISOString();
     const pendientes = await sbGet(
@@ -651,6 +666,7 @@ module.exports = async function handler(req, res) {
       if (elapsed() <= p2Budget) await new Promise(r => setTimeout(r, getDelay()));
     }
 
+    mark('paso2');
     // ── PASO 3: re-engagement — prospectos 'frio' de hace 30+ días ──────
     if (elapsed() > 220000) { summary.errors.push({ tipo: 'skip_paso3', msg: 'tiempo agotado antes de re-engagement' }); }
     else try {
@@ -752,8 +768,11 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    mark('done');
+    clearTimeout(killTimer);
     return res.json({ ok: true, summary });
   } catch(e) {
+    clearTimeout(killTimer);
     return res.status(500).json({ ok: false, error: e.message, summary });
   }
 };
