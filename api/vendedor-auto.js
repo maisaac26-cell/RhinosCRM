@@ -379,12 +379,28 @@ Devolvé SOLO JSON válido: {"asunto_a":"...","asunto_b":"...","asunto_c":"...",
 El cuerpo incluye el texto + \\n\\n + firma. Texto plano, sin markdown, sin backticks.${estiloRef}`;
 }
 
+// Elimina surrogates desapareados que rompen JSON.stringify (presentes en datos de Google Maps)
+function safeStr(s) {
+  if (!s) return '';
+  return String(s).replace(/[\uD800-\uDFFF]/g, (c, i, str) => {
+    const code = c.charCodeAt(0);
+    if (code >= 0xD800 && code <= 0xDBFF) {
+      const next = str.charCodeAt(i + 1);
+      if (next >= 0xDC00 && next <= 0xDFFF) return c; // par válido
+      return '';  // high surrogate sin low: descartar
+    }
+    const prev = str.charCodeAt(i - 1);
+    if (prev >= 0xD800 && prev <= 0xDBFF) return c; // low en par válido
+    return ''; // low surrogate sin high: descartar
+  });
+}
+
 async function generarEmail(cfg, prospecto, esFollowup, emailAnterior, abrioEmail) {
   const system = buildEmailSystem(cfg, esFollowup, abrioEmail);
   const rubroCtx = getRubroContext(prospecto.rubro);
   const userMsg = esFollowup
-    ? `Empresa: ${prospecto.empresa}\nRubro: ${prospecto.rubro || ''} (dolor típico: ${rubroCtx})\nEmail anterior — Asunto: ${emailAnterior.asunto}\nCuerpo: ${emailAnterior.cuerpo}`
-    : `Empresa: ${prospecto.empresa}\nContacto: ${prospecto.nombre_contacto || ''}\nRubro: ${prospecto.rubro || ''} (dolor típico: ${rubroCtx})\nLocalidad: ${prospecto.localidad || ''}${prospecto.notas ? '\nDatos reales: ' + prospecto.notas : ''}`;
+    ? `Empresa: ${safeStr(prospecto.empresa)}\nRubro: ${safeStr(prospecto.rubro)} (dolor típico: ${rubroCtx})\nEmail anterior — Asunto: ${safeStr(emailAnterior.asunto)}\nCuerpo: ${safeStr(emailAnterior.cuerpo)}`
+    : `Empresa: ${safeStr(prospecto.empresa)}\nContacto: ${safeStr(prospecto.nombre_contacto)}\nRubro: ${safeStr(prospecto.rubro)} (dolor típico: ${rubroCtx})\nLocalidad: ${safeStr(prospecto.localidad)}${prospecto.notas ? '\nDatos reales: ' + safeStr(prospecto.notas) : ''}`;
 
   const raw = await claudeChat(system, userMsg);
   const match = raw.match(/\{[\s\S]*\}/);
