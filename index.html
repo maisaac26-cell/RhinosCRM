@@ -1241,6 +1241,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div style="display:flex;gap:4px;margin-bottom:1rem">
       <button class="btn btn-sm meta-ctab meta-ctab-active" data-tab="existentes" onclick="metaCampTab('existentes')">📋 Campañas existentes</button>
       <button class="btn btn-sm meta-ctab" data-tab="nueva" onclick="metaCampTab('nueva')">➕ Nueva campaña</button>
+      <button class="btn btn-sm meta-ctab" data-tab="rapido" onclick="metaCampTab('rapido')" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">⚡ Lanzador Rápido</button>
     </div>
     <div id="meta-camp-existentes">
       <div id="meta-all-campaigns-list"><div class="empty"><div class="loader"></div><br>Cargando...</div></div>
@@ -1296,6 +1297,112 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <button class="btn btn-cyan" id="btn-create-campaign" onclick="metaCreateCampaign()" style="flex:1;justify-content:center;font-weight:600">🚀 Crear campaña en Meta</button>
       </div>
       <div id="nc-result" style="margin-top:1rem"></div>
+    </div>
+
+    <!-- ⚡ LANZADOR RÁPIDO -->
+    <div id="meta-camp-rapido" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+
+        <!-- Col izq: Config + Texto -->
+        <div style="display:flex;flex-direction:column;gap:1rem">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:12px;color:#fbbf24">⚡ Configuración</div>
+            <div class="field"><label>Nombre de la campaña</label>
+              <input id="bl-name" type="text" placeholder="Distribuidoras CABA — Nov 2026"/>
+            </div>
+            <div class="field">
+              <label>Presupuesto diario (ARS)</label>
+              <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+                <button class="btn btn-sm bl-preset" data-v="500"   onclick="metaBlPreset(500)"   style="font-size:11px;padding:3px 10px">$500</button>
+                <button class="btn btn-sm bl-preset" data-v="1000"  onclick="metaBlPreset(1000)"  style="font-size:11px;padding:3px 10px">$1.000</button>
+                <button class="btn btn-sm bl-preset" data-v="2000"  onclick="metaBlPreset(2000)"  style="font-size:11px;padding:3px 10px">$2.000</button>
+                <button class="btn btn-sm bl-preset" data-v="5000"  onclick="metaBlPreset(5000)"  style="font-size:11px;padding:3px 10px">$5.000</button>
+                <button class="btn btn-sm bl-preset" data-v="10000" onclick="metaBlPreset(10000)" style="font-size:11px;padding:3px 10px">$10.000</button>
+              </div>
+              <input id="bl-budget" type="number" placeholder="2000" min="100" oninput="metaBlUpdateSummary()"/>
+            </div>
+            <div class="field"><label>Objetivo</label>
+              <select id="bl-objective">
+                <option value="OUTCOME_LEADS">Generación de leads</option>
+                <option value="OUTCOME_TRAFFIC">Tráfico al sitio</option>
+                <option value="OUTCOME_AWARENESS">Reconocimiento de marca</option>
+                <option value="OUTCOME_ENGAGEMENT">Interacción</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:12px;margin-top:4px">
+              <label style="display:flex;gap:6px;align-items:center;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text2)"><input type="checkbox" id="bl-fb" checked> Facebook</label>
+              <label style="display:flex;gap:6px;align-items:center;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text2)"><input type="checkbox" id="bl-ig" checked> Instagram</label>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="margin-bottom:12px">Texto del anuncio</div>
+            <div class="field"><label>Título</label>
+              <input id="bl-headline" type="text" placeholder="Optimizá tu distribución con Rhinos"/>
+            </div>
+            <div class="field"><label>Descripción</label>
+              <textarea id="bl-body" rows="2" placeholder="Administrá stock, pedidos y clientes desde un solo lugar. Probalo gratis."></textarea>
+            </div>
+            <div class="field"><label>URL destino</label>
+              <input id="bl-link" type="text" value="https://rhinosapp.com"/>
+            </div>
+            <div class="field"><label>Botón</label>
+              <select id="bl-cta">
+                <option value="LEARN_MORE">Más información</option>
+                <option value="CONTACT_US">Contactanos</option>
+                <option value="GET_QUOTE">Pedir presupuesto</option>
+                <option value="SIGN_UP">Registrarse</option>
+                <option value="SUBSCRIBE">Suscribirse</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:4px" onclick="metaBlToggleAud()">
+              <div class="card-title" style="margin:0">Audiencia</div>
+              <span id="bl-aud-toggle" style="font-size:11px;color:var(--cyan)">▼ ver</span>
+            </div>
+            <div id="bl-aud-panel" style="display:none;margin-top:12px">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                <div class="field" style="margin:0;flex:1"><label>Edad mín.</label><input id="bl-age-min" type="number" value="28" min="18" max="65"/></div>
+                <div class="field" style="margin:0;flex:1"><label>Edad máx.</label><input id="bl-age-max" type="number" value="60" min="18" max="65"/></div>
+              </div>
+              <div class="field" style="margin-bottom:8px"><label>Ubicación</label><input id="bl-location" type="text" value="Argentina"/></div>
+              <div class="field"><label>Intereses sugeridos (B2B distribuidoras)</label>
+                <textarea id="bl-interests" rows="4" style="font-size:11px">Gestión de inventario, Distribución mayorista, Logística empresarial, Software ERP, Gestión de ventas, Cadena de suministro, Administración de empresas, Comercio mayorista, Gestión comercial, Pymes Argentina, Automatización de ventas, Software para empresas</textarea>
+                <div style="font-size:10px;color:var(--text3);margin-top:4px">💡 Sugeridos para distribuidoras y pymes con stock · Podés editarlos</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Col der: Imágenes -->
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="card-title" style="margin-bottom:4px">Tus fotos</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Cada foto → 1 anuncio · Se comprimen automáticamente</div>
+          <div id="bl-dropzone"
+            onclick="document.getElementById('bl-file-input').click()"
+            ondragover="event.preventDefault();this.style.borderColor='var(--cyan)'"
+            ondragleave="this.style.borderColor='var(--border)'"
+            ondrop="metaBlDrop(event)"
+            style="border:2px dashed var(--border);border-radius:var(--r);padding:32px 20px;text-align:center;cursor:pointer;transition:border-color 0.2s;margin-bottom:12px;flex-shrink:0">
+            <div style="font-size:32px;margin-bottom:8px">📁</div>
+            <div style="font-size:13px;color:var(--text2)">Arrastrá tus imágenes acá</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px">o hacé click · JPG/PNG · múltiple</div>
+          </div>
+          <input type="file" id="bl-file-input" accept="image/*" multiple style="display:none" onchange="metaBlAddFiles(this.files)"/>
+          <div id="bl-images-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;overflow-y:auto;flex:1"></div>
+          <div id="bl-images-empty" style="text-align:center;color:var(--text3);font-size:12px;padding:16px;display:none">Sin imágenes todavía</div>
+        </div>
+      </div>
+
+      <!-- Summary + botón -->
+      <div id="bl-summary" style="display:none;padding:10px 16px;border-radius:var(--r);border:1px solid rgba(251,191,36,0.3);background:rgba(251,191,36,0.06);margin-bottom:10px;font-size:13px;color:#fbbf24;display:flex;align-items:center;gap:8px">
+        <span id="bl-summary-text"></span>
+      </div>
+      <button class="btn" id="btn-batch-launch" onclick="metaBatchLaunch()" style="width:100%;justify-content:center;font-weight:700;font-size:14px;padding:12px 20px;background:rgba(251,191,36,0.15);color:#fbbf24;border-color:rgba(251,191,36,0.4)">🚀 Lanzar campaña</button>
+
+      <div id="bl-progress" style="display:none;margin-top:1rem;padding:14px 16px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);font-family:monospace;font-size:11px;line-height:2;max-height:320px;overflow-y:auto;white-space:pre-wrap"></div>
     </div>
   </div>
 
@@ -19603,8 +19710,203 @@ async function metaTodayReport() {
 function metaCampTab(tab) {
   document.querySelectorAll('.meta-ctab').forEach(b => b.classList.toggle('meta-ctab-active', b.dataset.tab === tab));
   document.getElementById('meta-camp-existentes').style.display = tab === 'existentes' ? 'block' : 'none';
-  document.getElementById('meta-camp-nueva').style.display = tab === 'nueva' ? 'block' : 'none';
+  document.getElementById('meta-camp-nueva').style.display      = tab === 'nueva'      ? 'block' : 'none';
+  document.getElementById('meta-camp-rapido').style.display     = tab === 'rapido'     ? 'block' : 'none';
   if (tab === 'existentes') metaLoadAllCampaigns();
+  if (tab === 'rapido')     metaBlUpdateSummary();
+}
+
+// ── LANZADOR RÁPIDO ───────────────────────────────────────────────────────────
+let _blQueue = []; // [{name, b64, url, size}]
+
+function metaBlPreset(val) {
+  const inp = document.getElementById('bl-budget');
+  if (inp) inp.value = val;
+  document.querySelectorAll('.bl-preset').forEach(b => {
+    b.style.borderColor = +b.dataset.v === val ? 'var(--cyan)' : 'var(--border)';
+    b.style.color       = +b.dataset.v === val ? 'var(--cyan)' : 'var(--text2)';
+  });
+  metaBlUpdateSummary();
+}
+
+function metaBlToggleAud() {
+  const p = document.getElementById('bl-aud-panel');
+  const t = document.getElementById('bl-aud-toggle');
+  if (!p) return;
+  const open = p.style.display !== 'none';
+  p.style.display = open ? 'none' : 'block';
+  if (t) t.textContent = open ? '▼ ver' : '▲ ocultar';
+}
+
+function metaBlDrop(e) {
+  e.preventDefault();
+  const zone = document.getElementById('bl-dropzone');
+  if (zone) zone.style.borderColor = 'var(--border)';
+  const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'));
+  if (files.length) metaBlAddFiles(files);
+}
+
+async function metaBlAddFiles(files) {
+  const arr = Array.from(files);
+  for (const f of arr) {
+    try {
+      const comp = await metaBlCompress(f, 1200, 0.85);
+      _blQueue.push({ name: f.name.replace(/\.[^.]+$/, ''), b64: comp.b64, url: comp.url, size: comp.size });
+    } catch(e) {}
+  }
+  metaBlRenderQueue();
+  metaBlUpdateSummary();
+}
+
+function metaBlCompress(file, maxPx, q) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = e => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxPx) { h = Math.round(h * maxPx / w); w = maxPx; }
+        if (h > maxPx) { w = Math.round(w * maxPx / h); h = maxPx; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', q);
+        const b64 = dataUrl.split(',')[1];
+        resolve({ b64, url: dataUrl, size: Math.round(b64.length * 0.75 / 1024) });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function metaBlRenderQueue() {
+  const grid  = document.getElementById('bl-images-grid');
+  const empty = document.getElementById('bl-images-empty');
+  if (!grid) return;
+  if (!_blQueue.length) {
+    grid.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  grid.innerHTML = _blQueue.map((item, i) => `
+    <div style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border);background:var(--surface)">
+      <img src="${item.url}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block"/>
+      <div style="padding:4px 6px">
+        <input value="${item.name}" onchange="_blQueue[${i}].name=this.value" style="width:100%;font-size:10px;background:transparent;border:none;color:var(--text2);padding:0;outline:none"/>
+        <div style="font-size:9px;color:var(--text3)">${item.size}KB</div>
+      </div>
+      <button onclick="metaBlRemove(${i})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:18px;text-align:center;padding:0">✕</button>
+    </div>
+  `).join('');
+}
+
+function metaBlRemove(i) {
+  _blQueue.splice(i, 1);
+  metaBlRenderQueue();
+  metaBlUpdateSummary();
+}
+
+function metaBlUpdateSummary() {
+  const s    = document.getElementById('bl-summary');
+  const st   = document.getElementById('bl-summary-text');
+  const btn  = document.getElementById('btn-batch-launch');
+  const bud  = parseFloat(document.getElementById('bl-budget')?.value) || 0;
+  const name = document.getElementById('bl-name')?.value.trim() || '';
+  const n    = _blQueue.length;
+  if (!s || !st) return;
+  if (n > 0 || bud > 0) {
+    s.style.display = 'flex';
+    const parts = [];
+    if (n > 0)  parts.push(`${n} anuncio${n !== 1 ? 's' : ''}`);
+    if (bud > 0) parts.push(`$${bud.toLocaleString('es-AR')}/día`);
+    if (name)    parts.push(name.slice(0, 30));
+    st.textContent = '⚡ ' + parts.join(' · ');
+  } else {
+    s.style.display = 'none';
+  }
+  if (btn) btn.textContent = n > 0 ? `🚀 Lanzar ${n} anuncio${n !== 1 ? 's' : ''}` : '🚀 Lanzar campaña';
+}
+
+async function metaBatchLaunch() {
+  const name    = document.getElementById('bl-name')?.value.trim();
+  const budget  = parseFloat(document.getElementById('bl-budget')?.value);
+  const obj     = document.getElementById('bl-objective')?.value || 'OUTCOME_LEADS';
+  const hl      = document.getElementById('bl-headline')?.value.trim();
+  const body    = document.getElementById('bl-body')?.value.trim();
+  const link    = document.getElementById('bl-link')?.value.trim();
+  const cta     = document.getElementById('bl-cta')?.value || 'LEARN_MORE';
+  const ageMin  = parseInt(document.getElementById('bl-age-min')?.value) || 28;
+  const ageMax  = parseInt(document.getElementById('bl-age-max')?.value) || 60;
+  const loc     = document.getElementById('bl-location')?.value.trim() || 'Argentina';
+  const interests = document.getElementById('bl-interests')?.value.trim();
+
+  if (!name)         { metaToast('Falta el nombre de la campaña', 'error'); return; }
+  if (!budget || budget < 100) { metaToast('Presupuesto mínimo: $100 ARS', 'error'); return; }
+  if (!_blQueue.length) { metaToast('Subí al menos una imagen', 'error'); return; }
+
+  const btn = document.getElementById('btn-batch-launch');
+  const prog = document.getElementById('bl-progress');
+  if (btn) { btn.disabled = true; btn.textContent = 'Lanzando...'; }
+  if (prog) { prog.style.display = 'block'; prog.textContent = ''; }
+
+  const log = (msg) => { if (prog) prog.textContent += msg + '\n'; };
+
+  try {
+    // Step 1: Create campaign + adset
+    log('▶ Creando campaña...');
+    const startResp = await fetch('/api/meta?action=batch_launch_start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaign_name: name, objective: obj, budget_daily: budget, age_min: ageMin, age_max: ageMax, location: loc, interests }),
+    }).then(r => r.json());
+
+    if (!startResp.ok) { log('✗ Error: ' + (startResp.error || 'No se pudo crear la campaña')); return; }
+    log(`✓ Campaña: ${startResp.campaign_id}`);
+    log(`✓ Adset:   ${startResp.adset_id}`);
+
+    // Step 2: Create each ad
+    let ok = 0, fail = 0;
+    for (let i = 0; i < _blQueue.length; i++) {
+      const item = _blQueue[i];
+      const adName = item.name || `${name} — Anuncio ${i + 1}`;
+      log(`\n▶ Anuncio ${i + 1}/${_blQueue.length}: ${adName}`);
+      try {
+        const adResp = await fetch('/api/meta?action=create_ad', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adset_id: startResp.adset_id,
+            campaign_id: startResp.campaign_id,
+            image_b64: item.b64,
+            image_name: adName + '.jpg',
+            ad_name: adName,
+            link_url: link || 'https://rhinosapp.com',
+            headline: hl || '',
+            body_text: body || '',
+            cta_type: cta,
+          }),
+        }).then(r => r.json());
+
+        if (adResp.ok) { log(`  ✓ Listo (ID: ${adResp.ad_id})`); ok++; }
+        else           { log(`  ✗ Error: ${adResp.error}`); fail++; }
+      } catch(e) { log(`  ✗ Error: ${e.message}`); fail++; }
+    }
+
+    log(`\n${'─'.repeat(40)}`);
+    log(`✅ Campaña lanzada: ${ok} anuncio${ok !== 1 ? 's' : ''} activo${ok !== 1 ? 's' : ''}${fail ? ` · ${fail} fallido${fail !== 1 ? 's' : ''}` : ''}`);
+    log(`📊 Budget: $${budget.toLocaleString('es-AR')} ARS/día`);
+    metaToast(`✅ ${ok} anuncio${ok !== 1 ? 's' : ''} lanzado${ok !== 1 ? 's' : ''}`, 'success');
+    _blQueue = [];
+    metaBlRenderQueue();
+    metaBlUpdateSummary();
+  } catch(e) {
+    log('\n✗ Error inesperado: ' + e.message);
+    metaToast('Error al lanzar: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; metaBlUpdateSummary(); }
+  }
 }
 
 let _metaCampRange = 7;

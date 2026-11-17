@@ -1439,6 +1439,76 @@ async function runUpdateLead(req, res) {
   } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
 }
 
+// ── BATCH LAUNCH START ────────────────────────────────────────────────────────
+async function runBatchLaunchStart(req, res) {
+  try {
+    const cfg       = await getMetaConfig();
+    const token     = cfg.meta_access_token  || '';
+    const rawId     = cfg.meta_ad_account_id || '';
+    const accountId = rawId.replace(/^act_/i, '');
+
+    if (!token || token === 'pending' || !accountId)
+      return res.status(200).json({ ok: false, error: 'Meta no configurado — guardá token y account ID en Configuración' });
+
+    const { campaign_name, objective, budget_daily, age_min, age_max } = req.body || {};
+    if (!campaign_name) return res.status(200).json({ ok: false, error: 'Nombre de campaña requerido' });
+    if (!budget_daily)  return res.status(200).json({ ok: false, error: 'Presupuesto diario requerido' });
+
+    const obj = objective || 'OUTCOME_LEADS';
+    const objMap = {
+      OUTCOME_LEADS:     { opt: 'LINK_CLICKS', bill: 'LINK_CLICKS' },
+      OUTCOME_TRAFFIC:   { opt: 'LINK_CLICKS', bill: 'LINK_CLICKS' },
+      OUTCOME_AWARENESS: { opt: 'REACH',       bill: 'IMPRESSIONS' },
+      OUTCOME_ENGAGEMENT:{ opt: 'POST_ENGAGEMENT', bill: 'POST_ENGAGEMENT' },
+    };
+    const { opt, bill } = objMap[obj] || objMap['OUTCOME_LEADS'];
+
+    // 1. Create campaign
+    const campaign = await metaPost(token, `act_${accountId}/campaigns`, {
+      name: campaign_name,
+      objective: obj,
+      status: 'ACTIVE',
+      special_ad_categories: [],
+    });
+
+    // 2. Create adset
+    const budgetCents = Math.round(parseFloat(budget_daily) * 100);
+    const adset = await metaPost(token, `act_${accountId}/adsets`, {
+      name: campaign_name + ' — Adset',
+      campaign_id: campaign.id,
+      daily_budget: budgetCents,
+      billing_event: bill,
+      optimization_goal: opt,
+      targeting: {
+        age_min: parseInt(age_min) || 28,
+        age_max: parseInt(age_max) || 60,
+        geo_locations: { countries: ['AR'] },
+      },
+      status: 'ACTIVE',
+    });
+
+    // Save to Supabase (non-fatal)
+    await Promise.all([
+      sbReq('POST', 'meta_campaigns?on_conflict=id', [{
+        id: campaign.id, name: campaign_name, status: 'ACTIVE',
+        objective: obj, budget_daily: parseFloat(budget_daily),
+        updated_at: new Date().toISOString(),
+      }]),
+      sbReq('POST', 'meta_adsets?on_conflict=id', [{
+        id: adset.id, campaign_id: campaign.id,
+        name: campaign_name + ' — Adset', status: 'ACTIVE',
+        budget_daily: parseFloat(budget_daily),
+        updated_at: new Date().toISOString(),
+      }]),
+    ]).catch(() => {});
+
+    return res.status(200).json({ ok: true, campaign_id: campaign.id, adset_id: adset.id });
+  } catch (err) {
+    console.error('[meta-batch-launch-start]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
@@ -1463,8 +1533,9 @@ export default async function handler(req, res) {
   if (action === 'morning_brief')     return runMorningBrief(res);
   if (action === 'cpl_trend')         return runCplTrend(res);
   if (action === 'account_health')    return runAccountHealth(res);
-  if (action === 'update_lead')       return runUpdateLead(req, res);
-  if (action === 'forecast')          return runForecast(res);
-  if (action === 'rebalance_budget')  return runRebalanceBudget(req, res);
+  if (action === 'update_lead')        return runUpdateLead(req, res);
+  if (action === 'forecast')           return runForecast(res);
+  if (action === 'rebalance_budget')   return runRebalanceBudget(req, res);
+  if (action === 'batch_launch_start') return runBatchLaunchStart(req, res);
   return runSync(res);
 }
