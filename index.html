@@ -20129,9 +20129,9 @@ async function metaCreateCampaign() {
   if (result) result.innerHTML = '<div class="empty"><div class="loader"></div><br>Creando campaña en Meta...</div>';
 
   try {
-    const r = await callAPI('meta_create_campaign', { name, objective: obj, budget_daily: parseFloat(budget), start_time: start || undefined, stop_time: end || undefined, age_min: parseInt(ageMin), age_max: parseInt(ageMax), location: loc, interests: int, platforms: { facebook: fb, instagram: ig } });
+    const r = await fetch('/api/meta?action=batch_launch_start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ campaign_name: name, objective: obj, budget_daily: parseFloat(budget), age_min: parseInt(ageMin), age_max: parseInt(ageMax), location: loc, interests: int }) }).then(x => x.json());
     if (r.ok || r.campaign_id) {
-      if (result) result.innerHTML = `<div class="card" style="border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.04)"><div style="color:var(--green);font-weight:600">✓ Campaña creada</div><div style="font-size:12px;color:var(--text2);margin-top:4px">ID: ${r.campaign_id || r.id || 'creado'}</div></div>`;
+      if (result) result.innerHTML = `<div class="card" style="border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.04)"><div style="color:var(--green);font-weight:600">✓ Campaña y adset creados</div><div style="font-size:12px;color:var(--text2);margin-top:4px">Campaign ID: ${r.campaign_id || 'creado'} · Adset: ${r.adset_id || ''}</div><div style="font-size:11px;color:var(--text3);margin-top:6px">Ahora podés subir anuncios desde ⚡ Lanzador Rápido o la sección Creativos.</div></div>`;
       setTimeout(metaDashboardLoad, 2000);
     } else {
       if (result) result.innerHTML = `<div class="card" style="border-color:rgba(248,113,113,0.3)"><div style="color:#f87171">${r.error || r.msg || 'Error desconocido'}</div></div>`;
