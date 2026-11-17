@@ -252,6 +252,13 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 .section-header{margin-bottom:1.5rem}
 .meta-ctab,.meta-ctab2,.meta-ctab3,.meta-lf{background:var(--surface2);border:1px solid var(--border);color:var(--text2);transition:all 0.15s}
 .meta-ctab-active,.meta-ctab2-active,.meta-ctab3-active,.meta-lf-active{background:rgba(0,229,204,0.1);border-color:rgba(0,229,204,0.4);color:var(--cyan)!important}
+.cre-range{font-size:11px!important;padding:4px 10px!important}.cre-range-active{background:rgba(0,229,204,0.1)!important;border-color:rgba(0,229,204,0.4)!important;color:var(--cyan)!important}
+.cre-view-btn{font-size:14px!important;padding:4px 9px!important;line-height:1!important}.cre-view-btn-active{background:rgba(0,229,204,0.1)!important;border-color:rgba(0,229,204,0.4)!important;color:var(--cyan)!important}
+.cre-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;padding:2px 7px;border-radius:8px;font-weight:700;white-space:nowrap}
+.cre-tbl{width:100%;border-collapse:collapse;font-size:12px}.cre-tbl th{font-size:10px;color:var(--text3);font-weight:600;padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap}.cre-tbl td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}.cre-tbl tr:hover td{background:var(--surface2)}
+.cre-queue-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:var(--r);margin-bottom:5px;border:1px solid var(--border)}
+.meta-toast{padding:10px 14px;border-radius:var(--r);font-size:12px;font-weight:500;pointer-events:auto;box-shadow:0 4px 16px rgba(0,0,0,0.3);border:1px solid;max-width:300px;animation:meta-toast-in 0.2s ease-out}
+@keyframes meta-toast-in{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
 .tab-row{display:flex;gap:4px;margin-bottom:1rem;background:var(--surface2);border-radius:var(--r);padding:3px}
 .tab-btn{flex:1;padding:7px 8px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:11px;color:var(--text2);font-family:var(--font);transition:all 0.15s;text-align:center;font-weight:500}
 .tab-btn.active{background:var(--surface);color:var(--cyan);border:1px solid var(--border)}
@@ -546,7 +553,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="nav-group-label">Meta ADS</div>
     <button class="nav-btn" data-sec="meta-dashboard"><span class="nav-icon">📊</span>Dashboard</button>
     <button class="nav-btn" data-sec="meta-campanas"><span class="nav-icon">🎯</span>Campañas</button>
-    <button class="nav-btn" data-sec="meta-contenido"><span class="nav-icon">🌳</span>Contenido</button>
+    <button class="nav-btn" data-sec="meta-contenido"><span class="nav-icon">🎨</span>Creativos</button>
     <button class="nav-btn" data-sec="meta-leads"><span class="nav-icon">📲</span>Leads WA</button>
 
     <div class="nav-group-label">Web</div>
@@ -879,8 +886,16 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
     <!-- ── TAB: CREATIVOS ─────────────────────────────────────────── -->
     <div id="meta-cont-creativos">
-      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
-        <select id="creativo-filter-camp" onchange="metaCreativosGrid()" style="font-size:12px;padding:5px 8px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface2);color:var(--text);min-width:160px">
+      <!-- KPI row -->
+      <div id="creativo-kpi-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"></div>
+      <!-- Toolbar -->
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <div style="display:flex;gap:3px">
+          <button class="btn btn-sm cre-range cre-range-active" data-days="7" onclick="metaSetRange(7)">7d</button>
+          <button class="btn btn-sm cre-range" data-days="14" onclick="metaSetRange(14)">14d</button>
+          <button class="btn btn-sm cre-range" data-days="30" onclick="metaSetRange(30)">30d</button>
+        </div>
+        <select id="creativo-filter-camp" onchange="metaCreativosGrid()" style="font-size:12px;padding:5px 8px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface2);color:var(--text);min-width:150px">
           <option value="">Todas las campañas</option>
         </select>
         <select id="creativo-sort" onchange="metaCreativosGrid()" style="font-size:12px;padding:5px 8px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface2);color:var(--text)">
@@ -888,9 +903,22 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <option value="ctr_desc">Mayor CTR</option>
           <option value="clicks_desc">Más clics</option>
           <option value="active_first">Activos primero</option>
+          <option value="days_desc">Más días</option>
         </select>
-        <button class="btn btn-sm" onclick="metaCreativosLoad()" style="font-size:11px;color:var(--cyan);border-color:rgba(0,229,204,0.3)">↻ Recargar</button>
-        <span id="creativo-count" style="font-size:11px;color:var(--text3);margin-left:auto"></span>
+        <input id="creativo-search" type="search" placeholder="Buscar..." oninput="metaCreativosGrid()" style="font-size:12px;padding:5px 8px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface2);color:var(--text);min-width:110px"/>
+        <div style="display:flex;gap:3px;margin-left:auto;align-items:center">
+          <button class="btn btn-sm cre-view-btn cre-view-btn-active" data-view="grid" onclick="metaSetView('grid')" title="Grilla">⊞</button>
+          <button class="btn btn-sm cre-view-btn" data-view="table" onclick="metaSetView('table')" title="Tabla">☰</button>
+          <button class="btn btn-sm" onclick="metaCreativosLoad()" style="font-size:11px;color:var(--cyan);border-color:rgba(0,229,204,0.3)">↻</button>
+        </div>
+        <span id="creativo-count" style="font-size:11px;color:var(--text3)"></span>
+      </div>
+      <!-- Bulk bar -->
+      <div id="meta-bulk-bar" style="display:none;padding:8px 12px;background:rgba(0,229,204,0.06);border:1px solid rgba(0,229,204,0.25);border-radius:var(--r);margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap">
+        <span id="meta-bulk-count" style="font-size:12px;color:var(--cyan);font-weight:600"></span>
+        <button class="btn btn-sm" onclick="metaBulkToggle('PAUSED')" style="color:#f87171;border-color:rgba(248,113,113,0.3);font-size:11px">⏸ Pausar</button>
+        <button class="btn btn-sm" onclick="metaBulkToggle('ACTIVE')" style="color:var(--green);border-color:rgba(34,197,94,0.3);font-size:11px">▶ Activar</button>
+        <button class="btn btn-sm" onclick="metaDeselectAll()" style="font-size:11px">✕ Deseleccionar</button>
       </div>
       <div id="meta-creativos-grid"><div class="empty"><div class="loader"></div><br>Cargando creativos...</div></div>
     </div>
@@ -931,9 +959,12 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           </div>
           <div class="card">
             <div class="card-title">✍️ Copy del anuncio</div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 8px;background:rgba(0,229,204,0.05);border-radius:var(--r);border:1px solid rgba(0,229,204,0.15)">
+              💡 El mismo copy se aplica a todas las imágenes del lote
+            </div>
             <div class="field">
-              <label>Nombre del anuncio <span style="font-size:10px;color:var(--text3)">(para reportes internos)</span></label>
-              <input id="new-ad-name" type="text" placeholder="Ej: GUA / LEADS / Imagen A — Nov 2026" style="font-size:12px"/>
+              <label>Prefijo de nombre <span style="font-size:10px;color:var(--text3)">(para reportes internos)</span></label>
+              <input id="new-ad-name" type="text" placeholder="Ej: GUA / LEADS — Nov 2026" style="font-size:12px"/>
             </div>
             <div class="field">
               <label>Titular</label>
@@ -943,22 +974,22 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <label>Texto principal</label>
               <textarea id="new-ad-body" rows="3" placeholder="Ej: Miles de distribuidoras ya digitalizaron su gestión con Rhinos..." style="font-size:12px" oninput="metaAdPreviewUpdate()"></textarea>
             </div>
-            <button class="btn btn-cyan btn-full" id="btn-create-ad" onclick="metaCreateAd()" style="font-weight:700;letter-spacing:0.03em;margin-top:4px">🚀 Crear anuncio en Meta</button>
+            <button class="btn btn-cyan btn-full" id="btn-create-ad" onclick="metaCreateAd()" style="font-weight:700;letter-spacing:0.03em;margin-top:4px">🚀 Subir y crear anuncios</button>
             <div id="create-ad-status" style="margin-top:10px;font-size:12px;line-height:1.5"></div>
           </div>
         </div>
         <div>
           <div class="card" style="margin-bottom:12px">
-            <div class="card-title">🖼️ Imagen del anuncio</div>
-            <div id="new-ad-dropzone" onclick="document.getElementById('new-ad-file').click()" style="min-height:160px;border:2px dashed var(--border);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--surface2);transition:border-color 0.2s;position:relative;overflow:hidden" ondragover="event.preventDefault();this.style.borderColor='var(--cyan)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="metaAdDrop(event)">
-              <div id="new-ad-dropzone-content" style="text-align:center;padding:20px;pointer-events:none">
-                <div style="font-size:28px;margin-bottom:8px">🖼️</div>
-                <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Arrastrá o hacé clic para elegir imagen</div>
-                <div style="font-size:11px;color:var(--text3)">JPG, PNG, WEBP · Se redimensiona a 1200px automáticamente</div>
+            <div class="card-title">🖼️ Imágenes del anuncio</div>
+            <div id="new-ad-dropzone" onclick="document.getElementById('new-ad-file').click()" style="min-height:120px;border:2px dashed var(--border);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--surface2);transition:border-color 0.2s;position:relative;overflow:hidden" ondragover="event.preventDefault();this.style.borderColor='var(--cyan)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="metaAdDrop(event)">
+              <div id="new-ad-dropzone-content" style="text-align:center;padding:16px;pointer-events:none">
+                <div style="font-size:24px;margin-bottom:6px">🖼️</div>
+                <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Arrastrá o hacé clic para elegir imágenes</div>
+                <div style="font-size:10px;color:var(--text3)">JPG, PNG, WEBP · Múltiples archivos · 1200px auto</div>
               </div>
             </div>
-            <input type="file" id="new-ad-file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="metaAdFileSelect(this)"/>
-            <div id="new-ad-img-info" style="margin-top:8px;font-size:11px;color:var(--text3);display:none"></div>
+            <input type="file" id="new-ad-file" accept="image/jpeg,image/png,image/gif,image/webp" multiple style="display:none" onchange="metaAdFileSelect(this)"/>
+            <div id="new-ad-queue" style="margin-top:4px"></div>
           </div>
           <div class="card">
             <div class="card-title">👁️ Vista previa</div>
@@ -16158,25 +16189,121 @@ function metaArbolSubTab(subtab) {
 
 // ── CREATIVE MANAGER ─────────────────────────────────────────────────────────
 
-let _metaCreativosData = null;
+let _metaCreativosData     = null;
+let _metaCreativosRange    = 7;
+let _metaCreativosView     = 'grid';
+let _metaCreativosSelected = new Set();
+let _newAdQueue            = [];
+let _newAdFile             = null;
+let _newAdB64              = null;
+
+function metaToast(msg, type) {
+  type = type || 'info';
+  let container = document.getElementById('_meta-toasts');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = '_meta-toasts';
+    Object.assign(container.style, {position:'fixed',top:'16px',right:'16px',zIndex:'9999',display:'flex',flexDirection:'column',gap:'8px',pointerEvents:'none'});
+    document.body.appendChild(container);
+  }
+  const colors = { success:['rgba(34,197,94,0.15)','var(--green)'], error:['rgba(248,113,113,0.15)','#f87171'], info:['rgba(0,229,204,0.1)','var(--cyan)'] };
+  const [bg, col] = colors[type] || colors.info;
+  const t = document.createElement('div');
+  t.className = 'meta-toast';
+  t.style.cssText = `background:${bg};color:${col};border-color:${col}40`;
+  t.textContent = msg;
+  container.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+function metaGetBadge(m) {
+  const ctr   = m.ctr_count ? m.ctr_sum / m.ctr_count : 0;
+  const spend = m.spend || 0;
+  if (spend < 2)                       return ['📊','Sin datos','rgba(99,102,241,0.15)','#a5b4fc'];
+  if (ctr >= 1.5)                      return ['🏆','Ganador',  'rgba(34,197,94,0.15)', 'var(--green)'];
+  if (ctr < 0.3 && spend >= 10)        return ['🔴','Pausar',   'rgba(248,113,113,0.15)','#f87171'];
+  if (ctr < 0.5)                       return ['⚠️','Revisar',  'rgba(251,191,36,0.15)', '#fbbf24'];
+  return                                      ['✅','OK',       'rgba(0,229,204,0.1)',   'var(--cyan)'];
+}
+
+function metaSetRange(days) {
+  _metaCreativosRange = days;
+  document.querySelectorAll('.cre-range').forEach(b => b.classList.toggle('cre-range-active', +b.dataset.days === days));
+  _metaCreativosData = null;
+  metaCreativosLoad();
+}
+
+function metaSetView(view) {
+  _metaCreativosView = view;
+  document.querySelectorAll('.cre-view-btn').forEach(b => b.classList.toggle('cre-view-btn-active', b.dataset.view === view));
+  if (_metaCreativosData) metaCreativosGrid();
+}
+
+function metaToggleSelect(adId) {
+  if (_metaCreativosSelected.has(adId)) _metaCreativosSelected.delete(adId);
+  else _metaCreativosSelected.add(adId);
+  const bar = document.getElementById('meta-bulk-bar');
+  const cnt = document.getElementById('meta-bulk-count');
+  const n = _metaCreativosSelected.size;
+  if (bar) bar.style.display = n > 0 ? 'flex' : 'none';
+  if (cnt) cnt.textContent = `${n} seleccionado${n !== 1 ? 's' : ''}`;
+  document.querySelectorAll('[data-ad-cb]').forEach(cb => { cb.checked = _metaCreativosSelected.has(cb.dataset.adCb); });
+}
+
+function metaSelectAll() {
+  document.querySelectorAll('[data-ad-cb]').forEach(cb => { _metaCreativosSelected.add(cb.dataset.adCb); cb.checked = true; });
+  const n = _metaCreativosSelected.size;
+  const bar = document.getElementById('meta-bulk-bar');
+  const cnt = document.getElementById('meta-bulk-count');
+  if (bar) bar.style.display = n > 0 ? 'flex' : 'none';
+  if (cnt) cnt.textContent = `${n} seleccionado${n !== 1 ? 's' : ''}`;
+}
+
+function metaDeselectAll() {
+  _metaCreativosSelected.clear();
+  const bar = document.getElementById('meta-bulk-bar');
+  if (bar) bar.style.display = 'none';
+  document.querySelectorAll('[data-ad-cb]').forEach(cb => cb.checked = false);
+}
+
+async function metaBulkToggle(newStatus) {
+  const ids = [..._metaCreativosSelected];
+  if (!ids.length) return;
+  try {
+    const r = await fetch('/api/meta?action=bulk_toggle', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, status: newStatus })
+    }).then(x => x.json());
+    if (r.ok) {
+      metaToast(`✓ ${r.updated} anuncio${r.updated !== 1 ? 's' : ''} ${newStatus === 'PAUSED' ? 'pausado' : 'activado'}${r.updated !== 1 ? 's' : ''}`, 'success');
+      metaDeselectAll();
+      _metaCreativosData = null;
+      metaCreativosLoad();
+    } else {
+      metaToast('Error: ' + (r.error || 'Error desconocido'), 'error');
+    }
+  } catch(e) { metaToast('Error de red: ' + e.message, 'error'); }
+}
 
 async function metaCreativosLoad() {
   const el = document.getElementById('meta-creativos-grid');
   if (!el) return;
   el.innerHTML = '<div class="empty"><div class="loader"></div><br>Cargando creativos...</div>';
+  const kpiEl = document.getElementById('creativo-kpi-row');
+  if (kpiEl) kpiEl.innerHTML = '';
   try {
-    const since30 = new Date(); since30.setDate(since30.getDate() - 30);
-    const since30str = since30.toISOString().slice(0, 10);
+    const since = new Date(); since.setDate(since.getDate() - _metaCreativosRange);
+    const sinceStr = since.toISOString().slice(0, 10);
     const [ads, campaigns, metrics] = await Promise.all([
       metaSbGet('meta_ads?order=updated_at.desc&limit=500&select=id,name,status,campaign_id,adset_id,thumbnail_url,created_at'),
       metaSbGet('meta_campaigns?select=id,name&limit=100'),
-      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since30str}&select=entity_id,spend,clicks,impressions,ctr,conversions`),
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${sinceStr}&select=entity_id,spend,clicks,impressions,ctr,conversions`),
     ]);
     const campMap = {};
     campaigns.forEach(c => campMap[c.id] = c.name);
     const metricsMap = {};
     metrics.forEach(m => {
-      if (!metricsMap[m.entity_id]) metricsMap[m.entity_id] = { spend: 0, clicks: 0, impressions: 0, conversions: 0, ctr_sum: 0, ctr_count: 0 };
+      if (!metricsMap[m.entity_id]) metricsMap[m.entity_id] = { spend:0, clicks:0, impressions:0, conversions:0, ctr_sum:0, ctr_count:0 };
       const agg = metricsMap[m.entity_id];
       agg.spend      += parseFloat(m.spend || 0);
       agg.clicks     += parseInt(m.clicks || 0);
@@ -16191,6 +16318,24 @@ async function metaCreativosLoad() {
       sel.innerHTML = '<option value="">Todas las campañas</option>' +
         campIds.map(id => `<option value="${id}">${campMap[id] || id}</option>`).join('');
     }
+    if (kpiEl) {
+      const totalSpend = Object.values(metricsMap).reduce((s, m) => s + m.spend, 0);
+      const ctrs = Object.values(metricsMap).filter(m => m.ctr_count > 0).map(m => m.ctr_sum / m.ctr_count);
+      const bestCtr = ctrs.length ? Math.max(...ctrs) : null;
+      const activeCount = ads.filter(a => a.status === 'ACTIVE').length;
+      const needsAttn = ads.filter(a => { const m = metricsMap[a.id]||{}; const c = m.ctr_count?m.ctr_sum/m.ctr_count:0; return (c<0.5&&m.spend>=5)||(c<0.3&&m.spend>=10); }).length;
+      kpiEl.innerHTML = [
+        ['💰','Gasto total',    fmtARS(totalSpend),                                 'var(--cyan)'],
+        ['🏆','Mejor CTR',      bestCtr ? bestCtr.toFixed(2)+'%' : '—',             bestCtr&&bestCtr>=1.5?'var(--green)':'var(--cyan)'],
+        ['▶', 'Activos',        activeCount.toString(),                              'var(--green)'],
+        ['⚠️','Para revisar',   needsAttn.toString(),                                needsAttn>0?'#fbbf24':'var(--text3)'],
+      ].map(([ico,lbl,val,col]) =>
+        `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:12px;text-align:center">
+          <div style="font-size:16px;margin-bottom:4px">${ico}</div>
+          <div style="font-size:18px;font-weight:700;color:${col}">${val}</div>
+          <div style="font-size:10px;color:var(--text3)">${lbl}</div>
+        </div>`).join('');
+    }
     metaCreativosGrid();
   } catch(e) {
     el.innerHTML = `<div class="empty">Error cargando creativos: ${e.message}</div>`;
@@ -16204,13 +16349,20 @@ function metaCreativosGrid() {
   const { ads, campMap, metricsMap } = _metaCreativosData;
   const filterCamp = document.getElementById('creativo-filter-camp')?.value || '';
   const sortBy     = document.getElementById('creativo-sort')?.value || 'spend_desc';
+  const search     = (document.getElementById('creativo-search')?.value || '').toLowerCase().trim();
   let filtered = filterCamp ? ads.filter(a => a.campaign_id === filterCamp) : ads;
+  if (search) filtered = filtered.filter(a => a.name.toLowerCase().includes(search) || (campMap[a.campaign_id]||'').toLowerCase().includes(search));
   filtered = [...filtered].sort((a, b) => {
     const ma = metricsMap[a.id] || {}, mb = metricsMap[b.id] || {};
-    if (sortBy === 'spend_desc')  return (mb.spend||0) - (ma.spend||0);
-    if (sortBy === 'ctr_desc')    return (mb.ctr_count ? mb.ctr_sum/mb.ctr_count : 0) - (ma.ctr_count ? ma.ctr_sum/ma.ctr_count : 0);
-    if (sortBy === 'clicks_desc') return (mb.clicks||0) - (ma.clicks||0);
+    if (sortBy === 'spend_desc')   return (mb.spend||0) - (ma.spend||0);
+    if (sortBy === 'ctr_desc')     return (mb.ctr_count?mb.ctr_sum/mb.ctr_count:0) - (ma.ctr_count?ma.ctr_sum/ma.ctr_count:0);
+    if (sortBy === 'clicks_desc')  return (mb.clicks||0) - (ma.clicks||0);
     if (sortBy === 'active_first') return a.status === 'ACTIVE' ? (b.status === 'ACTIVE' ? 0 : -1) : 1;
+    if (sortBy === 'days_desc') {
+      const dA = a.created_at ? Math.floor((Date.now()-new Date(a.created_at))/86400000) : 0;
+      const dB = b.created_at ? Math.floor((Date.now()-new Date(b.created_at))/86400000) : 0;
+      return dB - dA;
+    }
     return 0;
   });
   const countEl = document.getElementById('creativo-count');
@@ -16218,6 +16370,7 @@ function metaCreativosGrid() {
   if (!filtered.length) {
     el.innerHTML = '<div class="empty">No hay anuncios. Sincronizá primero desde Dashboard o subí el primer creativo.</div>'; return;
   }
+  if (_metaCreativosView === 'table') { metaRenderTable(el, filtered, campMap, metricsMap); return; }
   el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
     ${filtered.map(ad => {
       const m     = metricsMap[ad.id] || {};
@@ -16226,40 +16379,81 @@ function metaCreativosGrid() {
       const imps  = m.impressions ? (m.impressions >= 1000 ? (m.impressions/1000).toFixed(1)+'k' : m.impressions) : '0';
       const campName = campMap[ad.campaign_id] || '—';
       const isActive = ad.status === 'ACTIVE';
-      const sBg  = isActive ? 'rgba(34,197,94,0.15)'   : 'rgba(99,102,241,0.15)';
-      const sCol = isActive ? 'var(--green)'            : '#818cf8';
+      const sBg  = isActive ? 'rgba(34,197,94,0.15)' : 'rgba(99,102,241,0.15)';
+      const sCol = isActive ? 'var(--green)'          : '#818cf8';
       const ctrColor = ctr ? (parseFloat(ctr) >= 1.5 ? 'var(--green)' : parseFloat(ctr) >= 0.5 ? 'var(--cyan)' : '#fbbf24') : 'var(--text3)';
-      return `<div class="card" style="padding:0;overflow:hidden;transition:transform 0.15s,box-shadow 0.15s" onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.3)'" onmouseleave="this.style.transform='';this.style.boxShadow=''">
+      const [bIco, bLbl, bBg, bCol] = metaGetBadge(m);
+      const days = ad.created_at ? Math.floor((Date.now()-new Date(ad.created_at))/86400000) : null;
+      const isChecked = _metaCreativosSelected.has(ad.id);
+      return `<div class="card" style="padding:0;overflow:hidden;transition:transform 0.15s,box-shadow 0.15s;position:relative" onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.3)'" onmouseleave="this.style.transform='';this.style.boxShadow=''">
+        <label style="position:absolute;top:6px;left:6px;z-index:2;cursor:pointer" onclick="event.stopPropagation()">
+          <input type="checkbox" data-ad-cb="${ad.id}" ${isChecked?'checked':''} onchange="metaToggleSelect('${ad.id}')" style="width:14px;height:14px;cursor:pointer;accent-color:var(--cyan)"/>
+        </label>
         <div style="height:148px;background:var(--surface2);position:relative;overflow:hidden;cursor:pointer" onclick="metaCreativoDetail('${ad.id}')">
           ${ad.thumbnail_url ? `<img src="${ad.thumbnail_url}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.display='none'"/>` : ''}
           <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:28px;${ad.thumbnail_url?'opacity:0':''}">🖼️</div>
           <span style="position:absolute;top:6px;right:6px;font-size:9px;padding:2px 7px;border-radius:10px;background:${sBg};color:${sCol};font-weight:700;letter-spacing:0.04em;border:1px solid ${sCol}30">${ad.status}</span>
+          ${days !== null ? `<span style="position:absolute;bottom:6px;left:6px;font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(0,0,0,0.65);color:var(--text2)">${days}d</span>` : ''}
         </div>
         <div style="padding:10px">
           <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${ad.name.replace(/"/g,"'")}">${ad.name}</div>
-          <div style="font-size:10px;color:var(--text3);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${campName}</div>
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:7px">
+            <div style="font-size:10px;color:var(--text3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${campName}</div>
+            <span class="cre-badge" style="background:${bBg};color:${bCol}">${bIco} ${bLbl}</span>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;text-align:center;padding:6px 4px;background:var(--surface2);border-radius:var(--r);margin-bottom:8px">
-            <div>
-              <div style="font-size:13px;font-weight:700;color:${ctrColor}">${ctr ? ctr+'%' : '—'}</div>
-              <div style="font-size:9px;color:var(--text3)">CTR</div>
-            </div>
-            <div>
-              <div style="font-size:12px;font-weight:700;color:var(--text)">${spend}</div>
-              <div style="font-size:9px;color:var(--text3)">Gasto</div>
-            </div>
-            <div>
-              <div style="font-size:13px;font-weight:700;color:var(--text)">${imps}</div>
-              <div style="font-size:9px;color:var(--text3)">Imp.</div>
-            </div>
+            <div><div style="font-size:13px;font-weight:700;color:${ctrColor}">${ctr ? ctr+'%' : '—'}</div><div style="font-size:9px;color:var(--text3)">CTR</div></div>
+            <div><div style="font-size:12px;font-weight:700;color:var(--text)">${spend}</div><div style="font-size:9px;color:var(--text3)">Gasto</div></div>
+            <div><div style="font-size:13px;font-weight:700;color:var(--text)">${imps}</div><div style="font-size:9px;color:var(--text3)">Imp.</div></div>
           </div>
           <div style="display:flex;gap:5px">
             <button onclick="metaCreativoDetail('${ad.id}')" class="btn btn-sm" style="flex:1;font-size:11px;padding:4px">Ver detalles</button>
-            <button onclick="event.stopPropagation();metaToggleAd('${ad.id}','${ad.status}')" class="btn btn-sm" style="font-size:12px;padding:4px 9px;color:${isActive?'#f87171':'var(--green)'};border-color:${isActive?'rgba(248,113,113,0.3)':'rgba(34,197,94,0.3)'}" title="${isActive?'Pausar anuncio':'Activar anuncio'}">${isActive?'⏸':'▶'}</button>
+            <button onclick="event.stopPropagation();metaToggleAd('${ad.id}','${ad.status}')" class="btn btn-sm" style="font-size:12px;padding:4px 9px;color:${isActive?'#f87171':'var(--green)'};border-color:${isActive?'rgba(248,113,113,0.3)':'rgba(34,197,94,0.3)'}" title="${isActive?'Pausar':'Activar'}">${isActive?'⏸':'▶'}</button>
           </div>
         </div>
       </div>`;
     }).join('')}
   </div>`;
+}
+
+function metaRenderTable(el, filtered, campMap, metricsMap) {
+  el.innerHTML = `<div style="overflow-x:auto"><table class="cre-tbl">
+    <thead><tr>
+      <th style="width:32px"><button onclick="metaSelectAll()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0" title="Seleccionar todos">☑</button></th>
+      <th style="width:48px"></th>
+      <th>Nombre</th><th>Campaña</th><th>Estado</th><th>Perf.</th>
+      <th>CTR</th><th>Gasto</th><th>Clics</th><th>Días</th><th></th>
+    </tr></thead>
+    <tbody>
+    ${filtered.map(ad => {
+      const m = metricsMap[ad.id] || {};
+      const ctrNum = m.ctr_count ? m.ctr_sum/m.ctr_count : null;
+      const ctr = ctrNum ? ctrNum.toFixed(2) : null;
+      const ctrColor = ctr ? (parseFloat(ctr) >= 1.5 ? 'var(--green)' : parseFloat(ctr) >= 0.5 ? 'var(--cyan)' : '#fbbf24') : 'var(--text3)';
+      const spend = m.spend ? fmtARS(m.spend) : '$0';
+      const isActive = ad.status === 'ACTIVE';
+      const [bIco,bLbl,bBg,bCol] = metaGetBadge(m);
+      const days = ad.created_at ? Math.floor((Date.now()-new Date(ad.created_at))/86400000) : '—';
+      const isChecked = _metaCreativosSelected.has(ad.id);
+      return `<tr>
+        <td><input type="checkbox" data-ad-cb="${ad.id}" ${isChecked?'checked':''} onchange="metaToggleSelect('${ad.id}')" style="cursor:pointer;accent-color:var(--cyan)"/></td>
+        <td>${ad.thumbnail_url?`<img src="${ad.thumbnail_url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px" onerror="this.style.display='none'"/>`:'<div style="width:40px;height:40px;background:var(--surface2);border-radius:4px;display:flex;align-items:center;justify-content:center">🖼️</div>'}</td>
+        <td style="max-width:180px"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${ad.name.replace(/"/g,"'")}">${ad.name}</div></td>
+        <td style="max-width:140px"><div style="font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${campMap[ad.campaign_id]||'—'}</div></td>
+        <td><span style="font-size:9px;padding:2px 7px;border-radius:8px;background:${isActive?'rgba(34,197,94,0.15)':'rgba(99,102,241,0.15)'};color:${isActive?'var(--green)':'#818cf8'};font-weight:700">${ad.status}</span></td>
+        <td><span class="cre-badge" style="background:${bBg};color:${bCol}">${bIco} ${bLbl}</span></td>
+        <td style="color:${ctrColor};font-weight:700">${ctr ? ctr+'%' : '—'}</td>
+        <td style="color:var(--text);font-weight:600">${spend}</td>
+        <td style="color:var(--text)">${m.clicks||0}</td>
+        <td style="color:var(--text3)">${days}</td>
+        <td><div style="display:flex;gap:4px">
+          <button onclick="metaCreativoDetail('${ad.id}')" class="btn btn-sm" style="font-size:11px;padding:3px 8px">Ver</button>
+          <button onclick="metaToggleAd('${ad.id}','${ad.status}')" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:${isActive?'#f87171':'var(--green)'};border-color:${isActive?'rgba(248,113,113,0.3)':'rgba(34,197,94,0.3)'}">${isActive?'⏸':'▶'}</button>
+        </div></td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table></div>`;
 }
 
 async function metaCreativoDetail(adId) {
@@ -16269,26 +16463,25 @@ async function metaCreativoDetail(adId) {
   modal.style.display = 'block';
   content.innerHTML = '<div class="empty" style="padding:48px"><div class="loader"></div></div>';
   try {
-    const since30 = new Date(); since30.setDate(since30.getDate() - 30);
     const [adArr, metricsArr] = await Promise.all([
       metaSbGet(`meta_ads?id=eq.${adId}&select=id,name,status,campaign_id,adset_id,thumbnail_url,created_at`),
       metaSbGet(`meta_ad_metrics?entity_type=eq.ad&entity_id=eq.${adId}&order=date_start.desc&limit=30&select=date_start,spend,clicks,impressions,ctr,cpc,cpm,conversions`)
     ]);
     const ad = adArr[0];
     if (!ad) { content.innerHTML = '<div class="empty" style="padding:48px">Anuncio no encontrado</div>'; return; }
-    const campName   = (_metaCreativosData?.campMap?.[ad.campaign_id]) || ad.campaign_id || '—';
-    const totSpend   = metricsArr.reduce((s, m) => s + parseFloat(m.spend||0), 0);
-    const totClicks  = metricsArr.reduce((s, m) => s + parseInt(m.clicks||0), 0);
-    const totImps    = metricsArr.reduce((s, m) => s + parseInt(m.impressions||0), 0);
-    const totConv    = metricsArr.reduce((s, m) => s + parseInt(m.conversions||0), 0);
-    const avgCtr     = totImps > 0 ? ((totClicks / totImps) * 100).toFixed(2) : null;
-    const avgCpc     = totClicks > 0 ? (totSpend / totClicks).toFixed(2) : null;
-    const isActive   = ad.status === 'ACTIVE';
-    const sCol       = isActive ? 'var(--green)' : '#818cf8';
-    const last14     = metricsArr.slice(0, 14).reverse();
-    const maxSpend   = Math.max(...last14.map(m => parseFloat(m.spend||0)), 0.01);
-    const chartBars  = last14.map(m => {
-      const h = Math.max(Math.round((parseFloat(m.spend||0) / maxSpend) * 44), parseFloat(m.spend||0) > 0 ? 2 : 0);
+    const campName = (_metaCreativosData?.campMap?.[ad.campaign_id]) || ad.campaign_id || '—';
+    const totSpend = metricsArr.reduce((s, m) => s + parseFloat(m.spend||0), 0);
+    const totClicks= metricsArr.reduce((s, m) => s + parseInt(m.clicks||0), 0);
+    const totImps  = metricsArr.reduce((s, m) => s + parseInt(m.impressions||0), 0);
+    const totConv  = metricsArr.reduce((s, m) => s + parseInt(m.conversions||0), 0);
+    const avgCtr   = totImps > 0 ? ((totClicks / totImps) * 100).toFixed(2) : null;
+    const avgCpc   = totClicks > 0 ? (totSpend / totClicks).toFixed(2) : null;
+    const isActive = ad.status === 'ACTIVE';
+    const days     = ad.created_at ? Math.floor((Date.now()-new Date(ad.created_at))/86400000) : null;
+    const last14   = metricsArr.slice(0, 14).reverse();
+    const maxSpend = Math.max(...last14.map(m => parseFloat(m.spend||0)), 0.01);
+    const chartBars= last14.map(m => {
+      const h = Math.max(Math.round((parseFloat(m.spend||0)/maxSpend)*44), parseFloat(m.spend||0)>0?2:0);
       const sp = parseFloat(m.spend||0);
       return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1;min-width:0">
         <div style="font-size:8px;color:var(--cyan);white-space:nowrap;overflow:hidden;max-width:100%">${sp>0?fmtARS(sp):''}</div>
@@ -16296,39 +16489,39 @@ async function metaCreativoDetail(adId) {
         <div style="font-size:8px;color:var(--text3);white-space:nowrap">${(m.date_start||'').slice(5)||''}</div>
       </div>`;
     }).join('');
+    const ctrNum = avgCtr ? parseFloat(avgCtr) : 0;
+    let iaRec, iaBg;
+    if (totSpend < 2)               { iaRec='📊 Pocos datos todavía. Dale más tiempo (1-2 semanas) antes de decidir.'; iaBg='rgba(99,102,241,0.08)'; }
+    else if (ctrNum >= 1.5)         { iaRec='🏆 Excelente rendimiento. Mantenerlo activo y considerá aumentar el presupuesto.'; iaBg='rgba(34,197,94,0.08)'; }
+    else if (ctrNum < 0.3 && totSpend >= 10) { iaRec='🔴 CTR muy bajo con gasto significativo. Recomendamos pausarlo y reemplazar el creativo.'; iaBg='rgba(248,113,113,0.08)'; }
+    else if (ctrNum < 0.5)          { iaRec='⚠️ Rendimiento moderado. Probá ajustar el copy o la imagen para mejorar el CTR.'; iaBg='rgba(251,191,36,0.08)'; }
+    else                            { iaRec='✅ Rendimiento aceptable. Seguí monitoreando por una semana más antes de decidir.'; iaBg='rgba(0,229,204,0.06)'; }
     content.innerHTML = `
       <div style="position:relative">
-        ${ad.thumbnail_url ? `<img src="${ad.thumbnail_url}" style="width:100%;max-height:260px;object-fit:cover"/>` : `<div style="height:140px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:40px">🖼️</div>`}
+        ${ad.thumbnail_url?`<img src="${ad.thumbnail_url}" style="width:100%;max-height:260px;object-fit:cover"/>`:`<div style="height:140px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:40px">🖼️</div>`}
         <button onclick="document.getElementById('meta-creativo-modal').style.display='none'" style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.65);border:none;color:white;width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>
         <span style="position:absolute;bottom:10px;left:10px;font-size:10px;padding:2px 9px;border-radius:10px;background:${isActive?'rgba(34,197,94,0.9)':'rgba(99,102,241,0.9)'};color:white;font-weight:700">${ad.status}</span>
+        ${days!==null?`<span style="position:absolute;bottom:10px;right:10px;font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(0,0,0,0.65);color:var(--text2)">${days} días</span>`:''}
       </div>
       <div style="padding:16px">
         <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px">${ad.name}</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:14px">${campName}</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:12px">${campName}</div>
+        <div style="padding:10px 12px;background:${iaBg};border-radius:var(--r);margin-bottom:14px;font-size:12px;color:var(--text);line-height:1.5">
+          <div style="font-weight:600;margin-bottom:3px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text3)">Recomendación IA</div>
+          ${iaRec}
+        </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
-          ${[['Gasto total', fmtARS(totSpend), 'var(--cyan)'],
-             ['Clics', totClicks.toLocaleString('es-AR'), 'var(--text)'],
-             ['Impresiones', totImps >= 1000 ? (totImps/1000).toFixed(1)+'k' : totImps.toString(), 'var(--text)'],
-             ['Conversiones', totConv.toString(), '#a78bfa']].map(([lbl,val,col]) =>
-            `<div style="background:var(--surface2);padding:10px 6px;border-radius:var(--r);text-align:center">
-              <div style="font-size:14px;font-weight:700;color:${col}">${val}</div>
-              <div style="font-size:9px;color:var(--text3)">${lbl}</div>
-            </div>`).join('')}
+          ${[['Gasto total',fmtARS(totSpend),'var(--cyan)'],['Clics',totClicks.toLocaleString('es-AR'),'var(--text)'],['Impresiones',totImps>=1000?(totImps/1000).toFixed(1)+'k':totImps.toString(),'var(--text)'],['Conversiones',totConv.toString(),'#a78bfa']].map(([lbl,val,col])=>
+            `<div style="background:var(--surface2);padding:10px 6px;border-radius:var(--r);text-align:center"><div style="font-size:14px;font-weight:700;color:${col}">${val}</div><div style="font-size:9px;color:var(--text3)">${lbl}</div></div>`).join('')}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-          ${[['CTR promedio', avgCtr ? avgCtr+'%' : '—', avgCtr && parseFloat(avgCtr) >= 1 ? 'var(--green)' : '#fbbf24'],
-             ['CPC promedio', avgCpc ? fmtARS(avgCpc) : '—', 'var(--text)']].map(([lbl,val,col]) =>
-            `<div style="background:var(--surface2);padding:10px 8px;border-radius:var(--r);text-align:center">
-              <div style="font-size:17px;font-weight:700;color:${col}">${val}</div>
-              <div style="font-size:10px;color:var(--text3)">${lbl}</div>
-            </div>`).join('')}
+          ${[['CTR promedio',avgCtr?avgCtr+'%':'—',avgCtr&&parseFloat(avgCtr)>=1?'var(--green)':'#fbbf24'],['CPC promedio',avgCpc?fmtARS(avgCpc):'—','var(--text)']].map(([lbl,val,col])=>
+            `<div style="background:var(--surface2);padding:10px 8px;border-radius:var(--r);text-align:center"><div style="font-size:17px;font-weight:700;color:${col}">${val}</div><div style="font-size:10px;color:var(--text3)">${lbl}</div></div>`).join('')}
         </div>
-        ${last14.length > 0 ? `<div style="margin-bottom:14px">
+        ${last14.length>0?`<div style="margin-bottom:14px">
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Gasto diario · últimos 14 días</div>
-          <div style="display:flex;align-items:flex-end;gap:2px;height:66px;background:var(--surface2);border-radius:var(--r);padding:6px 8px 4px">
-            ${chartBars}
-          </div>
-        </div>` : ''}
+          <div style="display:flex;align-items:flex-end;gap:2px;height:66px;background:var(--surface2);border-radius:var(--r);padding:6px 8px 4px">${chartBars}</div>
+        </div>`:''}
         <div style="display:flex;gap:8px;margin-top:4px">
           <button onclick="metaToggleAd('${ad.id}','${ad.status}');document.getElementById('meta-creativo-modal').style.display='none'" class="btn" style="flex:1;color:${isActive?'#f87171':'var(--green)'};border-color:${isActive?'rgba(248,113,113,0.3)':'rgba(34,197,94,0.3)'};justify-content:center;font-weight:600">${isActive?'⏸ Pausar anuncio':'▶ Activar anuncio'}</button>
           <button onclick="document.getElementById('meta-creativo-modal').style.display='none'" class="btn btn-sm" style="padding:8px 14px">Cerrar</button>
@@ -16341,19 +16534,19 @@ async function metaCreativoDetail(adId) {
 
 async function metaToggleAd(adId, currentStatus) {
   const newStatus = currentStatus === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-  if (!confirm(`¿${newStatus === 'PAUSED' ? 'Pausar' : 'Activar'} este anuncio en Meta?`)) return;
   try {
     const r = await fetch('/api/meta?action=toggle_ad', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ad_id: adId, new_status: newStatus })
     }).then(x => x.json());
     if (r.ok) {
+      metaToast(`✓ Anuncio ${newStatus === 'PAUSED' ? 'pausado' : 'activado'}`, 'success');
       _metaCreativosData = null;
       metaCreativosLoad();
     } else {
-      alert('Error: ' + (r.error || 'Error desconocido'));
+      metaToast('Error: ' + (r.error || 'Error desconocido'), 'error');
     }
-  } catch(e) { alert('Error de red: ' + e.message); }
+  } catch(e) { metaToast('Error de red: ' + e.message, 'error'); }
 }
 
 async function metaNewAdLoad() {
@@ -16384,35 +16577,70 @@ async function metaNewAdLoadAdsets() {
   }
 }
 
-let _newAdFile = null;
-let _newAdB64  = null;
+function metaRenderQueue() {
+  const qEl = document.getElementById('new-ad-queue');
+  if (!qEl) return;
+  if (!_newAdQueue.length) { qEl.innerHTML = ''; return; }
+  const sIco   = { pending:'⏳', compressing:'🔄', uploading:'📤', done:'✅', error:'❌' };
+  const sColor = { pending:'var(--text3)', compressing:'#fbbf24', uploading:'var(--cyan)', done:'var(--green)', error:'#f87171' };
+  qEl.innerHTML = `<div style="margin-top:8px">
+    <div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">${_newAdQueue.length} imagen${_newAdQueue.length!==1?'es':''} en cola</div>
+    ${_newAdQueue.map((item, idx) => `
+    <div class="cre-queue-item">
+      <div style="width:36px;height:36px;flex-shrink:0;border-radius:4px;overflow:hidden;background:var(--surface)">
+        ${item.objectUrl?`<img src="${item.objectUrl}" style="width:100%;height:100%;object-fit:cover"/>`:
+          '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:16px">🖼️</div>'}
+      </div>
+      <input type="text" value="${(item.name||'').replace(/"/g,'&quot;')}" onchange="_newAdQueue[${idx}].name=this.value" style="flex:1;font-size:11px;padding:4px 7px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text);min-width:0" placeholder="Nombre del anuncio"/>
+      <span style="font-size:11px;color:${sColor[item.status]||'var(--text3)'};white-space:nowrap">${sIco[item.status]||''} ${item.status==='error'&&item.error?item.error.slice(0,20):item.status}</span>
+      ${(item.status==='pending'||item.status==='error')?`<button onclick="metaRemoveFromQueue(${idx})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0">✕</button>`:''}
+    </div>`).join('')}
+  </div>`;
+}
+
+function metaRemoveFromQueue(idx) {
+  const item = _newAdQueue[idx];
+  if (item?.objectUrl) try { URL.revokeObjectURL(item.objectUrl); } catch(e) {}
+  _newAdQueue.splice(idx, 1);
+  if (!_newAdQueue.length) { _newAdB64 = null; _newAdFile = null; }
+  else { const f = _newAdQueue.find(i => i.b64); if (f) { _newAdB64 = f.b64; _newAdFile = f.file; } else { _newAdB64 = null; _newAdFile = null; } }
+  metaRenderQueue();
+}
+
+function _metaQueueAddFiles(files) {
+  for (const file of files) {
+    _newAdQueue.push({ file, name: file.name.replace(/\.[^.]+$/, ''), b64: null,
+      objectUrl: URL.createObjectURL(file), status: 'pending', error: null });
+  }
+  metaRenderQueue();
+  (async () => {
+    for (let i = 0; i < _newAdQueue.length; i++) {
+      const item = _newAdQueue[i];
+      if (item.status !== 'pending') continue;
+      item.status = 'compressing';
+      metaRenderQueue();
+      try { item.b64 = await metaCompressImage(item.file); item.status = 'pending'; }
+      catch(e) { item.status = 'error'; item.error = e.message; }
+      metaRenderQueue();
+    }
+    const first = _newAdQueue.find(i => i.b64);
+    if (first) { _newAdB64 = first.b64; _newAdFile = first.file; metaAdPreviewUpdate(); }
+  })();
+}
 
 async function metaAdFileSelect(input) {
-  const file = input.files[0];
-  if (!file) return;
-  _newAdFile = file;
-  const infoEl = document.getElementById('new-ad-img-info');
-  if (infoEl) { infoEl.style.display = 'block'; infoEl.textContent = `Procesando ${file.name}...`; }
-  _newAdB64 = await metaCompressImage(file);
-  const finalKB = Math.round(_newAdB64.length * 0.75 / 1024);
-  if (infoEl) infoEl.textContent = `✓ ${file.name} · ~${finalKB} KB (comprimida para Meta)`;
-  const dataUrl = `data:image/jpeg;base64,${_newAdB64}`;
-  const dz = document.getElementById('new-ad-dropzone-content');
-  if (dz) dz.innerHTML = `<img src="${dataUrl}" style="max-width:100%;max-height:140px;object-fit:contain;border-radius:4px"/>`;
-  metaAdPreviewUpdate();
+  const files = Array.from(input.files || []).filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  _metaQueueAddFiles(files);
 }
 
 function metaAdDrop(event) {
   event.preventDefault();
   const dz = document.getElementById('new-ad-dropzone');
   if (dz) dz.style.borderColor = 'var(--border)';
-  const file = event.dataTransfer?.files?.[0];
-  if (!file || !file.type.startsWith('image/')) return;
-  const inp = document.getElementById('new-ad-file');
-  if (inp) {
-    try { const dt = new DataTransfer(); dt.items.add(file); inp.files = dt.files; } catch(e) {}
-    metaAdFileSelect(inp.files[0] ? inp : { files: [file] });
-  }
+  const files = Array.from(event.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  _metaQueueAddFiles(files);
 }
 
 function metaAdPreviewUpdate() {
@@ -16425,12 +16653,12 @@ function metaAdPreviewUpdate() {
   const ctaText = document.getElementById('new-ad-cta')?.selectedOptions[0]?.text || 'Más información';
   const urlText = document.getElementById('new-ad-url')?.value || 'rhinosapp.vercel.app';
   previewEl.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;max-width:280px;margin:0 auto;background:var(--surface)">
-    ${imgSrc ? `<img src="${imgSrc}" style="width:100%;height:155px;object-fit:cover"/>` : `<div style="height:120px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px">🖼️</div>`}
+    ${imgSrc?`<img src="${imgSrc}" style="width:100%;height:155px;object-fit:cover"/>`:`<div style="height:120px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px">🖼️</div>`}
     <div style="padding:9px">
-      ${body ? `<div style="font-size:11px;color:var(--text2);margin-bottom:5px;line-height:1.4">${body.substring(0,90)}${body.length>90?'…':''}</div>` : ''}
+      ${body?`<div style="font-size:11px;color:var(--text2);margin-bottom:5px;line-height:1.4">${body.substring(0,90)}${body.length>90?'…':''}</div>`:''}
       <div style="display:flex;align-items:center;gap:8px;padding:5px 7px;background:var(--surface2);border-radius:5px;border:1px solid var(--border)">
         <div style="flex:1;min-width:0">
-          ${headline ? `<div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${headline}</div>` : ''}
+          ${headline?`<div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${headline}</div>`:''}
           <div style="font-size:9px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${urlText.replace(/^https?:\/\//,'')}</div>
         </div>
         <div style="font-size:9px;padding:3px 7px;background:rgba(0,229,204,0.1);color:var(--cyan);border-radius:4px;white-space:nowrap;border:1px solid rgba(0,229,204,0.3);flex-shrink:0">${ctaText}</div>
@@ -16459,10 +16687,7 @@ function metaCompressImage(file, maxSizeMB) {
         let quality = 0.85;
         let dataUrl = canvas.toDataURL('image/jpeg', quality);
         const maxB64 = maxSizeMB * 1024 * 1024 * 1.37;
-        while (dataUrl.length > maxB64 && quality > 0.4) {
-          quality -= 0.1;
-          dataUrl = canvas.toDataURL('image/jpeg', quality);
-        }
+        while (dataUrl.length > maxB64 && quality > 0.4) { quality -= 0.1; dataUrl = canvas.toDataURL('image/jpeg', quality); }
         resolve(dataUrl.split(',')[1]);
       };
       img.src = e.target.result;
@@ -16476,37 +16701,46 @@ async function metaCreateAd() {
   const statusEl = document.getElementById('create-ad-status');
   const adsetId  = document.getElementById('new-ad-adset')?.value;
   const campId   = document.getElementById('new-ad-camp')?.value;
-  const adName   = document.getElementById('new-ad-name')?.value.trim();
+  const baseName = document.getElementById('new-ad-name')?.value.trim();
   const url      = document.getElementById('new-ad-url')?.value.trim();
   const headline = document.getElementById('new-ad-headline')?.value.trim();
   const bodyText = document.getElementById('new-ad-body')?.value.trim();
   const cta      = document.getElementById('new-ad-cta')?.value;
-  if (!adsetId) { alert('Seleccioná un conjunto de anuncios'); return; }
-  if (!_newAdB64) { alert('Seleccioná una imagen para el anuncio'); return; }
-  if (!adName)  { alert('Ingresá el nombre del anuncio'); return; }
-  btn.disabled = true; btn.textContent = '⏳ Subiendo imagen...';
-  if (statusEl) statusEl.innerHTML = '<span style="color:var(--cyan)">⏳ Subiendo imagen a Meta — puede tardar unos segundos...</span>';
-  try {
-    const r = await fetch('/api/meta?action=create_ad', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adset_id: adsetId, campaign_id: campId, image_b64: _newAdB64,
-        image_name: _newAdFile?.name || 'creative.jpg', ad_name: adName,
-        link_url: url || 'https://rhinosapp.vercel.app', headline: headline || '',
-        body_text: bodyText || '', cta_type: cta || 'LEARN_MORE' })
-    }).then(x => x.json());
-    if (r.ok) {
-      if (statusEl) statusEl.innerHTML = `<span style="color:var(--green)">✓ Anuncio creado. ID: <code>${r.ad_id}</code><br>Ya está activo en Meta. Aparecerá en la biblioteca en la próxima sincronización.</span>`;
-      btn.textContent = '✓ Creado exitosamente';
-      _newAdB64 = null; _newAdFile = null;
-      setTimeout(() => { btn.disabled = false; btn.textContent = '🚀 Crear anuncio en Meta'; }, 4000);
-      setTimeout(async () => { await fetch('/api/meta?action=sync').catch(()=>{}); _metaCreativosData = null; }, 3000);
-    } else {
-      if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">✕ Error: ${r.error || 'Error desconocido'}<br><span style="font-size:10px;color:var(--text3)">Verificá que el Page ID esté configurado y que el token tenga permisos de creación.</span></span>`;
-      btn.disabled = false; btn.textContent = '🚀 Crear anuncio en Meta';
-    }
-  } catch(e) {
-    if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">✕ Error de red: ${e.message}</span>`;
-    btn.disabled = false; btn.textContent = '🚀 Crear anuncio en Meta';
+  const readyItems = _newAdQueue.filter(i => i.b64 && (i.status === 'pending' || i.status === 'error'));
+  if (!adsetId) { metaToast('Seleccioná un conjunto de anuncios', 'error'); return; }
+  if (!readyItems.length) { metaToast('Seleccioná al menos una imagen', 'error'); return; }
+  if (!baseName) { metaToast('Ingresá el nombre del anuncio', 'error'); return; }
+  btn.disabled = true;
+  let created = 0, errors = 0;
+  for (const item of readyItems) {
+    item.status = 'uploading';
+    metaRenderQueue();
+    const adName = readyItems.length > 1 ? `${baseName} — ${item.name}` : baseName;
+    try {
+      const r = await fetch('/api/meta?action=create_ad', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adset_id: adsetId, campaign_id: campId, image_b64: item.b64,
+          image_name: item.file?.name || 'creative.jpg', ad_name: adName,
+          link_url: url || 'https://rhinosapp.vercel.app', headline: headline || '',
+          body_text: bodyText || '', cta_type: cta || 'LEARN_MORE' })
+      }).then(x => x.json());
+      if (r.ok) { item.status = 'done'; created++; }
+      else { item.status = 'error'; item.error = r.error || 'Error'; errors++; }
+    } catch(e) { item.status = 'error'; item.error = e.message; errors++; }
+    metaRenderQueue();
+  }
+  btn.disabled = false;
+  if (created > 0) {
+    const s = created !== 1 ? 's' : '';
+    metaToast(`✓ ${created} anuncio${s} creado${s} en Meta`, 'success');
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--green)">✓ ${created} anuncio${s} creado${s}${errors?' · '+errors+' con error':''}</span>`;
+    btn.textContent = `✓ ${created} creado${s}`;
+    setTimeout(() => { btn.textContent = '🚀 Subir y crear anuncios'; }, 4000);
+    setTimeout(async () => { await fetch('/api/meta?action=sync').catch(()=>{}); _metaCreativosData = null; }, 3000);
+  } else {
+    metaToast('Error creando los anuncios', 'error');
+    if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">✕ Error. Verificá los datos e intentá de nuevo.</span>`;
+    btn.textContent = '🚀 Subir y crear anuncios';
   }
 }
 

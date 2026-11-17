@@ -306,10 +306,40 @@ async function runToggleAd(req, res) {
   }
 }
 
+// ── BULK TOGGLE ───────────────────────────────────────────────────────────────
+async function runBulkToggle(req, res) {
+  try {
+    const cfg   = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending')
+      return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+
+    const { ids, status } = req.body || {};
+    if (!ids?.length || !status)
+      return res.status(200).json({ ok: false, error: 'ids y status son requeridos' });
+
+    let updated = 0;
+    for (const ad_id of ids) {
+      try {
+        await metaPatch(token, ad_id, { status });
+        await sbReq('PATCH', `meta_ads?id=eq.${ad_id}`, { status, updated_at: new Date().toISOString() });
+        updated++;
+      } catch(e) {
+        console.warn(`[bulk-toggle] skip ${ad_id}: ${e.message}`);
+      }
+    }
+    return res.status(200).json({ ok: true, updated });
+  } catch (err) {
+    console.error('[meta-bulk-toggle]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
-  if (action === 'agent')     return runAgent(res);
-  if (action === 'create_ad') return runCreateAd(req, res);
-  if (action === 'toggle_ad') return runToggleAd(req, res);
+  if (action === 'agent')       return runAgent(res);
+  if (action === 'create_ad')   return runCreateAd(req, res);
+  if (action === 'toggle_ad')   return runToggleAd(req, res);
+  if (action === 'bulk_toggle') return runBulkToggle(req, res);
   return runSync(res);
 }
