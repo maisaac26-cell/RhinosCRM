@@ -882,6 +882,82 @@ async function runMonthlyGoals(res) {
   } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
 }
 
+// ── WEEK-OVER-WEEK METRICS ───────────────────────────────────────────────────
+async function runWoWMetrics(res) {
+  try {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun
+    const startOfThisWeek = new Date(now); startOfThisWeek.setDate(now.getDate() - dayOfWeek);
+    const startOfLastWeek = new Date(startOfThisWeek); startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+    const endOfLastWeek   = new Date(startOfThisWeek); endOfLastWeek.setDate(startOfThisWeek.getDate() - 1);
+
+    const tw = isoDate(startOfThisWeek), lw0 = isoDate(startOfLastWeek), lw1 = isoDate(endOfLastWeek);
+
+    const [thisW, lastW] = await Promise.all([
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${tw}&select=spend,impressions,clicks,leads,messages_started`),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${lw0}&date_start=lte.${lw1}&select=spend,impressions,clicks,leads,messages_started`),
+    ]);
+
+    const agg = rows => ({
+      spend:    rows.reduce((s, r) => s + parseFloat(r.spend||0), 0),
+      impressions: rows.reduce((s, r) => s + parseInt(r.impressions||0), 0),
+      clicks:   rows.reduce((s, r) => s + parseInt(r.clicks||0), 0),
+      leads:    rows.reduce((s, r) => s + parseInt(r.leads||0), 0),
+      messages: rows.reduce((s, r) => s + parseInt(r.messages_started||0), 0),
+    });
+
+    const tw_agg = agg(thisW), lw_agg = agg(lastW);
+    const diff = key => lw_agg[key] > 0 ? ((tw_agg[key] - lw_agg[key]) / lw_agg[key]) * 100 : null;
+
+    return res.status(200).json({ ok: true, thisWeek: tw_agg, lastWeek: lw_agg, diff: { spend: diff('spend'), impressions: diff('impressions'), clicks: diff('clicks'), leads: diff('leads'), messages: diff('messages') } });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
+// ── CREATIVE LEADERBOARD ─────────────────────────────────────────────────────
+async function runLeaderboard(res) {
+  try {
+    const since30 = isoDate(new Date(Date.now() - 30 * 86400000));
+    const [ads, metrics, leads] = await Promise.all([
+      sbGet('meta_ads?select=id,name,status,campaign_id,adset_id&limit=300'),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since30}&select=entity_id,spend,impressions,clicks,leads,messages_started,frequency`),
+      sbGet('meta_leads_wa?select=ad_id&limit=2000').catch(() => []),
+    ]);
+
+    const leadCount = {};
+    for (const l of leads) if (l.ad_id) leadCount[l.ad_id] = (leadCount[l.ad_id] || 0) + 1;
+
+    const byAd = {};
+    for (const m of metrics) {
+      if (!byAd[m.entity_id]) byAd[m.entity_id] = { spend:0, impressions:0, clicks:0, leads:0, messages:0, freq_sum:0, freq_n:0 };
+      byAd[m.entity_id].spend       += parseFloat(m.spend||0);
+      byAd[m.entity_id].impressions += parseInt(m.impressions||0);
+      byAd[m.entity_id].clicks      += parseInt(m.clicks||0);
+      byAd[m.entity_id].leads       += parseInt(m.leads||0);
+      byAd[m.entity_id].messages    += parseInt(m.messages_started||0);
+      if (m.frequency) { byAd[m.entity_id].freq_sum += parseFloat(m.frequency); byAd[m.entity_id].freq_n++; }
+    }
+
+    const rows = ads.map(ad => {
+      const m = byAd[ad.id] || {};
+      const ctr = (m.impressions||0) > 0 ? m.clicks / m.impressions * 100 : 0;
+      const cpl = (m.leads||0) > 0 ? m.spend / m.leads : 0;
+      const freq = m.freq_n > 0 ? m.freq_sum / m.freq_n : 0;
+      const wh_leads = leadCount[ad.id] || 0;
+      // health score (0-100)
+      let score = 50;
+      if (ctr > 1.5) score += 20; else if (ctr > 0.8) score += 10; else if (ctr < 0.3) score -= 20;
+      if ((m.leads||0) > 0) score += 15; if ((m.leads||0) > 3) score += 5;
+      if (cpl > 0 && cpl < 5000) score += 10; else if (cpl > 20000) score -= 15;
+      if (freq > 3.5) score -= 20; else if (freq > 2.5) score -= 10;
+      if (ad.status !== 'ACTIVE') score -= 10;
+      score = Math.max(0, Math.min(100, score));
+      return { id: ad.id, name: ad.name, status: ad.status, campaign_id: ad.campaign_id, spend: m.spend||0, impressions: m.impressions||0, clicks: m.clicks||0, leads: m.leads||0, messages: m.messages||0, ctr, cpl, freq, score, wh_leads };
+    }).sort((a, b) => b.score - a.score);
+
+    return res.status(200).json({ ok: true, rows: rows.slice(0, 100), total: rows.length });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
@@ -899,5 +975,7 @@ export default async function handler(req, res) {
   if (action === 'budget_recs')       return runBudgetRecs(res);
   if (action === 'anomaly_check')     return runAnomalyCheck(res);
   if (action === 'monthly_goals')     return runMonthlyGoals(res);
+  if (action === 'wow_metrics')       return runWoWMetrics(res);
+  if (action === 'leaderboard')       return runLeaderboard(res);
   return runSync(res);
 }
