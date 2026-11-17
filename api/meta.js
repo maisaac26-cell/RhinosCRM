@@ -1,8 +1,8 @@
 // meta.js — Meta Marketing API: sync + agent IA (combinado para Vercel Hobby 12-fn limit)
 // ?action=sync  → sincroniza campañas/adsets/ads/métricas (cron 10am UTC)
 // ?action=agent → aplica reglas Goodly auto-pausa/escala (cron 11am UTC)
-const SB_URL = process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SB_URL = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
 const META_V = 'v21.0';
 
 async function sbGet(path) {
