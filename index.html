@@ -747,13 +747,15 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     </div>
 
-    <div class="metrics-row" id="meta-kpis" style="margin-bottom:1.25rem;grid-template-columns:repeat(3,1fr)">
+    <div class="metrics-row" id="meta-kpis" style="margin-bottom:1.25rem;grid-template-columns:repeat(4,1fr)">
       <div class="metric-card"><div class="m-label">Gasto 7d</div><div class="m-val cyan" id="mk-spend">—</div><div class="m-sub">ARS total</div></div>
+      <div class="metric-card"><div class="m-label">Leads 7d</div><div class="m-val green" id="mk-leads">—</div><div class="m-sub">formularios capturados</div></div>
+      <div class="metric-card"><div class="m-label">CPL prom.</div><div class="m-val cyan" id="mk-cpl">—</div><div class="m-sub">costo por lead ARS</div></div>
+      <div class="metric-card"><div class="m-label">Mensajes 7d</div><div class="m-val" id="mk-messages">—</div><div class="m-sub">conversaciones WA</div></div>
       <div class="metric-card"><div class="m-label">Impresiones</div><div class="m-val" id="mk-impressions">—</div><div class="m-sub">últimos 7 días</div></div>
-      <div class="metric-card"><div class="m-label">Clics</div><div class="m-val green" id="mk-clicks">—</div><div class="m-sub">al link</div></div>
+      <div class="metric-card"><div class="m-label">Clics</div><div class="m-val" id="mk-clicks">—</div><div class="m-sub">al link</div></div>
       <div class="metric-card"><div class="m-label">CTR prom.</div><div class="m-val" id="mk-ctr">—</div><div class="m-sub">click-through rate</div></div>
-      <div class="metric-card"><div class="m-label">CPC prom.</div><div class="m-val" id="mk-cpc">—</div><div class="m-sub">ARS por clic</div></div>
-      <div class="metric-card"><div class="m-label">Conversiones</div><div class="m-val" id="mk-conv">—</div><div class="m-sub">leads / compras</div></div>
+      <div class="metric-card"><div class="m-label">Conversiones</div><div class="m-val" id="mk-conv">—</div><div class="m-sub">compras / purchases</div></div>
     </div>
 
     <div class="card">
@@ -16027,23 +16029,27 @@ async function metaDashboardLoad() {
 
     const [campaigns, metrics] = await Promise.all([
       metaSbGet('meta_campaigns?order=updated_at.desc&limit=50'),
-      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7str}&select=spend,clicks,impressions,ctr,cpc,conversions`),
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7str}&select=spend,clicks,impressions,ctr,cpc,conversions,leads,messages_started`),
     ]);
 
     // KPIs
-    const totSpend = metrics.reduce((s, r) => s + parseFloat(r.spend || 0), 0);
-    const totImpr  = metrics.reduce((s, r) => s + parseInt(r.impressions || 0), 0);
-    const totClicks = metrics.reduce((s, r) => s + parseInt(r.clicks || 0), 0);
-    const totConv  = metrics.reduce((s, r) => s + parseInt(r.conversions || 0), 0);
-    const avgCtr   = totImpr > 0 ? (totClicks / totImpr) * 100 : 0;
-    const avgCpc   = totClicks > 0 ? totSpend / totClicks : 0;
+    const totSpend    = metrics.reduce((s, r) => s + parseFloat(r.spend || 0), 0);
+    const totImpr     = metrics.reduce((s, r) => s + parseInt(r.impressions || 0), 0);
+    const totClicks   = metrics.reduce((s, r) => s + parseInt(r.clicks || 0), 0);
+    const totConv     = metrics.reduce((s, r) => s + parseInt(r.conversions || 0), 0);
+    const totLeads    = metrics.reduce((s, r) => s + parseInt(r.leads || 0), 0);
+    const totMessages = metrics.reduce((s, r) => s + parseInt(r.messages_started || 0), 0);
+    const avgCtr      = totImpr > 0 ? (totClicks / totImpr) * 100 : 0;
+    const avgCpl      = totLeads > 0 ? totSpend / totLeads : 0;
 
     const setKpi = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     setKpi('mk-spend', fmtARS(totSpend));
+    setKpi('mk-leads', fmtNum(totLeads));
+    setKpi('mk-cpl', avgCpl > 0 ? fmtARS(avgCpl) : '—');
+    setKpi('mk-messages', fmtNum(totMessages));
     setKpi('mk-impressions', fmtNum(totImpr));
     setKpi('mk-clicks', fmtNum(totClicks));
     setKpi('mk-ctr', fmtPct(avgCtr));
-    setKpi('mk-cpc', fmtARS(avgCpc));
     setKpi('mk-conv', fmtNum(totConv));
 
     // Campaigns table
@@ -16097,43 +16103,50 @@ async function metaDashboardLoad() {
 async function metaLoadTopAds(since7str) {
   try {
     const adMetrics = await metaSbGet(
-      `meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7str}&select=entity_id,spend,clicks,impressions,ctr,conversions&order=ctr.desc&limit=20`
+      `meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7str}&select=entity_id,spend,clicks,impressions,ctr,conversions,leads,messages_started&limit=200`
     );
-    const ads = await metaSbGet('meta_ads?status=eq.ACTIVE&select=id,name&limit=100');
+    const ads = await metaSbGet('meta_ads?select=id,name&limit=200');
     const adMap = {}; ads.forEach(a => adMap[a.id] = a.name);
 
     // Aggregate by ad
     const byAd = {};
     adMetrics.forEach(m => {
-      if (!byAd[m.entity_id]) byAd[m.entity_id] = { spend:0, clicks:0, impressions:0, conversions:0 };
-      byAd[m.entity_id].spend += parseFloat(m.spend||0);
-      byAd[m.entity_id].clicks += parseInt(m.clicks||0);
+      if (!byAd[m.entity_id]) byAd[m.entity_id] = { spend:0, clicks:0, impressions:0, conversions:0, leads:0, messages:0 };
+      byAd[m.entity_id].spend       += parseFloat(m.spend||0);
+      byAd[m.entity_id].clicks      += parseInt(m.clicks||0);
       byAd[m.entity_id].impressions += parseInt(m.impressions||0);
       byAd[m.entity_id].conversions += parseInt(m.conversions||0);
+      byAd[m.entity_id].leads       += parseInt(m.leads||0);
+      byAd[m.entity_id].messages    += parseInt(m.messages_started||0);
     });
 
     const rows = Object.entries(byAd).map(([id, v]) => ({
       id, name: adMap[id] || id,
       ctr: v.impressions > 0 ? (v.clicks / v.impressions) * 100 : 0,
-      spend: v.spend, conversions: v.conversions
+      cpl: v.leads > 0 ? v.spend / v.leads : 0,
+      spend: v.spend, conversions: v.conversions, leads: v.leads, messages: v.messages
     }));
 
-    const top5 = [...rows].sort((a,b) => b.ctr - a.ctr).slice(0,5);
-    const low5 = rows.filter(r => r.spend >= 5 && r.ctr < 0.5).slice(0,5);
+    // Top 5 by leads first, then CTR
+    const top5 = [...rows].sort((a,b) => (b.leads - a.leads) || (b.ctr - a.ctr)).slice(0,5);
+    const low5 = rows.filter(r => r.spend >= 5 && r.ctr < 0.5 && r.leads === 0).sort((a,b)=>b.spend-a.spend).slice(0,5);
 
     const topEl = document.getElementById('meta-top-ads');
     if (topEl) topEl.innerHTML = top5.length
-      ? top5.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2);font-size:12px">
-          <span style="color:var(--text);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</span>
-          <span style="color:var(--green);font-weight:600">${fmtPct(r.ctr)}</span>
+      ? top5.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border2);font-size:11px">
+          <span style="color:var(--text);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</span>
+          <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+            ${r.leads>0?`<span style="color:var(--cyan);font-weight:600">${r.leads}💎</span>`:''}
+            <span style="color:var(--green);font-weight:600">${fmtPct(r.ctr)}</span>
+          </div>
         </div>`).join('')
       : '<div class="empty" style="font-size:12px">Sin datos suficientes</div>';
 
     const lowEl = document.getElementById('meta-low-ads');
     if (lowEl) lowEl.innerHTML = low5.length
-      ? low5.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2);font-size:12px">
+      ? low5.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border2);font-size:11px">
           <span style="color:var(--text);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</span>
-          <span style="color:#f87171;font-weight:600">${fmtPct(r.ctr)}</span>
+          <span style="color:#f87171;font-weight:600">${fmtPct(r.ctr)} · ${fmtARS(r.spend)}</span>
         </div>`).join('')
       : '<div class="empty" style="font-size:12px;color:var(--green)">Sin anuncios a pausar 🎉</div>';
   } catch(e) { /* silent */ }
@@ -16502,13 +16515,14 @@ async function metaLoadAllCampaigns() {
     for (const a of ads) {
       (adsByAdset[a.adset_id] = adsByAdset[a.adset_id]||[]).push(a);
       const m = adM[a.id]||{};
-      if (!adsetM[a.adset_id]) adsetM[a.adset_id] = {impressions:0,clicks:0,spend:0,reach:0,leads:0,messages:0};
+      if (!adsetM[a.adset_id]) adsetM[a.adset_id] = {impressions:0,clicks:0,spend:0,reach:0,leads:0,messages:0,freq_sum:0,freq_n:0};
       adsetM[a.adset_id].impressions += m.impressions||0;
       adsetM[a.adset_id].clicks      += m.clicks||0;
       adsetM[a.adset_id].spend       += m.spend||0;
       adsetM[a.adset_id].reach       += m.reach||0;
       adsetM[a.adset_id].leads       += m.leads||0;
       adsetM[a.adset_id].messages    += m.messages||0;
+      if (m.frequency) { adsetM[a.adset_id].freq_sum += parseFloat(m.frequency); adsetM[a.adset_id].freq_n++; }
     }
 
     // Group adsets + aggregate per campaign
@@ -16516,13 +16530,14 @@ async function metaLoadAllCampaigns() {
     for (const a of adsets) {
       (adsetsByCamp[a.campaign_id] = adsetsByCamp[a.campaign_id]||[]).push(a);
       const m = adsetM[a.id]||{};
-      if (!campM[a.campaign_id]) campM[a.campaign_id] = {impressions:0,clicks:0,spend:0,reach:0,leads:0,messages:0};
+      if (!campM[a.campaign_id]) campM[a.campaign_id] = {impressions:0,clicks:0,spend:0,reach:0,leads:0,messages:0,freq_sum:0,freq_n:0};
       campM[a.campaign_id].impressions += m.impressions||0;
       campM[a.campaign_id].clicks      += m.clicks||0;
       campM[a.campaign_id].spend       += m.spend||0;
       campM[a.campaign_id].reach       += m.reach||0;
       campM[a.campaign_id].leads       += m.leads||0;
       campM[a.campaign_id].messages    += m.messages||0;
+      if (m.frequency) { campM[a.campaign_id].freq_sum += parseFloat(m.frequency); campM[a.campaign_id].freq_n++; }
     }
 
     function fmtNum(n) { n=Number(n)||0; if(n>=1000000) return (n/1000000).toFixed(1)+'M'; if(n>=1000) return (n/1000).toFixed(1)+'k'; return n.toLocaleString(); }
@@ -16550,6 +16565,25 @@ async function metaLoadAllCampaigns() {
       return `<button class="btn btn-sm" onclick="${fn}('${id}','${s}')" style="font-size:10px;padding:2px 7px;color:${isA?'#f87171':'var(--green)'}" title="${isA?'Pausar':'Activar'}">${isA?'⏸':'▶'}</button>`; }
 
     function budgetLink(type,id,b) { return `<span onclick="metaInlineBudget('${type}','${id}',${b||0})" style="cursor:pointer;color:var(--cyan);font-size:10px" title="Editar presupuesto">${fmtARS(b)}/día ✏️</span>`; }
+
+    function healthScore(m) {
+      if (!m || (!m.impressions && !m.spend)) return null;
+      const ctr = m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0;
+      const freq = m.freq_n > 0 ? m.freq_sum / m.freq_n : 1;
+      const cfg2 = JSON.parse(localStorage.getItem('meta_config')||'{}');
+      const targetCpl2 = parseFloat(cfg2.meta_target_cpl||0);
+      const cpl = m.leads > 0 ? m.spend / m.leads : 0;
+      const cplScore = targetCpl2 > 0 && cpl > 0 ? Math.max(0, 1 - (cpl / (targetCpl2 * 2))) : 0.5;
+      const score = Math.min(100, Math.round(
+        (m.leads > 0 ? Math.min(m.leads * 8, 40) : 0) +
+        (Math.min(ctr * 5, 25)) +
+        (cplScore * 20) +
+        (Math.max(0, 15 - freq * 3))
+      ));
+      const col = score >= 70 ? 'var(--green)' : score >= 40 ? '#f59e0b' : '#f87171';
+      const label = score >= 70 ? '🟢' : score >= 40 ? '🟡' : '🔴';
+      return `<span title="Health score: leads+CTR+CPL+frecuencia" style="font-size:10px;color:${col};font-weight:700;cursor:default">${label} ${score}</span>`;
+    }
 
     function renderAd(ad) {
       const m=adM[ad.id]||{}, isA=ad.status==='ACTIVE';
@@ -16603,6 +16637,7 @@ async function metaLoadAllCampaigns() {
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
                   <div style="font-weight:700;font-size:13px">${c.name}</div>
                   ${badge(c.status)}
+                  ${healthScore(m)||''}
                 </div>
                 <div style="font-size:10px;color:var(--text3)">${(c.objective||'').replace('OUTCOME_','').replace('_',' ')||'—'} · ${budgetLink('campaign',c.id,c.budget_daily)}</div>
               </div>
