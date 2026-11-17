@@ -1053,6 +1053,112 @@ async function runAdsetEfficiency(res) {
   } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
 }
 
+async function runCplTrend(res) {
+  try {
+    const since8w = new Date(); since8w.setDate(since8w.getDate() - 55);
+    const sinceStr = isoDate(since8w);
+    const rows = await sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${sinceStr}&select=date_start,spend,leads`);
+
+    const weeks = {};
+    for (const r of rows) {
+      const d = new Date(r.date_start);
+      // ISO week: Monday-based
+      const day = d.getDay() || 7;
+      const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
+      const key = isoDate(mon);
+      if (!weeks[key]) weeks[key] = { spend: 0, leads: 0 };
+      weeks[key].spend += parseFloat(r.spend || 0);
+      weeks[key].leads += parseInt(r.leads || 0);
+    }
+
+    const sorted = Object.entries(weeks)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-8)
+      .map(([weekStart, m]) => ({
+        weekStart,
+        spend: Math.round(m.spend),
+        leads: m.leads,
+        cpl: m.leads > 0 ? Math.round(m.spend / m.leads) : null,
+      }));
+
+    return res.status(200).json({ ok: true, weeks: sorted });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
+async function runAccountHealth(res) {
+  try {
+    const [cfg, metrics7, ads, goals] = await Promise.all([
+      sbGet('rhinos_config?key=in.(meta_goal_leads_month,meta_goal_spend_month)&select=key,value'),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${isoDate(new Date(Date.now()-6*86400000))}&select=entity_id,spend,impressions,clicks,leads,messages_started`),
+      sbGet('meta_ads?status=eq.ACTIVE&select=id,name'),
+      sbGet('rhinos_config?key=in.(meta_goal_leads_month,meta_goal_spend_month)&select=key,value'),
+    ]);
+
+    const cfgMap = {}; for (const c of cfg) cfgMap[c.key] = parseFloat(c.value) || 0;
+    const goalLeads = cfgMap['meta_goal_leads_month'] || 0;
+    const goalSpend = cfgMap['meta_goal_spend_month'] || 0;
+
+    // Aggregate 7d totals
+    const agg = {};
+    for (const m of metrics7) {
+      if (!agg[m.entity_id]) agg[m.entity_id] = { spend: 0, impressions: 0, clicks: 0, leads: 0 };
+      agg[m.entity_id].spend       += parseFloat(m.spend || 0);
+      agg[m.entity_id].impressions += parseInt(m.impressions || 0);
+      agg[m.entity_id].clicks      += parseInt(m.clicks || 0);
+      agg[m.entity_id].leads       += parseInt(m.leads || 0);
+    }
+
+    const totSpend = Object.values(agg).reduce((s, a) => s + a.spend, 0);
+    const totLeads = Object.values(agg).reduce((s, a) => s + a.leads, 0);
+    const totImpr  = Object.values(agg).reduce((s, a) => s + a.impressions, 0);
+    const totClk   = Object.values(agg).reduce((s, a) => s + a.clicks, 0);
+    const avgCtr   = totImpr > 0 ? totClk / totImpr * 100 : 0;
+
+    // Score components (each 0-25)
+    // 1. CTR health (benchmark 1.5%)
+    const ctrScore = Math.min(25, Math.round(avgCtr / 1.5 * 25));
+
+    // 2. Lead velocity (leads/day vs expected from monthly goal)
+    const now = new Date();
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const pctMonth = dayOfMonth / daysInMonth;
+    const monthLeads = await sbGet(`meta_leads_wa?select=id&created_at=gte.${isoDate(new Date(now.getFullYear(), now.getMonth(), 1))}`).then(r => r.length).catch(() => 0);
+    let velScore = 12; // neutral
+    if (goalLeads > 0) {
+      const pctGoal = monthLeads / goalLeads;
+      const onTrackRatio = pctGoal / pctMonth;
+      velScore = Math.min(25, Math.max(0, Math.round(onTrackRatio * 20)));
+    } else if (totLeads > 0) velScore = Math.min(25, totLeads * 3);
+
+    // 3. Ad diversity (% of active ads that have leads in 7d)
+    const activeIds = ads.map(a => a.id);
+    const adsWithLeads = activeIds.filter(id => (agg[id]?.leads || 0) > 0).length;
+    const divScore = activeIds.length > 0 ? Math.min(25, Math.round(adsWithLeads / activeIds.length * 25)) : 12;
+
+    // 4. Spend pacing (is monthly spend on track?)
+    let pacingScore = 12;
+    if (goalSpend > 0) {
+      const monthSpend = await sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${isoDate(new Date(now.getFullYear(), now.getMonth(), 1))}&select=spend`).then(rows => rows.reduce((s, r) => s + parseFloat(r.spend || 0), 0)).catch(() => 0);
+      const pctSpend = monthSpend / goalSpend;
+      const paceRatio = pctSpend / pctMonth;
+      // On track = 1.0, slight over/under ok
+      if (paceRatio >= 0.8 && paceRatio <= 1.2) pacingScore = 25;
+      else if (paceRatio >= 0.6 && paceRatio <= 1.5) pacingScore = 18;
+      else pacingScore = 8;
+    } else pacingScore = 15;
+
+    const score = Math.min(100, ctrScore + velScore + divScore + pacingScore);
+    const grade = score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : score >= 40 ? 'D' : 'F';
+
+    return res.status(200).json({
+      ok: true, score, grade,
+      breakdown: { ctr: ctrScore, velocity: velScore, diversity: divScore, pacing: pacingScore },
+      meta: { avgCtr: avgCtr.toFixed(2), totLeads, totSpend: Math.round(totSpend), activeAds: activeIds.length, adsWithLeads },
+    });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
@@ -1074,5 +1180,7 @@ export default async function handler(req, res) {
   if (action === 'leaderboard')       return runLeaderboard(res);
   if (action === 'decay_check')       return runDecayCheck(res);
   if (action === 'adset_efficiency')  return runAdsetEfficiency(res);
+  if (action === 'cpl_trend')         return runCplTrend(res);
+  if (action === 'account_health')    return runAccountHealth(res);
   return runSync(res);
 }

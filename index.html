@@ -759,6 +759,16 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div class="metric-card"><div class="m-label">Conversiones</div><div class="m-val" id="mk-conv">—</div><div class="m-sub">compras / purchases</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem;padding:14px 18px" id="meta-health-card">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div id="meta-health-gauge" style="flex-shrink:0"></div>
+        <div style="flex:1;min-width:160px">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Salud de cuenta</div>
+          <div id="meta-health-breakdown" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:1.25rem" id="meta-goals-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         🎯 Objetivos del mes
@@ -889,6 +899,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         </div>
         <div id="meta-adset-eff-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
       </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        📈 Tendencia de CPL (últimas 8 semanas)
+        <button class="btn btn-sm" onclick="metaCplTrendLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-cpl-trend-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
     </div>
 
     <div class="card" id="meta-config-card">
@@ -16144,6 +16162,103 @@ function fmtARS(n) {
 function fmtPct(n) { return n != null ? parseFloat(n).toFixed(2) + '%' : '—'; }
 function fmtNum(n) { return n != null ? parseInt(n).toLocaleString('es-AR') : '—'; }
 
+// ── ACCOUNT HEALTH SCORE ─────────────────────────────────────────────────────
+async function metaAccountHealthLoad() {
+  const gauge = document.getElementById('meta-health-gauge');
+  const breakdown = document.getElementById('meta-health-breakdown');
+  if (!gauge) return;
+  gauge.innerHTML = '<div class="loader" style="width:16px;height:16px"></div>';
+  try {
+    const r = await fetch('/api/meta?action=account_health').then(x => x.json());
+    if (!r.ok) { gauge.innerHTML = ''; return; }
+    const { score, grade, breakdown: bd, meta: m } = r;
+    const gradeColor = grade === 'A' ? 'var(--green)' : grade === 'B' ? 'var(--cyan)' : grade === 'C' ? '#fbbf24' : '#f87171';
+    const radius = 28, circ = 2 * Math.PI * radius;
+    const filled = circ * (score / 100);
+    gauge.innerHTML = `<div style="position:relative;width:72px;height:72px">
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r="${radius}" fill="none" stroke="var(--border)" stroke-width="6"/>
+        <circle cx="36" cy="36" r="${radius}" fill="none" stroke="${gradeColor}" stroke-width="6"
+          stroke-dasharray="${filled} ${circ}" stroke-dashoffset="${circ/4}"
+          stroke-linecap="round" transform="rotate(-90 36 36)"/>
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1">
+        <div style="font-size:17px;font-weight:800;color:${gradeColor}">${score}</div>
+        <div style="font-size:9px;color:var(--text3)">/ 100</div>
+      </div>
+    </div>`;
+    const labels = { ctr: 'CTR', velocity: 'Leads', diversity: 'Diversidad', pacing: 'Pacing' };
+    breakdown.innerHTML = Object.entries(bd).map(([k, v]) =>
+      `<div style="display:flex;align-items:center;gap:5px">
+        <div style="width:28px;height:4px;border-radius:2px;background:${v>=20?'var(--green)':v>=14?'var(--cyan)':v>=8?'#fbbf24':'#f87171'}"></div>
+        <span style="font-size:10px;color:var(--text2)">${labels[k]}: <strong style="color:var(--text)">${v}/25</strong></span>
+      </div>`
+    ).join('') + `<div style="font-size:9px;color:var(--text3);grid-column:1/-1;margin-top:2px">CTR ${m.avgCtr}% · ${m.adsWithLeads}/${m.activeAds} ads con leads</div>`;
+  } catch(e) { gauge.innerHTML = ''; }
+}
+
+// ── CPL TREND CHART ──────────────────────────────────────────────────────────
+async function metaCplTrendLoad() {
+  const el = document.getElementById('meta-cpl-trend-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const r = await fetch('/api/meta?action=cpl_trend').then(x => x.json());
+    if (!r.ok || !r.weeks?.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin datos suficientes</div>'; return; }
+    const weeks = r.weeks;
+    const cplVals = weeks.map(w => w.cpl).filter(v => v !== null);
+    if (!cplVals.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin leads aún</div>'; return; }
+    const maxCpl = Math.max(...cplVals) * 1.1;
+    const minCpl = Math.min(...cplVals) * 0.9;
+    const W = 520, H = 100, PAD = 32;
+    const xStep = (W - PAD * 2) / (weeks.length - 1 || 1);
+
+    const pts = weeks.map((w, i) => {
+      const x = PAD + i * xStep;
+      const y = w.cpl !== null ? H - PAD - ((w.cpl - minCpl) / (maxCpl - minCpl || 1)) * (H - PAD * 1.4) : null;
+      return { x, y, ...w };
+    });
+
+    const pathD = pts.filter(p => p.y !== null).reduce((acc, p, i) => acc + (i === 0 ? `M${p.x},${p.y}` : ` L${p.x},${p.y}`), '');
+    const areaD = pts.filter(p => p.y !== null).reduce((acc, p, i, arr) => {
+      if (i === 0) return `M${p.x},${H - PAD/2} L${p.x},${p.y}`;
+      if (i === arr.length - 1) return acc + ` L${p.x},${p.y} L${p.x},${H - PAD/2} Z`;
+      return acc + ` L${p.x},${p.y}`;
+    }, '');
+
+    const fmt = n => n >= 1000 ? '$' + (n/1000).toFixed(1) + 'k' : '$' + n;
+    const labels = pts.map(p => {
+      const d = new Date(p.weekStart + 'T12:00:00Z');
+      return `${d.getDate()}/${d.getMonth()+1}`;
+    });
+
+    el.innerHTML = `<div style="overflow-x:auto">
+      <svg width="${W}" height="${H + 20}" viewBox="0 0 ${W} ${H+20}" style="display:block;min-width:300px;max-width:100%">
+        <defs>
+          <linearGradient id="cplGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--cyan)" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="var(--cyan)" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        <path d="${areaD}" fill="url(#cplGrad)"/>
+        <path d="${pathD}" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linejoin="round"/>
+        ${pts.map((p, i) => p.y !== null ? `
+          <circle cx="${p.x}" cy="${p.y}" r="3.5" fill="var(--surface)" stroke="var(--cyan)" stroke-width="2"/>
+          <text x="${p.x}" y="${p.y - 7}" text-anchor="middle" font-size="9" fill="var(--text2)">${fmt(p.cpl)}</text>
+          <text x="${p.x}" y="${H + 14}" text-anchor="middle" font-size="9" fill="var(--text3)">${labels[i]}</text>
+        ` : '').join('')}
+      </svg>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+      ${weeks.map(w => {
+        const d = new Date(w.weekStart + 'T12:00:00Z');
+        const lbl = `${d.getDate()}/${d.getMonth()+1}`;
+        return `<div style="font-size:10px;color:var(--text3)">${lbl}: <strong style="color:var(--text)">${w.cpl !== null ? fmt(w.cpl) : '—'}</strong> <span style="color:var(--text3)">(${w.leads} leads)</span></div>`;
+      }).join('')}
+    </div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── A/B TEST PANEL ───────────────────────────────────────────────────────────
 async function metaAbTestLoad() {
   const el = document.getElementById('meta-ab-pairs');
@@ -16860,6 +16975,8 @@ async function metaDashboardLoad() {
     metaFunnelLoad();
     metaDecayLoad();
     metaAdsetEfficiencyLoad();
+    metaAccountHealthLoad();
+    metaCplTrendLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
