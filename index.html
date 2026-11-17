@@ -983,6 +983,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <option value="">Todas las campañas</option>
         </select>
         <select id="creativo-sort" onchange="metaCreativosGrid()" style="font-size:12px;padding:5px 8px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+          <option value="leads_desc">Más leads</option>
           <option value="spend_desc">Mayor gasto</option>
           <option value="ctr_desc">Mayor CTR</option>
           <option value="clicks_desc">Más clics</option>
@@ -16727,7 +16728,7 @@ async function metaLoadAllCampaigns() {
                 <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${as.name}</div>
                 <div style="font-size:10px;color:var(--text3);margin-top:2px">${(as.optimization_goal||'').replace(/_/g,' ')||'—'} · ${budgetLink('adset',as.id,as.budget_daily)}</div>
               </div>
-              <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${badge(as.status)}${togBtn('adset',as.id,as.status)}</div>
+              <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${badge(as.status)}${healthScore(m)||''}${togBtn('adset',as.id,as.status)}</div>
             </div>
             ${chips(m)}
             ${adsHere.length?`<div style="font-size:10px;color:var(--text3);margin-top:5px;cursor:pointer" onclick="metaToggleAdsetExpand('${as.id}')">${isExp?'▲ Ocultar':'▼ Ver'} ${adsHere.length} anuncio${adsHere.length>1?'s':''}</div>`:'<div style="font-size:10px;color:var(--text3);margin-top:5px">Sin anuncios</div>'}
@@ -16948,18 +16949,20 @@ async function metaCreativosLoad() {
     const [ads, campaigns, metrics] = await Promise.all([
       metaSbGet('meta_ads?order=updated_at.desc&limit=500&select=id,name,status,campaign_id,adset_id,thumbnail_url,created_at'),
       metaSbGet('meta_campaigns?select=id,name&limit=100'),
-      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${sinceStr}&select=entity_id,spend,clicks,impressions,ctr,conversions`),
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${sinceStr}&select=entity_id,spend,clicks,impressions,ctr,conversions,leads,messages_started`),
     ]);
     const campMap = {};
     campaigns.forEach(c => campMap[c.id] = c.name);
     const metricsMap = {};
     metrics.forEach(m => {
-      if (!metricsMap[m.entity_id]) metricsMap[m.entity_id] = { spend:0, clicks:0, impressions:0, conversions:0, ctr_sum:0, ctr_count:0 };
+      if (!metricsMap[m.entity_id]) metricsMap[m.entity_id] = { spend:0, clicks:0, impressions:0, conversions:0, leads:0, messages:0, ctr_sum:0, ctr_count:0 };
       const agg = metricsMap[m.entity_id];
       agg.spend      += parseFloat(m.spend || 0);
       agg.clicks     += parseInt(m.clicks || 0);
       agg.impressions+= parseInt(m.impressions || 0);
       agg.conversions+= parseInt(m.conversions || 0);
+      agg.leads      += parseInt(m.leads || 0);
+      agg.messages   += parseInt(m.messages_started || 0);
       if (m.ctr) { agg.ctr_sum += parseFloat(m.ctr); agg.ctr_count++; }
     });
     _metaCreativosData = { ads, campMap, metricsMap };
@@ -17005,6 +17008,7 @@ function metaCreativosGrid() {
   if (search) filtered = filtered.filter(a => a.name.toLowerCase().includes(search) || (campMap[a.campaign_id]||'').toLowerCase().includes(search));
   filtered = [...filtered].sort((a, b) => {
     const ma = metricsMap[a.id] || {}, mb = metricsMap[b.id] || {};
+    if (sortBy === 'leads_desc')   return (mb.leads||0) - (ma.leads||0);
     if (sortBy === 'spend_desc')   return (mb.spend||0) - (ma.spend||0);
     if (sortBy === 'ctr_desc')     return (mb.ctr_count?mb.ctr_sum/mb.ctr_count:0) - (ma.ctr_count?ma.ctr_sum/ma.ctr_count:0);
     if (sortBy === 'clicks_desc')  return (mb.clicks||0) - (ma.clicks||0);
@@ -17052,11 +17056,16 @@ function metaCreativosGrid() {
             <div style="font-size:10px;color:var(--text3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${campName}</div>
             <span class="cre-badge" style="background:${bBg};color:${bCol}">${bIco} ${bLbl}</span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;text-align:center;padding:6px 4px;background:var(--surface2);border-radius:var(--r);margin-bottom:8px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;text-align:center;padding:6px 4px;background:var(--surface2);border-radius:var(--r);margin-bottom:6px">
             <div><div style="font-size:13px;font-weight:700;color:${ctrColor}">${ctr ? ctr+'%' : '—'}</div><div style="font-size:9px;color:var(--text3)">CTR</div></div>
             <div><div style="font-size:12px;font-weight:700;color:var(--text)">${spend}</div><div style="font-size:9px;color:var(--text3)">Gasto</div></div>
             <div><div style="font-size:13px;font-weight:700;color:var(--text)">${imps}</div><div style="font-size:9px;color:var(--text3)">Imp.</div></div>
           </div>
+          ${(m.leads||0)>0||m.messages>0?`<div style="display:flex;gap:6px;padding:4px 6px;background:rgba(0,229,204,0.06);border-radius:var(--r);margin-bottom:6px">
+            ${(m.leads||0)>0?`<div style="text-align:center;flex:1"><div style="font-size:12px;font-weight:700;color:var(--cyan)">${m.leads}</div><div style="font-size:9px;color:var(--text3)">Leads</div></div>`:''}
+            ${(m.leads||0)>0&&m.spend>0?`<div style="text-align:center;flex:1"><div style="font-size:11px;font-weight:700;color:var(--cyan)">${fmtARS(m.spend/m.leads).replace('$ ','$')}</div><div style="font-size:9px;color:var(--text3)">CPL</div></div>`:''}
+            ${(m.messages||0)>0?`<div style="text-align:center;flex:1"><div style="font-size:12px;font-weight:700;color:#a78bfa">${m.messages}</div><div style="font-size:9px;color:var(--text3)">Msgs</div></div>`:''}
+          </div>`:''}
           <div style="display:flex;gap:5px">
             <button onclick="metaCreativoDetail('${ad.id}')" class="btn btn-sm" style="flex:1;font-size:11px;padding:4px">Ver detalles</button>
             <button onclick="event.stopPropagation();metaToggleAd('${ad.id}','${ad.status}')" class="btn btn-sm" style="font-size:12px;padding:4px 9px;color:${isActive?'#f87171':'var(--green)'};border-color:${isActive?'rgba(248,113,113,0.3)':'rgba(34,197,94,0.3)'}" title="${isActive?'Pausar':'Activar'}">${isActive?'⏸':'▶'}</button>
