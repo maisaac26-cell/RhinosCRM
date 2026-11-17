@@ -250,6 +250,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 .refresh-btn{font-size:11px;color:var(--text3);border:none;background:none;cursor:pointer;font-family:var(--font);padding:0}
 .refresh-btn:hover{color:var(--cyan)}
 .section-header{margin-bottom:1.5rem}
+.meta-ctab,.meta-ctab2,.meta-lf{background:var(--surface2);border:1px solid var(--border);color:var(--text2);transition:all 0.15s}
+.meta-ctab-active,.meta-ctab2-active,.meta-lf-active{background:rgba(0,229,204,0.1);border-color:rgba(0,229,204,0.4);color:var(--cyan)!important}
 .tab-row{display:flex;gap:4px;margin-bottom:1rem;background:var(--surface2);border-radius:var(--r);padding:3px}
 .tab-btn{flex:1;padding:7px 8px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:11px;color:var(--text2);font-family:var(--font);transition:all 0.15s;text-align:center;font-weight:500}
 .tab-btn.active{background:var(--surface);color:var(--cyan);border:1px solid var(--border)}
@@ -541,10 +543,11 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="nav-group-label">Analytics</div>
     <button class="nav-btn" data-sec="analytics"><span class="nav-icon">📈</span>Analytics Web</button>
 
-    <div class="nav-group-label">Instagram</div>
-    <button class="nav-btn" data-sec="posts"><span class="nav-icon">📸</span>Posts</button>
-    <button class="nav-btn" data-sec="dms"><span class="nav-icon">💬</span>DMs</button>
-    <button class="nav-btn" data-sec="contenido"><span class="nav-icon">🎨</span>Contenido</button>
+    <div class="nav-group-label">Meta ADS</div>
+    <button class="nav-btn" data-sec="meta-dashboard"><span class="nav-icon">📊</span>Dashboard</button>
+    <button class="nav-btn" data-sec="meta-campanas"><span class="nav-icon">🎯</span>Campañas</button>
+    <button class="nav-btn" data-sec="meta-contenido"><span class="nav-icon">🌳</span>Contenido</button>
+    <button class="nav-btn" data-sec="meta-leads"><span class="nav-icon">📲</span>Leads WA</button>
 
     <div class="nav-group-label">Web</div>
     <button class="nav-btn" data-sec="webcontent"><span class="nav-icon">🌐</span>Blog y Web</button>
@@ -713,257 +716,277 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
   </div>
 
-  <!-- POSTS / INSTAGRAM -->
-  <div class="section" id="s-posts">
+  <!-- META ADS — DASHBOARD -->
+  <div class="section" id="s-meta-dashboard">
     <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div>
-        <div class="page-title">INSTA<span>GRAM</span></div>
-        <div class="page-sub">Perfil, posts y comentarios de @rhinosapp.</div>
+        <div class="page-title">META <span>ADS</span></div>
+        <div class="page-sub">Dashboard de métricas de campañas de Facebook e Instagram.</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-top:12px">
-        <button class="refresh-btn" id="btn-refresh">↻ Actualizar</button>
-        <button onclick="startModuleGuide('posts')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0" title="Guía de este módulo">ⓘ</button>
+        <button class="refresh-btn" id="btn-meta-refresh" onclick="metaDashboardLoad()">↻ Sincronizar</button>
+        <span id="meta-sync-badge" style="font-size:10px;padding:2px 10px;border-radius:10px;background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.25);display:none">✓ Sincronizado</span>
       </div>
     </div>
 
-    <!-- Perfil Instagram -->
-    <div id="ig-profile-bar" class="ig-profile">
-      <div class="ig-avatar" id="ig-avatar">R</div>
-      <div>
-        <div class="ig-name" id="ig-name">Cargando...</div>
-        <div class="ig-handle">@rhinosapp</div>
-        <div class="ig-bio" id="ig-bio"></div>
+    <div id="meta-no-config" style="display:none">
+      <div class="card" style="background:rgba(251,191,36,0.06);border-color:rgba(251,191,36,0.3)">
+        <div style="font-size:13px;color:#fbbf24;font-weight:600;margin-bottom:6px">⚠️ Credenciales Meta no configuradas</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Necesitás un Access Token de Meta y tu Ad Account ID para ver las métricas.</div>
+        <button class="btn btn-sm" onclick="document.getElementById('meta-config-card').scrollIntoView({behavior:'smooth'})" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">⚙️ Configurar ahora</button>
       </div>
     </div>
 
-    <!-- Métricas Instagram -->
-    <div class="metrics-row" id="metrics-row" style="margin-bottom:1.25rem">
-      <div class="metric-card"><div class="m-label">Seguidores</div><div class="m-val cyan" id="m-followers">—</div><div class="m-sub">cuenta total</div></div>
-      <div class="metric-card"><div class="m-label">Posts</div><div class="m-val" id="m-posts">—</div><div class="m-sub">publicaciones</div></div>
-      <div class="metric-card"><div class="m-label">Alcance 7d</div><div class="m-val green" id="m-reach">—</div><div class="m-sub">personas únicas</div></div>
-      <div class="metric-card"><div class="m-label">Impresiones 7d</div><div class="m-val" id="m-impressions">—</div><div class="m-sub">vistas totales</div></div>
+    <div class="metrics-row" id="meta-kpis" style="margin-bottom:1.25rem;grid-template-columns:repeat(3,1fr)">
+      <div class="metric-card"><div class="m-label">Gasto 7d</div><div class="m-val cyan" id="mk-spend">—</div><div class="m-sub">ARS total</div></div>
+      <div class="metric-card"><div class="m-label">Impresiones</div><div class="m-val" id="mk-impressions">—</div><div class="m-sub">últimos 7 días</div></div>
+      <div class="metric-card"><div class="m-label">Clics</div><div class="m-val green" id="mk-clicks">—</div><div class="m-sub">al link</div></div>
+      <div class="metric-card"><div class="m-label">CTR prom.</div><div class="m-val" id="mk-ctr">—</div><div class="m-sub">click-through rate</div></div>
+      <div class="metric-card"><div class="m-label">CPC prom.</div><div class="m-val" id="mk-cpc">—</div><div class="m-sub">ARS por clic</div></div>
+      <div class="metric-card"><div class="m-label">Conversiones</div><div class="m-val" id="mk-conv">—</div><div class="m-sub">leads / compras</div></div>
     </div>
 
-    <!-- Grid de posts + comentarios -->
     <div class="card">
-      <div class="card-title">Últimos posts <span style="margin-left:auto;font-size:11px;color:var(--text3);font-family:var(--font);text-transform:none;letter-spacing:0">Hacé clic para ver comentarios</span></div>
-      <div class="media-grid" id="media-grid"><div class="empty"><div class="loader"></div><br>Cargando posts...</div></div>
-    </div>
-
-    <div class="card" id="comments-card" style="display:none">
-      <div class="card-title">Comentarios del post <button class="btn btn-sm" id="btn-close-comments" style="margin-left:auto">✕ Cerrar</button></div>
-      <div id="comments-list"><div class="empty">Seleccioná un post</div></div>
-    </div>
-
-    <!-- Panel comentarios por post (vista lateral) -->
-    <div class="grid3">
-      <div>
-        <div class="card">
-          <div class="card-title">Posts</div>
-          <div id="posts-list-side"><div class="empty"><div class="loader"></div></div></div>
-        </div>
+      <div class="card-title">Campañas activas
+        <span id="meta-agent-badge" style="margin-left:auto;font-size:10px;padding:2px 10px;border-radius:10px;background:rgba(139,92,246,0.12);color:#a78bfa;border:1px solid rgba(139,92,246,0.25)">🤖 Agente IA activo</span>
       </div>
-      <div>
-        <div class="card">
-          <div class="card-title">Comentarios <span class="ct-accent" id="selected-post-title"></span></div>
-          <div id="comments-detail"><div class="empty">Seleccioná un post</div></div>
-        </div>
+      <div id="meta-campaigns-table"><div class="empty"><div class="loader"></div><br>Cargando campañas...</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title" style="color:var(--green)">🏆 Top 5 anuncios (CTR)</div>
+        <div id="meta-top-ads"><div class="empty">Sin datos</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:#f87171">⚠️ Anuncios a pausar</div>
+        <div id="meta-low-ads"><div class="empty">Sin datos</div></div>
       </div>
     </div>
 
-    <!-- Configuración de token Instagram -->
-    <div class="card" id="ig-config-card">
+    <div class="card" id="meta-config-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        📡 Conexión Instagram
-        <span id="ig-status-badge" style="font-size:10px;padding:2px 10px;border-radius:10px;background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.25)">Verificando...</span>
+        📡 Conexión Meta Marketing API
+        <span id="meta-conn-badge" style="font-size:10px;padding:2px 10px;border-radius:10px;background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.25)">No configurado</span>
       </div>
-      <div id="ig-config-info" style="font-size:13px;color:var(--text2);margin-bottom:1rem">Cargando estado del token...</div>
-      <div id="ig-token-form" style="display:none">
-        <div class="field" style="margin-bottom:8px">
-          <label>Nuevo token de acceso de Instagram</label>
-          <input id="ig-new-token" type="password" placeholder="Pegá el nuevo token de Meta aquí..." style="font-size:12px"/>
+      <div class="grid2" style="margin-bottom:12px">
+        <div class="field">
+          <label>Access Token de Meta</label>
+          <input id="meta-token-input" type="password" placeholder="EAAxxxxxxxxxxxxxxx..." style="font-size:12px"/>
         </div>
-        <div style="display:flex;gap:8px">
-          <button id="btn-save-ig-token" class="btn btn-cyan" style="flex:1;justify-content:center">✅ Validar y guardar token</button>
-          <button onclick="document.getElementById('ig-token-form').style.display='none'" class="btn" style="color:var(--text2)">Cancelar</button>
-        </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--text3)">
-          💡 Conseguí el token en: <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--cyan)">Meta Graph API Explorer</a> → seleccioná la app → generá token con permisos <code>instagram_basic, instagram_content_publish, pages_read_engagement</code>
+        <div class="field">
+          <label>Ad Account ID</label>
+          <input id="meta-account-input" type="text" placeholder="act_xxxxxxxxxxxxxxxxx" style="font-size:12px"/>
         </div>
       </div>
-      <button id="btn-show-ig-form" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">🔄 Actualizar token</button>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-cyan" style="flex:1;justify-content:center" onclick="metaSaveConfig()">✅ Guardar credenciales</button>
+        <button class="btn" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)" onclick="metaForceSync()">↻ Forzar sincronización</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.6">
+        💡 Conseguí el token en <strong>Meta Business Suite → Configuración → Usuarios del sistema</strong>.
+        El Ad Account ID tiene formato <code>act_XXXXXXXXX</code> y lo encontrás en Administrador de anuncios → URL.
+      </div>
     </div>
   </div>
 
-  <!-- DMs -->
-  <div class="section" id="s-dms">
-    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
-      <div><div class="page-title">DM<span>S</span></div>
-      <div class="page-sub">Mensajes directos de Instagram.</div></div>
-      <button onclick="startModuleGuide('dms')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
-    </div>
-    <div class="card" style="background:rgba(0,229,204,0.05);border-color:rgba(0,229,204,0.2)">
-      <div style="font-size:13px;color:var(--cyan);line-height:1.6">
-        <strong>Nota sobre DMs:</strong> La API de Meta requiere aprobación especial para leer DMs en tiempo real (<code>instagram_manage_messages</code>). Mientras tanto podés usar el generador de respuestas con IA abajo para responder rápido.
+  <!-- META ADS — CAMPAÑAS -->
+  <div class="section" id="s-meta-campanas">
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">CAMPA<span>ÑAS</span></div>
+        <div class="page-sub">Crear campañas nuevas y controlar las existentes.</div>
       </div>
     </div>
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title">Generador de respuesta IA</div>
-        <div class="field"><label>Pegá el DM recibido</label>
-          <textarea id="dm-input" placeholder="Ej: Hola! Vi su publicación sobre el CRM. ¿Cuánto cuesta? Tenemos una distribuidora de quesos en Córdoba..." rows="3"></textarea>
-        </div>
-        <div class="field"><label>Objetivo</label>
-          <select id="dm-objetivo">
-            <option>Llevar al lead a agendar una demo</option>
-            <option>Resolver objeción de precio</option>
-            <option>Resolver objeción "ya uso Excel"</option>
-            <option>Responder consulta técnica</option>
-            <option>Agradecer feedback positivo</option>
-          </select>
-        </div>
-        <button class="btn btn-cyan btn-full" id="btn-gen-dm">Generar respuesta con IA 🦏</button>
-      </div>
-      <div id="dm-output"><div class="empty">Generá una respuesta</div></div>
+    <div style="display:flex;gap:4px;margin-bottom:1rem">
+      <button class="btn btn-sm meta-ctab meta-ctab-active" data-tab="existentes" onclick="metaCampTab('existentes')">📋 Campañas existentes</button>
+      <button class="btn btn-sm meta-ctab" data-tab="nueva" onclick="metaCampTab('nueva')">➕ Nueva campaña</button>
     </div>
-
-    <div class="card">
-      <div class="card-title">Plantillas rápidas</div>
-      <div style="display:flex;flex-direction:column;gap:8px" id="dm-templates">
-        <div class="dm-tpl" data-tipo="precio" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;cursor:pointer;transition:border-color 0.15s">
-          <div style="font-size:12px;color:var(--cyan);font-weight:500;margin-bottom:3px">💬 "¿Cuánto cuesta?"</div>
-          <div style="font-size:12px;color:var(--text2)">Lead que pregunta precio antes de entender el valor</div>
-        </div>
-        <div class="dm-tpl" data-tipo="excel" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;cursor:pointer;transition:border-color 0.15s">
-          <div style="font-size:12px;color:var(--cyan);font-weight:500;margin-bottom:3px">💬 "Ya uso Excel y me va bien"</div>
-          <div style="font-size:12px;color:var(--text2)">Objeción más común del distribuidor</div>
-        </div>
-        <div class="dm-tpl" data-tipo="demo" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;cursor:pointer;transition:border-color 0.15s">
-          <div style="font-size:12px;color:var(--cyan);font-weight:500;margin-bottom:3px">📅 Pide demo o más info</div>
-          <div style="font-size:12px;color:var(--text2)">Lead caliente que quiere conocer el producto</div>
-        </div>
-        <div class="dm-tpl" data-tipo="chico" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;cursor:pointer;transition:border-color 0.15s">
-          <div style="font-size:12px;color:var(--cyan);font-weight:500;margin-bottom:3px">💬 "Mi negocio es muy chico"</div>
-          <div style="font-size:12px;color:var(--text2)">Distribuidor que cree que no lo necesita</div>
-        </div>
-      </div>
-      <div id="tpl-output" style="margin-top:1rem"></div>
+    <div id="meta-camp-existentes">
+      <div id="meta-all-campaigns-list"><div class="empty"><div class="loader"></div><br>Cargando...</div></div>
     </div>
-  </div>
-
-  <!-- CONTENIDO -->
-  <div class="section" id="s-contenido">
-    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
-      <div><div class="page-title">GENE<span>RADOR</span></div>
-      <div class="page-sub">Captions e ideas con identidad de marca RhinosApp.</div></div>
-      <button onclick="startModuleGuide('contenido')" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--cyan);font-size:12px;cursor:pointer;flex-shrink:0;margin-top:4px" title="Guía de este módulo">ⓘ</button>
-    </div>
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title">Configurar post</div>
-        <div class="field"><label>Módulo / Tema</label>
-          <select id="c-modulo">
-            <optgroup label="Módulos del producto">
-              <option value="Panel principal con indicadores del negocio">📊 Panel — Indicadores en tiempo real</option>
-              <option value="Inteligencia comercial y reportes automáticos">🧠 Inteligencia comercial + IA</option>
-              <option value="Productos y stock en tiempo real">📦 Stock y productos en tiempo real</option>
-              <option value="Ventas y pedidos">🛒 Ventas y pedidos</option>
-              <option value="Cobranzas y cuentas por cobrar">💰 Cobranzas — quién te debe plata</option>
-              <option value="Clientes y cuentas corrientes">👥 Clientes y cuentas corrientes</option>
-              <option value="Proveedores">🏭 Proveedores</option>
-              <option value="Compras y cuentas por pagar">🧾 Compras y cuentas por pagar</option>
-              <option value="ARCA integración automática con AFIP facturación electrónica">🇦🇷 ARCA — Facturación AFIP automática</option>
-            </optgroup>
-            <optgroup label="Contenido de conversión">
-              <option value="Excel vs RhinosApp comparación distribuidoras que reemplazan planillas">⚔️ Excel vs RhinosApp</option>
-              <option value="dolor del distribuidor que no sabe cuánto le deben ni qué stock tiene">😤 El dolor del distribuidor (identificación)</option>
-              <option value="caso de éxito distribuidora que digitalizó su operación con RhinosApp">🏆 Caso de éxito</option>
-              <option value="app móvil para vendedores en la calle">📱 App móvil para vendedores</option>
-              <option value="usuarios ilimitados plan único migración gratuita desde Excel">🎯 Plan único + migración gratis</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="field"><label>Ángulo específico</label>
-          <textarea id="c-angulo" placeholder="Ej: Mostrar que el dueño puede ver en tiempo real cuánto le deben sus clientes..." rows="2"></textarea>
-        </div>
-        <div class="field"><label>Formato</label>
-          <select id="c-formato">
-            <option>Post estático</option>
-            <option>Carrusel (3-7 slides)</option>
-            <option>Reel (guión + hook)</option>
-            <option>Story</option>
-          </select>
-        </div>
-        <div class="field"><label>Tono</label>
-          <select id="c-tono">
-            <option>Identificación con el dolor (empático)</option>
-            <option>Disruptivo y directo</option>
-            <option>Educativo / explicativo</option>
-            <option>Urgente con CTA fuerte</option>
-          </select>
-        </div>
-        <div class="field"><label>CTA</label>
-          <select id="c-cta">
-            <option>Agendá demo por WhatsApp</option>
-            <option>Visitá rhinosapp.vercel.app</option>
-            <option>Guardá este post</option>
-            <option>Etiquetá a un colega distribuidor</option>
-          </select>
-        </div>
-        <button class="btn btn-green btn-full" id="btn-gen-content">Generar contenido 🦏</button>
-
-        <!-- Opciones imagen -->
-        <div style="margin-top:10px;padding:10px 14px;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.2);border-radius:var(--r)">
-          <div style="font-size:10px;color:#a78bfa;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">🎨 Opciones de imagen DALL-E 3</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-            <div class="field" style="margin:0">
-              <label style="color:var(--text3)">Formato</label>
-              <select id="img-size" style="font-size:12px;padding:6px 8px">
-                <option value="square">⬜ Feed 1:1</option>
-                <option value="portrait">📱 Stories 9:16</option>
-                <option value="landscape">🖼 Banner 16:9</option>
-              </select>
-            </div>
-            <div class="field" style="margin:0">
-              <label style="color:var(--text3)">Calidad</label>
-              <select id="img-quality" style="font-size:12px;padding:6px 8px">
-                <option value="hd">⭐ HD</option>
-                <option value="standard">Standard</option>
-              </select>
-            </div>
-            <div class="field" style="margin:0">
-              <label style="color:var(--text3)">Variaciones</label>
-              <select id="img-variations" style="font-size:12px;padding:6px 8px">
-                <option value="1">1 imagen</option>
-                <option value="2">2 imágenes</option>
-                <option value="3">3 imágenes</option>
-              </select>
-            </div>
+    <div id="meta-camp-nueva" style="display:none">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">Configuración de campaña</div>
+          <div class="field"><label>Nombre</label>
+            <input id="nc-name" type="text" placeholder="Ej: Distribuidoras CABA — Nov 2026"/>
           </div>
-          <div class="field" style="margin-bottom:8px">
-            <label style="color:var(--text3)">Modelo de IA</label>
-            <select id="img-model" style="font-size:13px;padding:8px 10px">
-              <option value="gemini3">✦ Gemini 2.5 Flash Image — Gratis</option>
-              <option value="gemini3fast">⚡ Gemini 3.1 Flash Image — Gratis</option>
-              <option value="dalle">🎨 DALL-E 3 — Requiere crédito OpenAI</option>
+          <div class="field"><label>Objetivo</label>
+            <select id="nc-objective">
+              <option value="OUTCOME_LEADS">Generación de leads</option>
+              <option value="OUTCOME_TRAFFIC">Tráfico al sitio</option>
+              <option value="OUTCOME_AWARENESS">Reconocimiento de marca</option>
+              <option value="OUTCOME_ENGAGEMENT">Interacción</option>
+              <option value="OUTCOME_SALES">Ventas</option>
             </select>
           </div>
-          <button class="btn btn-full" id="btn-gen-image" style="background:rgba(0,229,204,0.12);color:var(--cyan);border-color:rgba(0,229,204,0.3);font-weight:600;font-size:14px;padding:11px">🎨 Generar imagen</button>
+          <div class="field"><label>Presupuesto diario (ARS)</label>
+            <input id="nc-budget" type="number" placeholder="2000" min="100"/>
+          </div>
+          <div class="grid2" style="gap:8px">
+            <div class="field" style="margin:0"><label>Fecha inicio</label><input id="nc-start" type="date"/></div>
+            <div class="field" style="margin:0"><label>Fecha fin (opcional)</label><input id="nc-end" type="date"/></div>
+          </div>
         </div>
-      </div>
-      <div>
-        <div id="content-output"><div class="empty">Completá el formulario y generá contenido</div></div>
-        <div id="image-output" style="margin-top:1rem"></div>
-        <!-- Botón publicar en Instagram -->
-        <div id="ig-publish-bar" style="display:none;margin-top:1rem">
-          <div style="background:linear-gradient(135deg,rgba(131,58,180,0.1),rgba(253,29,29,0.08),rgba(252,176,69,0.08));border:1px solid rgba(131,58,180,0.3);border-radius:var(--rl);padding:14px 16px">
-            <div style="font-size:11px;color:rgba(252,176,69,0.8);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">📸 Listo para publicar</div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Tenés el caption y la imagen generados. Publicá directo en Instagram o editá el caption primero.</div>
-            <div style="display:flex;gap:8px">
-              <button id="btn-ig-publish-now" class="btn btn-full" style="background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);color:white;border:none;font-weight:600">📸 Publicar en Instagram ahora</button>
+        <div class="card">
+          <div class="card-title">Audiencia</div>
+          <div class="field"><label>Edad</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="nc-age-min" type="number" value="30" min="18" max="65" style="width:80px"/>
+              <span style="color:var(--text3)">a</span>
+              <input id="nc-age-max" type="number" value="60" min="18" max="65" style="width:80px"/>
+            </div>
+          </div>
+          <div class="field"><label>Ubicación</label>
+            <input id="nc-location" type="text" value="Argentina"/>
+          </div>
+          <div class="field"><label>Intereses (separados por coma)</label>
+            <textarea id="nc-interests" rows="2" placeholder="distribución, logística, gestión comercial, ERP..."></textarea>
+          </div>
+          <div class="field"><label>Plataformas</label>
+            <div style="display:flex;gap:12px;margin-top:4px">
+              <label style="display:flex;gap:6px;align-items:center;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text2)"><input type="checkbox" id="nc-fb" checked> Facebook</label>
+              <label style="display:flex;gap:6px;align-items:center;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text2)"><input type="checkbox" id="nc-ig" checked> Instagram</label>
             </div>
           </div>
         </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-cyan" id="btn-create-campaign" onclick="metaCreateCampaign()" style="flex:1;justify-content:center;font-weight:600">🚀 Crear campaña en Meta</button>
+      </div>
+      <div id="nc-result" style="margin-top:1rem"></div>
+    </div>
+  </div>
+
+  <!-- META ADS — CONTENIDO -->
+  <div class="section" id="s-meta-contenido">
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">ÁRBOL DE <span>CONTENIDO</span></div>
+        <div class="page-sub">Metodología Goodly: módulo → problema → subproblema → ángulo → 3 hooks.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;margin-bottom:1rem">
+      <button class="btn btn-sm meta-ctab2 meta-ctab2-active" data-tab="arbol" onclick="metaContTab('arbol')">🌳 Árbol</button>
+      <button class="btn btn-sm meta-ctab2" data-tab="generar" onclick="metaContTab('generar')">✍️ Generar con IA</button>
+      <button class="btn btn-sm meta-ctab2" data-tab="creativos" onclick="metaContTab('creativos')">🎨 Creativos</button>
+    </div>
+    <div id="meta-cont-arbol">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-sm btn-cyan" onclick="metaTreeAddNode(null,'modulo')" style="font-size:12px">+ Módulo</button>
+        <button class="btn btn-sm" onclick="metaTreeLoad()" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);font-size:12px">↻ Recargar</button>
+      </div>
+      <div id="meta-tree-container"><div class="empty">Cargando árbol...</div></div>
+    </div>
+    <div id="meta-cont-generar" style="display:none">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">Configurar anuncio ADS</div>
+          <div class="field"><label>Módulo (desde árbol)</label>
+            <select id="ads-modulo"><option value="">— Seleccionar —</option></select>
+          </div>
+          <div class="field"><label>Problema</label>
+            <select id="ads-problema"><option value="">— Seleccionar módulo primero —</option></select>
+          </div>
+          <div class="field"><label>Ángulo específico</label>
+            <textarea id="ads-angulo" rows="2" placeholder="Ej: Dueño que pierde tiempo buscando deudores..."></textarea>
+          </div>
+          <div class="field"><label>Formato</label>
+            <select id="ads-formato">
+              <option>Video / Reel (guión + 3 hooks primeros 3 seg)</option>
+              <option>Imagen estática (titular + copy)</option>
+              <option>Carrusel (3-5 slides)</option>
+              <option>Story vertical</option>
+            </select>
+          </div>
+          <div class="field"><label>CTA</label>
+            <select id="ads-cta">
+              <option>Enviá un mensaje por WhatsApp</option>
+              <option>Probá gratis — rhinosapp.vercel.app</option>
+              <option>Agendá una demo</option>
+              <option>Guardá esto para cuando lo necesites</option>
+            </select>
+          </div>
+          <button class="btn btn-cyan btn-full" id="btn-gen-ads" onclick="metaGenAd()">✍️ Generar anuncio con IA 🦏</button>
+        </div>
+        <div>
+          <div id="ads-output"><div class="empty">Configurá y generá el anuncio</div></div>
+          <div id="ads-image-bar" style="display:none;margin-top:1rem">
+            <div class="card" style="background:rgba(139,92,246,0.05);border-color:rgba(139,92,246,0.3)">
+              <div class="card-title" style="color:#a78bfa">🎨 Generar imagen para este anuncio</div>
+              <div class="field"><label style="color:var(--text3)">Estilo</label>
+                <select id="ads-img-style">
+                  <option value="replicar">Replicar estilo actual de Rhinos</option>
+                  <option value="minimalista">Minimalista oscuro</option>
+                  <option value="bold">Bold con texto grande</option>
+                  <option value="foto">Fotografía corporativa</option>
+                </select>
+              </div>
+              <button class="btn btn-full" id="btn-gen-ads-img" onclick="metaGenAdImage()" style="background:rgba(139,92,246,0.12);color:#a78bfa;border-color:rgba(139,92,246,0.3)">🎨 Generar imagen</button>
+              <div id="ads-img-output" style="margin-top:10px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="meta-cont-creativos" style="display:none">
+      <div class="card" style="background:rgba(139,92,246,0.05);border-color:rgba(139,92,246,0.3)">
+        <div class="card-title" style="color:#a78bfa">🎨 Replicar estilo visual existente</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+          Subí una imagen de un anuncio actual de Rhinos. La IA analiza el estilo (paleta, tipografía, composición) y genera un prompt para replicarlo en nuevos creativos.
+        </div>
+        <div class="field">
+          <label>Cargar imagen de referencia</label>
+          <input type="file" id="creative-ref-file" accept="image/*,video/*" style="font-size:12px"/>
+        </div>
+        <div class="field">
+          <label>Descripción del anuncio nuevo a generar</label>
+          <textarea id="creative-desc" rows="2" placeholder="Ej: Anuncio mostrando que el dueño ve sus deudores en tiempo real desde el celular..."></textarea>
+        </div>
+        <button class="btn btn-full" id="btn-analyze-creative" onclick="metaAnalyzeCreative()" style="background:rgba(139,92,246,0.12);color:#a78bfa;border-color:rgba(139,92,246,0.3);font-weight:600">🔍 Analizar estilo y generar prompt</button>
+        <div id="creative-analysis-output" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- META ADS — LEADS WA -->
+  <div class="section" id="s-meta-leads">
+    <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="page-title">LEADS <span>WA</span></div>
+        <div class="page-sub">Leads de formularios Meta → bot califica → agenda llamada si es viable.</div>
+      </div>
+      <button class="refresh-btn" onclick="metaLeadsLoad()">↻ Actualizar</button>
+    </div>
+    <div class="metrics-row" style="margin-bottom:1.25rem">
+      <div class="metric-card"><div class="m-label">Nuevos</div><div class="m-val cyan" id="ml-nuevos">—</div><div class="m-sub">sin contactar</div></div>
+      <div class="metric-card"><div class="m-label">Calificados</div><div class="m-val green" id="ml-calificados">—</div><div class="m-sub">listos para llamar</div></div>
+      <div class="metric-card"><div class="m-label">Agendados</div><div class="m-val" id="ml-agendados">—</div><div class="m-sub">con cita confirmada</div></div>
+      <div class="metric-card"><div class="m-label">Descartados</div><div class="m-val" id="ml-descartados">—</div><div class="m-sub">no calificaron</div></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-sm meta-lf meta-lf-active" data-estado="todos" onclick="metaLeadsFilter('todos')">Todos</button>
+      <button class="btn btn-sm meta-lf" data-estado="nuevo" onclick="metaLeadsFilter('nuevo')">🆕 Nuevos</button>
+      <button class="btn btn-sm meta-lf" data-estado="calificado" onclick="metaLeadsFilter('calificado')">✅ Calificados</button>
+      <button class="btn btn-sm meta-lf" data-estado="agendado" onclick="metaLeadsFilter('agendado')">📅 Agendados</button>
+      <button class="btn btn-sm meta-lf" data-estado="descartado" onclick="metaLeadsFilter('descartado')">🚫 Descartados</button>
+    </div>
+    <div id="meta-leads-list"><div class="empty"><div class="loader"></div><br>Cargando leads...</div></div>
+    <div class="card" style="margin-top:1rem">
+      <div class="card-title">🤖 Bot calificador — probar manualmente</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+        Pegá la respuesta del formulario de un lead y el bot lo califica: tiene distribuidora, +3 vendedores o quiere digitalizar, Argentina.
+      </div>
+      <div class="grid2">
+        <div>
+          <div class="field">
+            <label>Respuestas del formulario</label>
+            <textarea id="bot-lead-input" rows="4" placeholder="Nombre: Juan García&#10;Empresa: Distribuidora El Gaucho&#10;Cargo: Dueño&#10;Empleados: 8&#10;Sector: Alimentos&#10;Consulta: Quiero organizar mi stock y cobranzas..."></textarea>
+          </div>
+          <button class="btn btn-cyan btn-full" id="btn-qualify-lead" onclick="metaQualifyLead()">🤖 Calificar con IA</button>
+        </div>
+        <div id="bot-qualify-output"><div class="empty">Pegá respuestas y calificá</div></div>
       </div>
     </div>
   </div>
@@ -15768,6 +15791,471 @@ function renderGuideStep() {
     nextBtn.onclick = () => guideStep(1);
   }
 }
+
+// ── META ADS ─────────────────────────────────────────
+const META_SB_URL = typeof SB_URL_FE !== 'undefined' ? SB_URL_FE : '';
+const META_SB_KEY = typeof SB_ANON_FE !== 'undefined' ? SB_ANON_FE : '';
+
+async function metaSbGet(path) {
+  const r = await fetch(`${META_SB_URL}/rest/v1/${path}`, {
+    headers: { apikey: META_SB_KEY, Authorization: `Bearer ${META_SB_KEY}` }
+  });
+  if (!r.ok) throw new Error(`SB ${path}: ${r.status}`);
+  return r.json();
+}
+
+async function metaSbPatch(path, body) {
+  await fetch(`${META_SB_URL}/rest/v1/${path}`, {
+    method: 'PATCH',
+    headers: { apikey: META_SB_KEY, Authorization: `Bearer ${META_SB_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+}
+
+function fmtARS(n) {
+  if (!n && n !== 0) return '—';
+  return '$' + parseFloat(n).toLocaleString('es-AR', { maximumFractionDigits: 0 });
+}
+function fmtPct(n) { return n != null ? parseFloat(n).toFixed(2) + '%' : '—'; }
+function fmtNum(n) { return n != null ? parseInt(n).toLocaleString('es-AR') : '—'; }
+
+async function metaDashboardLoad() {
+  const badge = document.getElementById('meta-sync-badge');
+  if (badge) badge.style.display = 'none';
+
+  try {
+    // Load metrics: aggregate last 7 days across all campaigns
+    const since7 = new Date(); since7.setDate(since7.getDate() - 7);
+    const since7str = since7.toISOString().slice(0, 10);
+
+    const [campaigns, metrics] = await Promise.all([
+      metaSbGet('meta_campaigns?order=updated_at.desc&limit=50'),
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7str}&select=spend,clicks,impressions,ctr,cpc,conversions`),
+    ]);
+
+    // KPIs
+    const totSpend = metrics.reduce((s, r) => s + parseFloat(r.spend || 0), 0);
+    const totImpr  = metrics.reduce((s, r) => s + parseInt(r.impressions || 0), 0);
+    const totClicks = metrics.reduce((s, r) => s + parseInt(r.clicks || 0), 0);
+    const totConv  = metrics.reduce((s, r) => s + parseInt(r.conversions || 0), 0);
+    const avgCtr   = totImpr > 0 ? (totClicks / totImpr) * 100 : 0;
+    const avgCpc   = totClicks > 0 ? totSpend / totClicks : 0;
+
+    const setKpi = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setKpi('mk-spend', fmtARS(totSpend));
+    setKpi('mk-impressions', fmtNum(totImpr));
+    setKpi('mk-clicks', fmtNum(totClicks));
+    setKpi('mk-ctr', fmtPct(avgCtr));
+    setKpi('mk-cpc', fmtARS(avgCpc));
+    setKpi('mk-conv', fmtNum(totConv));
+
+    // Campaigns table
+    const tbl = document.getElementById('meta-campaigns-table');
+    if (tbl) {
+      if (!campaigns.length) {
+        tbl.innerHTML = '<div class="empty">No hay campañas sincronizadas. Configurá tus credenciales Meta y hacé clic en "Forzar sincronización".</div>';
+      } else {
+        tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="color:var(--text3);font-size:11px;border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:6px 8px">Campaña</th>
+            <th style="padding:6px 8px">Estado</th>
+            <th style="padding:6px 8px">Objetivo</th>
+            <th style="padding:6px 8px;text-align:right">Presupuesto/día</th>
+            <th style="padding:6px 8px">Acciones</th>
+          </tr></thead><tbody>
+          ${campaigns.map(c => `<tr style="border-bottom:1px solid var(--border2)">
+            <td style="padding:7px 8px;color:var(--text);font-weight:500">${c.name}</td>
+            <td style="padding:7px 8px;text-align:center">
+              <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.status==='ACTIVE'?'rgba(34,197,94,0.12)':'rgba(248,113,113,0.12)'};color:${c.status==='ACTIVE'?'var(--green)':'#f87171'}">${c.status}</span>
+            </td>
+            <td style="padding:7px 8px;color:var(--text2)">${(c.objective||'').replace('OUTCOME_','')}</td>
+            <td style="padding:7px 8px;text-align:right;color:var(--cyan)">${fmtARS(c.budget_daily)}</td>
+            <td style="padding:7px 8px;text-align:center">
+              <button onclick="metaToggleCampaign('${c.id}','${c.status}')" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:${c.status==='ACTIVE'?'#f87171':'var(--green)'}">
+                ${c.status==='ACTIVE'?'⏸ Pausar':'▶ Activar'}
+              </button>
+            </td>
+          </tr>`).join('')}
+          </tbody></table>`;
+      }
+    }
+
+    // Check if configured
+    const noConf = document.getElementById('meta-no-config');
+    if (noConf) noConf.style.display = !campaigns.length ? 'block' : 'none';
+    if (badge) { badge.style.display = 'inline'; badge.textContent = `✓ ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`; }
+
+    // Top/low ads
+    metaLoadTopAds(since7str);
+
+  } catch (e) {
+    console.warn('[meta-dashboard]', e.message);
+    const tbl = document.getElementById('meta-campaigns-table');
+    if (tbl) tbl.innerHTML = `<div class="empty">Error cargando: ${e.message}</div>`;
+  }
+}
+
+async function metaLoadTopAds(since7str) {
+  try {
+    const adMetrics = await metaSbGet(
+      `meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7str}&select=entity_id,spend,clicks,impressions,ctr,conversions&order=ctr.desc&limit=20`
+    );
+    const ads = await metaSbGet('meta_ads?status=eq.ACTIVE&select=id,name&limit=100');
+    const adMap = {}; ads.forEach(a => adMap[a.id] = a.name);
+
+    // Aggregate by ad
+    const byAd = {};
+    adMetrics.forEach(m => {
+      if (!byAd[m.entity_id]) byAd[m.entity_id] = { spend:0, clicks:0, impressions:0, conversions:0 };
+      byAd[m.entity_id].spend += parseFloat(m.spend||0);
+      byAd[m.entity_id].clicks += parseInt(m.clicks||0);
+      byAd[m.entity_id].impressions += parseInt(m.impressions||0);
+      byAd[m.entity_id].conversions += parseInt(m.conversions||0);
+    });
+
+    const rows = Object.entries(byAd).map(([id, v]) => ({
+      id, name: adMap[id] || id,
+      ctr: v.impressions > 0 ? (v.clicks / v.impressions) * 100 : 0,
+      spend: v.spend, conversions: v.conversions
+    }));
+
+    const top5 = [...rows].sort((a,b) => b.ctr - a.ctr).slice(0,5);
+    const low5 = rows.filter(r => r.spend >= 5 && r.ctr < 0.5).slice(0,5);
+
+    const topEl = document.getElementById('meta-top-ads');
+    if (topEl) topEl.innerHTML = top5.length
+      ? top5.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2);font-size:12px">
+          <span style="color:var(--text);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</span>
+          <span style="color:var(--green);font-weight:600">${fmtPct(r.ctr)}</span>
+        </div>`).join('')
+      : '<div class="empty" style="font-size:12px">Sin datos suficientes</div>';
+
+    const lowEl = document.getElementById('meta-low-ads');
+    if (lowEl) lowEl.innerHTML = low5.length
+      ? low5.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2);font-size:12px">
+          <span style="color:var(--text);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</span>
+          <span style="color:#f87171;font-weight:600">${fmtPct(r.ctr)}</span>
+        </div>`).join('')
+      : '<div class="empty" style="font-size:12px;color:var(--green)">Sin anuncios a pausar 🎉</div>';
+  } catch(e) { /* silent */ }
+}
+
+async function metaToggleCampaign(id, currentStatus) {
+  const newStatus = currentStatus === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+  if (!confirm(`¿${newStatus === 'PAUSED' ? 'Pausar' : 'Activar'} esta campaña?`)) return;
+  try {
+    const r = await callAPI('meta_toggle_campaign', { campaign_id: id, new_status: newStatus });
+    if (r.ok) metaDashboardLoad();
+    else alert('Error: ' + (r.error || r.msg));
+  } catch(e) { alert('Error de red: ' + e.message); }
+}
+
+async function metaSaveConfig() {
+  const token   = document.getElementById('meta-token-input')?.value.trim();
+  const account = document.getElementById('meta-account-input')?.value.trim();
+  if (!token || !account) { alert('Completá ambos campos'); return; }
+  try {
+    const r = await callAPI('save_config', { key: 'meta_access_token', value: token });
+    await callAPI('save_config', { key: 'meta_ad_account_id', value: account });
+    const badge = document.getElementById('meta-conn-badge');
+    if (badge) { badge.textContent = '✓ Guardado'; badge.style.color = 'var(--green)'; }
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function metaForceSync() {
+  const btn = document.getElementById('btn-meta-force-sync');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
+  try {
+    const r = await fetch('/api/meta-sync').then(x => x.json());
+    alert(r.ok ? `✓ Sincronizado: ${(r.log||[]).join(', ')}` : 'Error: ' + (r.error || r.msg));
+    if (r.ok) metaDashboardLoad();
+  } catch(e) { alert('Error: ' + e.message); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '↻ Forzar sincronización'; } }
+}
+
+// ── CAMPAÑAS tabs ──
+function metaCampTab(tab) {
+  document.querySelectorAll('.meta-ctab').forEach(b => b.classList.toggle('meta-ctab-active', b.dataset.tab === tab));
+  document.getElementById('meta-camp-existentes').style.display = tab === 'existentes' ? 'block' : 'none';
+  document.getElementById('meta-camp-nueva').style.display = tab === 'nueva' ? 'block' : 'none';
+  if (tab === 'existentes') metaLoadAllCampaigns();
+}
+
+async function metaLoadAllCampaigns() {
+  const el = document.getElementById('meta-all-campaigns-list');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div><br>Cargando...</div>';
+  try {
+    const camps = await metaSbGet('meta_campaigns?order=updated_at.desc&limit=100');
+    if (!camps.length) { el.innerHTML = '<div class="empty">No hay campañas. Configurá Meta y sincronizá primero.</div>'; return; }
+    el.innerHTML = camps.map(c => `
+      <div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <div style="font-weight:600;color:var(--text);font-size:13px">${c.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${(c.objective||'').replace('OUTCOME_','')} · Budget/día: ${fmtARS(c.budget_daily)}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.status==='ACTIVE'?'rgba(34,197,94,0.12)':'rgba(99,102,241,0.12)'};color:${c.status==='ACTIVE'?'var(--green)':'#818cf8'}">${c.status}</span>
+            <button onclick="metaToggleCampaign('${c.id}','${c.status}')" class="btn btn-sm" style="font-size:11px;color:${c.status==='ACTIVE'?'#f87171':'var(--green)'}">
+              ${c.status==='ACTIVE'?'⏸ Pausar':'▶ Activar'}
+            </button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+async function metaCreateCampaign() {
+  const name    = document.getElementById('nc-name')?.value.trim();
+  const obj     = document.getElementById('nc-objective')?.value;
+  const budget  = document.getElementById('nc-budget')?.value;
+  const start   = document.getElementById('nc-start')?.value;
+  const end     = document.getElementById('nc-end')?.value;
+  const ageMin  = document.getElementById('nc-age-min')?.value;
+  const ageMax  = document.getElementById('nc-age-max')?.value;
+  const loc     = document.getElementById('nc-location')?.value.trim();
+  const int     = document.getElementById('nc-interests')?.value.trim();
+  const fb      = document.getElementById('nc-fb')?.checked;
+  const ig      = document.getElementById('nc-ig')?.checked;
+  const result  = document.getElementById('nc-result');
+
+  if (!name || !budget) { alert('Completá nombre y presupuesto'); return; }
+
+  const btn = document.getElementById('btn-create-campaign');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creando...'; }
+  if (result) result.innerHTML = '<div class="empty"><div class="loader"></div><br>Creando campaña en Meta...</div>';
+
+  try {
+    const r = await callAPI('meta_create_campaign', { name, objective: obj, budget_daily: parseFloat(budget), start_time: start || undefined, stop_time: end || undefined, age_min: parseInt(ageMin), age_max: parseInt(ageMax), location: loc, interests: int, platforms: { facebook: fb, instagram: ig } });
+    if (r.ok || r.campaign_id) {
+      if (result) result.innerHTML = `<div class="card" style="border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.04)"><div style="color:var(--green);font-weight:600">✓ Campaña creada</div><div style="font-size:12px;color:var(--text2);margin-top:4px">ID: ${r.campaign_id || r.id || 'creado'}</div></div>`;
+      setTimeout(metaDashboardLoad, 2000);
+    } else {
+      if (result) result.innerHTML = `<div class="card" style="border-color:rgba(248,113,113,0.3)"><div style="color:#f87171">${r.error || r.msg || 'Error desconocido'}</div></div>`;
+    }
+  } catch(e) {
+    if (result) result.innerHTML = `<div class="card" style="border-color:rgba(248,113,113,0.3)"><div style="color:#f87171">Error: ${e.message}</div></div>`;
+  } finally { if (btn) { btn.disabled = false; btn.textContent = '🚀 Crear campaña en Meta'; } }
+}
+
+// ── CONTENIDO tabs ──
+function metaContTab(tab) {
+  document.querySelectorAll('.meta-ctab2').forEach(b => b.classList.toggle('meta-ctab2-active', b.dataset.tab === tab));
+  ['arbol','generar','creativos'].forEach(t => {
+    const el = document.getElementById(`meta-cont-${t}`);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'arbol') metaTreeLoad();
+  if (tab === 'generar') metaTreeLoadSelects();
+}
+
+async function metaTreeLoad() {
+  const el = document.getElementById('meta-tree-container');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const nodes = await metaSbGet('meta_content_tree?order=sort_order.asc,id.asc&limit=500');
+    if (!nodes.length) { el.innerHTML = '<div class="empty">Árbol vacío. Hacé clic en "+ Módulo" para comenzar.</div>'; return; }
+    const byParent = {}; nodes.forEach(n => { const p = n.parent_id || 'root'; (byParent[p] = byParent[p]||[]).push(n); });
+    el.innerHTML = renderTreeLevel(byParent, 'root', 0);
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+function renderTreeLevel(byParent, parentId, depth) {
+  const children = byParent[parentId] || [];
+  if (!children.length) return '';
+  const colors = { modulo:'var(--cyan)', problema:'#a78bfa', subproblema:'#fbbf24', angulo:'var(--green)', hook:'var(--text2)' };
+  const nextLevel = { modulo:'problema', problema:'subproblema', subproblema:'angulo', angulo:'hook', hook:null };
+  return children.map(n => {
+    const color = colors[n.level] || 'var(--text)';
+    const hasChildren = byParent[n.id];
+    const sub = renderTreeLevel(byParent, n.id, depth + 1);
+    const addBtn = nextLevel[n.level] ? `<button onclick="metaTreeAddNode(${n.id},'${nextLevel[n.level]}')" style="font-size:10px;padding:1px 6px;border:1px solid ${color};border-radius:4px;background:transparent;color:${color};cursor:pointer;opacity:0.6;margin-left:4px">+${nextLevel[n.level]}</button>` : '';
+    return `<div style="margin-left:${depth*16}px;margin-bottom:4px">
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:var(--r);background:var(--surface2);border-left:3px solid ${color}">
+        <span style="font-size:10px;color:${color};font-weight:700;text-transform:uppercase;letter-spacing:0.06em;min-width:60px">${n.level}</span>
+        <span style="font-size:12px;color:var(--text);flex:1">${n.title}</span>
+        ${addBtn}
+        <button onclick="metaTreeDelete(${n.id})" style="font-size:10px;padding:1px 6px;border:1px solid rgba(248,113,113,0.3);border-radius:4px;background:transparent;color:#f87171;cursor:pointer;opacity:0.6">✕</button>
+      </div>
+      ${sub}
+    </div>`;
+  }).join('');
+}
+
+async function metaTreeAddNode(parentId, level) {
+  const title = prompt(`Título del ${level}:`);
+  if (!title) return;
+  try {
+    await fetch(`${META_SB_URL}/rest/v1/meta_content_tree`, {
+      method: 'POST',
+      headers: { apikey: META_SB_KEY, Authorization: `Bearer ${META_SB_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ parent_id: parentId, level, title })
+    });
+    metaTreeLoad();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function metaTreeDelete(id) {
+  if (!confirm('¿Eliminar este nodo y todos sus hijos?')) return;
+  try {
+    await fetch(`${META_SB_URL}/rest/v1/meta_content_tree?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { apikey: META_SB_KEY, Authorization: `Bearer ${META_SB_KEY}` }
+    });
+    metaTreeLoad();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function metaTreeLoadSelects() {
+  try {
+    const nodes = await metaSbGet('meta_content_tree?order=sort_order.asc&limit=500');
+    const modulos  = nodes.filter(n => n.level === 'modulo');
+    const problemas = nodes.filter(n => n.level === 'problema');
+    const selMod = document.getElementById('ads-modulo');
+    const selProb = document.getElementById('ads-problema');
+    if (selMod) selMod.innerHTML = '<option value="">— Seleccionar —</option>' + modulos.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
+    if (selMod && selProb) selMod.onchange = () => {
+      const mid = parseInt(selMod.value);
+      const sub = problemas.filter(p => p.parent_id === mid);
+      selProb.innerHTML = '<option value="">— Seleccionar —</option>' + sub.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
+    };
+  } catch(e) { /* silent */ }
+}
+
+async function metaGenAd() {
+  const modulo  = document.getElementById('ads-modulo');
+  const problema = document.getElementById('ads-problema');
+  const angulo  = document.getElementById('ads-angulo')?.value.trim();
+  const formato = document.getElementById('ads-formato')?.value;
+  const cta     = document.getElementById('ads-cta')?.value;
+  const out     = document.getElementById('ads-output');
+  if (!out) return;
+
+  setLoading(out, 'Generando anuncio con IA...');
+  try {
+    const r = await callAPI('generate_meta_ad', {
+      modulo: modulo?.options[modulo.selectedIndex]?.text || '',
+      problema: problema?.options[problema.selectedIndex]?.text || '',
+      angulo, formato, cta
+    });
+    out.innerHTML = `<div class="card" style="border-color:rgba(0,229,204,0.3)">
+      <div style="font-size:10px;color:var(--cyan);font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">✓ Anuncio generado</div>
+      ${r.hook1 ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">HOOK 1 (0-3 seg)</div><div style="font-size:13px;color:var(--cyan);font-weight:500">${r.hook1}</div></div>` : ''}
+      ${r.hook2 ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">HOOK 2 (0-3 seg)</div><div style="font-size:13px;color:#a78bfa;font-weight:500">${r.hook2}</div></div>` : ''}
+      ${r.hook3 ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">HOOK 3 (0-3 seg)</div><div style="font-size:13px;color:#fbbf24;font-weight:500">${r.hook3}</div></div>` : ''}
+      ${r.copy || r.caption ? `<div style="margin-top:12px;font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">${r.copy || r.caption}</div>` : ''}
+      ${r.script ? `<div style="margin-top:12px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">GUIÓN COMPLETO</div><div style="font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap">${r.script}</div></div>` : ''}
+    </div>`;
+    const bar = document.getElementById('ads-image-bar');
+    if (bar) bar.style.display = 'block';
+  } catch(e) { out.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+async function metaGenAdImage() {
+  const style   = document.getElementById('ads-img-style')?.value;
+  const desc    = document.getElementById('ads-angulo')?.value || document.getElementById('ads-output')?.textContent || '';
+  const out     = document.getElementById('ads-img-output');
+  if (!out) return;
+  setLoading(out, 'Generando imagen...');
+  try {
+    const r = await callAPI('generate_image', { prompt: `Anuncio Meta ADS para RhinosApp en estilo ${style}: ${desc}`, model: 'gemini3', size: 'portrait' });
+    out.innerHTML = r.url ? `<img src="${r.url}" style="width:100%;border-radius:var(--r);margin-top:8px"/>` : `<div class="empty">${r.error || 'Sin imagen'}</div>`;
+  } catch(e) { out.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+async function metaAnalyzeCreative() {
+  const fileInput = document.getElementById('creative-ref-file');
+  const desc      = document.getElementById('creative-desc')?.value.trim();
+  const out       = document.getElementById('creative-analysis-output');
+  if (!out) return;
+  if (!fileInput?.files?.length && !desc) { alert('Subí una imagen o escribí una descripción'); return; }
+  setLoading(out, 'Analizando estilo con IA...');
+  try {
+    const r = await callAPI('analyze_creative_style', { description: desc });
+    out.innerHTML = `<div class="card" style="border-color:rgba(139,92,246,0.3)">
+      <div style="font-size:10px;color:#a78bfa;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">✓ Análisis de estilo</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">${r.analysis || r.prompt || JSON.stringify(r)}</div>
+    </div>`;
+  } catch(e) { out.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── LEADS WA ──
+let _metaLeadsFilter = 'todos';
+
+async function metaLeadsLoad() {
+  const el = document.getElementById('meta-leads-list');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div><br>Cargando leads...</div>';
+  try {
+    const all = await metaSbGet('meta_leads_wa?order=created_at.desc&limit=200');
+
+    // Counts
+    const setCount = (id, estado) => { const e = document.getElementById(id); if (e) e.textContent = all.filter(l => l.estado === estado).length; };
+    setCount('ml-nuevos', 'nuevo');
+    setCount('ml-calificados', 'calificado');
+    setCount('ml-agendados', 'agendado');
+    setCount('ml-descartados', 'descartado');
+
+    const leads = _metaLeadsFilter === 'todos' ? all : all.filter(l => l.estado === _metaLeadsFilter);
+    if (!leads.length) { el.innerHTML = '<div class="empty">Sin leads en este estado</div>'; return; }
+
+    el.innerHTML = leads.map(l => {
+      const estadoColors = { nuevo:'rgba(99,102,241,0.12)', contactado:'rgba(251,191,36,0.12)', calificado:'rgba(34,197,94,0.12)', agendado:'rgba(0,229,204,0.12)', descartado:'rgba(248,113,113,0.12)' };
+      const estadoText   = { nuevo:'🆕 Nuevo', contactado:'📞 Contactado', calificado:'✅ Calificado', agendado:'📅 Agendado', descartado:'🚫 Descartado' };
+      return `<div class="card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-weight:600;font-size:13px;color:var(--text)">${l.nombre || 'Sin nombre'}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">${l.empresa || ''} · ${l.telefono || ''} · ${l.email || ''}</div>
+            ${l.notas ? `<div style="font-size:11px;color:var(--text2);margin-top:4px">${l.notas}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${estadoColors[l.estado]||''};color:var(--text2)">${estadoText[l.estado]||l.estado}</span>
+            <select onchange="metaLeadChangeEstado(${l.id},this.value)" style="font-size:11px;padding:3px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text2)">
+              ${['nuevo','contactado','calificado','agendado','descartado'].map(s => `<option value="${s}" ${s===l.estado?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+function metaLeadsFilter(estado) {
+  _metaLeadsFilter = estado;
+  document.querySelectorAll('.meta-lf').forEach(b => b.classList.toggle('meta-lf-active', b.dataset.estado === estado));
+  metaLeadsLoad();
+}
+
+async function metaLeadChangeEstado(id, estado) {
+  try {
+    await metaSbPatch(`meta_leads_wa?id=eq.${id}`, { estado, updated_at: new Date().toISOString() });
+    metaLeadsLoad();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function metaQualifyLead() {
+  const input = document.getElementById('bot-lead-input')?.value.trim();
+  const out   = document.getElementById('bot-qualify-output');
+  if (!input || !out) return;
+  setLoading(out, 'Calificando con IA...');
+  try {
+    const r = await callAPI('qualify_meta_lead', { lead_text: input });
+    const calificado = r.calificado || r.qualified;
+    out.innerHTML = `<div class="card" style="border-color:rgba(${calificado?'34,197,94':'248,113,113'},0.3)">
+      <div style="font-size:14px;font-weight:700;color:var(--${calificado?'green':'text2'});margin-bottom:8px">${calificado ? '✅ CALIFICADO' : '🚫 NO CALIFICADO'}</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6">${r.razon || r.reason || ''}</div>
+      ${calificado && r.accion ? `<div style="margin-top:10px;font-size:12px;color:var(--cyan)">➤ ${r.accion}</div>` : ''}
+    </div>`;
+  } catch(e) { out.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// Auto-load dashboard when section shows
+document.querySelector('.nav-btn[data-sec="meta-dashboard"]')?.addEventListener('click', () => setTimeout(metaDashboardLoad, 100));
+document.querySelector('.nav-btn[data-sec="meta-campanas"]')?.addEventListener('click', () => setTimeout(() => metaLoadAllCampaigns(), 100));
+document.querySelector('.nav-btn[data-sec="meta-leads"]')?.addEventListener('click', () => setTimeout(metaLeadsLoad, 100));
 
 // ── BLOG Y WEB ────────────────────────────────────────
 const WC_API = '/api/web-content';
