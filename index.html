@@ -973,6 +973,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-journal-list"><div class="empty" style="font-size:12px">Sin entradas aún</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-hourly-heatmap-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        🕐 Leads por hora del día
+        <button class="btn btn-sm" onclick="metaHourlyHeatmapLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-hourly-heatmap-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:1.25rem" id="meta-period-compare-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         📅 Comparación de períodos
@@ -17223,6 +17231,80 @@ async function _metaJournalDelete(id) {
   }
 }
 
+// ── HOURLY LEADS HEATMAP ─────────────────────────────────────────────────────
+async function metaHourlyHeatmapLoad() {
+  const el = document.getElementById('meta-hourly-heatmap-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Cargando...</div>';
+  try {
+    const since90 = new Date(Date.now() - 90 * 86400000).toISOString();
+    const leads = await metaSbGet(`meta_leads_wa?fecha_lead=gte.${since90}&select=fecha_lead&limit=2000`);
+    if (!leads.length) { el.innerHTML = '<div class="empty">Sin datos de leads con timestamp</div>'; return; }
+
+    const hourCounts = new Array(24).fill(0);
+    const dowCounts  = new Array(7).fill(0); // 0=Sun..6=Sat
+    for (const l of leads) {
+      if (!l.fecha_lead) continue;
+      const d = new Date(l.fecha_lead);
+      hourCounts[d.getHours()]++;
+      dowCounts[d.getDay()]++;
+    }
+    const maxH = Math.max(...hourCounts, 1);
+    const maxD = Math.max(...dowCounts, 1);
+    const total = leads.length;
+
+    // Hour labels grouped by block: 0-5 Madrugada, 6-11 Mañana, 12-17 Tarde, 18-23 Noche
+    const blockColor = h => h<6?'#6366f1':h<12?'#f59e0b':h<18?'var(--cyan)':'#a78bfa';
+    const hourBars = hourCounts.map((v,h) => {
+      const pct = Math.round(v/maxH*100);
+      const col = blockColor(h);
+      const lbl = h.toString().padStart(2,'0');
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+        <div style="font-size:9px;color:var(--text3);min-height:14px;line-height:14px">${v>0?v:''}</div>
+        <div style="width:100%;background:var(--surface2);border-radius:3px 3px 0 0;height:60px;position:relative">
+          <div style="position:absolute;bottom:0;left:0;right:0;background:${col};border-radius:3px 3px 0 0;height:${pct}%;opacity:0.85;transition:height 0.3s" title="${lbl}h: ${v} leads"></div>
+        </div>
+        <div style="font-size:9px;color:var(--text3)">${lbl}</div>
+      </div>`;
+    }).join('');
+
+    const days = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const dowBars = dowCounts.map((v,d) => {
+      const pct = Math.round(v/maxD*100);
+      const isWeekend = d===0||d===6;
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+        <div style="font-size:9px;color:var(--text3);min-height:14px;line-height:14px">${v>0?v:''}</div>
+        <div style="width:100%;background:var(--surface2);border-radius:3px 3px 0 0;height:50px;position:relative">
+          <div style="position:absolute;bottom:0;left:0;right:0;background:${isWeekend?'#f87171':'var(--green)'};border-radius:3px 3px 0 0;height:${pct}%;opacity:0.85"></div>
+        </div>
+        <div style="font-size:9px;color:${isWeekend?'#f87171':'var(--text3)'}">${days[d]}</div>
+      </div>`;
+    }).join('');
+
+    // Best hour
+    const bestHour = hourCounts.indexOf(maxH);
+    const bestDow = dowCounts.indexOf(maxD);
+    const bestHourLabel = `${bestHour.toString().padStart(2,'0')}:00–${(bestHour+1).toString().padStart(2,'0')}:00`;
+
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">
+        ${total} leads · últimos 90 días ·
+        mejor hora: <span style="color:var(--cyan)">${bestHourLabel}</span> ·
+        mejor día: <span style="color:var(--green)">${days[bestDow]}</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Por hora del día</div>
+      <div style="display:flex;gap:2px;align-items:flex-end;margin-bottom:14px">${hourBars}</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Por día de la semana</div>
+      <div style="display:flex;gap:4px;align-items:flex-end">${dowBars}</div>
+      <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+        <span style="font-size:10px;color:var(--text3)"><span style="color:#6366f1">■</span> Madrugada 0-5h</span>
+        <span style="font-size:10px;color:var(--text3)"><span style="color:#f59e0b">■</span> Mañana 6-11h</span>
+        <span style="font-size:10px;color:var(--text3)"><span style="color:var(--cyan)">■</span> Tarde 12-17h</span>
+        <span style="font-size:10px;color:var(--text3)"><span style="color:#a78bfa">■</span> Noche 18-23h</span>
+      </div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── PERIOD COMPARISON ────────────────────────────────────────────────────────
 async function metaPeriodCompareLoad() {
   const el = document.getElementById('meta-period-compare-content');
@@ -17649,6 +17731,7 @@ async function metaDashboardLoad() {
     metaJournalLoad();
     metaAdScoreLoad();
     metaPeriodCompareLoad();
+    metaHourlyHeatmapLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
