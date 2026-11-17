@@ -1057,6 +1057,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="btn btn-sm meta-ctab2" data-tab="subir" onclick="metaContTab('subir')">📤 Subir nuevo</button>
       <button class="btn btn-sm meta-ctab2" data-tab="arbol" onclick="metaContTab('arbol')">🌳 Árbol IA</button>
       <button class="btn btn-sm meta-ctab2" data-tab="comparar" onclick="metaContTab('comparar')">⚖️ Comparar</button>
+      <button class="btn btn-sm meta-ctab2" data-tab="ab" onclick="metaContTab('ab')">🔬 A/B Tests</button>
     </div>
 
     <!-- ── TAB: CREATIVOS ─────────────────────────────────────────── -->
@@ -1250,6 +1251,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <button class="btn btn-cyan btn-sm" onclick="metaRenderComparador()">⚖️ Comparar</button>
       </div>
       <div id="comp-result"></div>
+    </div>
+
+    <!-- ── TAB: A/B TESTS ────────────────────────────────────────── -->
+    <div id="meta-cont-ab" style="display:none">
+      <div class="card" style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text2);line-height:1.6">Etiquetá tus anuncios con <strong>🔬 Test A/B</strong> y <strong>🔬 Test B</strong> desde el botón 🏷️ en las tarjetas de creativos. Acá se comparan automáticamente los pares encontrados.</div>
+      </div>
+      <div id="meta-ab-pairs"><div class="empty" style="font-size:12px">Cargando pares A/B...</div></div>
     </div>
 
     <!-- ── MODAL DETALLE CREATIVO ─────────────────────────────────── -->
@@ -16135,6 +16144,81 @@ function fmtARS(n) {
 function fmtPct(n) { return n != null ? parseFloat(n).toFixed(2) + '%' : '—'; }
 function fmtNum(n) { return n != null ? parseInt(n).toLocaleString('es-AR') : '—'; }
 
+// ── A/B TEST PANEL ───────────────────────────────────────────────────────────
+async function metaAbTestLoad() {
+  const el = document.getElementById('meta-ab-pairs');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    if (!_metaAdTags) await metaAdTagsLoad();
+    // Find ads tagged as A/B
+    const aAds = [], bAds = [];
+    for (const [adId, tags] of Object.entries(_metaAdTags || {})) {
+      if (tags.includes('🔬 Test A/B')) aAds.push(adId);
+      if (tags.includes('🔬 Test B')) bAds.push(adId);
+    }
+    if (!aAds.length && !bAds.length) {
+      el.innerHTML = `<div class="empty" style="font-size:12px">Sin pares A/B etiquetados. Usá el botón 🏷️ en las tarjetas de creativos para etiquetar anuncios como "🔬 Test A/B" y "🔬 Test B".</div>`;
+      return;
+    }
+    const allIds = [...new Set([...aAds, ...bAds])];
+    const since30 = new Date(); since30.setDate(since30.getDate() - 29);
+    const sinceStr = since30.toISOString().slice(0, 10);
+    const [ads, metrics] = await Promise.all([
+      metaSbGet(`meta_ads?id=in.(${allIds.join(',')})&select=id,name,status,thumbnail_url`),
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&entity_id=in.(${allIds.join(',')})&date_start=gte.${sinceStr}&select=entity_id,spend,impressions,clicks,leads,messages_started`),
+    ]);
+    const adMap = {}; for (const a of ads) adMap[a.id] = a;
+    const metricAgg = {};
+    for (const m of metrics) {
+      if (!metricAgg[m.entity_id]) metricAgg[m.entity_id] = { spend:0, impressions:0, clicks:0, leads:0, messages:0 };
+      metricAgg[m.entity_id].spend       += parseFloat(m.spend||0);
+      metricAgg[m.entity_id].impressions += parseInt(m.impressions||0);
+      metricAgg[m.entity_id].clicks      += parseInt(m.clicks||0);
+      metricAgg[m.entity_id].leads       += parseInt(m.leads||0);
+      metricAgg[m.entity_id].messages    += parseInt(m.messages_started||0);
+    }
+    const statCard = (adId, label, labelCol) => {
+      const ad = adMap[adId]; if (!ad) return '';
+      const m = metricAgg[adId] || {};
+      const ctr = m.impressions > 0 ? (m.clicks / m.impressions * 100).toFixed(2) : '—';
+      const cpl = m.leads > 0 ? fmtARS(m.spend / m.leads).replace('$ ','$') : '—';
+      return `<div style="background:var(--surface2);border-radius:var(--r);padding:12px;flex:1;min-width:0">
+        <div style="font-size:10px;font-weight:700;color:${labelCol};margin-bottom:4px;text-transform:uppercase;letter-spacing:0.08em">${label}</div>
+        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:8px">${ad.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;text-align:center;margin-bottom:8px">
+          <div><div style="font-size:14px;font-weight:700;color:var(--cyan)">${ctr}${ctr!=='—'?'%':''}</div><div style="font-size:9px;color:var(--text3)">CTR</div></div>
+          <div><div style="font-size:13px;font-weight:700;color:var(--green)">${m.leads||0}</div><div style="font-size:9px;color:var(--text3)">Leads</div></div>
+          <div><div style="font-size:11px;font-weight:700">${cpl}</div><div style="font-size:9px;color:var(--text3)">CPL</div></div>
+        </div>
+        <div style="font-size:10px;color:var(--text3)">${fmtARS(m.spend)} · ${(m.impressions/1000).toFixed(1)}k imp.</div>
+        <div style="display:flex;gap:5px;margin-top:8px">
+          <button onclick="metaCreativoDetail('${adId}')" class="btn btn-sm" style="flex:1;font-size:10px">Ver detalles</button>
+          <button onclick="metaAdTagModal('${adId}','${(ad.name||'').replace(/'/g,"\\'")}');event.stopPropagation()" class="btn btn-sm" style="font-size:11px;padding:4px 7px">🏷️</button>
+        </div>
+      </div>`;
+    };
+    if (!aAds.length || !bAds.length) {
+      const soloIds = aAds.length ? aAds : bAds;
+      const soloLabel = aAds.length ? '🔬 Test A/B' : '🔬 Test B';
+      el.innerHTML = `<div class="empty" style="font-size:12px">Solo se encontraron variantes "${soloLabel}". Etiquetá la otra variante para ver la comparación.</div>
+        ${soloIds.map(id => statCard(id, soloLabel, 'var(--cyan)')).join('')}`;
+      return;
+    }
+    el.innerHTML = aAds.map((aId, i) => {
+      const bId = bAds[i] || bAds[0];
+      const aM = metricAgg[aId] || {}, bM = metricAgg[bId] || {};
+      const winner = aM.leads >= bM.leads ? (aM.leads > bM.leads ? 'A' : 'empate') : 'B';
+      return `<div style="margin-bottom:16px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:8px;text-align:center">
+          ${winner !== 'empate' ? `🏆 Ganador: Variante ${winner}` : '🤝 Empate hasta ahora'}
+        </div>
+        <div style="display:flex;gap:10px">${statCard(aId, 'Variante A', 'var(--cyan)')}${statCard(bId, 'Variante B', '#a78bfa')}</div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── CREATIVE DECAY DETECTION ─────────────────────────────────────────────────
 async function metaDecayLoad() {
   const el = document.getElementById('meta-decay-content');
@@ -17484,7 +17568,7 @@ async function metaCreateCampaign() {
 // ── CONTENIDO tabs ──
 function metaContTab(tab) {
   document.querySelectorAll('.meta-ctab2').forEach(b => b.classList.toggle('meta-ctab2-active', b.dataset.tab === tab));
-  ['creativos','subir','arbol','comparar'].forEach(t => {
+  ['creativos','subir','arbol','comparar','ab'].forEach(t => {
     const el = document.getElementById(`meta-cont-${t}`);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
@@ -17492,6 +17576,7 @@ function metaContTab(tab) {
   if (tab === 'subir')     metaNewAdLoad();
   if (tab === 'arbol')     metaTreeLoad();
   if (tab === 'comparar')  metaComparadorLoad();
+  if (tab === 'ab')        metaAbTestLoad();
 }
 
 function metaArbolSubTab(subtab) {
