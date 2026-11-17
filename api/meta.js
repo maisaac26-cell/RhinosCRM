@@ -1268,6 +1268,79 @@ async function runAccountHealth(res) {
   } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
 }
 
+async function runRebalanceBudget(req, res) {
+  try {
+    const dryRun = req.body?.dry_run !== false; // default true for safety
+    const cfg   = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, msg: 'Meta not configured' });
+
+    const since7 = isoDate(new Date(Date.now() - 6 * 86400000));
+    const [adsets, metrics] = await Promise.all([
+      sbGet('meta_adsets?status=eq.ACTIVE&select=id,name,budget_daily,campaign_id'),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7}&select=entity_id,spend,leads`),
+    ]);
+    const ads = await sbGet('meta_ads?select=id,adset_id&limit=500');
+    const adToAdset = {}; for (const a of ads) adToAdset[a.id] = a.adset_id;
+
+    // Aggregate metrics per adset
+    const adsetAgg = {};
+    for (const m of metrics) {
+      const asId = adToAdset[m.entity_id];
+      if (!asId) continue;
+      if (!adsetAgg[asId]) adsetAgg[asId] = { spend: 0, leads: 0 };
+      adsetAgg[asId].spend += parseFloat(m.spend || 0);
+      adsetAgg[asId].leads += parseInt(m.leads || 0);
+    }
+
+    const withData = adsets
+      .filter(as => adsetAgg[as.id] && adsetAgg[as.id].spend > 100)
+      .map(as => ({
+        id: as.id, name: as.name, budget_daily: parseFloat(as.budget_daily) || 0,
+        spend: adsetAgg[as.id].spend,
+        leads: adsetAgg[as.id].leads,
+        cpl: adsetAgg[as.id].leads > 0 ? adsetAgg[as.id].spend / adsetAgg[as.id].leads : null,
+      }));
+
+    if (withData.length < 2) return res.status(200).json({ ok: false, msg: 'Insufficient data for rebalancing' });
+
+    const totSpend = withData.reduce((s,a)=>s+a.spend,0);
+    const totLeads = withData.reduce((s,a)=>s+a.leads,0);
+    const avgCpl = totLeads > 0 ? totSpend / totLeads : 0;
+
+    // Find candidates
+    const withLeads = withData.filter(a=>a.cpl!=null&&a.leads>=2);
+    if (!withLeads.length) return res.status(200).json({ ok: false, msg: 'No adsets with leads to compare' });
+
+    const worst  = withLeads.sort((a,b)=>b.cpl-a.cpl)[0];
+    const best   = withLeads.sort((a,b)=>a.cpl-b.cpl)[0];
+    if (worst.id === best.id) return res.status(200).json({ ok: false, msg: 'Same adset is best and worst' });
+    if (avgCpl > 0 && worst.cpl < avgCpl * 1.3) return res.status(200).json({ ok: false, msg: 'All adsets within acceptable CPL range' });
+
+    const transferARS = Math.round(Math.max(100, worst.budget_daily * 0.2));
+    const newWorstBudget = Math.max(100, worst.budget_daily - transferARS);
+    const newBestBudget  = best.budget_daily + transferARS;
+
+    const plan = {
+      from: { id: worst.id, name: worst.name, oldBudget: worst.budget_daily, newBudget: newWorstBudget, cpl: Math.round(worst.cpl) },
+      to:   { id: best.id,  name: best.name,  oldBudget: best.budget_daily,  newBudget: newBestBudget,  cpl: Math.round(best.cpl) },
+      transferARS,
+      avgCpl: Math.round(avgCpl),
+    };
+
+    if (dryRun) return res.status(200).json({ ok: true, dry_run: true, plan });
+
+    // Execute
+    await metaPatch(token, worst.id, { daily_budget: newWorstBudget * 100 });
+    await sbReq('PATCH', `meta_adsets?id=eq.${worst.id}`, { budget_daily: newWorstBudget, updated_at: new Date().toISOString() });
+    await metaPatch(token, best.id,  { daily_budget: newBestBudget * 100 });
+    await sbReq('PATCH', `meta_adsets?id=eq.${best.id}`,  { budget_daily: newBestBudget,  updated_at: new Date().toISOString() });
+
+    await pushNotify('⚖️ Presupuesto rebalanceado', `−$${transferARS} de ${worst.name.slice(0,20)}\n+$${transferARS} a ${best.name.slice(0,20)}`);
+    return res.status(200).json({ ok: true, dry_run: false, plan, executed: true });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
 async function runForecast(res) {
   try {
     const now = new Date();
@@ -1392,5 +1465,6 @@ export default async function handler(req, res) {
   if (action === 'account_health')    return runAccountHealth(res);
   if (action === 'update_lead')       return runUpdateLead(req, res);
   if (action === 'forecast')          return runForecast(res);
+  if (action === 'rebalance_budget')  return runRebalanceBudget(req, res);
   return runSync(res);
 }

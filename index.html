@@ -975,6 +975,30 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-journal-list"><div class="empty" style="font-size:12px">Sin entradas aún</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-rebalance-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        ⚖️ Rebalanceo de presupuesto
+        <button class="btn btn-sm" onclick="metaRebalanceLoad()" style="font-size:10px;color:var(--text3)">↻ Analizar</button>
+      </div>
+      <div id="meta-rebalance-content"><div class="empty" style="font-size:12px">Presioná Analizar para ver oportunidades de rebalanceo</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem" id="meta-cohort-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        📊 Calidad de leads por mes
+        <button class="btn btn-sm" onclick="metaCohortLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-cohort-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem" id="meta-roi-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        💹 ROI estimado
+        <button class="btn btn-sm" onclick="metaRoiLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-roi-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:1.25rem" id="meta-forecast-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         🔮 Proyección fin de mes
@@ -17383,6 +17407,227 @@ async function metaAlertsLoad() {
   } catch(e) { console.warn('[meta-alerts]', e.message); }
 }
 
+// ── BUDGET REBALANCER ────────────────────────────────────────────────────────
+let _metaRebalancePlan = null;
+
+async function metaRebalanceLoad() {
+  const el = document.getElementById('meta-rebalance-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Analizando adsets...</div>';
+  try {
+    const r = await fetch('/api/meta?action=rebalance_budget', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({dry_run:true})
+    }).then(r=>r.json());
+
+    if (!r.ok) {
+      el.innerHTML = `<div style="font-size:12px;padding:10px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:6px;color:var(--green)">✅ ${r.msg||'No hay rebalanceo necesario en este momento'}</div>`;
+      return;
+    }
+
+    _metaRebalancePlan = r.plan;
+    const fA = n => '$'+Math.round(n).toLocaleString('es-AR');
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">
+        CPL promedio de cuenta: <strong>${fA(r.plan.avgCpl)}</strong>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="padding:10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px">
+          <div style="font-size:10px;color:#f87171;margin-bottom:4px;font-weight:600">📉 Reducir presupuesto</div>
+          <div style="font-size:11px;color:var(--text);margin-bottom:4px">${r.plan.from.name.slice(0,25)}</div>
+          <div style="font-size:10px;color:var(--text3)">CPL: ${fA(r.plan.from.cpl)}</div>
+          <div style="font-size:10px;color:var(--text3)">${fA(r.plan.from.oldBudget)} → <strong style="color:#f87171">${fA(r.plan.from.newBudget)}</strong>/día</div>
+        </div>
+        <div style="padding:10px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px">
+          <div style="font-size:10px;color:var(--green);margin-bottom:4px;font-weight:600">📈 Aumentar presupuesto</div>
+          <div style="font-size:11px;color:var(--text);margin-bottom:4px">${r.plan.to.name.slice(0,25)}</div>
+          <div style="font-size:10px;color:var(--text3)">CPL: ${fA(r.plan.to.cpl)}</div>
+          <div style="font-size:10px;color:var(--text3)">${fA(r.plan.to.oldBudget)} → <strong style="color:var(--green)">${fA(r.plan.to.newBudget)}</strong>/día</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm" onclick="_metaRebalanceExecute()" style="font-size:11px;color:var(--cyan);border-color:rgba(0,229,204,0.4)">
+          ⚖️ Ejecutar rebalanceo (${fA(r.plan.transferARS)}/día)
+        </button>
+        <span style="font-size:10px;color:var(--text3)">Esta acción modifica los presupuestos en Meta</span>
+      </div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+async function _metaRebalanceExecute() {
+  if (!_metaRebalancePlan) return;
+  if (!confirm('¿Ejecutar el rebalanceo de presupuesto en Meta Ads?')) return;
+  const el = document.getElementById('meta-rebalance-content');
+  el.innerHTML = '<div class="empty">Ejecutando...</div>';
+  try {
+    const r = await fetch('/api/meta?action=rebalance_budget', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({dry_run:false})
+    }).then(r=>r.json());
+    if (r.ok && r.executed) {
+      metaToast('✅ Rebalanceo ejecutado correctamente', 'ok');
+      metaRebalanceLoad();
+    } else {
+      metaToast('Error: '+(r.error||r.msg), 'err');
+      metaRebalanceLoad();
+    }
+  } catch(e) { metaToast('Error: '+e.message, 'err'); }
+}
+
+// ── COHORT LEAD QUALITY ───────────────────────────────────────────────────────
+async function metaCohortLoad() {
+  const el = document.getElementById('meta-cohort-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Cargando...</div>';
+  try {
+    const leads = await metaSbGet('meta_leads_wa?select=fecha_lead,calificado,estado&limit=5000&order=fecha_lead.asc');
+    if (!leads.length) { el.innerHTML='<div class="empty">Sin datos</div>'; return; }
+
+    const cohorts = {};
+    for (const l of leads) {
+      const d = new Date(l.fecha_lead);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (!cohorts[key]) cohorts[key]={month:key,leads:0,calificados:0,contactados:0,rechazados:0};
+      cohorts[key].leads++;
+      if (l.calificado)              cohorts[key].calificados++;
+      if (l.estado==='contactado'||l.estado==='calificado') cohorts[key].contactados++;
+      if (l.estado==='rechazado')    cohorts[key].rechazados++;
+    }
+
+    const sorted = Object.values(cohorts).sort((a,b)=>a.month.localeCompare(b.month));
+    const maxLeads = Math.max(...sorted.map(c=>c.leads),1);
+
+    const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    el.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="color:var(--text3);border-bottom:1px solid var(--border)">
+        <th style="padding:5px 8px 7px 0;text-align:left">Mes</th>
+        <th style="padding:5px 6px 7px;text-align:left">Leads</th>
+        <th style="padding:5px 6px 7px;text-align:center">Calificados</th>
+        <th style="padding:5px 6px 7px;text-align:center">Contactados</th>
+        <th style="padding:5px 6px 7px;text-align:center">Rechazados</th>
+        <th style="padding:5px 6px 7px;text-align:center">Cal.%</th>
+      </tr></thead>
+      <tbody>${sorted.reverse().map(c=>{
+        const [y,m] = c.month.split('-');
+        const monthLabel = `${monthNames[parseInt(m)-1]} ${y}`;
+        const calPct = Math.round(c.calificados/c.leads*100);
+        const pct=Math.round(c.leads/maxLeads*100);
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+          <td style="padding:7px 8px 7px 0;color:var(--text2)">${monthLabel}</td>
+          <td style="padding:7px 6px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="width:50px;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
+                <div style="height:100%;background:var(--cyan);width:${pct}%;border-radius:3px"></div>
+              </div>
+              <span style="color:var(--text)">${c.leads}</span>
+            </div>
+          </td>
+          <td style="padding:7px 6px;text-align:center;color:var(--green)">${c.calificados}</td>
+          <td style="padding:7px 6px;text-align:center;color:#f59e0b">${c.contactados}</td>
+          <td style="padding:7px 6px;text-align:center;color:#f87171">${c.rechazados}</td>
+          <td style="padding:7px 6px;text-align:center">
+            <span style="color:${calPct>=30?'var(--green)':calPct>=15?'#f59e0b':'var(--text3)'};font-weight:600">${calPct}%</span>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── ROI ESTIMATOR ─────────────────────────────────────────────────────────────
+async function metaRoiLoad() {
+  const el = document.getElementById('meta-roi-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Cargando...</div>';
+  try {
+    const [metrics, cfg] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte=${new Date(Date.now()-365*86400000).toISOString().slice(0,10)}&select=date_start,spend,leads`),
+      metaSbGet('rhinos_config?key=eq.meta_lead_value&select=value'),
+    ]);
+
+    const leadValue = cfg[0] ? parseFloat(cfg[0].value)||0 : 0;
+    const fA = n => '$'+Math.round(n).toLocaleString('es-AR');
+
+    // Aggregate by month
+    const byMonth = {};
+    for (const m of metrics) {
+      const [y,mo] = m.date_start.split('-');
+      const key = `${y}-${mo}`;
+      if (!byMonth[key]) byMonth[key]={spend:0,leads:0};
+      byMonth[key].spend+=parseFloat(m.spend||0);
+      byMonth[key].leads+=parseInt(m.leads||0);
+    }
+
+    const monthNames=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const sorted = Object.entries(byMonth).sort(([a],[b])=>a.localeCompare(b)).slice(-6);
+
+    if (!leadValue) {
+      // No lead value configured — show UI to configure
+      const row = sorted.map(([k,m]) => {
+        const [y,mo]=k.split('-');
+        return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px">
+          <span style="color:var(--text2)">${monthNames[parseInt(mo)-1]} ${y}</span>
+          <span style="color:var(--text)">${m.leads} leads</span>
+          <span style="color:var(--cyan)">${fA(m.spend)}</span>
+          <span style="color:var(--text3)">CPL: ${m.leads>0?fA(m.spend/m.leads):'—'}</span>
+        </div>`;
+      }).join('');
+      el.innerHTML = `<div style="padding:10px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:6px;margin-bottom:12px;font-size:11px">
+          ⚠️ Configurá el valor estimado por lead para ver el ROI real.
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <input id="meta-lead-value-input" type="number" placeholder="Valor por lead (ARS)" style="flex:1;padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text)"/>
+            <button class="btn btn-sm" onclick="_metaSaveLeadValue()" style="font-size:11px;color:var(--cyan);border-color:rgba(0,229,204,0.4)">Guardar</button>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:8px">Historial de los últimos 6 meses:</div>
+        ${row}`;
+      return;
+    }
+
+    el.innerHTML = `<div style="font-size:11px;color:var(--text3);margin-bottom:10px">
+        Valor configurado por lead: <strong style="color:var(--cyan)">${fA(leadValue)}</strong>
+        <button onclick="_metaEditLeadValue()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:10px;margin-left:6px">✏️ cambiar</button>
+      </div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="color:var(--text3);border-bottom:1px solid var(--border)">
+          <th style="padding:5px 8px 7px 0;text-align:left">Mes</th>
+          <th style="padding:5px 6px 7px;text-align:right">Leads</th>
+          <th style="padding:5px 6px 7px;text-align:right">Gasto</th>
+          <th style="padding:5px 6px 7px;text-align:right">Rev. estimada</th>
+          <th style="padding:5px 6px 7px;text-align:right">ROI</th>
+        </tr></thead>
+        <tbody>${sorted.reverse().map(([k,m])=>{
+          const [y,mo]=k.split('-');
+          const rev = m.leads * leadValue;
+          const roi = m.spend>0 ? Math.round((rev-m.spend)/m.spend*100) : null;
+          const roiColor = roi===null?'var(--text3)':roi>=100?'var(--green)':roi>=0?'#f59e0b':'#f87171';
+          return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+            <td style="padding:7px 8px 7px 0;color:var(--text2)">${monthNames[parseInt(mo)-1]} ${y}</td>
+            <td style="padding:7px 6px;text-align:right;color:var(--text)">${m.leads}</td>
+            <td style="padding:7px 6px;text-align:right;color:var(--text3)">${fA(m.spend)}</td>
+            <td style="padding:7px 6px;text-align:right;color:var(--cyan)">${fA(rev)}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:600;color:${roiColor}">${roi!==null?roi+'%':'—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+async function _metaSaveLeadValue() {
+  const val = document.getElementById('meta-lead-value-input')?.value;
+  if (!val || isNaN(val)) { metaToast('Ingresá un valor válido', 'info'); return; }
+  await callAPI('save_config', { key: 'meta_lead_value', value: val });
+  metaToast('✅ Valor guardado', 'ok');
+  metaRoiLoad();
+}
+
+function _metaEditLeadValue() {
+  const el = document.getElementById('meta-roi-content');
+  el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;padding:10px">
+    <input id="meta-lead-value-input" type="number" placeholder="Valor estimado por lead (ARS)" style="flex:1;padding:7px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text)"/>
+    <button class="btn btn-sm" onclick="_metaSaveLeadValue()" style="font-size:11px;color:var(--cyan);border-color:rgba(0,229,204,0.4)">Guardar</button>
+    <button class="btn btn-sm" onclick="metaRoiLoad()" style="font-size:11px">Cancelar</button>
+  </div>`;
+}
+
 // ── FORECAST ─────────────────────────────────────────────────────────────────
 async function metaForecastLoad() {
   const el = document.getElementById('meta-forecast-content');
@@ -18363,6 +18608,9 @@ async function metaDashboardLoad() {
     metaAdScoreLoad();
     metaPeriodCompareLoad();
     metaHourlyHeatmapLoad();
+    metaRebalanceLoad();
+    metaCohortLoad();
+    metaRoiLoad();
     metaForecastLoad();
     metaCreativeAnalysisLoad();
     metaDailyBudgetLoad();
