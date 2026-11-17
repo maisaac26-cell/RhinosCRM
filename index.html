@@ -4592,11 +4592,11 @@ async function loadComments(mediaId) {
   }
 }
 
-document.getElementById('btn-close-comments').addEventListener('click', () => {
-  document.getElementById('comments-card').style.display = 'none';
+document.getElementById('btn-close-comments')?.addEventListener('click', () => {
+  document.getElementById('comments-card')?.style && (document.getElementById('comments-card').style.display = 'none');
   document.querySelectorAll('.media-card').forEach(c => c.classList.remove('selected'));
 });
-document.getElementById('btn-refresh').addEventListener('click', loadDashboard);
+document.getElementById('btn-refresh')?.addEventListener('click', loadDashboard);
 document.getElementById('btn-db-refresh')?.addEventListener('click', loadCommercialDashboard);
 
 // ── INSTAGRAM CONFIG CARD ─────────────────────────────
@@ -4644,13 +4644,13 @@ async function loadIgConfigStatus() {
   }
 }
 
-document.getElementById('btn-show-ig-form').addEventListener('click', () => {
+document.getElementById('btn-show-ig-form')?.addEventListener('click', () => {
   const form = document.getElementById('ig-token-form');
   form.style.display = form.style.display === 'none' ? 'block' : 'none';
   if (form.style.display === 'block') document.getElementById('ig-new-token').focus();
 });
 
-document.getElementById('btn-save-ig-token').addEventListener('click', async function() {
+document.getElementById('btn-save-ig-token')?.addEventListener('click', async function() {
   const token = document.getElementById('ig-new-token').value.trim();
   if (!token) { showToast('Pegá el token primero'); return; }
   this.disabled = true; this.textContent = '⏳ Validando...';
@@ -4751,7 +4751,7 @@ async function loadPostsSide() {
 }
 
 // ── DMs ───────────────────────────────────────────────
-document.getElementById('btn-gen-dm').addEventListener('click', async function() {
+document.getElementById('btn-gen-dm')?.addEventListener('click', async function() {
   const txt = document.getElementById('dm-input').value.trim();
   const obj = document.getElementById('dm-objetivo').value;
   if (!txt) { showToast('Pegá el DM primero'); return; }
@@ -4831,10 +4831,10 @@ async function generarContenido() {
     document.getElementById('btn-regen-content').addEventListener('click', generarContenido);
   } catch(e) { out.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
-document.getElementById('btn-gen-content').addEventListener('click', generarContenido);
+document.getElementById('btn-gen-content')?.addEventListener('click', generarContenido);
 
 // ── GENERACIÓN DE IMÁGENES ───────────────────────────
-document.getElementById('btn-gen-image').addEventListener('click', async function() {
+document.getElementById('btn-gen-image')?.addEventListener('click', async function() {
   const modulo = document.getElementById('c-modulo');
   const angulo = document.getElementById('c-angulo').value.trim();
   const formato = document.getElementById('c-formato').value;
@@ -5411,7 +5411,7 @@ function showIgPublishBar(caption, imageUrl) {
   if (bar) bar.style.display = 'block';
 }
 
-document.getElementById('btn-ig-publish-now').addEventListener('click', () => {
+document.getElementById('btn-ig-publish-now')?.addEventListener('click', () => {
   openIgPublishModal(igPublishData.caption, igPublishData.imageUrl);
 });
 
