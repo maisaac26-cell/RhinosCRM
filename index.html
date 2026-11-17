@@ -1010,12 +1010,28 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-forecast-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-lvr-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        📈 Lead Velocity Rate (LVR)
+        <button class="btn btn-sm" onclick="metaLvrLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-lvr-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:1.25rem" id="meta-creative-analysis-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         🎨 Análisis de creativos
         <button class="btn btn-sm" onclick="metaCreativeAnalysisLoad()" style="font-size:10px;color:var(--text3)">↻</button>
       </div>
       <div id="meta-creative-analysis-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem" id="meta-abtest-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        🧪 Comparativa A/B de creativos
+        <button class="btn btn-sm" onclick="metaAbTestLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-abtest-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
     </div>
 
     <div class="card" style="margin-bottom:1.25rem" id="meta-daily-budget-card">
@@ -1032,6 +1048,22 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <button class="btn btn-sm" onclick="metaResponseTimeLoad()" style="font-size:10px;color:var(--text3)">↻</button>
       </div>
       <div id="meta-response-time-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem" id="meta-weekday-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        📅 Rendimiento por día de semana
+        <button class="btn btn-sm" onclick="metaWeekdayLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-weekday-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem" id="meta-wasted-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        🚨 Gasto sin conversión
+        <button class="btn btn-sm" onclick="metaWastedLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-wasted-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
     </div>
 
     <div class="card" style="margin-bottom:1.25rem" id="meta-dupes-card">
@@ -17696,6 +17728,88 @@ async function metaForecastLoad() {
   } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
 }
 
+// ── LEAD VELOCITY RATE ────────────────────────────────────────────────────────
+async function metaLvrLoad() {
+  const el = document.getElementById('meta-lvr-content');
+  if (!el) return;
+  try {
+    const since8w = new Date(); since8w.setDate(since8w.getDate() - 56);
+    const since8wStr = since8w.toISOString().slice(0, 10);
+    const metrics = await metaSbGet(
+      `meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since8wStr}&select=date_start,leads,spend`
+    );
+    if (!metrics.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin datos suficientes (necesita al menos 2 semanas)</div>'; return; }
+
+    // Group by ISO week
+    const weekAgg = {};
+    for (const m of metrics) {
+      const d = new Date(m.date_start + 'T00:00:00');
+      const dow = d.getDay(); // 0=sun
+      const mon = new Date(d); mon.setDate(d.getDate() - ((dow + 6) % 7)); // Monday
+      const wk = mon.toISOString().slice(0, 10);
+      if (!weekAgg[wk]) weekAgg[wk] = { leads: 0, spend: 0 };
+      weekAgg[wk].leads += parseInt(m.leads || 0);
+      weekAgg[wk].spend += parseFloat(m.spend || 0);
+    }
+    const weeks = Object.keys(weekAgg).sort().slice(-8);
+    if (weeks.length < 2) { el.innerHTML = '<div class="empty" style="font-size:12px">Necesita al menos 2 semanas de datos</div>'; return; }
+
+    const data = weeks.map(w => ({ week: w, ...weekAgg[w] }));
+    const maxLeads = Math.max(...data.map(d => d.leads), 1);
+
+    // Compute LVR for each week vs prior
+    const lvrData = data.map((d, i) => {
+      const prev = data[i - 1];
+      const lvr = prev && prev.leads > 0 ? ((d.leads - prev.leads) / prev.leads * 100) : null;
+      return { ...d, lvr };
+    });
+
+    // Sparkline bars
+    const bars = lvrData.map((d, i) => {
+      const h = Math.round((d.leads / maxLeads) * 56);
+      const lvrColor = d.lvr === null ? 'var(--text3)' : d.lvr > 10 ? 'var(--green)' : d.lvr < -10 ? '#f87171' : 'var(--cyan)';
+      const lvrStr = d.lvr === null ? '' : (d.lvr > 0 ? '+' : '') + d.lvr.toFixed(0) + '%';
+      const label = d.week.slice(5); // MM-DD
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:40px">
+        <div style="font-size:9px;color:${lvrColor};font-weight:700;height:14px;line-height:14px">${lvrStr}</div>
+        <div style="display:flex;align-items:flex-end;height:60px">
+          <div style="width:14px;background:var(--cyan);opacity:0.75;height:${h}px;border-radius:2px 2px 0 0"></div>
+        </div>
+        <div style="font-size:9px;color:var(--text3)">${label}</div>
+        <div style="font-size:10px;color:var(--text2);font-weight:600">${d.leads}</div>
+      </div>`;
+    }).join('');
+
+    // Overall trend
+    const lastWeek = lvrData[lvrData.length - 1];
+    const prevWeek = lvrData[lvrData.length - 2];
+    const avg4 = data.slice(-4).reduce((s, d) => s + d.leads, 0) / 4;
+    const avg4prev = data.slice(-8, -4).reduce((s, d) => s + d.leads, 0) / 4;
+    const trend4 = avg4prev > 0 ? ((avg4 - avg4prev) / avg4prev * 100) : 0;
+
+    const trendColor = trend4 > 5 ? 'var(--green)' : trend4 < -5 ? '#f87171' : 'var(--cyan)';
+    const trendIcon = trend4 > 5 ? '📈' : trend4 < -5 ? '📉' : '➡️';
+
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-around;align-items:flex-end;padding:4px 0;gap:4px">${bars}</div>
+      <div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap">
+        <div style="background:var(--surface2,var(--bg3));border:1px solid var(--border);border-radius:6px;padding:10px 14px;flex:1;min-width:140px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">LVR última semana</div>
+          <div style="font-size:18px;font-weight:700;color:${lastWeek.lvr===null?'var(--text3)':lastWeek.lvr>0?'var(--green)':'#f87171'}">
+            ${lastWeek.lvr === null ? '—' : (lastWeek.lvr > 0 ? '+' : '') + lastWeek.lvr.toFixed(1) + '%'}
+          </div>
+          <div style="font-size:11px;color:var(--text2)">${lastWeek.leads} leads vs ${prevWeek?.leads || 0} semana ant.</div>
+        </div>
+        <div style="background:var(--surface2,var(--bg3));border:1px solid var(--border);border-radius:6px;padding:10px 14px;flex:1;min-width:140px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">${trendIcon} Tendencia 4 semanas</div>
+          <div style="font-size:18px;font-weight:700;color:${trendColor}">${trend4 > 0 ? '+' : ''}${trend4.toFixed(1)}%</div>
+          <div style="font-size:11px;color:var(--text2)">${avg4.toFixed(1)} leads/sem (prev: ${avg4prev.toFixed(1)})</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">LVR = % cambio de leads semana a semana. Positivo = aceleración de la máquina de leads</div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── CREATIVE ANALYSIS ─────────────────────────────────────────────────────────
 async function metaCreativeAnalysisLoad() {
   const el = document.getElementById('meta-creative-analysis-content');
@@ -17793,6 +17907,78 @@ async function metaCreativeAnalysisLoad() {
   } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
 }
 
+// ── A/B CREATIVE COMPARATOR ──────────────────────────────────────────────────
+async function metaAbTestLoad() {
+  const el = document.getElementById('meta-abtest-content');
+  if (!el) return;
+  try {
+    const since30 = new Date(); since30.setDate(since30.getDate() - 29);
+    const since30str = since30.toISOString().slice(0, 10);
+    const [metrics, ads] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since30str}&select=entity_id,spend,leads,impressions,clicks`),
+      metaSbGet('meta_ads?select=id,name,status&limit=500'),
+    ]);
+    const adMap = {}; for (const a of ads) adMap[a.id] = a;
+
+    // Extract base name: everything before first _ or - (strip trailing digits)
+    const baseName = name => {
+      const m = name.match(/^([A-Za-záéíóúÁÉÍÓÚñÑ0-9 ]+?)(?:[_\-]\d|\s+v\d|\s+V\d|[_\-][A-Z])/);
+      return (m ? m[1] : name.split(/[_\-]/)[0]).trim().slice(0, 32);
+    };
+
+    // Aggregate per base name
+    const groups = {};
+    for (const m of metrics) {
+      const ad = adMap[m.entity_id]; if (!ad) continue;
+      const base = baseName(ad.name);
+      if (!groups[base]) groups[base] = { base, ads: new Set(), spend: 0, leads: 0, impressions: 0, clicks: 0 };
+      groups[base].ads.add(ad.name);
+      groups[base].spend       += parseFloat(m.spend || 0);
+      groups[base].leads       += parseInt(m.leads || 0);
+      groups[base].impressions += parseInt(m.impressions || 0);
+      groups[base].clicks      += parseInt(m.clicks || 0);
+    }
+
+    const list = Object.values(groups).filter(g => g.spend > 100 && g.ads.size >= 1).sort((a, b) => b.leads - a.leads);
+    if (!list.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin suficientes datos (necesita gasto &gt; $100 por grupo en los últimos 30 días)</div>'; return; }
+
+    const bestCpl = Math.min(...list.filter(g => g.leads > 0).map(g => g.spend / g.leads));
+    const bestLeads = Math.max(...list.map(g => g.leads));
+
+    el.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="color:var(--text3);font-size:10px;border-bottom:1px solid var(--border)">
+        <th style="text-align:left;padding:5px 8px">Creativo base</th>
+        <th style="padding:5px 6px;text-align:center">Variantes</th>
+        <th style="padding:5px 6px;text-align:right">Gasto</th>
+        <th style="padding:5px 6px;text-align:center">Leads</th>
+        <th style="padding:5px 6px;text-align:right">CPL</th>
+        <th style="padding:5px 6px;text-align:center">CTR</th>
+        <th style="padding:5px 6px;text-align:center">Score</th>
+      </tr></thead><tbody>
+      ${list.map(g => {
+        const cpl = g.leads > 0 ? g.spend / g.leads : null;
+        const ctr = g.impressions > 0 ? (g.clicks / g.impressions * 100) : null;
+        const isWinner = g.leads === bestLeads && g.leads > 0;
+        const isBestCpl = cpl !== null && Math.abs(cpl - bestCpl) < 0.01;
+        const score = g.leads > 0 ? Math.min(100, Math.round((bestCpl / cpl) * 50 + (g.leads / bestLeads) * 50)) : 0;
+        const scoreColor = score >= 75 ? 'var(--green)' : score >= 45 ? 'var(--cyan)' : '#f87171';
+        return `<tr style="border-bottom:1px solid var(--border2)">
+          <td style="padding:7px 8px;color:var(--text);font-weight:500">
+            ${isWinner ? '🏆 ' : ''}${g.base}
+          </td>
+          <td style="padding:7px 6px;text-align:center;color:var(--text3)">${g.ads.size}</td>
+          <td style="padding:7px 6px;text-align:right;color:var(--text2)">${fmtARS(g.spend)}</td>
+          <td style="padding:7px 6px;text-align:center;font-weight:600;color:${g.leads>0?'var(--cyan)':'var(--text3)'}">${g.leads}</td>
+          <td style="padding:7px 6px;text-align:right;color:${isBestCpl?'var(--green)':'var(--text2)'}">${cpl ? fmtARS(cpl) : '—'}</td>
+          <td style="padding:7px 6px;text-align:center;color:${ctr&&ctr>=1.5?'var(--green)':ctr&&ctr>=0.5?'var(--cyan)':'var(--text3)'}">${ctr ? ctr.toFixed(2)+'%' : '—'}</td>
+          <td style="padding:7px 6px;text-align:center;color:${scoreColor};font-weight:700">${g.leads > 0 ? score : '—'}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">Score = mix de CPL relativo + volumen de leads. 🏆 = mayor cantidad de leads en 30d</div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── DAILY BUDGET TRACKER ─────────────────────────────────────────────────────
 async function metaDailyBudgetLoad() {
   const el = document.getElementById('meta-daily-budget-content');
@@ -17867,6 +18053,158 @@ async function metaDailyBudgetLoad() {
         </div>
       </div>`;
   } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── WASTED SPEND (NO CONVERSIONS) ────────────────────────────────────────────
+async function metaWastedLoad() {
+  const el = document.getElementById('meta-wasted-content');
+  if (!el) return;
+  try {
+    const since14 = new Date(); since14.setDate(since14.getDate() - 13);
+    const since14str = since14.toISOString().slice(0, 10);
+    const [metrics, ads] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since14str}&select=entity_id,spend,leads,impressions,clicks`),
+      metaSbGet('meta_ads?select=id,name,status&limit=500'),
+    ]);
+    const adMap = {}; for (const a of ads) adMap[a.id] = a;
+
+    // Aggregate per ad
+    const agg = {};
+    for (const m of metrics) {
+      if (!agg[m.entity_id]) agg[m.entity_id] = { spend:0, leads:0, impressions:0, clicks:0 };
+      agg[m.entity_id].spend       += parseFloat(m.spend || 0);
+      agg[m.entity_id].leads       += parseInt(m.leads || 0);
+      agg[m.entity_id].impressions += parseInt(m.impressions || 0);
+      agg[m.entity_id].clicks      += parseInt(m.clicks || 0);
+    }
+
+    // Wasted: active ads with spend > $200 and 0 leads in last 14 days
+    const wasted = Object.entries(agg)
+      .filter(([id, m]) => m.leads === 0 && m.spend >= 200 && adMap[id]?.status === 'ACTIVE')
+      .map(([id, m]) => ({ id, name: adMap[id]?.name || id, ...m }))
+      .sort((a, b) => b.spend - a.spend)
+      .slice(0, 10);
+
+    if (!wasted.length) {
+      el.innerHTML = '<div class="empty" style="font-size:12px;color:var(--green)">✓ No hay anuncios activos con gasto significativo sin leads en los últimos 14 días</div>';
+      return;
+    }
+
+    const totalWasted = wasted.reduce((s, w) => s + w.spend, 0);
+    el.innerHTML = `
+      <div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px">
+        <span style="color:#f87171;font-weight:600">${wasted.length} anuncio${wasted.length>1?'s':''} activo${wasted.length>1?'s':''}</span>
+        <span style="color:var(--text2)"> con </span>
+        <span style="color:#f87171;font-weight:600">${fmtARS(totalWasted)}</span>
+        <span style="color:var(--text2)"> gastado${wasted.length>1?'s':''} y 0 leads en 14 días</span>
+      </div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="color:var(--text3);font-size:10px;border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:5px 8px">Anuncio</th>
+          <th style="padding:5px 6px;text-align:right">Gasto 14d</th>
+          <th style="padding:5px 6px;text-align:center">Impresiones</th>
+          <th style="padding:5px 6px;text-align:center">Clics</th>
+          <th style="padding:5px 6px;text-align:center">CTR</th>
+          <th style="padding:5px 6px;text-align:center">Acción</th>
+        </tr></thead><tbody>
+        ${wasted.map(w => {
+          const ctr = w.impressions > 0 ? (w.clicks / w.impressions * 100).toFixed(2) : '0.00';
+          return `<tr style="border-bottom:1px solid var(--border2)">
+            <td style="padding:7px 8px;color:var(--text);font-weight:500;max-width:140px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${w.name}">${w.name}</div></td>
+            <td style="padding:7px 6px;text-align:right;color:#f87171;font-weight:600">${fmtARS(w.spend)}</td>
+            <td style="padding:7px 6px;text-align:center;color:var(--text2)">${w.impressions.toLocaleString('es-AR')}</td>
+            <td style="padding:7px 6px;text-align:center;color:var(--text2)">${w.clicks.toLocaleString('es-AR')}</td>
+            <td style="padding:7px 6px;text-align:center;color:${parseFloat(ctr)>=1?'var(--cyan)':'var(--text3)'}">${ctr}%</td>
+            <td style="padding:7px 6px;text-align:center">
+              <button onclick="metaToggleAd('${w.id}','ACTIVE')" class="btn btn-sm" style="font-size:10px;padding:3px 8px;color:#f87171;border-color:rgba(248,113,113,0.4)">⏸ Pausar</button>
+            </td>
+          </tr>`;
+        }).join('')}
+        </tbody></table></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">Solo anuncios ACTIVE con gasto ≥ $200 y 0 leads en los últimos 14 días</div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── WEEKDAY PERFORMANCE HEATMAP ───────────────────────────────────────────────
+async function metaWeekdayLoad() {
+  const el = document.getElementById('meta-weekday-content');
+  if (!el) return;
+  try {
+    const since90 = new Date(); since90.setDate(since90.getDate() - 89);
+    const since90str = since90.toISOString().slice(0, 10);
+    const metrics = await metaSbGet(
+      `meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since90str}&select=date_start,spend,leads,impressions,clicks`
+    );
+    if (!metrics.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin datos suficientes (necesita al menos 1 semana de historial)</div>'; return; }
+
+    const DAYS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const agg = Array.from({length:7}, () => ({ spend:0, leads:0, impressions:0, clicks:0, days:0 }));
+    const dayCounts = Array(7).fill(0);
+    const dayDates = new Set();
+
+    for (const m of metrics) {
+      const d = new Date(m.date_start + 'T00:00:00');
+      const dow = d.getDay();
+      const key = `${dow}-${m.date_start}`;
+      if (!dayDates.has(key)) { dayDates.add(key); dayCounts[dow]++; }
+      agg[dow].spend       += parseFloat(m.spend || 0);
+      agg[dow].leads       += parseInt(m.leads || 0);
+      agg[dow].impressions += parseInt(m.impressions || 0);
+      agg[dow].clicks      += parseInt(m.clicks || 0);
+    }
+
+    // Normalize by number of occurrences for each day
+    const norm = agg.map((g, i) => ({
+      day: DAYS[i],
+      spend:  dayCounts[i] > 0 ? g.spend / dayCounts[i] : 0,
+      leads:  dayCounts[i] > 0 ? g.leads / dayCounts[i] : 0,
+      cpl:    g.leads > 0 ? g.spend / g.leads : null,
+      ctr:    g.impressions > 0 ? g.clicks / g.impressions * 100 : null,
+      count:  dayCounts[i],
+    }));
+
+    const maxLeads = Math.max(...norm.map(n => n.leads), 0.001);
+    const maxSpend = Math.max(...norm.map(n => n.spend), 0.001);
+    const minCpl   = Math.min(...norm.filter(n => n.cpl).map(n => n.cpl));
+    const maxCpl   = Math.max(...norm.filter(n => n.cpl).map(n => n.cpl), 1);
+
+    // Bar chart + summary table
+    const bars = norm.map(n => {
+      const leadsH = Math.round((n.leads / maxLeads) * 60);
+      const spendH = Math.round((n.spend / maxSpend) * 60);
+      const cplColor = n.cpl === null ? 'var(--text3)' : n.cpl <= minCpl * 1.2 ? 'var(--green)' : n.cpl >= maxCpl * 0.85 ? '#f87171' : 'var(--cyan)';
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:36px">
+        <div style="font-size:10px;color:var(--cyan);font-weight:600">${n.leads > 0 ? n.leads.toFixed(1) : ''}</div>
+        <div style="display:flex;gap:2px;align-items:flex-end;height:64px">
+          <div title="Leads promedio" style="width:10px;background:var(--cyan);opacity:0.7;height:${leadsH}px;border-radius:2px 2px 0 0"></div>
+          <div title="Gasto promedio" style="width:10px;background:var(--purple);opacity:0.5;height:${spendH}px;border-radius:2px 2px 0 0"></div>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:var(--text)">${n.day}</div>
+        <div style="font-size:9px;color:${cplColor}">${n.cpl ? fmtARS(n.cpl).replace('$ ','$') : '—'}</div>
+      </div>`;
+    }).join('');
+
+    const bestDay = norm.reduce((best, n) => (!best || (n.leads > best.leads && n.cpl !== null && n.cpl < (best.cpl||Infinity))) ? n : best, null);
+    const worstDay = norm.filter(n => n.cpl).reduce((worst, n) => (!worst || n.cpl > worst.cpl) ? n : worst, null);
+
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-around;align-items:flex-end;padding:8px 0 4px;gap:4px">${bars}</div>
+      <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;color:var(--text3)">
+        <span><span style="display:inline-block;width:8px;height:8px;background:var(--cyan);border-radius:1px;opacity:.7"></span> Leads/día</span>
+        <span><span style="display:inline-block;width:8px;height:8px;background:var(--purple);border-radius:1px;opacity:.5"></span> Gasto/día</span>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
+        ${bestDay ? `<div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:6px;padding:8px 12px;font-size:12px">
+          <span style="color:var(--green);font-weight:600">✓ Mejor día: ${bestDay.day}</span>
+          <span style="color:var(--text2);margin-left:8px">${bestDay.leads.toFixed(1)} leads/día · CPL ${fmtARS(bestDay.cpl||0)}</span>
+        </div>` : ''}
+        ${worstDay ? `<div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:8px 12px;font-size:12px">
+          <span style="color:#f87171;font-weight:600">↓ Peor CPL: ${worstDay.day}</span>
+          <span style="color:var(--text2);margin-left:8px">${worstDay.leads.toFixed(1)} leads/día · CPL ${fmtARS(worstDay.cpl||0)}</span>
+        </div>` : ''}
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">Promedio diario últimos 90 días · CPL = costo por lead ese día</div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 
 // ── RESPONSE TIME ANALYTICS ───────────────────────────────────────────────────
@@ -18704,7 +19042,11 @@ async function metaDashboardLoad() {
     metaCohortLoad();
     metaRoiLoad();
     metaForecastLoad();
+    metaLvrLoad();
     metaCreativeAnalysisLoad();
+    metaAbTestLoad();
+    metaWeekdayLoad();
+    metaWastedLoad();
     metaDailyBudgetLoad();
     metaResponseTimeLoad();
     metaDupesLoad();
