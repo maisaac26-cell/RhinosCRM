@@ -62,9 +62,10 @@ async function runSync(res) {
   try {
     const cfg = await getMetaConfig();
     const token     = cfg.meta_access_token  || '';
-    const accountId = cfg.meta_ad_account_id || '';
+    const rawId     = cfg.meta_ad_account_id || '';
+    const accountId = rawId.replace(/^act_/i, '');
 
-    if (!token || token === 'pending' || !accountId || accountId === 'pending') {
+    if (!token || token === 'pending' || !accountId || rawId === 'pending') {
       return res.status(200).json({ ok: false, msg: 'Meta token/account not configured', _v: 'sync-v1' });
     }
 
@@ -148,9 +149,10 @@ async function runAgent(res) {
   try {
     const cfg = await getMetaConfig();
     const token     = cfg.meta_access_token  || '';
-    const accountId = cfg.meta_ad_account_id || '';
+    const rawId2    = cfg.meta_ad_account_id || '';
+    const accountId = rawId2.replace(/^act_/i, '');
 
-    if (!token || token === 'pending' || !accountId || accountId === 'pending') {
+    if (!token || token === 'pending' || !accountId || rawId2 === 'pending') {
       return res.status(200).json({ ok: false, msg: 'Meta not configured', _v: 'agent-v1' });
     }
 
