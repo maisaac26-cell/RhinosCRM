@@ -790,6 +790,17 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-digest-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        🧠 Resumen de rendimiento
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-sm" onclick="metaDigestCopy()" style="font-size:10px;color:var(--text3)">📋 Copiar</button>
+          <button class="btn btn-sm" onclick="metaDigestLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+      </div>
+      <div id="meta-digest-content"><div class="empty" style="font-size:12px">Cargando análisis...</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:1.25rem" id="meta-goals-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         🎯 Objetivos del mes
@@ -16989,6 +17000,100 @@ async function metaCalendarHeatmap() {
   } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 
+// ── PERFORMANCE DIGEST ──────────────────────────────────────────────────────
+let _metaDigestText = '';
+
+async function metaDigestLoad() {
+  const el = document.getElementById('meta-digest-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const since30 = new Date(); since30.setDate(since30.getDate() - 29);
+    const since7  = new Date(); since7.setDate(since7.getDate() - 6);
+    const s30 = since30.toISOString().slice(0,10), s7 = since7.toISOString().slice(0,10);
+    const monthStart = new Date(); monthStart.setDate(1);
+    const sMon = monthStart.toISOString().slice(0,10);
+
+    const [m30, m7, ads, decayR, goalR] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${s30}&select=entity_id,spend,leads,impressions,clicks`),
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${s7}&select=entity_id,spend,leads,impressions,clicks`),
+      metaSbGet('meta_ads?status=eq.ACTIVE&select=id,name&limit=200'),
+      fetch('/api/meta?action=decay_check').then(x=>x.json()).catch(()=>({ok:false})),
+      fetch('/api/meta?action=monthly_goals').then(x=>x.json()).catch(()=>({ok:false})),
+    ]);
+
+    const agg = (rows) => {
+      const a = {}; for (const r of rows) {
+        if (!a[r.entity_id]) a[r.entity_id] = {spend:0,leads:0,impressions:0,clicks:0};
+        a[r.entity_id].spend       += parseFloat(r.spend||0);
+        a[r.entity_id].leads       += parseInt(r.leads||0);
+        a[r.entity_id].impressions += parseInt(r.impressions||0);
+        a[r.entity_id].clicks      += parseInt(r.clicks||0);
+      } return a;
+    };
+    const agg30 = agg(m30), agg7 = agg(m7);
+    const adNameMap = {}; for (const a of ads) adNameMap[a.id] = a.name;
+
+    const tot30 = { spend:0, leads:0, impressions:0, clicks:0 };
+    const tot7  = { spend:0, leads:0, impressions:0, clicks:0 };
+    for (const v of Object.values(agg30)) { tot30.spend+=v.spend; tot30.leads+=v.leads; tot30.impressions+=v.impressions; tot30.clicks+=v.clicks; }
+    for (const v of Object.values(agg7))  { tot7.spend+=v.spend;  tot7.leads+=v.leads;  tot7.impressions+=v.impressions;  tot7.clicks+=v.clicks; }
+
+    const ctr30 = tot30.impressions>0 ? tot30.clicks/tot30.impressions*100 : 0;
+    const cpl30 = tot30.leads>0 ? tot30.spend/tot30.leads : 0;
+    const ctr7  = tot7.impressions>0 ? tot7.clicks/tot7.impressions*100 : 0;
+    const cpl7  = tot7.leads>0 ? tot7.spend/tot7.leads : 0;
+
+    const sortedLeads30 = Object.entries(agg30).filter(([,v])=>v.leads>0).sort(([,a],[,b])=>b.leads-a.leads);
+    const sortedCpl30   = Object.entries(agg30).filter(([,v])=>v.leads>0).sort(([,a],[,b])=>(a.spend/a.leads)-(b.spend/b.leads));
+    const noLeads30     = Object.entries(agg30).filter(([,v])=>v.spend>500&&v.leads===0);
+
+    const topAd = sortedLeads30[0];
+    const bestCplAd = sortedCpl30[0];
+    const adsWithLeads30 = sortedLeads30.length;
+    const totalActiveAds = ads.length;
+    const decaying = decayR.ok ? (decayR.decaying||[]).length : 0;
+
+    const lines = [];
+    if (tot30.leads > 0) {
+      const topPct = topAd ? Math.round(agg30[topAd[0]].leads / tot30.leads * 100) : 0;
+      lines.push(`📊 En los últimos 30 días generaste <strong>${tot30.leads} leads</strong> con un gasto total de <strong>${fmtARS(tot30.spend)}</strong>.`);
+      lines.push(`📈 CTR promedio: <strong>${ctr30.toFixed(2)}%</strong> · CPL promedio: <strong>${fmtARS(cpl30)}</strong>.`);
+      if (topAd) lines.push(`🏆 Tu anuncio más efectivo: <em>"${(adNameMap[topAd[0]]||topAd[0]).slice(0,50)}"</em> con ${topAd[1].leads} leads (${topPct}% del total).`);
+      if (bestCplAd && bestCplAd[0] !== topAd?.[0]) lines.push(`💰 Mejor CPL: <em>"${(adNameMap[bestCplAd[0]]||bestCplAd[0]).slice(0,40)}"</em> a ${fmtARS(agg30[bestCplAd[0]].spend/agg30[bestCplAd[0]].leads)}/lead.`);
+    } else {
+      lines.push(`⚠️ Sin leads registrados en los últimos 30 días. Revisá tus campañas y la sincronización.`);
+    }
+    if (adsWithLeads30 > 0 && totalActiveAds > 0) {
+      const pctActive = Math.round(adsWithLeads30/totalActiveAds*100);
+      lines.push(`${pctActive >= 60 ? '✅' : '⚠️'} ${adsWithLeads30} de ${totalActiveAds} anuncios activos generaron leads en los últimos 30 días (${pctActive}%).`);
+    }
+    if (noLeads30.length > 0) {
+      const totalWasted = noLeads30.reduce((s,[,v])=>s+v.spend,0);
+      lines.push(`💸 ${noLeads30.length} anuncio${noLeads30.length>1?'s':''} gastaron ${fmtARS(totalWasted)} sin conseguir leads — considerar pausarlos.`);
+    }
+    if (decaying > 0) lines.push(`📉 ${decaying} anuncio${decaying>1?'s están':'está'} en declive de rendimiento esta semana.`);
+    if (ctr7 > ctr30 * 1.1) lines.push(`📈 Esta semana el CTR (${ctr7.toFixed(2)}%) está <span style="color:var(--green)">por encima</span> del promedio del mes.`);
+    else if (ctr7 < ctr30 * 0.85) lines.push(`📉 Esta semana el CTR (${ctr7.toFixed(2)}%) está <span style="color:#f87171">por debajo</span> del promedio del mes.`);
+    if (goalR.ok && goalR.goals) {
+      const gl = goalR.goals; const totL = goalR.leads || 0; const totS = goalR.spend || 0;
+      if (gl.leads > 0) {
+        const pctL = Math.round(totL / gl.leads * 100);
+        lines.push(`🎯 Leads del mes: ${totL} / ${gl.leads} (${pctL}%) — ${pctL >= goalR.pctMonth*100 ? '<span style="color:var(--green)">on track</span>' : '<span style="color:#fbbf24">por debajo del ritmo esperado</span>'}.`);
+      }
+    }
+
+    _metaDigestText = lines.map(l => l.replace(/<[^>]+>/g,'')).join('\n');
+    el.innerHTML = `<div style="line-height:1.75">${lines.map(l=>`<div style="font-size:12px;padding:3px 0">${l}</div>`).join('')}</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:8px">Generado ${new Date().toLocaleString('es-AR',{hour:'2-digit',minute:'2-digit'})}</div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+function metaDigestCopy() {
+  if (!_metaDigestText) { metaToast('Generá el resumen primero', 'info'); return; }
+  navigator.clipboard.writeText(_metaDigestText).then(() => metaToast('✓ Copiado al portapapeles', 'ok')).catch(() => metaToast('No se pudo copiar', 'err'));
+}
+
 // ── ATTRIBUTION BY CAMPAIGN ──────────────────────────────────────────────────
 let _metaAttrData = null;
 let _metaAttrMetric = 'spend';
@@ -17212,6 +17317,7 @@ async function metaDashboardLoad() {
     // All panel loaders (KPIs + top/low ads handled by metaKpiLoad above)
     _metaTodayStripStart();
     _metaAttrData = null; metaAttrLoad(); // reset cache on full reload
+    metaDigestLoad();
     metaAgentLogLoad();
     metaLeadQualityLoad();
     metaBudgetRecsLoad();
