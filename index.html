@@ -758,6 +758,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div class="metric-card"><div class="m-label">Conversiones</div><div class="m-val" id="mk-conv">—</div><div class="m-sub">compras / purchases</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-goals-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        🎯 Objetivos del mes
+        <button class="btn btn-sm" onclick="metaGoalsLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-goals-content"><div class="empty" style="font-size:12px">Sin objetivos configurados</div></div>
+    </div>
+
     <div class="card">
       <div class="card-title">Campañas activas
         <span id="meta-agent-badge" style="margin-left:auto;font-size:10px;padding:2px 10px;border-radius:10px;background:rgba(139,92,246,0.12);color:#a78bfa;border:1px solid rgba(139,92,246,0.25)">🤖 Agente IA activo</span>
@@ -811,6 +819,23 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     </div>
 
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          🚨 Alertas de anomalías
+          <button class="btn btn-sm" onclick="metaAnomalyLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-anomaly-content"><div class="empty" style="font-size:12px">Verificando...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          📅 Mapa de actividad (30d)
+          <button class="btn btn-sm" onclick="metaCalendarHeatmap()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-calendar-heat"><div class="empty" style="font-size:12px">Sin datos</div></div>
+      </div>
+    </div>
+
     <div class="card" id="meta-config-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         📡 Conexión Meta Marketing API
@@ -844,6 +869,17 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="field" style="margin:0">
           <label>Token verificación webhook <span style="font-size:10px;color:var(--text3)">— para captura de leads</span></label>
           <input id="meta-webhook-token-input" type="text" placeholder="rhinos_meta_webhook_2026" style="font-size:12px"/>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;margin-top:4px">🎯 Objetivos mensuales</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div class="field" style="margin:0">
+          <label style="font-size:10px">Leads objetivo/mes</label>
+          <input id="meta-goal-leads-input" type="number" placeholder="0 = sin objetivo" style="font-size:12px"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label style="font-size:10px">Presupuesto mensual (ARS)</label>
+          <input id="meta-goal-spend-input" type="number" placeholder="0 = sin límite" style="font-size:12px"/>
         </div>
       </div>
       <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;margin-top:4px">⚙️ Reglas del agente IA</div>
@@ -16040,6 +16076,138 @@ function fmtARS(n) {
 function fmtPct(n) { return n != null ? parseFloat(n).toFixed(2) + '%' : '—'; }
 function fmtNum(n) { return n != null ? parseInt(n).toLocaleString('es-AR') : '—'; }
 
+// ── MONTHLY GOALS ────────────────────────────────────────────────────────────
+async function metaGoalsLoad() {
+  const el = document.getElementById('meta-goals-content');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/meta?action=monthly_goals').then(x => x.json());
+    if (!r.ok) { el.innerHTML = `<div class="empty">Error: ${r.error}</div>`; return; }
+    const { totSpend, totLeads, totMessages, pctMonth, dayOfMonth, daysInMonth, goalLeads, goalSpend } = r;
+
+    if (!goalLeads && !goalSpend) {
+      el.innerHTML = `<div class="empty" style="font-size:12px">Sin objetivos — configurá leads y presupuesto en la sección de config ↓</div>`; return;
+    }
+
+    const bar = (val, goal, color, label, fmt) => {
+      if (!goal) return '';
+      const pct = Math.min((val / goal) * 100, 100);
+      const onTrack = val >= goal * pctMonth * 0.85;
+      const barColor = pct >= 100 ? 'var(--green)' : onTrack ? color : '#f59e0b';
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:var(--text2)">${label}</span>
+          <span style="font-size:12px;font-weight:700;color:${barColor}">${fmt(val)} / ${fmt(goal)}</span>
+        </div>
+        <div style="background:var(--border);border-radius:4px;height:8px;overflow:hidden">
+          <div style="height:100%;border-radius:4px;background:${barColor};width:${pct}%;transition:width 0.4s ease"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:3px">
+          <span>${pct.toFixed(1)}% completado · día ${dayOfMonth}/${daysInMonth}</span>
+          <span>${onTrack || pct >= 100 ? '✓ En ritmo' : '⚠ Por debajo del ritmo'}</span>
+        </div>
+      </div>`;
+    };
+
+    el.innerHTML = `<div style="padding:4px 0">
+      ${bar(totLeads, goalLeads, 'var(--cyan)', 'Leads', n => n.toString())}
+      ${bar(totSpend, goalSpend, '#a78bfa', 'Gasto mensual', fmtARS)}
+      ${!goalLeads && !goalSpend ? '' : `<div style="font-size:10px;color:var(--text3);text-align:right">Mensajes este mes: <strong>${totMessages}</strong></div>`}
+    </div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── ANOMALY DETECTION ─────────────────────────────────────────────────────────
+async function metaAnomalyLoad() {
+  const el = document.getElementById('meta-anomaly-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const r = await fetch('/api/meta?action=anomaly_check').then(x => x.json());
+    if (!r.ok) { el.innerHTML = `<div class="empty">Error: ${r.error}</div>`; return; }
+    const { anomalies, today: t, avg7: a } = r;
+
+    const typeConf = {
+      spike: { icon: '🔴', col: '#f87171' },
+      drop:  { icon: '🟡', col: '#f59e0b' },
+      warn:  { icon: '⚠️', col: '#f59e0b' },
+    };
+
+    if (!anomalies.length) {
+      el.innerHTML = `<div class="empty" style="color:var(--green);font-size:12px">✓ Todo normal — sin anomalías detectadas<br><span style="font-size:10px;color:var(--text3)">Hoy: ${fmtARS(t.spend)} · ${t.leads} leads · 7d avg: ${fmtARS(a.spend)}/día</span></div>`;
+    } else {
+      el.innerHTML = anomalies.map(an => {
+        const c = typeConf[an.type] || typeConf.warn;
+        const pct = an.avg7 > 0 ? (((an.today / an.avg7) - 1) * 100).toFixed(0) : 0;
+        return `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border2)">
+          <span style="font-size:16px;flex-shrink:0">${c.icon}</span>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600;color:${c.col}">${an.label}</div>
+            <div style="font-size:10px;color:var(--text3)">Hoy: ${an.metric === 'ctr' ? an.today.toFixed(2)+'%' : an.metric === 'spend' ? fmtARS(an.today) : an.today.toLocaleString('es-AR')} · Prom.7d: ${an.metric === 'ctr' ? an.avg7.toFixed(2)+'%' : an.metric === 'spend' ? fmtARS(an.avg7) : an.avg7.toFixed(1)} (${pct > 0 ? '+' : ''}${pct}%)</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── CALENDAR HEATMAP ──────────────────────────────────────────────────────────
+async function metaCalendarHeatmap() {
+  const el = document.getElementById('meta-calendar-heat');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const since30 = new Date(); since30.setDate(since30.getDate() - 29);
+    const since30str = since30.toISOString().slice(0, 10);
+    const rows = await metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since30str}&select=date_start,spend,leads`);
+
+    const byDate = {};
+    for (const r of rows) {
+      if (!byDate[r.date_start]) byDate[r.date_start] = { spend: 0, leads: 0 };
+      byDate[r.date_start].spend += parseFloat(r.spend || 0);
+      byDate[r.date_start].leads += parseInt(r.leads || 0);
+    }
+
+    const days = [];
+    for (let i = 29; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate()-i); days.push(d.toISOString().slice(0,10)); }
+    const spends = days.map(d => byDate[d]?.spend || 0);
+    const maxS = Math.max(...spends, 1);
+
+    const cellW = 32, cellH = 24, gap = 2;
+    const cols = 6, rows2 = 5;
+    const W = cols * (cellW + gap), H = rows2 * (cellH + gap) + 24;
+
+    const cells = days.map((d, i) => {
+      const s = byDate[d]?.spend || 0;
+      const l = byDate[d]?.leads || 0;
+      const intensity = s / maxS;
+      const alpha = 0.08 + intensity * 0.75;
+      const col = `rgba(0,229,204,${alpha.toFixed(2)})`;
+      const col2 = l > 0 ? `rgba(34,197,94,${Math.min(alpha * 1.5, 0.9).toFixed(2)})` : col;
+      const col3 = l > 0 ? col2 : col;
+      const x = (i % cols) * (cellW + gap);
+      const y = Math.floor(i / cols) * (cellH + gap) + 20;
+      const title = `${d.slice(5)}: ${fmtARS(s)}${l > 0 ? ` · ${l} leads` : ''}`;
+      return `<g title="${title}">
+        <rect x="${x}" y="${y}" width="${cellW}" height="${cellH}" rx="3" fill="${col3}" style="cursor:default"/>
+        ${l > 0 ? `<text x="${x+cellW/2}" y="${y+cellH/2+1}" text-anchor="middle" dominant-baseline="middle" font-size="9" fill="var(--text2)" font-weight="600">${l}</text>` : s > 0 ? `<text x="${x+cellW/2}" y="${y+cellH/2+1}" text-anchor="middle" dominant-baseline="middle" font-size="8" fill="var(--text3)">${(s/1000).toFixed(1)}k</text>` : ''}
+      </g>`;
+    }).join('');
+
+    const dayLabels = ['D1','D6','D11','D16','D21','D26'].map((_, i) => days[i*5] ? `<text x="${i * (cellW+gap) + cellW/2}" y="13" text-anchor="middle" font-size="8" fill="var(--text3)">${days[i*5]?.slice(8)}</text>` : '').join('');
+
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible">
+      ${dayLabels}
+      ${cells}
+    </svg>
+    <div style="display:flex;gap:12px;margin-top:6px;font-size:9px;color:var(--text3)">
+      <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:8px;background:rgba(0,229,204,0.08);border-radius:2px"></span>Sin gasto</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:8px;background:rgba(0,229,204,0.5);border-radius:2px"></span>Gasto</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:8px;background:rgba(34,197,94,0.6);border-radius:2px"></span>Con leads</span>
+    </div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
 async function metaDashboardLoad() {
   const badge = document.getElementById('meta-sync-badge');
   if (badge) badge.style.display = 'none';
@@ -16110,12 +16278,15 @@ async function metaDashboardLoad() {
     if (noConf) noConf.style.display = !campaigns.length ? 'block' : 'none';
     if (badge) { badge.style.display = 'inline'; badge.textContent = `✓ ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`; }
 
-    // Top/low ads + agent log + lead quality + budget recs + spend trend
+    // Top/low ads + agent log + lead quality + budget recs + spend trend + goals + anomaly + calendar
     metaLoadTopAds(since7str);
     metaAgentLogLoad();
     metaLeadQualityLoad();
     metaBudgetRecsLoad();
     metaSpendTrendLoad();
+    metaGoalsLoad();
+    metaAnomalyLoad();
+    metaCalendarHeatmap();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
@@ -16302,6 +16473,8 @@ async function metaSaveConfig() {
   const maxFreq      = document.getElementById('meta-max-freq-input')?.value.trim();
   const cplMult      = document.getElementById('meta-cpl-mult-input')?.value.trim();
   const minSpend     = document.getElementById('meta-min-spend-input')?.value.trim();
+  const goalLeads    = document.getElementById('meta-goal-leads-input')?.value.trim();
+  const goalSpend    = document.getElementById('meta-goal-spend-input')?.value.trim();
   if (!token || !account) { metaToast('Completá Access Token y Ad Account ID', 'error'); return; }
   try {
     await callAPI('save_config', { key: 'meta_access_token', value: token });
@@ -16313,6 +16486,8 @@ async function metaSaveConfig() {
     if (maxFreq)      await callAPI('save_config', { key: 'meta_max_freq', value: parseFloat(maxFreq) });
     if (cplMult)      await callAPI('save_config', { key: 'meta_max_cpl_mult', value: parseFloat(cplMult) });
     if (minSpend)     await callAPI('save_config', { key: 'meta_min_spend_pause', value: parseFloat(minSpend) });
+    if (goalLeads)    await callAPI('save_config', { key: 'meta_goal_leads_month', value: parseFloat(goalLeads) });
+    if (goalSpend)    await callAPI('save_config', { key: 'meta_goal_spend_month', value: parseFloat(goalSpend) });
     // persist agent thresholds locally too so forecast chip can read them
     const cfg = JSON.parse(localStorage.getItem('meta_config')||'{}');
     if (targetCpl)  cfg.meta_target_cpl = targetCpl;
@@ -17182,14 +17357,54 @@ async function metaCreativoDetail(adId) {
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Gasto diario · últimos 14 días</div>
           <div style="display:flex;align-items:flex-end;gap:2px;height:66px;background:var(--surface2);border-radius:var(--r);padding:6px 8px 4px">${chartBars}</div>
         </div>`:''}
+        <div style="margin-bottom:14px" id="meta-ad-notes-section-${adId}">
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">📝 Notas internas</div>
+          <div id="meta-ad-note-loading-${adId}" style="font-size:11px;color:var(--text3)">Cargando...</div>
+        </div>
         <div style="display:flex;gap:8px;margin-top:4px">
           <button onclick="metaToggleAd('${ad.id}','${ad.status}');document.getElementById('meta-creativo-modal').style.display='none'" class="btn" style="flex:1;color:${isActive?'#f87171':'var(--green)'};border-color:${isActive?'rgba(248,113,113,0.3)':'rgba(34,197,94,0.3)'};justify-content:center;font-weight:600">${isActive?'⏸ Pausar anuncio':'▶ Activar anuncio'}</button>
+          <button onclick="metaDuplicateAdModal('${ad.id}','${ad.name}')" class="btn btn-sm" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);padding:8px 10px">📋 Dupl.</button>
           <button onclick="document.getElementById('meta-creativo-modal').style.display='none'" class="btn btn-sm" style="padding:8px 14px">Cerrar</button>
         </div>
       </div>`;
+    setTimeout(() => metaAdNoteLoad(adId), 50);
   } catch(e) {
     content.innerHTML = `<div class="empty" style="padding:40px">Error: ${e.message}</div>`;
   }
+}
+
+// Load ad note from rhinos_config and render in modal
+async function metaAdNoteLoad(adId) {
+  const el = document.getElementById(`meta-ad-note-loading-${adId}`);
+  if (!el) return;
+  try {
+    const rows = await metaSbGet('rhinos_config?key=eq.meta_ad_notes&select=value');
+    const notes = rows[0] ? JSON.parse(String(rows[0].value).replace(/^"|"$/g, '') || '{}') : {};
+    const note = notes[adId] || '';
+    el.outerHTML = `<div>
+      <textarea id="meta-ad-note-input-${adId}" placeholder="Agregar nota interna sobre este anuncio..." rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px;resize:vertical;box-sizing:border-box;line-height:1.4">${note}</textarea>
+      <button class="btn btn-sm" onclick="metaAdNoteSave('${adId}')" style="margin-top:4px;font-size:10px;color:var(--cyan);border-color:rgba(0,229,204,0.3)">💾 Guardar nota</button>
+      <span id="meta-ad-note-status-${adId}" style="font-size:10px;color:var(--text3);margin-left:8px"></span>
+    </div>`;
+  } catch(e) {
+    if (el) el.textContent = 'Error cargando notas';
+  }
+}
+
+async function metaAdNoteSave(adId) {
+  const input = document.getElementById(`meta-ad-note-input-${adId}`);
+  const status = document.getElementById(`meta-ad-note-status-${adId}`);
+  if (!input) return;
+  const noteText = input.value.trim();
+  if (status) status.textContent = 'Guardando...';
+  try {
+    const rows = await metaSbGet('rhinos_config?key=eq.meta_ad_notes&select=value');
+    const notes = rows[0] ? JSON.parse(String(rows[0].value).replace(/^"|"$/g, '') || '{}') : {};
+    if (noteText) notes[adId] = noteText;
+    else delete notes[adId];
+    await callAPI('save_config', { key: 'meta_ad_notes', value: JSON.stringify(notes) });
+    if (status) { status.textContent = '✓ Guardado'; setTimeout(() => { if (status) status.textContent = ''; }, 2000); }
+  } catch(e) { if (status) status.textContent = 'Error: ' + e.message; }
 }
 
 async function metaToggleAd(adId, currentStatus) {

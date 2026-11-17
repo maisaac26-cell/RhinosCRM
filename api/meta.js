@@ -809,6 +809,79 @@ async function runTodayReport(res) {
   }
 }
 
+// ── ANOMALY CHECK ─────────────────────────────────────────────────────────────
+async function runAnomalyCheck(res) {
+  try {
+    const today = isoDate(new Date());
+    const since8 = isoDate(new Date(Date.now() - 8 * 86400000));
+    const yesterday = isoDate(new Date(Date.now() - 86400000));
+
+    const [todayM, weekM] = await Promise.all([
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=eq.${today}&select=spend,impressions,clicks,leads`),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since8}&date_start=lte.${yesterday}&select=date_start,spend,impressions,clicks,leads`),
+    ]);
+
+    const sum = (arr, f) => arr.reduce((s, r) => s + parseFloat(r[f] || 0), 0);
+    const tSpend = sum(todayM, 'spend'), tImpr = sum(todayM, 'impressions');
+    const tClicks = sum(todayM, 'clicks'), tLeads = sum(todayM, 'leads');
+
+    // aggregate 7d by day to get daily averages
+    const byDay = {};
+    for (const r of weekM) {
+      if (!byDay[r.date_start]) byDay[r.date_start] = { spend: 0, impressions: 0, clicks: 0, leads: 0 };
+      byDay[r.date_start].spend       += parseFloat(r.spend || 0);
+      byDay[r.date_start].impressions += parseFloat(r.impressions || 0);
+      byDay[r.date_start].clicks      += parseFloat(r.clicks || 0);
+      byDay[r.date_start].leads       += parseFloat(r.leads || 0);
+    }
+    const nDays = Math.max(Object.keys(byDay).length, 1);
+    const aSpend = sum(weekM, 'spend') / nDays;
+    const aImpr  = sum(weekM, 'impressions') / nDays;
+    const aClicks = sum(weekM, 'clicks') / nDays;
+    const aLeads  = sum(weekM, 'leads') / nDays;
+
+    const anomalies = [];
+    if (aSpend > 50) {
+      const r = tSpend / aSpend;
+      if (r > 1.6) anomalies.push({ type: 'spike', metric: 'spend', label: 'Gasto inusualmente alto', today: tSpend, avg7: aSpend, ratio: r });
+      else if (r < 0.4 && tSpend < 500) anomalies.push({ type: 'drop', metric: 'spend', label: 'Gasto muy bajo — revisar campañas', today: tSpend, avg7: aSpend, ratio: r });
+    }
+    if (aImpr > 300) {
+      const r = tImpr / aImpr;
+      if (r < 0.35) anomalies.push({ type: 'drop', metric: 'impressions', label: 'Caída brusca de impresiones', today: tImpr, avg7: aImpr, ratio: r });
+    }
+    if (aClicks > 10 && aImpr > 0 && tImpr > 0) {
+      const ctrToday = tClicks / tImpr, ctrAvg = aClicks / aImpr;
+      if (ctrAvg > 0 && ctrToday < ctrAvg * 0.45) anomalies.push({ type: 'drop', metric: 'ctr', label: 'CTR muy por debajo del promedio', today: ctrToday * 100, avg7: ctrAvg * 100, ratio: ctrToday / ctrAvg });
+    }
+    if (aLeads > 0.5 && tSpend > aSpend * 0.5) {
+      if (tLeads === 0) anomalies.push({ type: 'warn', metric: 'leads', label: 'Sin leads hoy con gasto activo', today: 0, avg7: aLeads, ratio: 0 });
+    }
+
+    return res.status(200).json({ ok: true, anomalies, today: { spend: tSpend, impressions: tImpr, clicks: tClicks, leads: tLeads }, avg7: { spend: aSpend, impressions: aImpr, clicks: aClicks, leads: aLeads } });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
+// ── MONTHLY GOALS ─────────────────────────────────────────────────────────────
+async function runMonthlyGoals(res) {
+  try {
+    const now = new Date();
+    const monthStart = isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    const [metrics, cfg] = await Promise.all([
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${monthStart}&select=spend,leads,messages_started`),
+      sbGet(`rhinos_config?key=in.(meta_goal_leads_month,meta_goal_spend_month)&select=key,value`),
+    ]);
+    const c = {}; for (const r of cfg) c[r.key] = parseFloat(String(r.value).replace(/^"|"$/g,'')) || 0;
+    const totSpend = metrics.reduce((s, r) => s + parseFloat(r.spend || 0), 0);
+    const totLeads = metrics.reduce((s, r) => s + parseInt(r.leads || 0), 0);
+    const totMessages = metrics.reduce((s, r) => s + parseInt(r.messages_started || 0), 0);
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+    const pctMonth = dayOfMonth / daysInMonth;
+    return res.status(200).json({ ok: true, totSpend, totLeads, totMessages, pctMonth, dayOfMonth, daysInMonth, goalLeads: c.meta_goal_leads_month, goalSpend: c.meta_goal_spend_month });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
@@ -824,5 +897,7 @@ export default async function handler(req, res) {
   if (action === 'today_report')      return runTodayReport(res);
   if (action === 'lead_quality')      return runLeadQuality(res);
   if (action === 'budget_recs')       return runBudgetRecs(res);
+  if (action === 'anomaly_check')     return runAnomalyCheck(res);
+  if (action === 'monthly_goals')     return runMonthlyGoals(res);
   return runSync(res);
 }
