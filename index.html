@@ -19249,10 +19249,9 @@ async function metaSaveConfig() {
   const minSpend     = document.getElementById('meta-min-spend-input')?.value.trim();
   const goalLeads    = document.getElementById('meta-goal-leads-input')?.value.trim();
   const goalSpend    = document.getElementById('meta-goal-spend-input')?.value.trim();
-  if (!token || !account) { metaToast('Completá Access Token y Ad Account ID', 'error'); return; }
   try {
-    await callAPI('save_config', { key: 'meta_access_token', value: token });
-    await callAPI('save_config', { key: 'meta_ad_account_id', value: account });
+    if (token)   await callAPI('save_config', { key: 'meta_access_token', value: token });
+    if (account) await callAPI('save_config', { key: 'meta_ad_account_id', value: account });
     if (pageId)       await callAPI('save_config', { key: 'meta_page_id', value: pageId });
     if (targetCpl)    await callAPI('save_config', { key: 'meta_target_cpl', value: parseFloat(targetCpl) });
     if (webhookToken) await callAPI('save_config', { key: 'meta_webhook_verify_token', value: webhookToken });
