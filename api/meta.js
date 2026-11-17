@@ -1,9 +1,11 @@
 // meta.js — Meta Marketing API: sync + agent IA (combinado para Vercel Hobby 12-fn limit)
 // ?action=sync  → sincroniza campañas/adsets/ads/métricas (cron 10am UTC)
 // ?action=agent → aplica reglas Goodly auto-pausa/escala (cron 11am UTC)
+// ?action=wa_ventas → webhook del bot de ventas por WhatsApp (lib/wa-ventas.js)
 const SB_URL = 'https://konbqkvrcnxzpltxjdyj.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
 const META_V = 'v21.0';
+import waVentas from '../lib/wa-ventas.js';
 
 async function sbGet(path) {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
@@ -407,6 +409,9 @@ async function runWebhook(req, res) {
     if (mode === 'subscribe' && token === verifyToken) return res.status(200).send(challenge);
     return res.status(403).json({ error: 'Token de verificación incorrecto' });
   }
+
+  // POST de WhatsApp (bot de ventas) si Meta usa esta misma URL
+  if (req.body?.object === 'whatsapp_business_account') return waVentas.handle(req, res);
 
   // POST: lead recibido desde Meta
   try {
@@ -1581,6 +1586,7 @@ export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
   if (action === 'webhook')           return runWebhook(req, res);
+  if (action === 'wa_ventas')         return waVentas.handle(req, res);
   if (action === 'create_ad')         return runCreateAd(req, res);
   if (action === 'toggle_ad')         return runToggleAd(req, res);
   if (action === 'toggle_adset')      return runToggleAdset(req, res);
