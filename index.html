@@ -794,12 +794,21 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        💡 Recomendaciones de presupuesto
-        <button class="btn btn-sm" onclick="metaBudgetRecsLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          💡 Recomendaciones de presupuesto
+          <button class="btn btn-sm" onclick="metaBudgetRecsLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-budget-recs"><div class="empty" style="font-size:12px">Sin datos</div></div>
       </div>
-      <div id="meta-budget-recs"><div class="empty" style="font-size:12px">Sin datos</div></div>
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          📈 Gasto diario — 30 días
+          <button class="btn btn-sm" onclick="metaSpendTrendLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-spend-trend"><div class="empty" style="font-size:12px">Sin datos</div></div>
+      </div>
     </div>
 
     <div class="card" id="meta-config-card">
@@ -16100,11 +16109,12 @@ async function metaDashboardLoad() {
     if (noConf) noConf.style.display = !campaigns.length ? 'block' : 'none';
     if (badge) { badge.style.display = 'inline'; badge.textContent = `✓ ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`; }
 
-    // Top/low ads + agent log + lead quality + budget recs
+    // Top/low ads + agent log + lead quality + budget recs + spend trend
     metaLoadTopAds(since7str);
     metaAgentLogLoad();
     metaLeadQualityLoad();
     metaBudgetRecsLoad();
+    metaSpendTrendLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
@@ -16344,6 +16354,51 @@ async function metaHistoricalSync(days) {
     else metaToast('Error: ' + (r.error || r.msg), 'err');
   } catch(e) { metaToast('Error: ' + e.message, 'err'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '📥 Importar histórico'; } }
+}
+
+// ── SPEND TREND SPARKLINE ────────────────────────────────────────────────────
+async function metaSpendTrendLoad() {
+  const el = document.getElementById('meta-spend-trend');
+  if (!el) return;
+  try {
+    const since30 = new Date(); since30.setDate(since30.getDate() - 29);
+    const since30str = since30.toISOString().slice(0, 10);
+    const rows = await metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since30str}&select=date_start,spend,leads`);
+    if (!rows.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin datos de los últimos 30 días</div>'; return; }
+
+    // Aggregate by date
+    const byDate = {};
+    for (const r of rows) {
+      if (!byDate[r.date_start]) byDate[r.date_start] = { spend: 0, leads: 0 };
+      byDate[r.date_start].spend += parseFloat(r.spend || 0);
+      byDate[r.date_start].leads += parseInt(r.leads || 0);
+    }
+    // Fill all 30 days
+    const days = [];
+    for (let i = 29; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate()-i); days.push(d.toISOString().slice(0,10)); }
+    const spends = days.map(d => byDate[d]?.spend || 0);
+    const leads  = days.map(d => byDate[d]?.leads || 0);
+    const maxS = Math.max(...spends, 1);
+    const totSpend30 = spends.reduce((a,b)=>a+b,0);
+    const totLeads30 = leads.reduce((a,b)=>a+b,0);
+
+    const W = 320, H = 60, pad = 2;
+    const pts = spends.map((s,i) => `${pad + (i/(days.length-1))*(W-pad*2)},${pad + (1-s/maxS)*(H-pad*2)}`).join(' ');
+    const area = `${pad},${H-pad} ` + pts + ` ${W-pad},${H-pad}`;
+
+    el.innerHTML = `<div style="display:flex;gap:12px;margin-bottom:8px">
+      <div><div style="font-size:10px;color:var(--text3)">Gasto 30d</div><div style="font-size:14px;font-weight:700;color:var(--cyan)">${fmtARS(totSpend30)}</div></div>
+      <div><div style="font-size:10px;color:var(--text3)">Leads 30d</div><div style="font-size:14px;font-weight:700;color:var(--green)">${totLeads30}</div></div>
+      ${totLeads30>0?`<div><div style="font-size:10px;color:var(--text3)">CPL 30d</div><div style="font-size:14px;font-weight:700">${fmtARS(totSpend30/totLeads30)}</div></div>`:''}
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:60px">
+      <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,229,204,0.3)"/><stop offset="100%" stop-color="rgba(0,229,204,0.02)"/></linearGradient></defs>
+      <polygon points="${area}" fill="url(#sg)"/>
+      <polyline points="${pts}" fill="none" stroke="var(--cyan)" stroke-width="1.5" stroke-linejoin="round"/>
+      ${spends.some(s=>s>0)?`<text x="${pad + ((spends.indexOf(Math.max(...spends)))/(days.length-1))*(W-pad*2)}" y="${pad + (1-Math.max(...spends)/maxS)*(H-pad*2)-4}" font-size="8" fill="var(--cyan)" text-anchor="middle">${fmtARS(Math.max(...spends))}</text>`:''}
+    </svg>
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:3px"><span>${days[0].slice(5)}</span><span>Hoy</span></div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 
 // ── BUDGET RECOMMENDATIONS ────────────────────────────────────────────────────
