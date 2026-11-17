@@ -16371,6 +16371,9 @@ async function metaDecayLoad() {
 }
 
 // ── ADSET EFFICIENCY ─────────────────────────────────────────────────────────
+let _metaAdsetEffData = null;
+let _metaAdsetEffEditMode = false;
+
 async function metaAdsetEfficiencyLoad() {
   const el = document.getElementById('meta-adset-eff-content');
   if (!el) return;
@@ -16378,25 +16381,79 @@ async function metaAdsetEfficiencyLoad() {
   try {
     const r = await fetch('/api/meta?action=adset_efficiency').then(x => x.json());
     if (!r.ok) { el.innerHTML = `<div class="empty">Error: ${r.error}</div>`; return; }
-    const rows = (r.rows || []).filter(a => a.spend > 0).slice(0, 8);
-    if (!rows.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin datos de adsets (30d)</div>'; return; }
-    const maxEff = Math.max(...rows.map(a => a.efficiency), 1);
-    el.innerHTML = rows.map(r => {
-      const isActive = r.status === 'ACTIVE';
-      const barW = Math.max((r.efficiency / maxEff) * 100, 2);
-      const barCol = r.efficiency > 0 ? (r.efficiency >= maxEff * 0.6 ? 'var(--green)' : r.efficiency >= maxEff * 0.3 ? '#f59e0b' : '#f87171') : 'var(--border)';
-      return `<div style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-          <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;${!isActive?'color:var(--text3)':''}">${r.name}</span>
-          <span style="font-size:11px;font-weight:600;color:var(--cyan);flex-shrink:0;margin-left:8px">${r.leads} leads</span>
-          <span style="font-size:10px;color:var(--text3);flex-shrink:0;margin-left:6px">${r.cpl ? fmtARS(r.cpl).replace('$ ','$') : '—'}</span>
+    _metaAdsetEffData = (r.rows || []).filter(a => a.spend > 0).slice(0, 10);
+    _metaAdsetEffEditMode = false;
+    _metaAdsetEffRender();
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+function _metaAdsetEffRender() {
+  const el = document.getElementById('meta-adset-eff-content');
+  if (!el || !_metaAdsetEffData) return;
+  const rows = _metaAdsetEffData;
+  if (!rows.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin datos de adsets (30d)</div>'; return; }
+  const maxEff = Math.max(...rows.map(a => a.efficiency), 1);
+  const editBtn = `<div style="text-align:right;margin-bottom:8px">
+    <button class="btn btn-sm" onclick="_metaAdsetEffToggleEdit()" style="font-size:10px;color:${_metaAdsetEffEditMode?'var(--cyan)':'var(--text3)'}">${_metaAdsetEffEditMode?'✖ Cancelar':'✏️ Editar presupuestos'}</button>
+    ${_metaAdsetEffEditMode?`<button class="btn btn-sm" onclick="_metaAdsetEffSaveAll()" style="font-size:10px;color:var(--green);border-color:rgba(34,197,94,0.4);margin-left:5px">💾 Guardar todo</button>`:''}
+  </div>`;
+  el.innerHTML = editBtn + rows.map((r, i) => {
+    const isActive = r.status === 'ACTIVE';
+    const barW = Math.max((r.efficiency / maxEff) * 100, 2);
+    const barCol = r.efficiency > 0 ? (r.efficiency >= maxEff * 0.6 ? 'var(--green)' : r.efficiency >= maxEff * 0.3 ? '#f59e0b' : '#f87171') : 'var(--border)';
+    if (_metaAdsetEffEditMode) {
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;padding:6px 8px;background:var(--surface2);border-radius:var(--r)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${!isActive?'color:var(--text3)':''}">${r.name}</div>
+          <div style="font-size:9px;color:var(--text3)">Actual: ${r.budget ? fmtARS(r.budget)+'/día' : '—'} · ${r.leads} leads</div>
         </div>
-        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
-          <div style="width:${barW}%;height:100%;background:${barCol};border-radius:3px;transition:width 0.5s"></div>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          <span style="font-size:9px;color:var(--text3)">$</span>
+          <input type="number" id="adset-budget-${r.id}" placeholder="${r.budget ? Math.round(r.budget) : ''}" value="${r.budget ? Math.round(r.budget) : ''}"
+            style="width:72px;padding:3px 6px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);text-align:right"/>
         </div>
       </div>`;
-    }).join('');
-  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+    }
+    return `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;${!isActive?'color:var(--text3)':''}">${r.name}</span>
+        <span style="font-size:11px;font-weight:600;color:var(--cyan);flex-shrink:0;margin-left:8px">${r.leads} leads</span>
+        <span style="font-size:10px;color:var(--text3);flex-shrink:0;margin-left:6px">${r.cpl ? fmtARS(r.cpl).replace('$ ','$') : '—'}</span>
+      </div>
+      <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+        <div style="width:${barW}%;height:100%;background:${barCol};border-radius:3px;transition:width 0.5s"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _metaAdsetEffToggleEdit() {
+  _metaAdsetEffEditMode = !_metaAdsetEffEditMode;
+  _metaAdsetEffRender();
+}
+
+async function _metaAdsetEffSaveAll() {
+  const rows = _metaAdsetEffData || [];
+  const changes = rows.map(r => {
+    const inp = document.getElementById(`adset-budget-${r.id}`);
+    const newVal = inp ? parseFloat(inp.value) : null;
+    return newVal && newVal !== Math.round(r.budget||0) && newVal >= 100 ? { id: r.id, name: r.name, budget: newVal } : null;
+  }).filter(Boolean);
+  if (!changes.length) { metaToast('Sin cambios de presupuesto', 'info'); return; }
+  metaToast(`Actualizando ${changes.length} adset${changes.length>1?'s':''}...`, 'info');
+  let ok = 0, fail = 0;
+  for (const c of changes) {
+    try {
+      const r = await fetch('/api/meta?action=update_budget', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ entity_type: 'adset', entity_id: c.id, daily_budget: c.budget })
+      }).then(x => x.json());
+      if (r.ok) ok++; else fail++;
+    } catch(e) { fail++; }
+  }
+  metaToast(`${ok} presupuesto${ok!==1?'s':''} actualizado${ok!==1?'s':''}${fail?' · '+fail+' error(es)':''}`, ok>0?'ok':'err');
+  _metaAdsetEffEditMode = false;
+  setTimeout(metaAdsetEfficiencyLoad, 1200);
 }
 
 // ── SEND WEEKLY REPORT NOW ───────────────────────────────────────────────────
