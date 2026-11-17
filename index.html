@@ -19252,25 +19252,37 @@ async function metaSaveBudget(entityType, entityId) {
 
 async function metaConfigLoadState() {
   try {
-    const cfg = await metaSbGet('rhinos_config?key=in.(meta_access_token,meta_ad_account_id,meta_page_id)&select=key,value');
-    const keys = new Set(cfg.map(c => c.key));
+    const cfg = await metaSbGet('rhinos_config?key=in.(meta_access_token,meta_ad_account_id,meta_page_id,meta_target_cpl,meta_webhook_verify_token,meta_goal_leads_month,meta_goal_spend_month,meta_min_ctr,meta_max_freq,meta_max_cpl_mult,meta_min_spend_pause)&select=key,value');
+    const map = {}; for (const c of cfg) map[c.key] = (c.value||'').replace(/^"|"$/g,'');
+
+    // Lock sensitive fields
     const lock = (field, sbKey) => {
-      if (keys.has(sbKey)) {
+      if (map[sbKey]) {
         document.getElementById(`meta-${field}-locked`).style.display = 'block';
         document.getElementById(`meta-${field}-input`).style.display = 'none';
         document.getElementById(`meta-${field}-lock-btn`).style.display = 'inline-block';
-        const badge = document.getElementById('meta-conn-badge');
-        if (badge && keys.has('meta_access_token') && keys.has('meta_ad_account_id')) {
-          badge.textContent = '✓ Configurado';
-          badge.style.background = 'rgba(34,197,94,0.12)';
-          badge.style.color = 'var(--green)';
-          badge.style.borderColor = 'rgba(34,197,94,0.3)';
-        }
       }
     };
     lock('token', 'meta_access_token');
     lock('account', 'meta_ad_account_id');
     lock('page', 'meta_page_id');
+
+    // Badge
+    if (map['meta_access_token'] && map['meta_ad_account_id']) {
+      const badge = document.getElementById('meta-conn-badge');
+      if (badge) { badge.textContent = '✓ Guardado'; badge.style.background = 'rgba(34,197,94,0.12)'; badge.style.color = 'var(--green)'; badge.style.borderColor = 'rgba(34,197,94,0.3)'; }
+    }
+
+    // Populate numeric / text fields with saved values
+    const setVal = (id, key) => { const el = document.getElementById(id); if (el && map[key]) el.value = map[key]; };
+    setVal('meta-cpl-input',          'meta_target_cpl');
+    setVal('meta-webhook-token-input','meta_webhook_verify_token');
+    setVal('meta-goal-leads-input',   'meta_goal_leads_month');
+    setVal('meta-goal-spend-input',   'meta_goal_spend_month');
+    setVal('meta-min-ctr-input',      'meta_min_ctr');
+    setVal('meta-max-freq-input',     'meta_max_freq');
+    setVal('meta-cpl-mult-input',     'meta_max_cpl_mult');
+    setVal('meta-min-spend-input',    'meta_min_spend_pause');
   } catch(e) {}
 }
 function metaCredUnlock(field) {
