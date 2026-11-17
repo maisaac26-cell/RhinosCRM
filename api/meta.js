@@ -1164,7 +1164,7 @@ async function runMorningBrief(res) {
 
 async function runCplTrend(res) {
   try {
-    const since8w = new Date(); since8w.setDate(since8w.getDate() - 55);
+    const since8w = new Date(); since8w.setDate(since8w.getDate() - 91);
     const sinceStr = isoDate(since8w);
     const rows = await sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${sinceStr}&select=date_start,spend,leads`);
 
@@ -1182,7 +1182,7 @@ async function runCplTrend(res) {
 
     const sorted = Object.entries(weeks)
       .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-8)
+      .slice(-13)
       .map(([weekStart, m]) => ({
         weekStart,
         spend: Math.round(m.spend),
@@ -1268,6 +1268,91 @@ async function runAccountHealth(res) {
   } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
 }
 
+async function runForecast(res) {
+  try {
+    const now = new Date();
+    const curMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const daysInMonth   = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth    = now.getDate();
+
+    // Get last 60d of daily metrics
+    const since60 = isoDate(new Date(Date.now() - 60 * 86400000));
+    const [rows, goals] = await Promise.all([
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since60}&select=date_start,spend,leads`),
+      sbGet('rhinos_config?key=in.(meta_goal_leads_month,meta_goal_spend_month)&select=key,value'),
+    ]);
+
+    // Aggregate by day
+    const byDay = {};
+    for (const r of rows) {
+      const d = r.date_start;
+      if (!byDay[d]) byDay[d] = { spend: 0, leads: 0 };
+      byDay[d].spend += parseFloat(r.spend || 0);
+      byDay[d].leads += parseInt(r.leads || 0);
+    }
+
+    // This month daily data
+    const curMonthData = Object.entries(byDay)
+      .filter(([d]) => d >= curMonthStart.toISOString().slice(0,10))
+      .sort(([a],[b]) => a.localeCompare(b));
+
+    const spendSoFar = curMonthData.reduce((s,[,m]) => s + m.spend, 0);
+    const leadsSoFar = curMonthData.reduce((s,[,m]) => s + m.leads, 0);
+
+    // Last 14 days for trend (not just this month)
+    const since14 = isoDate(new Date(Date.now() - 14 * 86400000));
+    const recent14 = Object.entries(byDay).filter(([d]) => d >= since14).sort(([a],[b])=>a.localeCompare(b));
+    const n = recent14.length;
+
+    // Linear regression on leads
+    let leadSlope = 0, spendSlope = 0;
+    if (n >= 3) {
+      const xs = recent14.map((_,i) => i);
+      const yL = recent14.map(([,m]) => m.leads);
+      const yS = recent14.map(([,m]) => m.spend);
+      const xMean = xs.reduce((a,b)=>a+b,0)/n;
+      const yLMean = yL.reduce((a,b)=>a+b,0)/n;
+      const ysMean = yS.reduce((a,b)=>a+b,0)/n;
+      const ssxx = xs.reduce((s,x)=>s+(x-xMean)**2,0);
+      const ssxyL = xs.reduce((s,x,i)=>s+(x-xMean)*(yL[i]-yLMean),0);
+      const ssxyS = xs.reduce((s,x,i)=>s+(x-xMean)*(yS[i]-ysMean),0);
+      leadSlope  = ssxx > 0 ? ssxyL/ssxx : 0;
+      spendSlope = ssxx > 0 ? ssxyS/ssxx : 0;
+    }
+
+    // Avg last 7d
+    const avg7Leads = recent14.slice(-7).reduce((s,[,m])=>s+m.leads,0)/7;
+    const avg7Spend = recent14.slice(-7).reduce((s,[,m])=>s+m.spend,0)/7;
+
+    // Project remaining days using avg7
+    const daysLeft = daysInMonth - dayOfMonth;
+    const projectedLeads = Math.round(leadsSoFar + avg7Leads * daysLeft);
+    const projectedSpend = Math.round(spendSoFar + avg7Spend * daysLeft);
+
+    // Trend direction
+    const trendDir = leadSlope > 0.3 ? 'up' : leadSlope < -0.3 ? 'down' : 'flat';
+
+    const goalMap = {}; for (const g of goals) goalMap[g.key] = parseFloat(g.value) || 0;
+
+    return res.status(200).json({
+      ok: true,
+      leadsSoFar: Math.round(leadsSoFar),
+      spendSoFar: Math.round(spendSoFar),
+      projectedLeads,
+      projectedSpend,
+      avg7Leads: Math.round(avg7Leads * 10) / 10,
+      avg7Spend: Math.round(avg7Spend),
+      trendDir,
+      leadSlope: Math.round(leadSlope * 100) / 100,
+      daysLeft,
+      dayOfMonth,
+      daysInMonth,
+      goalLeads: goalMap['meta_goal_leads_month'] || 0,
+      goalSpend: goalMap['meta_goal_spend_month'] || 0,
+    });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
 async function runUpdateLead(req, res) {
   try {
     const { id, calificado, estado, notas } = req.body || {};
@@ -1306,5 +1391,6 @@ export default async function handler(req, res) {
   if (action === 'cpl_trend')         return runCplTrend(res);
   if (action === 'account_health')    return runAccountHealth(res);
   if (action === 'update_lead')       return runUpdateLead(req, res);
+  if (action === 'forecast')          return runForecast(res);
   return runSync(res);
 }

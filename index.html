@@ -975,6 +975,22 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-journal-list"><div class="empty" style="font-size:12px">Sin entradas aún</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-forecast-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        🔮 Proyección fin de mes
+        <button class="btn btn-sm" onclick="metaForecastLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-forecast-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem" id="meta-creative-analysis-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        🎨 Análisis de creativos
+        <button class="btn btn-sm" onclick="metaCreativeAnalysisLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-creative-analysis-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:1.25rem" id="meta-daily-budget-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         💵 Ritmo de presupuesto diario
@@ -17367,6 +17383,165 @@ async function metaAlertsLoad() {
   } catch(e) { console.warn('[meta-alerts]', e.message); }
 }
 
+// ── FORECAST ─────────────────────────────────────────────────────────────────
+async function metaForecastLoad() {
+  const el = document.getElementById('meta-forecast-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Calculando proyección...</div>';
+  try {
+    const f = await fetch('/api/meta?action=forecast').then(r=>r.json());
+    if (!f.ok) { el.innerHTML=`<div class="empty">Error: ${f.error}</div>`; return; }
+
+    const fA = n => '$'+Math.round(n).toLocaleString('es-AR');
+    const trendIcon = f.trendDir==='up'?'📈':f.trendDir==='down'?'📉':'➡️';
+    const trendLabel = f.trendDir==='up'?'Tendencia al alza':f.trendDir==='down'?'Tendencia a la baja':'Tendencia estable';
+    const trendColor = f.trendDir==='up'?'var(--green)':f.trendDir==='down'?'#f87171':'#f59e0b';
+
+    // Goal achievement
+    let leadGoalBlock = '', spendGoalBlock = '';
+    if (f.goalLeads > 0) {
+      const pct = Math.round(f.projectedLeads/f.goalLeads*100);
+      const col = pct>=100?'var(--green)':pct>=75?'#f59e0b':'#f87171';
+      leadGoalBlock = `<div style="margin-top:8px;padding:8px;border-radius:6px;background:var(--surface2)">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Meta leads: ${f.goalLeads.toLocaleString('es-AR')}</div>
+        <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
+          <div style="height:100%;background:${col};width:${Math.min(100,pct)}%;border-radius:4px"></div>
+        </div>
+        <div style="font-size:10px;margin-top:3px;color:${col}">${pct}% proyectado — ${pct>=100?'✅ Meta alcanzable':'⚠️ Ajustar ritmo'}</div>
+      </div>`;
+    }
+    if (f.goalSpend > 0) {
+      const pct = Math.round(f.projectedSpend/f.goalSpend*100);
+      const col = pct>=85&&pct<=115?'var(--green)':pct>115?'#f87171':'#f59e0b';
+      spendGoalBlock = `<div style="margin-top:6px;padding:8px;border-radius:6px;background:var(--surface2)">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Meta gasto: ${fA(f.goalSpend)}</div>
+        <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
+          <div style="height:100%;background:${col};width:${Math.min(100,pct)}%;border-radius:4px"></div>
+        </div>
+        <div style="font-size:10px;margin-top:3px;color:${col}">${pct}% del presupuesto — ${pct>115?'⚡ Sobrepresupuesto':pct>=85?'✅ En rango':'📉 Sub-utilizando'}</div>
+      </div>`;
+    }
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:22px;font-weight:700;color:var(--cyan)">${f.projectedLeads}</div>
+          <div style="font-size:10px;color:var(--text3)">Leads proyectados EOM</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">${f.leadsSoFar} actuales · +${f.projectedLeads-f.leadsSoFar} restantes</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:22px;font-weight:700;color:var(--text)">${fA(f.projectedSpend)}</div>
+          <div style="font-size:10px;color:var(--text3)">Gasto proyectado EOM</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">${fA(f.spendSoFar)} actual</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:10px">
+        <span style="font-size:16px">${trendIcon}</span>
+        <span style="color:${trendColor}">${trendLabel}</span>
+        <span style="color:var(--text3)">· Avg 7d: ${f.avg7Leads} leads/día · ${fA(f.avg7Spend)}/día</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3)">Día ${f.dayOfMonth} de ${f.daysInMonth} · ${f.daysLeft} días restantes · Basado en ritmo de últimos 7 días</div>
+      ${leadGoalBlock}${spendGoalBlock}`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── CREATIVE ANALYSIS ─────────────────────────────────────────────────────────
+async function metaCreativeAnalysisLoad() {
+  const el = document.getElementById('meta-creative-analysis-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Analizando creativos...</div>';
+  try {
+    const daysAgo = d => new Date(Date.now()-d*86400000).toISOString().slice(0,10);
+    const [metrics, ads] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${daysAgo(30)}&select=entity_id,spend,impressions,clicks,leads`),
+      metaSbGet('meta_ads?select=id,name&limit=500'),
+    ]);
+
+    const adMap = {}; for (const a of ads) adMap[a.id] = a.name;
+    // Aggregate per ad
+    const adAgg = {};
+    for (const m of metrics) {
+      const id = m.entity_id;
+      if (!adAgg[id]) adAgg[id] = {spend:0,impressions:0,clicks:0,leads:0, name: adMap[id]||id};
+      adAgg[id].spend+=parseFloat(m.spend||0); adAgg[id].impressions+=parseInt(m.impressions||0);
+      adAgg[id].clicks+=parseInt(m.clicks||0); adAgg[id].leads+=parseInt(m.leads||0);
+    }
+
+    // Extract keywords from ad names (words > 3 chars)
+    const stopWords = new Set(['para','este','esta','los','las','con','una','del','que','por','mas','sin','hay','ads','set','new','the','and','ing']);
+    const wordStats = {};
+    for (const [,a] of Object.entries(adAgg)) {
+      if (!a.name) continue;
+      const words = a.name.toLowerCase()
+        .replace(/[^a-záéíóúüñ\s]/gi,'')
+        .split(/\s+/)
+        .filter(w=>w.length>3 && !stopWords.has(w));
+      for (const w of [...new Set(words)]) {
+        if (!wordStats[w]) wordStats[w]={spend:0,leads:0,clicks:0,impressions:0,count:0};
+        wordStats[w].spend+=a.spend; wordStats[w].leads+=a.leads;
+        wordStats[w].clicks+=a.clicks; wordStats[w].impressions+=a.impressions;
+        wordStats[w].count++;
+      }
+    }
+
+    // Filter: words appearing in ≥ 2 ads, with meaningful spend
+    const keywords = Object.entries(wordStats)
+      .filter(([,s]) => s.count>=2 && s.spend>100)
+      .map(([word, s]) => ({
+        word,
+        count: s.count,
+        leads: s.leads,
+        spend: s.spend,
+        cpl: s.leads>0 ? s.spend/s.leads : null,
+        ctr: s.impressions>0 ? s.clicks/s.impressions*100 : 0,
+      }))
+      .sort((a,b)=>b.leads-a.leads)
+      .slice(0,15);
+
+    if (!keywords.length) {
+      el.innerHTML = '<div class="empty">Pocos datos — necesitás más anuncios con nombres descriptivos para el análisis</div>';
+      return;
+    }
+
+    const maxLeads = Math.max(...keywords.map(k=>k.leads),1);
+    const fA = n => '$'+Math.round(n).toLocaleString('es-AR');
+
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">
+        Palabras clave en nombres de anuncios · ${Object.keys(adAgg).length} anuncios analizados · últimos 30 días
+      </div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="color:var(--text3);border-bottom:1px solid var(--border)">
+          <th style="padding:5px 8px 7px 0;text-align:left">Keyword</th>
+          <th style="padding:5px 6px 7px;text-align:center">Ads</th>
+          <th style="padding:5px 6px 7px;text-align:left">Leads</th>
+          <th style="padding:5px 6px 7px;text-align:center">CPL</th>
+          <th style="padding:5px 6px 7px;text-align:center">CTR</th>
+        </tr></thead>
+        <tbody>${keywords.map(k=>{
+          const pct=Math.round(k.leads/maxLeads*100);
+          return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+            <td style="padding:7px 8px 7px 0;font-weight:500;color:var(--text)">${k.word}</td>
+            <td style="padding:7px 6px;text-align:center;color:var(--text3)">${k.count}</td>
+            <td style="padding:7px 6px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <div style="width:60px;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
+                  <div style="height:100%;background:var(--cyan);width:${pct}%;border-radius:3px"></div>
+                </div>
+                <span style="color:var(--text);font-weight:${k.leads>0?600:400}">${k.leads}</span>
+              </div>
+            </td>
+            <td style="padding:7px 6px;text-align:center;color:${k.cpl?'var(--text3)':'var(--text3)'}">${k.cpl?fA(k.cpl):'—'}</td>
+            <td style="padding:7px 6px;text-align:center;color:${k.ctr>=1.5?'var(--green)':k.ctr>=0.5?'var(--cyan)':'var(--text3)'}">${k.ctr.toFixed(1)}%</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">
+        * Palabras que aparecen en 2+ anuncios con gasto &gt; $100 en los últimos 30 días
+      </div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── DAILY BUDGET TRACKER ─────────────────────────────────────────────────────
 async function metaDailyBudgetLoad() {
   const el = document.getElementById('meta-daily-budget-content');
@@ -18188,6 +18363,8 @@ async function metaDashboardLoad() {
     metaAdScoreLoad();
     metaPeriodCompareLoad();
     metaHourlyHeatmapLoad();
+    metaForecastLoad();
+    metaCreativeAnalysisLoad();
     metaDailyBudgetLoad();
     metaResponseTimeLoad();
     metaDupesLoad();
