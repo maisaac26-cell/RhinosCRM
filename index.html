@@ -737,6 +737,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <button class="refresh-btn" id="btn-meta-refresh" onclick="metaDashboardLoad()">↻ Sincronizar</button>
         <button class="btn btn-sm" onclick="metaSendWeeklyReport()" style="font-size:11px;color:#a78bfa;border-color:rgba(139,92,246,0.3)" title="Enviar resumen ahora">📱 Enviar resumen</button>
         <button class="btn btn-sm" onclick="metaSendMorningBrief()" style="font-size:11px;color:#fbbf24;border-color:rgba(251,191,36,0.3)" title="Enviar brief de ayer ahora">🌅 Brief diario</button>
+        <button class="btn btn-sm" onclick="metaLeadsCsvExport()" style="font-size:11px;color:var(--green);border-color:rgba(34,197,94,0.3)" title="Exportar leads como CSV">⬇ Leads CSV</button>
+        <button class="btn btn-sm" onclick="metaMetricsCsvExport()" style="font-size:11px;color:var(--cyan);border-color:rgba(0,229,204,0.3)" title="Exportar métricas 90d como CSV">⬇ Métricas CSV</button>
+        <span id="meta-sync-status" style="font-size:10px;color:var(--text3)">— sync</span>
         <span id="meta-sync-badge" style="font-size:10px;padding:2px 10px;border-radius:10px;background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.25);display:none">✓ Sincronizado</span>
       </div>
     </div>
@@ -1042,7 +1045,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     <div class="card" style="margin-bottom:1.25rem" id="meta-leads-table-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         📋 Leads recientes
-        <button class="btn btn-sm" onclick="metaLeadsTableLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="metaLeadsCsvExport()" style="font-size:10px;color:var(--green);border-color:rgba(34,197,94,0.4)">⬇ CSV</button>
+          <button class="btn btn-sm" onclick="metaLeadsTableLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
         <input id="mlt-search" type="text" placeholder="Buscar nombre, teléfono..." oninput="metaLeadsTableLoad()" style="flex:1;min-width:0;padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text)"/>
@@ -17539,7 +17545,7 @@ async function metaRoiLoad() {
   el.innerHTML = '<div class="empty" style="font-size:12px">Cargando...</div>';
   try {
     const [metrics, cfg] = await Promise.all([
-      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte=${new Date(Date.now()-365*86400000).toISOString().slice(0,10)}&select=date_start,spend,leads`),
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${new Date(Date.now()-365*86400000).toISOString().slice(0,10)}&select=date_start,spend,leads`),
       metaSbGet('rhinos_config?key=eq.meta_lead_value&select=value'),
     ]);
 
@@ -18006,6 +18012,91 @@ async function metaDupesLoad() {
       }).join('')}
       ${dupes.length>15?`<div style="font-size:11px;color:var(--text3);text-align:center;padding:6px">...y ${dupes.length-15} grupos más</div>`:''}`;
   } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── SYNC HEALTH ──────────────────────────────────────────────────────────────
+async function metaSyncHealthLoad() {
+  try {
+    const badge = document.getElementById('meta-sync-status');
+    if (!badge) return;
+    badge.textContent = 'verificando...';
+
+    const rows = await metaSbGet('meta_ad_metrics?entity_type=eq.ad&select=date_start&order=date_start.desc&limit=1');
+    if (!rows.length) { badge.textContent = '⚠️ Sin datos'; badge.style.color='#f87171'; return; }
+
+    const lastDate   = rows[0].date_start;
+    const lastDt     = new Date(lastDate+'T12:00:00');
+    const now        = new Date();
+    const yesterday  = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1);
+    const diffDays   = Math.round((now-lastDt)/86400000);
+
+    if (diffDays <= 1) {
+      badge.textContent = `✅ Sync: ${lastDate}`;
+      badge.style.color = 'var(--green)';
+    } else if (diffDays <= 3) {
+      badge.textContent = `⚠️ Último dato: ${lastDate} (${diffDays}d)`;
+      badge.style.color = '#f59e0b';
+    } else {
+      badge.textContent = `🔴 Datos desactualizados: ${lastDate} (${diffDays}d sin sync)`;
+      badge.style.color = '#f87171';
+    }
+  } catch(e) {
+    const b = document.getElementById('meta-sync-status');
+    if (b) { b.textContent = '⚠️ Error verificando sync'; b.style.color='#f87171'; }
+  }
+}
+
+// ── CSV EXPORT ───────────────────────────────────────────────────────────────
+async function metaLeadsCsvExport() {
+  metaToast('Generando CSV...', 'info');
+  try {
+    const [leads, ads] = await Promise.all([
+      metaSbGet('meta_leads_wa?select=id,nombre,telefono,email,empresa,ad_id,estado,calificado,notas,fecha_lead&order=fecha_lead.desc&limit=5000'),
+      metaSbGet('meta_ads?select=id,name&limit=500'),
+    ]);
+    const adMap = {}; for (const a of ads) adMap[a.id] = a.name;
+    const headers = ['ID','Nombre','Teléfono','Email','Empresa','Anuncio','Estado','Calificado','Notas','Fecha Lead'];
+    const rows = leads.map(l => [
+      l.id, l.nombre||'', l.telefono||'', l.email||'', l.empresa||'',
+      adMap[l.ad_id]||l.ad_id||'',
+      l.estado||'nuevo', l.calificado?'Sí':'No', (l.notas||'').replace(/,/g,';'),
+      l.fecha_lead ? new Date(l.fecha_lead).toLocaleString('es-AR') : '',
+    ]);
+    const csv = [headers.join(','), ...rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,"'")}"`).join(','))].join('\n');
+    const blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `meta-leads-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    metaToast(`✅ ${leads.length} leads exportados`, 'ok');
+  } catch(e) { metaToast('Error exportando: '+e.message, 'err'); }
+}
+
+async function metaMetricsCsvExport() {
+  metaToast('Generando CSV de métricas...', 'info');
+  try {
+    const daysAgo = d => new Date(Date.now()-d*86400000).toISOString().slice(0,10);
+    const [metrics, ads] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${daysAgo(90)}&select=entity_id,date_start,spend,impressions,clicks,leads,messages_started&order=date_start.desc&limit=10000`),
+      metaSbGet('meta_ads?select=id,name&limit=500'),
+    ]);
+    const adMap = {}; for (const a of ads) adMap[a.id] = a.name;
+    const headers = ['Fecha','Anuncio','Gasto','Impresiones','Clicks','CTR%','Leads','CPL','Mensajes WA'];
+    const rows = metrics.map(m => {
+      const ctr = m.impressions>0?((m.clicks/m.impressions)*100).toFixed(2):'0';
+      const cpl = m.leads>0?(m.spend/m.leads).toFixed(0):'';
+      return [m.date_start, adMap[m.entity_id]||m.entity_id,
+        parseFloat(m.spend||0).toFixed(0), m.impressions||0, m.clicks||0,
+        ctr, m.leads||0, cpl, m.messages_started||0];
+    });
+    const csv = [headers.join(','), ...rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,"'")}"`).join(','))].join('\n');
+    const blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `meta-metricas-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    metaToast(`✅ ${metrics.length} filas exportadas (90 días)`, 'ok');
+  } catch(e) { metaToast('Error exportando: '+e.message, 'err'); }
 }
 
 // ── LEADS TABLE ──────────────────────────────────────────────────────────────
@@ -18583,6 +18674,7 @@ async function metaDashboardLoad() {
     if (badge) { badge.style.display = 'inline'; badge.textContent = `✓ ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`; }
 
     // All panel loaders (KPIs + top/low ads handled by metaKpiLoad above)
+    metaSyncHealthLoad();
     metaAlertsLoad();
     _metaTodayStripStart();
     _metaAttrData = null; metaAttrLoad(); // reset cache on full reload
