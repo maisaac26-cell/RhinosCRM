@@ -1991,6 +1991,43 @@ La respuesta debe:
       result = { ok: true };
     }
 
+    else if (action === 'meta_toggle_campaign') {
+      const { campaign_id, new_status } = body;
+      if (!campaign_id || !new_status) { return res.status(400).json({ error: 'campaign_id y new_status requeridos' }); }
+      // Get Meta token from config
+      const cfgRows = await new Promise((resolve) => {
+        const r2 = https.request({
+          hostname: new URL(SB_URL_CONF).hostname,
+          path: '/rest/v1/rhinos_config?key=in.(meta_access_token)',
+          method: 'GET',
+          headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF }
+        }, (r) => { let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>{ try{resolve(JSON.parse(raw))}catch(e){resolve([])} }); });
+        r2.on('error', () => resolve([])); r2.end();
+      });
+      const metaToken = cfgRows.length ? (cfgRows[0].value||'').replace(/^"|"$/g,'').trim() : '';
+      if (!metaToken || metaToken === 'pending') { return res.status(400).json({ error: 'Meta no configurado' }); }
+      // Call Meta API
+      const metaRes = await fetch(`https://graph.facebook.com/v21.0/${campaign_id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: new_status, access_token: metaToken })
+      });
+      const metaJson = await metaRes.json();
+      if (metaJson.error) { return res.status(200).json({ ok: false, error: metaJson.error.message }); }
+      // Update Supabase
+      const patchPayload = JSON.stringify({ status: new_status, updated_at: new Date().toISOString() });
+      await new Promise((resolve) => {
+        const r2 = https.request({
+          hostname: new URL(SB_URL_CONF).hostname,
+          path: `/rest/v1/meta_campaigns?id=eq.${campaign_id}`,
+          method: 'PATCH',
+          headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF,
+            'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(patchPayload) }
+        }, (r) => { let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>resolve(raw)); });
+        r2.on('error', () => resolve('')); r2.write(patchPayload); r2.end();
+      });
+      result = { ok: true };
+    }
+
     else {
       return res.status(400).json({ error: 'Unknown action: ' + action });
     }

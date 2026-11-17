@@ -46,10 +46,21 @@ async function metaPatch(token, entityId, body) {
   return j;
 }
 
+async function metaPost(token, path, body) {
+  const r = await fetch(`https://graph.facebook.com/${META_V}/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, access_token: token }),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(`Meta POST ${path}: ${j.error.message}`);
+  return j;
+}
+
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
 async function getMetaConfig() {
-  const rows = await sbGet('rhinos_config?key=in.(meta_access_token,meta_ad_account_id)&select=key,value');
+  const rows = await sbGet('rhinos_config?key=in.(meta_access_token,meta_ad_account_id,meta_page_id)&select=key,value');
   const cfg = {};
   for (const { key, value } of rows) cfg[key] = (typeof value === 'string' ? value : JSON.stringify(value)).replace(/^"|"$/g, '').trim();
   return cfg;
@@ -209,8 +220,96 @@ async function runAgent(res) {
   }
 }
 
+// ── CREATE AD ─────────────────────────────────────────────────────────────────
+async function runCreateAd(req, res) {
+  try {
+    const cfg       = await getMetaConfig();
+    const token     = cfg.meta_access_token  || '';
+    const rawId     = cfg.meta_ad_account_id || '';
+    const pageId    = cfg.meta_page_id       || '';
+    const accountId = rawId.replace(/^act_/i, '');
+
+    if (!token || token === 'pending' || !accountId)
+      return res.status(200).json({ ok: false, error: 'Meta no configurado — guardá token y account ID' });
+    if (!pageId)
+      return res.status(200).json({ ok: false, error: 'Page ID no configurado. Agregalo en Configuración → Meta.' });
+
+    const { adset_id, campaign_id, image_b64, image_name, ad_name, link_url, headline, body_text, cta_type } = req.body || {};
+    if (!adset_id || !image_b64)
+      return res.status(200).json({ ok: false, error: 'adset_id e image_b64 son requeridos' });
+
+    // 1. Upload image
+    const imgResult = await metaPost(token, `act_${accountId}/adimages`, {
+      bytes: image_b64,
+      name: image_name || 'creative.jpg',
+    });
+    const imgHash = Object.values(imgResult.images || {})[0]?.hash;
+    if (!imgHash) throw new Error('Meta no devolvió el hash de la imagen');
+
+    // 2. Create ad creative
+    const creative = await metaPost(token, `act_${accountId}/adcreatives`, {
+      name: ad_name || 'Creativo ' + Date.now(),
+      object_story_spec: {
+        page_id: pageId,
+        link_data: {
+          image_hash: imgHash,
+          link: link_url || 'https://rhinosapp.vercel.app',
+          message: body_text || '',
+          name: headline || '',
+          call_to_action: { type: cta_type || 'LEARN_MORE' },
+        },
+      },
+    });
+
+    // 3. Create ad (starts ACTIVE)
+    const ad = await metaPost(token, `act_${accountId}/ads`, {
+      name: ad_name || 'Anuncio ' + Date.now(),
+      adset_id,
+      creative: { creative_id: creative.id },
+      status: 'ACTIVE',
+    });
+
+    // 4. Insert into Supabase so it shows immediately without waiting for cron sync
+    await sbReq('POST', 'meta_ads?on_conflict=id', [{
+      id: ad.id, adset_id, campaign_id: campaign_id || null,
+      name: ad_name || 'Anuncio ' + Date.now(), status: 'ACTIVE',
+      creative_id: creative.id, thumbnail_url: null,
+      updated_at: new Date().toISOString(),
+    }]).catch(() => {}); // non-fatal
+
+    return res.status(200).json({ ok: true, ad_id: ad.id, creative_id: creative.id, image_hash: imgHash });
+  } catch (err) {
+    console.error('[meta-create-ad]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
+// ── TOGGLE AD ─────────────────────────────────────────────────────────────────
+async function runToggleAd(req, res) {
+  try {
+    const cfg   = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending')
+      return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+
+    const { ad_id, new_status } = req.body || {};
+    if (!ad_id || !new_status)
+      return res.status(200).json({ ok: false, error: 'ad_id y new_status son requeridos' });
+
+    await metaPatch(token, ad_id, { status: new_status });
+    await sbReq('PATCH', `meta_ads?id=eq.${ad_id}`, { status: new_status, updated_at: new Date().toISOString() });
+
+    return res.status(200).json({ ok: true, ad_id, new_status });
+  } catch (err) {
+    console.error('[meta-toggle-ad]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
-  if (action === 'agent') return runAgent(res);
+  if (action === 'agent')     return runAgent(res);
+  if (action === 'create_ad') return runCreateAd(req, res);
+  if (action === 'toggle_ad') return runToggleAd(req, res);
   return runSync(res);
 }
