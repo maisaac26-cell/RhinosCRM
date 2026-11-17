@@ -1172,6 +1172,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <input id="meta-goal-spend-input" type="number" placeholder="0 = sin límite" style="font-size:12px"/>
         </div>
       </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;margin-top:4px">📱 Alertas WhatsApp (CallMeBot)</div>
+      <div class="field" style="margin-bottom:4px">
+        <label style="font-size:10px">Destinatarios WA <span style="color:var(--text3)">— JSON: [{"name":"Nombre","phone":"5491XXXXXXXX","apikey":"XXXXX"}]</span></label>
+        <input id="meta-wa-recipients-input" type="text" placeholder='[{"name":"Tu nombre","phone":"5491XXXXXXXX","apikey":"123456"}]' style="font-size:11px;font-family:monospace"/>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:12px">
+        Para activar CallMeBot: mandá <strong>"I allow callmebot to send me messages"</strong> al <strong>+34 644 59 72 97</strong> por WhatsApp y te responden con tu apikey. El teléfono sin +, con código de país (Argentina: 5491XXXXXXXX).
+      </div>
       <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;margin-top:4px">⚙️ Reglas del agente IA</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px">
         <div class="field" style="margin:0">
@@ -19254,6 +19262,11 @@ async function metaSaveConfig() {
     if (minSpend)     await callAPI('save_config', { key: 'meta_min_spend_pause', value: parseFloat(minSpend) });
     if (goalLeads)    await callAPI('save_config', { key: 'meta_goal_leads_month', value: parseFloat(goalLeads) });
     if (goalSpend)    await callAPI('save_config', { key: 'meta_goal_spend_month', value: parseFloat(goalSpend) });
+    const waRaw = document.getElementById('meta-wa-recipients-input')?.value.trim();
+    if (waRaw) {
+      try { JSON.parse(waRaw); await callAPI('save_config', { key: 'wa_recipients', value: waRaw }); }
+      catch(e) { metaToast('wa_recipients: JSON inválido — revisá el formato', 'error'); }
+    }
     // persist agent thresholds locally too so forecast chip can read them
     const cfg = JSON.parse(localStorage.getItem('meta_config')||'{}');
     if (targetCpl)  cfg.meta_target_cpl = targetCpl;
