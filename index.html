@@ -251,7 +251,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 .refresh-btn:hover{color:var(--cyan)}
 .section-header{margin-bottom:1.5rem}
 .meta-ctab,.meta-ctab2,.meta-ctab3,.meta-lf{background:var(--surface2);border:1px solid var(--border);color:var(--text2);transition:all 0.15s}
-.meta-ctab-active,.meta-ctab2-active,.meta-ctab3-active,.meta-lf-active{background:rgba(0,229,204,0.1);border-color:rgba(0,229,204,0.4);color:var(--cyan)!important}
+.meta-ctab-active,.meta-ctab2-active,.meta-ctab3-active,.meta-lf-active,.meta-kpi-range-active{background:rgba(0,229,204,0.1);border-color:rgba(0,229,204,0.4);color:var(--cyan)!important}
 .cre-range{font-size:11px!important;padding:4px 10px!important}.cre-range-active{background:rgba(0,229,204,0.1)!important;border-color:rgba(0,229,204,0.4)!important;color:var(--cyan)!important}
 .cre-view-btn{font-size:14px!important;padding:4px 9px!important;line-height:1!important}.cre-view-btn-active{background:rgba(0,229,204,0.1)!important;border-color:rgba(0,229,204,0.4)!important;color:var(--cyan)!important}
 .cre-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;padding:2px 7px;border-radius:8px;font-weight:700;white-space:nowrap}
@@ -749,13 +749,22 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     </div>
 
+    <div style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:10px;color:var(--text3);font-weight:600;margin-right:4px">Período:</span>
+      <button class="btn btn-sm meta-kpi-range-btn meta-kpi-range-active" data-range="7" onclick="metaKpiRangeSet(7)">7d</button>
+      <button class="btn btn-sm meta-kpi-range-btn" data-range="14" onclick="metaKpiRangeSet(14)">14d</button>
+      <button class="btn btn-sm meta-kpi-range-btn" data-range="30" onclick="metaKpiRangeSet(30)">30d</button>
+      <button class="btn btn-sm meta-kpi-range-btn" data-range="month" onclick="metaKpiRangeSet('month')">Este mes</button>
+      <div id="mk-range-label" style="font-size:10px;color:var(--text3);margin-left:4px"></div>
+    </div>
+
     <div class="metrics-row" id="meta-kpis" style="margin-bottom:1.25rem;grid-template-columns:repeat(4,1fr)">
-      <div class="metric-card"><div class="m-label">Gasto 7d</div><div class="m-val cyan" id="mk-spend">—</div><div class="m-sub">ARS total</div><div id="mk-spend-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
-      <div class="metric-card"><div class="m-label">Leads 7d</div><div class="m-val green" id="mk-leads">—</div><div class="m-sub">formularios capturados</div><div id="mk-leads-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
+      <div class="metric-card"><div class="m-label" id="mk-lbl-spend">Gasto 7d</div><div class="m-val cyan" id="mk-spend">—</div><div class="m-sub">ARS total</div><div id="mk-spend-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
+      <div class="metric-card"><div class="m-label" id="mk-lbl-leads">Leads 7d</div><div class="m-val green" id="mk-leads">—</div><div class="m-sub">formularios capturados</div><div id="mk-leads-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
       <div class="metric-card"><div class="m-label">CPL prom.</div><div class="m-val cyan" id="mk-cpl">—</div><div class="m-sub">costo por lead ARS</div></div>
-      <div class="metric-card"><div class="m-label">Mensajes 7d</div><div class="m-val" id="mk-messages">—</div><div class="m-sub">conversaciones WA</div><div id="mk-messages-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
-      <div class="metric-card"><div class="m-label">Impresiones</div><div class="m-val" id="mk-impressions">—</div><div class="m-sub">últimos 7 días</div><div id="mk-impressions-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
-      <div class="metric-card"><div class="m-label">Clics</div><div class="m-val" id="mk-clicks">—</div><div class="m-sub">al link</div><div id="mk-clicks-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
+      <div class="metric-card"><div class="m-label" id="mk-lbl-messages">Mensajes 7d</div><div class="m-val" id="mk-messages">—</div><div class="m-sub">conversaciones WA</div><div id="mk-messages-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
+      <div class="metric-card"><div class="m-label" id="mk-lbl-impressions">Impresiones 7d</div><div class="m-val" id="mk-impressions">—</div><div class="m-sub">alcance de impresiones</div><div id="mk-impressions-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
+      <div class="metric-card"><div class="m-label" id="mk-lbl-clicks">Clics 7d</div><div class="m-val" id="mk-clicks">—</div><div class="m-sub">al link</div><div id="mk-clicks-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
       <div class="metric-card"><div class="m-label">CTR prom.</div><div class="m-val" id="mk-ctr">—</div><div class="m-sub">click-through rate</div></div>
       <div class="metric-card"><div class="m-label">Conversiones</div><div class="m-val" id="mk-conv">—</div><div class="m-sub">compras / purchases</div></div>
     </div>
@@ -16901,21 +16910,39 @@ async function metaCalendarHeatmap() {
   } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 
-async function metaDashboardLoad() {
-  const badge = document.getElementById('meta-sync-badge');
-  if (badge) badge.style.display = 'none';
+let _metaKpiRange = 7; // days, or 'month'
 
+function metaKpiRangeSet(range) {
+  _metaKpiRange = range;
+  document.querySelectorAll('.meta-kpi-range-btn').forEach(b => {
+    b.classList.toggle('meta-kpi-range-active', String(b.dataset.range) === String(range));
+  });
+  metaKpiLoad();
+}
+
+function _metaKpiSinceStr() {
+  if (_metaKpiRange === 'month') {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  }
+  const d = new Date(); d.setDate(d.getDate() - Number(_metaKpiRange));
+  return d.toISOString().slice(0, 10);
+}
+
+async function metaKpiLoad() {
+  const sinceStr = _metaKpiSinceStr();
+  const lbl = _metaKpiRange === 'month' ? 'este mes' : `últimos ${_metaKpiRange}d`;
+  const setLbl = id => { const el = document.getElementById(id); if (el) el.textContent = id.replace('mk-lbl-','').replace(/^\w/, c => c.toUpperCase()) + ' ' + lbl; };
+  ['mk-lbl-spend','mk-lbl-leads','mk-lbl-messages','mk-lbl-impressions','mk-lbl-clicks'].forEach(id => {
+    const el = document.getElementById(id); if (!el) return;
+    const name = id.replace('mk-lbl-','');
+    const names = { spend:'Gasto', leads:'Leads', messages:'Mensajes', impressions:'Impresiones', clicks:'Clics' };
+    el.textContent = (names[name] || name) + ' ' + lbl;
+  });
+  const rangeEl = document.getElementById('mk-range-label');
+  if (rangeEl) rangeEl.textContent = `desde ${sinceStr}`;
   try {
-    // Load metrics: aggregate last 7 days across all campaigns
-    const since7 = new Date(); since7.setDate(since7.getDate() - 7);
-    const since7str = since7.toISOString().slice(0, 10);
-
-    const [campaigns, metrics] = await Promise.all([
-      metaSbGet('meta_campaigns?order=updated_at.desc&limit=50'),
-      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7str}&select=spend,clicks,impressions,ctr,cpc,conversions,leads,messages_started`),
-    ]);
-
-    // KPIs
+    const metrics = await metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${sinceStr}&select=spend,clicks,impressions,ctr,cpc,conversions,leads,messages_started`);
     const totSpend    = metrics.reduce((s, r) => s + parseFloat(r.spend || 0), 0);
     const totImpr     = metrics.reduce((s, r) => s + parseInt(r.impressions || 0), 0);
     const totClicks   = metrics.reduce((s, r) => s + parseInt(r.clicks || 0), 0);
@@ -16924,7 +16951,6 @@ async function metaDashboardLoad() {
     const totMessages = metrics.reduce((s, r) => s + parseInt(r.messages_started || 0), 0);
     const avgCtr      = totImpr > 0 ? (totClicks / totImpr) * 100 : 0;
     const avgCpl      = totLeads > 0 ? totSpend / totLeads : 0;
-
     const setKpi = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     setKpi('mk-spend', fmtARS(totSpend));
     setKpi('mk-leads', fmtNum(totLeads));
@@ -16934,6 +16960,25 @@ async function metaDashboardLoad() {
     setKpi('mk-clicks', fmtNum(totClicks));
     setKpi('mk-ctr', fmtPct(avgCtr));
     setKpi('mk-conv', fmtNum(totConv));
+    metaLoadTopAds(sinceStr);
+  } catch(e) { /* silent */ }
+}
+
+async function metaDashboardLoad() {
+  const badge = document.getElementById('meta-sync-badge');
+  if (badge) badge.style.display = 'none';
+
+  try {
+    // Load metrics: aggregate last N days across all campaigns (dynamic range)
+    const since7 = new Date(); since7.setDate(since7.getDate() - 7);
+    const since7str = since7.toISOString().slice(0, 10);
+
+    const [campaigns] = await Promise.all([
+      metaSbGet('meta_campaigns?order=updated_at.desc&limit=50'),
+    ]);
+
+    // KPIs loaded via metaKpiLoad (dynamic range)
+    metaKpiLoad();
 
     // Campaigns table
     const tbl = document.getElementById('meta-campaigns-table');
@@ -16971,8 +17016,7 @@ async function metaDashboardLoad() {
     if (noConf) noConf.style.display = !campaigns.length ? 'block' : 'none';
     if (badge) { badge.style.display = 'inline'; badge.textContent = `✓ ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`; }
 
-    // All panel loaders
-    metaLoadTopAds(since7str);
+    // All panel loaders (KPIs + top/low ads handled by metaKpiLoad above)
     metaAgentLogLoad();
     metaLeadQualityLoad();
     metaBudgetRecsLoad();
