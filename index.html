@@ -770,6 +770,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="btn btn-sm meta-kpi-range-btn meta-kpi-range-active" data-range="7" onclick="metaKpiRangeSet(7)">7d</button>
       <button class="btn btn-sm meta-kpi-range-btn" data-range="14" onclick="metaKpiRangeSet(14)">14d</button>
       <button class="btn btn-sm meta-kpi-range-btn" data-range="30" onclick="metaKpiRangeSet(30)">30d</button>
+      <button class="btn btn-sm meta-kpi-range-btn" data-range="60" onclick="metaKpiRangeSet(60)">60d</button>
+      <button class="btn btn-sm meta-kpi-range-btn" data-range="90" onclick="metaKpiRangeSet(90)">90d</button>
       <button class="btn btn-sm meta-kpi-range-btn" data-range="month" onclick="metaKpiRangeSet('month')">Este mes</button>
       <div id="mk-range-label" style="font-size:10px;color:var(--text3);margin-left:4px"></div>
     </div>
@@ -19278,10 +19280,24 @@ async function metaForceSync() {
 }
 
 function metaHistoricalSyncModal() {
-  const days = prompt('¿Cuántos días de historial importar? (máx 180)', '30');
-  if (!days) return;
-  const d = Math.min(Math.max(parseInt(days) || 30, 1), 180);
-  metaHistoricalSync(d);
+  const opts = [
+    {label:'30 días (1 mes)', val:30},
+    {label:'60 días (2 meses)', val:60},
+    {label:'90 días (3 meses)', val:90},
+    {label:'180 días (6 meses)', val:180},
+  ];
+  const html = `<div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
+    <div style="font-size:13px;color:var(--text2);margin-bottom:4px">¿Cuántos días de historial importar desde Meta?</div>
+    ${opts.map(o => `<button onclick="document.getElementById('meta-hist-modal').remove();metaHistoricalSync(${o.val})" class="btn" style="text-align:left;padding:10px 14px;font-size:13px">${o.label}</button>`).join('')}
+    <button onclick="document.getElementById('meta-hist-modal').remove()" class="btn btn-sm" style="color:var(--text3);margin-top:4px">Cancelar</button>
+  </div>`;
+  let m = document.getElementById('meta-hist-modal');
+  if (m) m.remove();
+  m = document.createElement('div');
+  m.id = 'meta-hist-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+  m.innerHTML = `<div style="background:var(--surface,#1d2130);border:1px solid var(--border);border-radius:12px;padding:20px 24px;min-width:280px;max-width:340px">${html}</div>`;
+  document.body.appendChild(m);
 }
 
 async function metaHistoricalSync(days) {
