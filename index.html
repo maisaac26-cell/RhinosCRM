@@ -973,6 +973,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-journal-list"><div class="empty" style="font-size:12px">Sin entradas aún</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-ad-score-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        ⭐ Puntuación de anuncios
+        <button class="btn btn-sm" onclick="metaAdScoreLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-ad-score-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
     <div class="card" id="meta-config-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         📡 Conexión Meta Marketing API
@@ -17207,6 +17215,99 @@ async function _metaJournalDelete(id) {
   }
 }
 
+// ── AD SCORE ─────────────────────────────────────────────────────────────────
+async function metaAdScoreLoad() {
+  const el = document.getElementById('meta-ad-score-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Calculando puntuaciones...</div>';
+  try {
+    const daysAgo = d => new Date(Date.now() - d * 86400000).toISOString().slice(0,10);
+    const [m30, activeAds] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${daysAgo(30)}&select=entity_id,date_start,spend,impressions,clicks,leads`),
+      metaSbGet('meta_ads?status=eq.ACTIVE&select=id,name&limit=200'),
+    ]);
+    if (!activeAds.length) { el.innerHTML = '<div class="empty">Sin anuncios activos</div>'; return; }
+
+    const activeIds = new Set(activeAds.map(a => a.id));
+    const adNameMap = {}; for (const a of activeAds) adNameMap[a.id] = a.name;
+    const s7 = daysAgo(7), s14 = daysAgo(14);
+    const agg30 = {}, agg7 = {}, aggP7 = {};
+    for (const m of m30) {
+      if (!activeIds.has(m.entity_id)) continue;
+      const id = m.entity_id;
+      if (!agg30[id]) agg30[id] = {spend:0,impressions:0,clicks:0,leads:0};
+      agg30[id].spend += parseFloat(m.spend||0); agg30[id].impressions += parseInt(m.impressions||0);
+      agg30[id].clicks += parseInt(m.clicks||0); agg30[id].leads += parseInt(m.leads||0);
+      if (m.date_start >= s7) {
+        if (!agg7[id]) agg7[id]={leads:0,spend:0};
+        agg7[id].leads+=parseInt(m.leads||0); agg7[id].spend+=parseFloat(m.spend||0);
+      } else if (m.date_start >= s14) {
+        if (!aggP7[id]) aggP7[id]={leads:0,spend:0};
+        aggP7[id].leads+=parseInt(m.leads||0); aggP7[id].spend+=parseFloat(m.spend||0);
+      }
+    }
+    const totLeads=Object.values(agg30).reduce((s,a)=>s+a.leads,0);
+    const totSpend=Object.values(agg30).reduce((s,a)=>s+a.spend,0);
+    const avgCpl = totLeads>0 ? totSpend/totLeads : 0;
+
+    const scored = activeAds.map(ad => {
+      const id=ad.id, d=agg30[id]||{spend:0,impressions:0,clicks:0,leads:0};
+      const d7=agg7[id]||{leads:0,spend:0}, dp7=aggP7[id]||{leads:0,spend:0};
+      const ctr=d.impressions>0 ? d.clicks/d.impressions*100 : 0;
+      const cpl=d.leads>0 ? d.spend/d.leads : 0;
+
+      let ctrS = ctr>=3?25 : ctr>=1.5?20 : ctr>=0.8?12 : ctr>=0.3?6 : 0;
+      let cplS = 0;
+      if (d.leads>0 && avgCpl>0) {
+        const r=cpl/avgCpl; cplS = r<=0.6?30 : r<=0.85?25 : r<=1.0?20 : r<=1.3?12 : r<=1.7?6 : 2;
+      } else if (d.leads===0 && d.spend>200) cplS=0;
+      else cplS=8;
+      let actS = d7.leads>=10?25 : d7.leads>=5?20 : d7.leads>=2?14 : d7.leads>=1?8 : 0;
+      let momS = 10;
+      if (d7.leads>0 && dp7.leads>0) { const r=d7.leads/dp7.leads; momS=r>=1.5?20:r>=1.0?15:r>=0.7?10:r>=0.4?5:0; }
+      else if (d7.leads>0 && dp7.leads===0) momS=14;
+      else if (d7.leads===0 && dp7.leads>0) momS=0;
+
+      const score=Math.min(100, ctrS+cplS+actS+momS);
+      const [grade,gc] = score>=80?['A','var(--green)']:score>=65?['B','var(--cyan)']:score>=50?['C','#f59e0b']:score>=35?['D','#f87171']:['F','#ef4444'];
+
+      let rec='';
+      if (d7.leads===0 && d7.spend>300)   rec='🛑 Sin leads con gasto alto — pausar o renovar creativo';
+      else if (d7.leads===0 && d7.spend>50) rec='⚠️ Sin actividad reciente — revisar';
+      else if (ctr<0.5 && d.impressions>1000) rec='👁 CTR bajo — revisar audiencia/creativo';
+      else if (d.leads>0 && avgCpl>0 && cpl>avgCpl*1.5) rec='💸 CPL alto vs promedio — revisar segmentación';
+      else if (d7.leads>0 && dp7.leads>0 && d7.leads<dp7.leads*0.5) rec='📉 En declive — revisar fatiga';
+      else if (score>=75 && d7.spend>0) rec='🚀 Top performer — considerar escalar';
+      else if (d7.leads>=3) rec='✅ Funcionando bien';
+      else rec='📊 Pocos datos — continuar monitoreando';
+
+      return {id, name:ad.name, score, grade, gc, ctr, cpl, leads7:d7.leads, spend:d.spend, rec};
+    }).sort((a,b)=>b.score-a.score);
+
+    el.innerHTML = `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">${scored.length} anuncios activos · Últimos 30 días</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="color:var(--text3);border-bottom:1px solid var(--border)">
+          <th style="padding:4px 8px 6px 0;text-align:left">Anuncio</th>
+          <th style="padding:4px 6px 6px;text-align:center">Score</th>
+          <th style="padding:4px 6px 6px;text-align:center">CTR</th>
+          <th style="padding:4px 6px 6px;text-align:center">Leads 7d</th>
+          <th style="padding:4px 6px 6px;text-align:center">CPL 30d</th>
+          <th style="padding:4px 6px 6px;text-align:left">Recomendación</th>
+        </tr></thead>
+        <tbody>${scored.map(a=>`
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+            <td style="padding:6px 8px 6px 0;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.name}">${a.name.length>22?a.name.slice(0,22)+'…':a.name}</td>
+            <td style="padding:6px;text-align:center"><span style="font-weight:700;color:${a.gc}">${a.grade}</span> <span style="font-size:10px;color:var(--text3)">${a.score}</span></td>
+            <td style="padding:6px;text-align:center;color:${a.ctr>=1.5?'var(--green)':a.ctr>=0.5?'var(--cyan)':'var(--text3)'}">${a.ctr.toFixed(1)}%</td>
+            <td style="padding:6px;text-align:center;font-weight:${a.leads7>0?'600':'normal'};color:${a.leads7>0?'var(--text)':'var(--text3)'}">${a.leads7}</td>
+            <td style="padding:6px;text-align:center;color:var(--text3)">${a.cpl>0?'$'+Math.round(a.cpl).toLocaleString('es-AR'):'—'}</td>
+            <td style="padding:6px;color:var(--text2)">${a.rec}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── ATTRIBUTION BY CAMPAIGN ──────────────────────────────────────────────────
 let _metaAttrData = null;
 let _metaAttrMetric = 'spend';
@@ -17449,6 +17550,7 @@ async function metaDashboardLoad() {
     metaAccountHealthLoad();
     metaCplTrendLoad();
     metaJournalLoad();
+    metaAdScoreLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
