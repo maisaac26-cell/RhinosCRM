@@ -251,7 +251,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 .refresh-btn:hover{color:var(--cyan)}
 .section-header{margin-bottom:1.5rem}
 .meta-ctab,.meta-ctab2,.meta-ctab3,.meta-lf{background:var(--surface2);border:1px solid var(--border);color:var(--text2);transition:all 0.15s}
-.meta-ctab-active,.meta-ctab2-active,.meta-ctab3-active,.meta-lf-active,.meta-kpi-range-active{background:rgba(0,229,204,0.1);border-color:rgba(0,229,204,0.4);color:var(--cyan)!important}
+.meta-ctab-active,.meta-ctab2-active,.meta-ctab3-active,.meta-lf-active,.meta-kpi-range-active,.meta-attr-tab.meta-kpi-range-active{background:rgba(0,229,204,0.1);border-color:rgba(0,229,204,0.4);color:var(--cyan)!important}
 .cre-range{font-size:11px!important;padding:4px 10px!important}.cre-range-active{background:rgba(0,229,204,0.1)!important;border-color:rgba(0,229,204,0.4)!important;color:var(--cyan)!important}
 .cre-view-btn{font-size:14px!important;padding:4px 9px!important;line-height:1!important}.cre-view-btn-active{background:rgba(0,229,204,0.1)!important;border-color:rgba(0,229,204,0.4)!important;color:var(--cyan)!important}
 .cre-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;padding:2px 7px;border-radius:8px;font-weight:700;white-space:nowrap}
@@ -741,6 +741,17 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     </div>
 
+    <div id="meta-today-strip" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 14px;background:var(--surface2);border-radius:var(--r);border:1px solid var(--border);margin-bottom:14px;font-size:11px">
+      <span style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap">HOY</span>
+      <span id="mts-spend" style="color:var(--text)">—</span>
+      <span style="color:var(--border)">·</span>
+      <span id="mts-leads" style="color:var(--cyan);font-weight:700">— leads</span>
+      <span style="color:var(--border)">·</span>
+      <span id="mts-msg" style="color:var(--text2)">— msgs</span>
+      <span id="mts-delta" style="margin-left:4px;font-size:10px"></span>
+      <button onclick="metaTodayReport()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:0;margin-left:auto" title="Ver detalle">📊 Detalle</button>
+    </div>
+
     <div id="meta-no-config" style="display:none">
       <div class="card" style="background:rgba(251,191,36,0.06);border-color:rgba(251,191,36,0.3)">
         <div style="font-size:13px;color:#fbbf24;font-weight:600;margin-bottom:6px">⚠️ Credenciales Meta no configuradas</div>
@@ -785,6 +796,17 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <button class="btn btn-sm" onclick="metaGoalsLoad()" style="font-size:10px;color:var(--text3)">↻</button>
       </div>
       <div id="meta-goals-content"><div class="empty" style="font-size:12px">Sin objetivos configurados</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        🗂️ Atribución por campaña (30d)
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-sm meta-attr-tab meta-kpi-range-active" data-metric="spend" onclick="metaAttrTab('spend')" style="font-size:10px">Gasto</button>
+          <button class="btn btn-sm meta-attr-tab" data-metric="leads" onclick="metaAttrTab('leads')" style="font-size:10px">Leads</button>
+        </div>
+      </div>
+      <div id="meta-attr-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
     </div>
 
     <div class="card">
@@ -16967,6 +16989,93 @@ async function metaCalendarHeatmap() {
   } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 
+// ── ATTRIBUTION BY CAMPAIGN ──────────────────────────────────────────────────
+let _metaAttrData = null;
+let _metaAttrMetric = 'spend';
+
+async function metaAttrLoad() {
+  const el = document.getElementById('meta-attr-content');
+  if (!el) return;
+  if (_metaAttrData) { _metaAttrRender(); return; }
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const since30 = new Date(); since30.setDate(since30.getDate() - 29);
+    const sinceStr = since30.toISOString().slice(0, 10);
+    const [metrics, ads, campaigns] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${sinceStr}&select=entity_id,spend,leads`),
+      metaSbGet('meta_ads?select=id,campaign_id&limit=500'),
+      metaSbGet('meta_campaigns?select=id,name&limit=100'),
+    ]);
+    const adCampMap = {}; for (const a of ads) adCampMap[a.id] = a.campaign_id;
+    const campNameMap = {}; for (const c of campaigns) campNameMap[c.id] = c.name;
+    const agg = {};
+    for (const m of metrics) {
+      const cid = adCampMap[m.entity_id]; if (!cid) continue;
+      if (!agg[cid]) agg[cid] = { spend: 0, leads: 0, name: campNameMap[cid] || cid };
+      agg[cid].spend += parseFloat(m.spend || 0);
+      agg[cid].leads += parseInt(m.leads || 0);
+    }
+    _metaAttrData = Object.values(agg).filter(c => c.spend > 0).sort((a, b) => b.spend - a.spend);
+    _metaAttrRender();
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+function metaAttrTab(metric) {
+  _metaAttrMetric = metric;
+  document.querySelectorAll('.meta-attr-tab').forEach(b => b.classList.toggle('meta-kpi-range-active', b.dataset.metric === metric));
+  _metaAttrRender();
+}
+
+function _metaAttrRender() {
+  const el = document.getElementById('meta-attr-content');
+  if (!el || !_metaAttrData) return;
+  const rows = [..._metaAttrData].sort((a, b) => b[_metaAttrMetric] - a[_metaAttrMetric]);
+  const total = rows.reduce((s, r) => s + r[_metaAttrMetric], 0);
+  if (!total) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin datos</div>'; return; }
+  const COLS = ['var(--cyan)','#a78bfa','#f59e0b','#f87171','#34d399'];
+  el.innerHTML = rows.map((r, i) => {
+    const pct = total > 0 ? (r[_metaAttrMetric] / total * 100).toFixed(1) : 0;
+    const val = _metaAttrMetric === 'spend' ? fmtARS(r.spend).replace('$ ','$') : r.leads + ' leads';
+    const col = COLS[i % COLS.length];
+    return `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${r.name}</span>
+        <span style="font-size:11px;font-weight:600;flex-shrink:0;margin-left:8px;color:${col}">${pct}%</span>
+        <span style="font-size:10px;color:var(--text3);flex-shrink:0;margin-left:6px">${val}</span>
+      </div>
+      <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${col};border-radius:3px;transition:width 0.6s"></div>
+      </div>
+    </div>`;
+  }).join('') + `<div style="font-size:10px;color:var(--text3);text-align:right;margin-top:4px">Total: ${_metaAttrMetric==='spend'?fmtARS(total).replace('$ ','$'):total+' leads'}</div>`;
+}
+
+let _metaTodayStripInterval = null;
+
+async function metaTodayStripLoad() {
+  try {
+    const r = await fetch('/api/meta?action=today_report').then(x => x.json());
+    if (!r.ok) return;
+    const { today: t, yesterday: y } = r;
+    const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
+    setEl('mts-spend', fmtARS(t.spend||0));
+    setEl('mts-leads', `<strong>${t.leads||0}</strong> leads`);
+    setEl('mts-msg', `${t.messages||0} msgs`);
+    if (y) {
+      const pct = y.leads > 0 ? ((t.leads - y.leads) / y.leads * 100).toFixed(0) : null;
+      const col = t.leads > y.leads ? 'var(--green)' : t.leads < y.leads ? '#f87171' : 'var(--text3)';
+      const arrow = t.leads > y.leads ? '↑' : t.leads < y.leads ? '↓' : '=';
+      setEl('mts-delta', pct !== null ? `<span style="color:${col}">${arrow}${Math.abs(pct)}% vs ayer</span>` : '');
+    }
+  } catch(e) {}
+}
+
+function _metaTodayStripStart() {
+  metaTodayStripLoad();
+  if (_metaTodayStripInterval) clearInterval(_metaTodayStripInterval);
+  _metaTodayStripInterval = setInterval(metaTodayStripLoad, 10 * 60 * 1000); // every 10 min
+}
+
 let _metaKpiRange = 7; // days, or 'month'
 
 function metaKpiRangeSet(range) {
@@ -17101,6 +17210,8 @@ async function metaDashboardLoad() {
     if (badge) { badge.style.display = 'inline'; badge.textContent = `✓ ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`; }
 
     // All panel loaders (KPIs + top/low ads handled by metaKpiLoad above)
+    _metaTodayStripStart();
+    _metaAttrData = null; metaAttrLoad(); // reset cache on full reload
     metaAgentLogLoad();
     metaLeadQualityLoad();
     metaBudgetRecsLoad();
