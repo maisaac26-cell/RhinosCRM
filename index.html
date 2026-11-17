@@ -874,6 +874,23 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     </div>
 
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          📉 Creativos en declive (7d vs 7-14d)
+          <button class="btn btn-sm" onclick="metaDecayLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-decay-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          ⚡ Eficiencia de adsets (30d)
+          <button class="btn btn-sm" onclick="metaAdsetEfficiencyLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-adset-eff-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+      </div>
+    </div>
+
     <div class="card" id="meta-config-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         📡 Conexión Meta Marketing API
@@ -16118,6 +16135,61 @@ function fmtARS(n) {
 function fmtPct(n) { return n != null ? parseFloat(n).toFixed(2) + '%' : '—'; }
 function fmtNum(n) { return n != null ? parseInt(n).toLocaleString('es-AR') : '—'; }
 
+// ── CREATIVE DECAY DETECTION ─────────────────────────────────────────────────
+async function metaDecayLoad() {
+  const el = document.getElementById('meta-decay-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const r = await fetch('/api/meta?action=decay_check').then(x => x.json());
+    if (!r.ok) { el.innerHTML = `<div class="empty">Error: ${r.error}</div>`; return; }
+    if (!r.decaying.length) {
+      el.innerHTML = `<div class="empty" style="color:var(--green);font-size:12px">✓ Sin creativos en declive (${r.analyzed} analizados)</div>`;
+      return;
+    }
+    el.innerHTML = r.decaying.map(d => `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border2)">
+      <span style="font-size:16px;flex-shrink:0">${d.ctrDrop > 60 ? '🔴' : '🟡'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</div>
+        <div style="font-size:10px;color:var(--text3)">
+          CTR: ${d.ctrPrior.toFixed(2)}% → ${d.ctrRecent.toFixed(2)}% (−${d.ctrDrop.toFixed(0)}%)
+          ${d.leadsDrop ? ` · Sin leads esta semana (${d.leadsPrior} la anterior)` : ''}
+        </div>
+      </div>
+      <button class="btn btn-sm" onclick="metaToggleAd('${d.id}','ACTIVE')" style="font-size:10px;color:#f87171;border-color:rgba(248,113,113,0.3);flex-shrink:0">Pausar</button>
+    </div>`).join('');
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── ADSET EFFICIENCY ─────────────────────────────────────────────────────────
+async function metaAdsetEfficiencyLoad() {
+  const el = document.getElementById('meta-adset-eff-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const r = await fetch('/api/meta?action=adset_efficiency').then(x => x.json());
+    if (!r.ok) { el.innerHTML = `<div class="empty">Error: ${r.error}</div>`; return; }
+    const rows = (r.rows || []).filter(a => a.spend > 0).slice(0, 8);
+    if (!rows.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin datos de adsets (30d)</div>'; return; }
+    const maxEff = Math.max(...rows.map(a => a.efficiency), 1);
+    el.innerHTML = rows.map(r => {
+      const isActive = r.status === 'ACTIVE';
+      const barW = Math.max((r.efficiency / maxEff) * 100, 2);
+      const barCol = r.efficiency > 0 ? (r.efficiency >= maxEff * 0.6 ? 'var(--green)' : r.efficiency >= maxEff * 0.3 ? '#f59e0b' : '#f87171') : 'var(--border)';
+      return `<div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;${!isActive?'color:var(--text3)':''}">${r.name}</span>
+          <span style="font-size:11px;font-weight:600;color:var(--cyan);flex-shrink:0;margin-left:8px">${r.leads} leads</span>
+          <span style="font-size:10px;color:var(--text3);flex-shrink:0;margin-left:6px">${r.cpl ? fmtARS(r.cpl).replace('$ ','$') : '—'}</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div style="width:${barW}%;height:100%;background:${barCol};border-radius:3px;transition:width 0.5s"></div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── SEND WEEKLY REPORT NOW ───────────────────────────────────────────────────
 async function metaSendWeeklyReport() {
   const btn = document.querySelector('[onclick="metaSendWeeklyReport()"]');
@@ -16702,6 +16774,8 @@ async function metaDashboardLoad() {
     metaLeaderboardLoad();
     metaDaypartLoad();
     metaFunnelLoad();
+    metaDecayLoad();
+    metaAdsetEfficiencyLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);

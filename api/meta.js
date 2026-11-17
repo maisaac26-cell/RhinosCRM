@@ -958,6 +958,101 @@ async function runLeaderboard(res) {
   } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
 }
 
+// ── CREATIVE DECAY DETECTION ─────────────────────────────────────────────────
+async function runDecayCheck(res) {
+  try {
+    const today   = isoDate(new Date());
+    const d7      = isoDate(new Date(Date.now() - 7 * 86400000));
+    const d14     = isoDate(new Date(Date.now() - 14 * 86400000));
+
+    const [recent, prior, ads] = await Promise.all([
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${d7}&date_start=lte.${today}&select=entity_id,spend,impressions,clicks,leads`),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${d14}&date_start=lt.${d7}&select=entity_id,spend,impressions,clicks,leads`),
+      sbGet('meta_ads?select=id,name,status&limit=300'),
+    ]);
+
+    const adMap = {}; for (const a of ads) adMap[a.id] = a;
+
+    const agg = (rows) => {
+      const m = {};
+      for (const r of rows) {
+        if (!m[r.entity_id]) m[r.entity_id] = { spend:0, impressions:0, clicks:0, leads:0 };
+        m[r.entity_id].spend       += parseFloat(r.spend||0);
+        m[r.entity_id].impressions += parseInt(r.impressions||0);
+        m[r.entity_id].clicks      += parseInt(r.clicks||0);
+        m[r.entity_id].leads       += parseInt(r.leads||0);
+      }
+      return m;
+    };
+
+    const rM = agg(recent), pM = agg(prior);
+    const decaying = [];
+
+    for (const [id, r] of Object.entries(rM)) {
+      const p = pM[id];
+      if (!p) continue;
+      const ad = adMap[id];
+      if (!ad || ad.status !== 'ACTIVE') continue;
+      if (r.spend < 5 || p.spend < 5) continue;
+
+      const ctrR = r.impressions > 0 ? r.clicks / r.impressions * 100 : 0;
+      const ctrP = p.impressions > 0 ? p.clicks / p.impressions * 100 : 0;
+      if (ctrP < 0.1) continue;
+
+      const ctrDrop = (ctrP - ctrR) / ctrP;
+      const leadsDrop = p.leads > 0 && r.leads === 0;
+
+      if (ctrDrop > 0.35 || (leadsDrop && p.leads >= 2)) {
+        decaying.push({
+          id,
+          name: ad.name,
+          ctrRecent: ctrR,
+          ctrPrior: ctrP,
+          ctrDrop: ctrDrop * 100,
+          leadsRecent: r.leads,
+          leadsPrior: p.leads,
+          spendRecent: r.spend,
+          leadsDrop,
+        });
+      }
+    }
+
+    decaying.sort((a, b) => b.ctrDrop - a.ctrDrop);
+    return res.status(200).json({ ok: true, decaying: decaying.slice(0, 10), analyzed: Object.keys(rM).length });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
+// ── ADSET EFFICIENCY ─────────────────────────────────────────────────────────
+async function runAdsetEfficiency(res) {
+  try {
+    const since30 = isoDate(new Date(Date.now() - 30 * 86400000));
+    const [adsets, metrics] = await Promise.all([
+      sbGet('meta_adsets?select=id,name,status,budget_daily,campaign_id&limit=200'),
+      sbGet(`meta_ad_metrics?entity_type=eq.adset&date_start=gte.${since30}&select=entity_id,spend,impressions,clicks,leads,messages_started`),
+    ]);
+
+    const byAdset = {};
+    for (const m of metrics) {
+      if (!byAdset[m.entity_id]) byAdset[m.entity_id] = { spend:0, impressions:0, clicks:0, leads:0, messages:0 };
+      byAdset[m.entity_id].spend       += parseFloat(m.spend||0);
+      byAdset[m.entity_id].impressions += parseInt(m.impressions||0);
+      byAdset[m.entity_id].clicks      += parseInt(m.clicks||0);
+      byAdset[m.entity_id].leads       += parseInt(m.leads||0);
+      byAdset[m.entity_id].messages    += parseInt(m.messages_started||0);
+    }
+
+    const rows = adsets.map(a => {
+      const m = byAdset[a.id] || {};
+      const ctr = m.impressions > 0 ? m.clicks / m.impressions * 100 : 0;
+      const cpl = m.leads > 0 ? m.spend / m.leads : null;
+      const efficiency = m.leads > 0 && m.spend > 0 ? m.leads / m.spend * 1000 : 0; // leads per 1k ARS
+      return { id: a.id, name: a.name, status: a.status, budget: a.budget_daily, campaign_id: a.campaign_id, spend: m.spend||0, leads: m.leads||0, messages: m.messages||0, ctr, cpl, efficiency };
+    }).sort((a, b) => b.efficiency - a.efficiency);
+
+    return res.status(200).json({ ok: true, rows: rows.slice(0, 50), total: rows.length });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
@@ -977,5 +1072,7 @@ export default async function handler(req, res) {
   if (action === 'monthly_goals')     return runMonthlyGoals(res);
   if (action === 'wow_metrics')       return runWoWMetrics(res);
   if (action === 'leaderboard')       return runLeaderboard(res);
+  if (action === 'decay_check')       return runDecayCheck(res);
+  if (action === 'adset_efficiency')  return runAdsetEfficiency(res);
   return runSync(res);
 }
