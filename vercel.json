@@ -6,25 +6,22 @@
     "api/webhook-mp.js":         { "maxDuration": 15  },
     "api/weekly-report.js":      { "maxDuration": 30  },
     "api/auto-emails.js":        { "maxDuration": 30  },
-    "api/auto-notif.js":         { "maxDuration": 30  },
     "api/web-content.js":        { "maxDuration": 15  },
     "api/vendedor.js":           { "maxDuration": 60  },
     "api/vendedor-auto.js":      { "maxDuration": 300 },
     "api/vendedor-prospecta.js": { "maxDuration": 300 },
     "api/vendedor-replies.js":   { "maxDuration": 60  },
-    "api/meta-sync.js":          { "maxDuration": 60  },
-    "api/meta-agent.js":         { "maxDuration": 60  }
+    "api/meta.js":               { "maxDuration": 60  }
   },
   "crons": [
     { "path": "/api/weekly-report",      "schedule": "0 13 * * 1"   },
     { "path": "/api/auto-emails",        "schedule": "0 12 * * *"   },
-    { "path": "/api/auto-notif",         "schedule": "0 12 * * *"   },
     { "path": "/api/vendedor-auto",      "schedule": "0 19 * * *"   },
     { "path": "/api/vendedor-prospecta", "schedule": "0 11 * * *"   },
     { "path": "/api/vendedor-replies",   "schedule": "0 14 * * *"   },
     { "path": "/api/vendedor?action=send_whatsapp", "schedule": "0 13 * * 1-5" },
-    { "path": "/api/meta-sync",  "schedule": "0 10 * * *" },
-    { "path": "/api/meta-agent", "schedule": "0 11 * * *" }
+    { "path": "/api/meta?action=sync",  "schedule": "0 10 * * *" },
+    { "path": "/api/meta?action=agent", "schedule": "0 11 * * *" }
   ],
   "rewrites": [
     { "source": "/auth/callback", "destination": "/index.html" },

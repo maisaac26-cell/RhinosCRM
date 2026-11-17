@@ -15966,7 +15966,7 @@ async function metaForceSync() {
   const btn = document.getElementById('btn-meta-force-sync');
   if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
   try {
-    const r = await fetch('/api/meta-sync').then(x => x.json());
+    const r = await fetch('/api/meta?action=sync').then(x => x.json());
     alert(r.ok ? `✓ Sincronizado: ${(r.log||[]).join(', ')}` : 'Error: ' + (r.error || r.msg));
     if (r.ok) metaDashboardLoad();
   } catch(e) { alert('Error: ' + e.message); }

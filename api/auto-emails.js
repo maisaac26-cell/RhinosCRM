@@ -196,7 +196,53 @@ module.exports = async function handler(req, res) {
       }
     } catch {}
 
-    return res.status(200).json({ ok: true, summary });
+    res.status(200).json({ ok: true, summary });
+
+    // ── auto-notif: push notifications (formerly auto-notif.js) ──────────────
+    try {
+      const PUSH_URL = 'https://rhinos-crm.vercel.app/api/push';
+      const today2 = new Date();
+      const localMonth = `${today2.getFullYear()}-${String(today2.getMonth()+1).padStart(2,'0')}`;
+      const localDate  = `${today2.getFullYear()}-${String(today2.getMonth()+1).padStart(2,'0')}-${String(today2.getDate()).padStart(2,'0')}`;
+
+      const sendPush = (title, body, tag) =>
+        fetch(PUSH_URL, { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'send', title, body, url:'/', tag }) })
+        .then(r=>r.json()).catch(()=>({sent:0}));
+
+      const rules = await sbReq('GET', 'rhinos_notif_rules?activo=eq.true');
+      const active = new Set((Array.isArray(rules)?rules:[]).map(r => r.tipo));
+      const ruleConfig = {};
+      (Array.isArray(rules)?rules:[]).forEach(r => ruleConfig[r.tipo] = r.config || {});
+
+      if (active.has('cobros_vencidos')) {
+        const cobros = await sbReq('GET', `rhinos_cobros?status=eq.vencido&periodo=eq.${localMonth}`);
+        if (cobros?.length) await sendPush(`💳 ${cobros.length} cobro${cobros.length>1?'s':''} vencido${cobros.length>1?'s':''}`,`Hay ${cobros.length} cliente${cobros.length>1?'s':''} con cobros vencidos en ${localMonth}.`,'cobros_vencidos');
+      }
+      if (active.has('followups_vencidos')) {
+        const leads = await sbReq('GET', `rhinos_leads?next_followup=lt.${localDate}&status=not.in.(cliente,perdido,imposible)&select=id`);
+        if (leads?.length) await sendPush(`📅 ${leads.length} follow-up${leads.length>1?'s':''} vencido${leads.length>1?'s':''}`,`${leads.length} lead${leads.length>1?'s':''} requieren seguimiento hoy.`,'followups_vencidos');
+      }
+      if (active.has('sueldo_pendiente')) {
+        const sueldos = await sbReq('GET', `rhinos_sueldos?periodo=eq.${localMonth}&status=eq.pendiente&select=id`);
+        if (sueldos?.length) await sendPush(`👥 ${sueldos.length} sueldo${sueldos.length>1?'s':''} pendiente${sueldos.length>1?'s':''}`,`Quedan ${sueldos.length} sueldo${sueldos.length>1?'s':''} por pagar en ${localMonth}.`,'sueldo_pendiente');
+      }
+      if (active.has('contrato_vence')) {
+        const in7 = new Date(today2); in7.setDate(in7.getDate()+7);
+        const in7str = `${in7.getFullYear()}-${String(in7.getMonth()+1).padStart(2,'0')}-${String(in7.getDate()).padStart(2,'0')}`;
+        const clients = await sbReq('GET', `rhinos_clients?contrato_fin=gte.${localDate}&contrato_fin=lte.${in7str}&estado=eq.activo&select=nombre,contrato_fin`);
+        if (clients?.length) await sendPush(`📋 Contrato${clients.length>1?'s':''} por vencer`,`${clients.map(c=>c.nombre).join(', ')} vence${clients.length===1?'':'n'} en 7 días.`,'contrato_vence');
+      }
+      if (active.has('leads_inactivos')) {
+        const dias = ruleConfig['leads_inactivos']?.dias_inactividad || 7;
+        const cutoff = new Date(today2); cutoff.setDate(cutoff.getDate()-dias);
+        const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,'0')}-${String(cutoff.getDate()).padStart(2,'0')}`;
+        const leads = await sbReq('GET', `rhinos_leads?status=not.in.(cliente,perdido,imposible)&updated_at=lt.${cutoffStr}T00:00:00Z&select=id,name,next_followup`);
+        const frios = (Array.isArray(leads)?leads:[]).filter(l => !l.next_followup || l.next_followup <= localDate);
+        if (frios.length) await sendPush(`❄️ ${frios.length} lead${frios.length>1?'s':''} inactivo${frios.length>1?'s':''}`,`${frios.slice(0,3).map(l=>l.name).join(', ')}${frios.length>3?` y ${frios.length-3} más`:''} sin actividad.`,'leads_inactivos');
+      }
+    } catch(notifErr) { console.error('[auto-notif]', notifErr.message); }
+
   } catch(e) {
     return res.status(500).json({ ok: false, error: e.message });
   }
