@@ -459,6 +459,24 @@ async function runWebhook(req, res) {
 
         saved.push({ leadgen_id: leadgenId, nombre, phone });
         await pushNotify('🎯 Nuevo lead de Meta!', `${nombre || 'Sin nombre'}\n${phone || email || 'Sin contacto'}`);
+
+        // WA instant notification
+        try {
+          const [waRaw, adRaw] = await Promise.all([
+            sbGet('rhinos_config?key=eq.wa_recipients&select=value'),
+            adId ? sbGet(`meta_ads?id=eq.${adId}&select=name&limit=1`) : Promise.resolve([]),
+          ]);
+          let waList = [];
+          if (waRaw[0]) { try { waList = JSON.parse(waRaw[0].value.replace(/^"|"$/g, '')); } catch(e) {} }
+          if (waList.length) {
+            const adName = adRaw[0]?.name || 'Desconocido';
+            const hora   = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+            const msg    = `🔔 *Nuevo lead Meta*\n👤 ${nombre||'Sin nombre'}\n📱 ${phone||'Sin teléfono'}\n📢 ${adName.slice(0,30)}\n⏰ ${hora}`;
+            await Promise.all(waList.map(r =>
+              fetch(`https://api.callmebot.com/whatsapp.php?phone=${r.phone}&text=${encodeURIComponent(msg)}&apikey=${r.apikey}`).catch(() => {})
+            ));
+          }
+        } catch(e) {}
       }
     }
     return res.status(200).json({ ok: true, saved });

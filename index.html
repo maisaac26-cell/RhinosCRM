@@ -975,6 +975,30 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-journal-list"><div class="empty" style="font-size:12px">Sin entradas aún</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-daily-budget-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        💵 Ritmo de presupuesto diario
+        <button class="btn btn-sm" onclick="metaDailyBudgetLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-daily-budget-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem" id="meta-response-time-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        ⚡ Tiempo de respuesta a leads
+        <button class="btn btn-sm" onclick="metaResponseTimeLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-response-time-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem" id="meta-dupes-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        🔍 Leads duplicados
+        <button class="btn btn-sm" onclick="metaDupesLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-dupes-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:1.25rem" id="meta-leads-table-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         📋 Leads recientes
@@ -17343,6 +17367,227 @@ async function metaAlertsLoad() {
   } catch(e) { console.warn('[meta-alerts]', e.message); }
 }
 
+// ── DAILY BUDGET TRACKER ─────────────────────────────────────────────────────
+async function metaDailyBudgetLoad() {
+  const el = document.getElementById('meta-daily-budget-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Calculando...</div>';
+  try {
+    const now = new Date();
+    const curMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+    const daysInMonth   = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const dayOfMonth    = now.getDate();
+    const daysLeft      = daysInMonth - dayOfMonth + 1; // including today
+
+    const [metrics, goals] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${curMonthStart}&select=spend`),
+      metaSbGet('rhinos_config?key=eq.meta_goal_spend_month&select=value'),
+    ]);
+
+    const spendSoFar = metrics.reduce((s,m) => s+parseFloat(m.spend||0), 0);
+    const goalSpend  = goals[0] ? parseFloat(goals[0].value)||0 : 0;
+    const fA = n => '$'+Math.round(n).toLocaleString('es-AR');
+
+    if (!goalSpend) {
+      el.innerHTML = `<div style="font-size:12px;color:var(--text2)">Configurá una meta de gasto mensual en ⚙️ Configuración para ver el tracker.</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)">Gasto acumulado este mes: <strong style="color:var(--cyan)">${fA(spendSoFar)}</strong></div>`;
+      return;
+    }
+
+    const remaining  = Math.max(0, goalSpend - spendSoFar);
+    const idealDaily = daysLeft > 0 ? remaining / daysLeft : 0;
+    const actualDaily = dayOfMonth > 1 ? spendSoFar / (dayOfMonth - 1) : 0;
+    const pctDone    = Math.min(100, Math.round(spendSoFar/goalSpend*100));
+    const pctDay     = Math.round(dayOfMonth/daysInMonth*100);
+    const paceRatio  = pctDay > 0 ? pctDone/pctDay : 0;
+
+    let statusLabel, statusColor;
+    if (paceRatio > 1.2)      { statusLabel = '⚡ Sobrepasando ritmo'; statusColor = '#f87171'; }
+    else if (paceRatio > 0.95){ statusLabel = '✅ En ritmo ideal';     statusColor = 'var(--green)'; }
+    else if (paceRatio > 0.7) { statusLabel = '⚠️ Levemente lento';   statusColor = '#f59e0b'; }
+    else                      { statusLabel = '🐢 Muy por debajo';     statusColor = '#f87171'; }
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--cyan)">${fA(spendSoFar)}</div>
+          <div style="font-size:10px;color:var(--text3)">Gastado</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--text)">${fA(remaining)}</div>
+          <div style="font-size:10px;color:var(--text3)">Restante</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--green)">${fA(idealDaily)}</div>
+          <div style="font-size:10px;color:var(--text3)">Ideal/día (${daysLeft}d restantes)</div>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:6px;height:10px;overflow:hidden;margin-bottom:6px;position:relative">
+        <div style="height:100%;background:var(--cyan);width:${pctDone}%;border-radius:6px;transition:width 0.5s"></div>
+        <div style="position:absolute;top:0;left:${pctDay}%;width:2px;height:100%;background:rgba(255,255,255,0.3)"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:10px">
+        <span>${pctDone}% del gasto · día ${dayOfMonth}/${daysInMonth}</span>
+        <span style="color:${statusColor}">${statusLabel}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px">
+        <div style="padding:8px;background:var(--surface2);border-radius:6px">
+          <div style="color:var(--text3);font-size:10px;margin-bottom:2px">Ritmo actual/día</div>
+          <div style="color:var(--text);font-weight:600">${fA(actualDaily)}</div>
+        </div>
+        <div style="padding:8px;background:var(--surface2);border-radius:6px">
+          <div style="color:var(--text3);font-size:10px;margin-bottom:2px">Meta mensual</div>
+          <div style="color:var(--text);font-weight:600">${fA(goalSpend)}</div>
+        </div>
+      </div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── RESPONSE TIME ANALYTICS ───────────────────────────────────────────────────
+async function metaResponseTimeLoad() {
+  const el = document.getElementById('meta-response-time-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Calculando...</div>';
+  try {
+    const leads = await metaSbGet(
+      'meta_leads_wa?estado=neq.nuevo&select=fecha_lead,updated_at,estado&limit=500&order=fecha_lead.desc'
+    );
+    if (!leads.length) {
+      el.innerHTML = '<div class="empty" style="font-size:12px">Sin leads contactados aún. Los tiempos se calculan cuando actualizás el estado de un lead.</div>';
+      return;
+    }
+
+    const times = leads
+      .map(l => { const a=new Date(l.updated_at), b=new Date(l.fecha_lead); return (a-b)/60000; }) // minutes
+      .filter(t => t>0 && t<10080); // 0 to 7 days
+
+    if (!times.length) { el.innerHTML = '<div class="empty">Sin datos suficientes</div>'; return; }
+
+    const avg    = times.reduce((a,b)=>a+b,0)/times.length;
+    const sorted = [...times].sort((a,b)=>a-b);
+    const median = sorted[Math.floor(sorted.length/2)];
+    const within1h  = times.filter(t=>t<=60).length;
+    const within24h = times.filter(t=>t<=1440).length;
+    const pct1h  = Math.round(within1h/times.length*100);
+    const pct24h = Math.round(within24h/times.length*100);
+
+    function fmtMin(m) {
+      if (m<60)  return Math.round(m)+'min';
+      if (m<1440) return Math.round(m/60)+'h';
+      return Math.round(m/1440)+'d';
+    }
+
+    const goldenColor = pct1h>=50 ? 'var(--green)' : pct1h>=25 ? '#f59e0b' : '#f87171';
+
+    // Distribution buckets: <1h, 1-6h, 6-24h, 1-3d, >3d
+    const buckets = [
+      { label:'<1h',   count: times.filter(t=>t<60).length },
+      { label:'1-6h',  count: times.filter(t=>t>=60&&t<360).length },
+      { label:'6-24h', count: times.filter(t=>t>=360&&t<1440).length },
+      { label:'1-3d',  count: times.filter(t=>t>=1440&&t<4320).length },
+      { label:'>3d',   count: times.filter(t=>t>=4320).length },
+    ];
+    const maxB = Math.max(...buckets.map(b=>b.count), 1);
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--cyan)">${fmtMin(avg)}</div>
+          <div style="font-size:10px;color:var(--text3)">Promedio</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--text)">${fmtMin(median)}</div>
+          <div style="font-size:10px;color:var(--text3)">Mediana</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:${goldenColor}">${pct1h}%</div>
+          <div style="font-size:10px;color:var(--text3)">Golden hour (&lt;1h)</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--green)">${pct24h}%</div>
+          <div style="font-size:10px;color:var(--text3)">&lt;24hs</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:6px">Distribución de tiempos (${times.length} leads)</div>
+      <div style="display:flex;gap:4px;align-items:flex-end;height:50px">
+        ${buckets.map(b=>{
+          const pct=Math.round(b.count/maxB*100);
+          const col=b.label==='<1h'?'var(--green)':b.label==='1-6h'?'var(--cyan)':b.label==='6-24h'?'#f59e0b':'#f87171';
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+            <div style="font-size:9px;color:var(--text3)">${b.count}</div>
+            <div style="width:100%;background:var(--surface2);border-radius:3px 3px 0 0;height:36px;position:relative">
+              <div style="position:absolute;bottom:0;left:0;right:0;background:${col};border-radius:3px 3px 0 0;height:${pct}%"></div>
+            </div>
+            <div style="font-size:9px;color:var(--text3)">${b.label}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:10px;font-size:11px;padding:8px;border-radius:6px;background:${pct1h>=50?'rgba(34,197,94,0.1)':'rgba(245,158,11,0.1)'};border:1px solid ${pct1h>=50?'rgba(34,197,94,0.3)':'rgba(245,158,11,0.3)'}">
+        ${pct1h>=50 ? `✅ Excelente — más de la mitad de leads contactados en la primera hora` : pct1h>=25 ? `⚠️ Mejorable — solo ${pct1h}% de leads en primera hora (meta: >50%)` : `🔴 Crítico — solo ${pct1h}% contactados en 1h. Responder rápido mejora hasta 7x la conversión`}
+      </div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── DUPLICATE LEADS DETECTOR ──────────────────────────────────────────────────
+async function metaDupesLoad() {
+  const el = document.getElementById('meta-dupes-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Analizando...</div>';
+  try {
+    const leads = await metaSbGet('meta_leads_wa?select=id,nombre,telefono,ad_id,fecha_lead,estado&limit=2000&order=fecha_lead.desc');
+    const ads = await metaSbGet('meta_ads?select=id,name&limit=200');
+    const adMap = {}; for (const a of ads) adMap[a.id] = a.name;
+
+    // Normalize phone: keep digits only
+    const normalize = p => (p||'').replace(/\D/g,'').replace(/^(54|0054)/,'').replace(/^9/,'').slice(-10);
+
+    const byPhone = {};
+    for (const l of leads) {
+      const norm = normalize(l.telefono);
+      if (!norm || norm.length < 7) continue;
+      if (!byPhone[norm]) byPhone[norm] = [];
+      byPhone[norm].push(l);
+    }
+
+    const dupes = Object.values(byPhone).filter(g=>g.length>1).sort((a,b)=>b.length-a.length);
+
+    if (!dupes.length) {
+      el.innerHTML = '<div class="empty" style="font-size:12px;color:var(--green)">✅ Sin duplicados detectados</div>';
+      return;
+    }
+
+    const totalDupes = dupes.reduce((s,g)=>s+(g.length-1),0);
+    el.innerHTML = `<div style="font-size:11px;color:var(--text3);margin-bottom:10px">
+        ${dupes.length} números con duplicados · ${totalDupes} leads redundantes en total
+      </div>
+      ${dupes.slice(0,15).map(group=>{
+        const first = group[0];
+        const phone = first.telefono||'—';
+        const name  = first.nombre||'Sin nombre';
+        const statusColors = {nuevo:'#60a5fa',contactado:'#f59e0b',calificado:'var(--green)',rechazado:'#f87171'};
+        return `<div style="border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:12px;font-weight:600;color:var(--text)">${name}</span>
+            <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(239,68,68,0.15);color:#f87171">${group.length}× lead</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:6px">📱 ${phone}</div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            ${group.map(l=>{
+              const fecha=new Date(l.fecha_lead).toLocaleDateString('es-AR',{day:'numeric',month:'short',year:'2-digit'});
+              const ad=(adMap[l.ad_id]||l.ad_id||'—').slice(0,25);
+              const sc=statusColors[l.estado]||'var(--text3)';
+              return `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3)">
+                <span>${fecha} · ${ad}</span>
+                <span style="color:${sc}">${l.estado||'nuevo'}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+      ${dupes.length>15?`<div style="font-size:11px;color:var(--text3);text-align:center;padding:6px">...y ${dupes.length-15} grupos más</div>`:''}`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── LEADS TABLE ──────────────────────────────────────────────────────────────
 let _mltPage = 0;
 const _MLT_PAGE_SIZE = 25;
@@ -17943,6 +18188,9 @@ async function metaDashboardLoad() {
     metaAdScoreLoad();
     metaPeriodCompareLoad();
     metaHourlyHeatmapLoad();
+    metaDailyBudgetLoad();
+    metaResponseTimeLoad();
+    metaDupesLoad();
     metaLeadsTableLoad();
 
   } catch (e) {
