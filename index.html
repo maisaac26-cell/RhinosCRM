@@ -741,6 +741,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     </div>
 
+    <div id="meta-alerts-banner" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+
     <div id="meta-today-strip" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 14px;background:var(--surface2);border-radius:var(--r);border:1px solid var(--border);margin-bottom:14px;font-size:11px">
       <span style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap">HOY</span>
       <span id="mts-spend" style="color:var(--text)">—</span>
@@ -17254,6 +17256,93 @@ async function _metaJournalDelete(id) {
   }
 }
 
+// ── PERFORMANCE ALERTS ───────────────────────────────────────────────────────
+async function metaAlertsLoad() {
+  const banner = document.getElementById('meta-alerts-banner');
+  if (!banner) return;
+  banner.style.display = 'none';
+  try {
+    const daysAgo = d => new Date(Date.now() - d * 86400000).toISOString().slice(0,10);
+    const now = new Date();
+    const curMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+    const prevMonthStart= new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,10);
+    const prevMonthEnd  = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0,10);
+
+    const [m30, m7, m48h, goals, activeAds] = await Promise.all([
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${prevMonthStart}&select=entity_id,date_start,spend,leads`),
+      metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${daysAgo(14)}&select=entity_id,date_start,leads,spend`),
+      metaSbGet(`meta_leads_wa?fecha_lead=gte.${new Date(Date.now()-48*3600000).toISOString()}&select=id&limit=1`),
+      metaSbGet('rhinos_config?key=in.(meta_goal_leads_month,meta_goal_spend_month)&select=key,value'),
+      metaSbGet('meta_ads?status=eq.ACTIVE&select=id&limit=1'),
+    ]);
+
+    const alerts = [];
+    const goalMap = {}; for (const g of goals) goalMap[g.key] = parseFloat(g.value)||0;
+
+    // Check 1: No active ads
+    if (!activeAds.length) alerts.push({ level:'critical', msg:'🔴 Sin anuncios activos — verificar estado de campañas' });
+
+    // Check 2: No leads in 48h
+    if (!m48h.length) alerts.push({ level:'critical', msg:'🔴 Sin leads en las últimas 48hs' });
+
+    // Check 3: Ads spending with 0 leads (7d)
+    const agg7={}, aggP7={};
+    for (const m of m7) {
+      const id=m.entity_id;
+      if (m.date_start>=daysAgo(7)) {
+        if(!agg7[id]) agg7[id]={spend:0,leads:0};
+        agg7[id].spend+=parseFloat(m.spend||0); agg7[id].leads+=parseInt(m.leads||0);
+      } else {
+        if(!aggP7[id]) aggP7[id]={spend:0,leads:0};
+        aggP7[id].spend+=parseFloat(m.spend||0); aggP7[id].leads+=parseInt(m.leads||0);
+      }
+    }
+    const wastingAds = Object.values(agg7).filter(a=>a.spend>500&&a.leads===0).length;
+    if (wastingAds>0) alerts.push({ level:'warning', msg:`⚠️ ${wastingAds} anuncio${wastingAds>1?'s':''} con gasto sin leads esta semana` });
+
+    // Check 4: WoW leads drop > 40%
+    const tot7=Object.values(agg7).reduce((s,a)=>s+a.leads,0);
+    const totp7=Object.values(aggP7).reduce((s,a)=>s+a.leads,0);
+    if (tot7>0 && totp7>0 && tot7<totp7*0.6) {
+      const pct=Math.round((1-tot7/totp7)*100);
+      alerts.push({ level:'warning', msg:`⚠️ Leads esta semana cayeron ${pct}% vs semana anterior` });
+    }
+
+    // Check 5: Monthly goal pacing
+    if (goalMap['meta_goal_leads_month']>0) {
+      const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+      const dayOfMonth=now.getDate();
+      const curLeads=m30.filter(m=>m.date_start>=curMonthStart).reduce((s,m)=>s+parseInt(m.leads||0),0);
+      const pace=(curLeads/dayOfMonth)*daysInMonth;
+      const pct=Math.round(pace/goalMap['meta_goal_leads_month']*100);
+      if (pct<70) alerts.push({ level:'critical', msg:`🔴 Meta de leads en riesgo — proyección ${pct}% del objetivo` });
+      else if (pct>=100) alerts.push({ level:'ok', msg:`✅ En camino a superar la meta de leads (${pct}%)` });
+    }
+
+    // Check 6: CPL this month vs last month
+    const curM={spend:0,leads:0}, prvM={spend:0,leads:0};
+    for (const m of m30) {
+      if (m.date_start>=curMonthStart) { curM.spend+=parseFloat(m.spend||0); curM.leads+=parseInt(m.leads||0); }
+      else if (m.date_start>=prevMonthStart&&m.date_start<=prevMonthEnd) { prvM.spend+=parseFloat(m.spend||0); prvM.leads+=parseInt(m.leads||0); }
+    }
+    const cCpl=curM.leads>0?curM.spend/curM.leads:0;
+    const pCpl=prvM.leads>0?prvM.spend/prvM.leads:0;
+    if (cCpl>0&&pCpl>0&&cCpl>pCpl*1.4) {
+      const pct=Math.round((cCpl/pCpl-1)*100);
+      alerts.push({ level:'warning', msg:`⚠️ CPL subió ${pct}% vs mes anterior` });
+    }
+
+    if (!alerts.length) alerts.push({ level:'ok', msg:'✅ Todo parece estar funcionando bien' });
+
+    const colMap = { critical:'rgba(239,68,68,0.15)', warning:'rgba(245,158,11,0.15)', ok:'rgba(34,197,94,0.1)' };
+    const bdrMap = { critical:'rgba(239,68,68,0.5)', warning:'rgba(245,158,11,0.5)', ok:'rgba(34,197,94,0.3)' };
+    banner.innerHTML = alerts.map(a=>
+      `<div style="padding:6px 10px;border-radius:6px;border:1px solid ${bdrMap[a.level]||bdrMap.warning};background:${colMap[a.level]||colMap.warning};font-size:11px;color:var(--text)">${a.msg}</div>`
+    ).join('');
+    banner.style.display = 'flex';
+  } catch(e) { console.warn('[meta-alerts]', e.message); }
+}
+
 // ── LEADS TABLE ──────────────────────────────────────────────────────────────
 let _mltPage = 0;
 const _MLT_PAGE_SIZE = 25;
@@ -17829,6 +17918,7 @@ async function metaDashboardLoad() {
     if (badge) { badge.style.display = 'inline'; badge.textContent = `✓ ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`; }
 
     // All panel loaders (KPIs + top/low ads handled by metaKpiLoad above)
+    metaAlertsLoad();
     _metaTodayStripStart();
     _metaAttrData = null; metaAttrLoad(); // reset cache on full reload
     metaDigestLoad();
