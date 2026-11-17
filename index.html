@@ -1376,23 +1376,43 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           </div>
         </div>
 
-        <!-- Col der: Imágenes -->
-        <div class="card" style="display:flex;flex-direction:column">
-          <div class="card-title" style="margin-bottom:4px">Tus fotos</div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Cada foto → 1 anuncio · Se comprimen automáticamente</div>
-          <div id="bl-dropzone"
-            onclick="document.getElementById('bl-file-input').click()"
-            ondragover="event.preventDefault();this.style.borderColor='var(--cyan)'"
-            ondragleave="this.style.borderColor='var(--border)'"
-            ondrop="metaBlDrop(event)"
-            style="border:2px dashed var(--border);border-radius:var(--r);padding:32px 20px;text-align:center;cursor:pointer;transition:border-color 0.2s;margin-bottom:12px;flex-shrink:0">
-            <div style="font-size:32px;margin-bottom:8px">📁</div>
-            <div style="font-size:13px;color:var(--text2)">Arrastrá tus imágenes acá</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:4px">o hacé click · JPG/PNG · múltiple</div>
+        <!-- Col der: Creativos -->
+        <div class="card" style="display:flex;flex-direction:column;gap:0">
+          <div class="card-title" style="margin-bottom:4px">Tus creativos</div>
+          <!-- Type tabs -->
+          <div style="display:flex;gap:4px;margin-bottom:12px">
+            <button class="btn btn-sm bl-ctype bl-ctype-active" data-ct="foto" onclick="metaBlCreativeTab('foto')" style="font-size:11px">🖼 Fotos</button>
+            <button class="btn btn-sm bl-ctype" data-ct="video" onclick="metaBlCreativeTab('video')" style="font-size:11px">🎬 Video URL</button>
           </div>
-          <input type="file" id="bl-file-input" accept="image/*" multiple style="display:none" onchange="metaBlAddFiles(this.files)"/>
-          <div id="bl-images-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;overflow-y:auto;flex:1"></div>
-          <div id="bl-images-empty" style="text-align:center;color:var(--text3);font-size:12px;padding:16px;display:none">Sin imágenes todavía</div>
+
+          <!-- Fotos panel -->
+          <div id="bl-foto-panel" style="display:flex;flex-direction:column;flex:1">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Cada foto → 1 anuncio · Se comprimen automáticamente</div>
+            <div id="bl-dropzone"
+              onclick="document.getElementById('bl-file-input').click()"
+              ondragover="event.preventDefault();this.style.borderColor='var(--cyan)'"
+              ondragleave="this.style.borderColor='var(--border)'"
+              ondrop="metaBlDrop(event)"
+              style="border:2px dashed var(--border);border-radius:var(--r);padding:28px 20px;text-align:center;cursor:pointer;transition:border-color 0.2s;margin-bottom:10px;flex-shrink:0">
+              <div style="font-size:28px;margin-bottom:6px">📁</div>
+              <div style="font-size:13px;color:var(--text2)">Arrastrá tus imágenes acá</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">o hacé click · JPG/PNG · múltiple</div>
+            </div>
+            <input type="file" id="bl-file-input" accept="image/*" multiple style="display:none" onchange="metaBlAddFiles(this.files)"/>
+            <div id="bl-images-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;overflow-y:auto;flex:1"></div>
+            <div id="bl-images-empty" style="text-align:center;color:var(--text3);font-size:12px;padding:16px;display:none">Sin imágenes todavía</div>
+          </div>
+
+          <!-- Video panel -->
+          <div id="bl-video-panel" style="display:none;flex-direction:column;gap:10px">
+            <div style="font-size:11px;color:var(--text3)">Pegá el link directo a tu video · Meta lo descarga solo · Google Drive, Dropbox, MP4 público</div>
+            <div style="padding:10px;border-radius:var(--r);border:1px solid rgba(251,191,36,0.2);background:rgba(251,191,36,0.04);font-size:11px;color:#fbbf24;line-height:1.6">
+              💡 <strong>Google Drive:</strong> Compartí el archivo como "Cualquiera con el link" y usá el link directo:<br/>
+              <code style="font-size:10px;color:var(--cyan)">drive.google.com/uc?export=download&id=TU_ID</code>
+            </div>
+            <div id="bl-video-list" style="display:flex;flex-direction:column;gap:8px"></div>
+            <button class="btn btn-sm" onclick="metaBlAddVideoRow()" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);font-size:11px;width:100%;justify-content:center">+ Agregar video</button>
+          </div>
         </div>
       </div>
 
@@ -19717,7 +19737,48 @@ function metaCampTab(tab) {
 }
 
 // ── LANZADOR RÁPIDO ───────────────────────────────────────────────────────────
-let _blQueue = []; // [{name, b64, url, size}]
+let _blQueue     = []; // [{name, b64, url, size}]  — imágenes
+let _blCreativeMode = 'foto'; // 'foto' | 'video'
+
+function metaBlCreativeTab(ct) {
+  _blCreativeMode = ct;
+  document.querySelectorAll('.bl-ctype').forEach(b => b.classList.toggle('bl-ctype-active', b.dataset.ct === ct));
+  const fp = document.getElementById('bl-foto-panel');
+  const vp = document.getElementById('bl-video-panel');
+  if (fp) fp.style.display = ct === 'foto'  ? 'flex' : 'none';
+  if (vp) vp.style.display = ct === 'video' ? 'flex' : 'none';
+  metaBlUpdateSummary();
+}
+
+let _blVideoRows = 0;
+function metaBlAddVideoRow() {
+  const list = document.getElementById('bl-video-list');
+  if (!list) return;
+  const idx = _blVideoRows++;
+  const row = document.createElement('div');
+  row.id = `bl-vrow-${idx}`;
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;background:var(--surface)';
+  row.innerHTML = `
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+      <input placeholder="Nombre del anuncio" style="font-size:11px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:2px 0;outline:none" data-vname="${idx}"/>
+      <input placeholder="URL del video (MP4 público, Google Drive, Dropbox...)" style="font-size:11px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--cyan);padding:2px 0;outline:none" data-vurl="${idx}" oninput="metaBlUpdateSummary()"/>
+    </div>
+    <button onclick="document.getElementById('bl-vrow-${idx}').remove();metaBlUpdateSummary()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;flex-shrink:0">✕</button>`;
+  list.appendChild(row);
+  metaBlUpdateSummary();
+}
+
+function metaBlGetVideoRows() {
+  const rows = [];
+  document.querySelectorAll('[data-vurl]').forEach(inp => {
+    const url = inp.value.trim();
+    if (!url) return;
+    const idx = inp.dataset.vurl;
+    const nameEl = document.querySelector(`[data-vname="${idx}"]`);
+    rows.push({ url, name: nameEl?.value.trim() || `Video ${rows.length + 1}` });
+  });
+  return rows;
+}
 
 function metaBlPreset(val) {
   const inp = document.getElementById('bl-budget');
@@ -19816,19 +19877,24 @@ function metaBlUpdateSummary() {
   const btn  = document.getElementById('btn-batch-launch');
   const bud  = parseFloat(document.getElementById('bl-budget')?.value) || 0;
   const name = document.getElementById('bl-name')?.value.trim() || '';
-  const n    = _blQueue.length;
+  const nImg = _blQueue.length;
+  const nVid = _blCreativeMode === 'video' ? metaBlGetVideoRows().length : 0;
+  const n    = _blCreativeMode === 'video' ? nVid : nImg;
   if (!s || !st) return;
   if (n > 0 || bud > 0) {
     s.style.display = 'flex';
     const parts = [];
-    if (n > 0)  parts.push(`${n} anuncio${n !== 1 ? 's' : ''}`);
+    if (n > 0)   parts.push(`${n} ${_blCreativeMode === 'video' ? 'video' + (n !== 1 ? 's' : '') : 'anuncio' + (n !== 1 ? 's' : '')}`);
     if (bud > 0) parts.push(`$${bud.toLocaleString('es-AR')}/día`);
     if (name)    parts.push(name.slice(0, 30));
     st.textContent = '⚡ ' + parts.join(' · ');
   } else {
     s.style.display = 'none';
   }
-  if (btn) btn.textContent = n > 0 ? `🚀 Lanzar ${n} anuncio${n !== 1 ? 's' : ''}` : '🚀 Lanzar campaña';
+  const label = _blCreativeMode === 'video'
+    ? (n > 0 ? `🚀 Lanzar ${n} video${n !== 1 ? 's' : ''}` : '🚀 Lanzar campaña')
+    : (n > 0 ? `🚀 Lanzar ${n} anuncio${n !== 1 ? 's' : ''}` : '🚀 Lanzar campaña');
+  if (btn) btn.textContent = label;
 }
 
 async function metaBatchLaunch() {
@@ -19844,9 +19910,13 @@ async function metaBatchLaunch() {
   const loc     = document.getElementById('bl-location')?.value.trim() || 'Argentina';
   const interests = document.getElementById('bl-interests')?.value.trim();
 
+  const isVideo = _blCreativeMode === 'video';
+  const videoRows = isVideo ? metaBlGetVideoRows() : [];
+
   if (!name)         { metaToast('Falta el nombre de la campaña', 'error'); return; }
   if (!budget || budget < 100) { metaToast('Presupuesto mínimo: $100 ARS', 'error'); return; }
-  if (!_blQueue.length) { metaToast('Subí al menos una imagen', 'error'); return; }
+  if (!isVideo && !_blQueue.length)  { metaToast('Subí al menos una imagen', 'error'); return; }
+  if (isVideo  && !videoRows.length) { metaToast('Agregá al menos una URL de video', 'error'); return; }
 
   const btn = document.getElementById('btn-batch-launch');
   const prog = document.getElementById('bl-progress');
@@ -19867,39 +19937,56 @@ async function metaBatchLaunch() {
     log(`✓ Campaña: ${startResp.campaign_id}`);
     log(`✓ Adset:   ${startResp.adset_id}`);
 
-    // Step 2: Create each ad
     let ok = 0, fail = 0;
-    for (let i = 0; i < _blQueue.length; i++) {
-      const item = _blQueue[i];
-      const adName = item.name || `${name} — Anuncio ${i + 1}`;
-      log(`\n▶ Anuncio ${i + 1}/${_blQueue.length}: ${adName}`);
-      try {
-        const adResp = await fetch('/api/meta?action=create_ad', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adset_id: startResp.adset_id,
-            campaign_id: startResp.campaign_id,
-            image_b64: item.b64,
-            image_name: adName + '.jpg',
-            ad_name: adName,
-            link_url: link || 'https://rhinosapp.com',
-            headline: hl || '',
-            body_text: body || '',
-            cta_type: cta,
-          }),
-        }).then(r => r.json());
 
-        if (adResp.ok) { log(`  ✓ Listo (ID: ${adResp.ad_id})`); ok++; }
-        else           { log(`  ✗ Error: ${adResp.error}`); fail++; }
-      } catch(e) { log(`  ✗ Error: ${e.message}`); fail++; }
+    if (isVideo) {
+      // Video mode: each row = one video ad
+      for (let i = 0; i < videoRows.length; i++) {
+        const item = videoRows[i];
+        const adName = item.name || `${name} — Video ${i + 1}`;
+        log(`\n▶ Video ${i + 1}/${videoRows.length}: ${adName}`);
+        try {
+          const adResp = await fetch('/api/meta?action=create_video_ad', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adset_id: startResp.adset_id, campaign_id: startResp.campaign_id,
+              video_url: item.url, ad_name: adName,
+              link_url: link || 'https://rhinosapp.com',
+              headline: hl || '', body_text: body || '', cta_type: cta,
+            }),
+          }).then(r => r.json());
+          if (adResp.ok) { log(`  ✓ Listo (ID: ${adResp.ad_id})`); ok++; }
+          else           { log(`  ✗ Error: ${adResp.error}`); fail++; }
+        } catch(e) { log(`  ✗ Error: ${e.message}`); fail++; }
+      }
+    } else {
+      // Image mode: each queued image = one ad
+      for (let i = 0; i < _blQueue.length; i++) {
+        const item = _blQueue[i];
+        const adName = item.name || `${name} — Anuncio ${i + 1}`;
+        log(`\n▶ Anuncio ${i + 1}/${_blQueue.length}: ${adName}`);
+        try {
+          const adResp = await fetch('/api/meta?action=create_ad', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adset_id: startResp.adset_id, campaign_id: startResp.campaign_id,
+              image_b64: item.b64, image_name: adName + '.jpg', ad_name: adName,
+              link_url: link || 'https://rhinosapp.com',
+              headline: hl || '', body_text: body || '', cta_type: cta,
+            }),
+          }).then(r => r.json());
+          if (adResp.ok) { log(`  ✓ Listo (ID: ${adResp.ad_id})`); ok++; }
+          else           { log(`  ✗ Error: ${adResp.error}`); fail++; }
+        } catch(e) { log(`  ✗ Error: ${e.message}`); fail++; }
+      }
     }
 
+    const tipo = isVideo ? 'video' : 'anuncio';
     log(`\n${'─'.repeat(40)}`);
-    log(`✅ Campaña lanzada: ${ok} anuncio${ok !== 1 ? 's' : ''} activo${ok !== 1 ? 's' : ''}${fail ? ` · ${fail} fallido${fail !== 1 ? 's' : ''}` : ''}`);
+    log(`✅ Campaña lanzada: ${ok} ${tipo}${ok !== 1 ? 's' : ''} activo${ok !== 1 ? 's' : ''}${fail ? ` · ${fail} fallido${fail !== 1 ? 's' : ''}` : ''}`);
     log(`📊 Budget: $${budget.toLocaleString('es-AR')} ARS/día`);
-    metaToast(`✅ ${ok} anuncio${ok !== 1 ? 's' : ''} lanzado${ok !== 1 ? 's' : ''}`, 'success');
-    _blQueue = [];
-    metaBlRenderQueue();
+    metaToast(`✅ ${ok} ${tipo}${ok !== 1 ? 's' : ''} lanzado${ok !== 1 ? 's' : ''}`, 'success');
+    if (!isVideo) { _blQueue = []; metaBlRenderQueue(); }
     metaBlUpdateSummary();
   } catch(e) {
     log('\n✗ Error inesperado: ' + e.message);

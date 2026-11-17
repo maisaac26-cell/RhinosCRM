@@ -1439,6 +1439,68 @@ async function runUpdateLead(req, res) {
   } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
 }
 
+// ── CREATE VIDEO AD ──────────────────────────────────────────────────────────
+async function runCreateVideoAd(req, res) {
+  try {
+    const cfg       = await getMetaConfig();
+    const token     = cfg.meta_access_token  || '';
+    const rawId     = cfg.meta_ad_account_id || '';
+    const pageId    = cfg.meta_page_id       || '';
+    const accountId = rawId.replace(/^act_/i, '');
+
+    if (!token || token === 'pending' || !accountId)
+      return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    if (!pageId)
+      return res.status(200).json({ ok: false, error: 'Page ID no configurado' });
+
+    const { adset_id, campaign_id, video_url, ad_name, link_url, headline, body_text, cta_type } = req.body || {};
+    if (!adset_id || !video_url)
+      return res.status(200).json({ ok: false, error: 'adset_id y video_url son requeridos' });
+
+    // 1. Upload video by URL (Meta downloads it directly — no Vercel size limit)
+    const vidResult = await metaPost(token, `act_${accountId}/advideos`, {
+      file_url: video_url,
+      name: ad_name || 'video_' + Date.now(),
+    });
+    const videoId = vidResult.id;
+    if (!videoId) throw new Error('Meta no devolvió el ID del video. Verificá que la URL sea pública.');
+
+    // 2. Create ad creative with video
+    const creative = await metaPost(token, `act_${accountId}/adcreatives`, {
+      name: (ad_name || 'Video Ad') + ' Creative',
+      object_story_spec: {
+        page_id: pageId,
+        video_data: {
+          video_id: videoId,
+          message: body_text || '',
+          title: headline || '',
+          link_description: headline || '',
+          call_to_action: { type: cta_type || 'LEARN_MORE', value: { link: link_url || 'https://rhinosapp.com' } },
+        },
+      },
+    });
+
+    // 3. Create ad
+    const ad = await metaPost(token, `act_${accountId}/ads`, {
+      name: ad_name || 'Video Ad ' + Date.now(),
+      adset_id,
+      creative: { creative_id: creative.id },
+      status: 'ACTIVE',
+    });
+
+    await sbReq('POST', 'meta_ads?on_conflict=id', [{
+      id: ad.id, adset_id, campaign_id: campaign_id || null,
+      name: ad_name || 'Video Ad', status: 'ACTIVE',
+      creative_id: creative.id, updated_at: new Date().toISOString(),
+    }]).catch(() => {});
+
+    return res.status(200).json({ ok: true, ad_id: ad.id, video_id: videoId, creative_id: creative.id });
+  } catch (err) {
+    console.error('[meta-create-video-ad]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 // ── BATCH LAUNCH START ────────────────────────────────────────────────────────
 async function runBatchLaunchStart(req, res) {
   try {
@@ -1537,5 +1599,6 @@ export default async function handler(req, res) {
   if (action === 'forecast')           return runForecast(res);
   if (action === 'rebalance_budget')   return runRebalanceBudget(req, res);
   if (action === 'batch_launch_start') return runBatchLaunchStart(req, res);
+  if (action === 'create_video_ad')    return runCreateVideoAd(req, res);
   return runSync(res);
 }
