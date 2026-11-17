@@ -60,7 +60,8 @@ async function metaPost(token, path, body) {
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
 async function getMetaConfig() {
-  const rows = await sbGet('rhinos_config?key=in.(meta_access_token,meta_ad_account_id,meta_page_id,meta_webhook_verify_token,meta_target_cpl)&select=key,value');
+  const keys = 'meta_access_token,meta_ad_account_id,meta_page_id,meta_webhook_verify_token,meta_target_cpl,meta_min_ctr,meta_max_freq,meta_max_cpl_mult,meta_min_spend_pause';
+  const rows = await sbGet(`rhinos_config?key=in.(${keys})&select=key,value`);
   const cfg = {};
   for (const { key, value } of rows) cfg[key] = (typeof value === 'string' ? value : JSON.stringify(value)).replace(/^"|"$/g, '').trim();
   return cfg;
@@ -177,7 +178,11 @@ async function runAgent(res) {
     const token     = cfg.meta_access_token  || '';
     const rawId2    = cfg.meta_ad_account_id || '';
     const accountId = rawId2.replace(/^act_/i, '');
-    const targetCpl = parseFloat(cfg.meta_target_cpl || 0); // 0 = deshabilitado
+    const targetCpl  = parseFloat(cfg.meta_target_cpl   || 0);   // 0 = deshabilitado
+    const minCtr     = parseFloat(cfg.meta_min_ctr       || 0.3); // CTR mínimo %
+    const maxFreq    = parseFloat(cfg.meta_max_freq      || 3.5); // frecuencia máxima
+    const cplMult    = parseFloat(cfg.meta_max_cpl_mult  || 2);   // pausa si CPL > targetCpl × esto
+    const minSpend   = parseFloat(cfg.meta_min_spend_pause|| 10); // gasto mínimo antes de pausar
 
     if (!token || token === 'pending' || !accountId || rawId2 === 'pending') {
       return res.status(200).json({ ok: false, msg: 'Meta not configured', _v: 'agent-v2' });
@@ -205,16 +210,16 @@ async function runAgent(res) {
       const avgFreq        = rows.reduce((s, r) => s + parseFloat(r.frequency || 0), 0) / rows.length;
       const cpl            = totLeads > 0 ? totSpend / totLeads : 0;
 
-      // Determine pause reason (priority order)
+      // Determine pause reason (priority order, using configurable thresholds)
       let pauseReason = null;
-      if (avgFreq > 3.5 && totImpressions > 300)
-        pauseReason = `fatiga creativa (freq ${avgFreq.toFixed(1)}x)`;
-      else if (totSpend >= 10 && totClicks === 0)
+      if (avgFreq > maxFreq && totImpressions > 300)
+        pauseReason = `fatiga creativa (freq ${avgFreq.toFixed(1)}x > ${maxFreq})`;
+      else if (totSpend >= minSpend && totClicks === 0)
         pauseReason = `sin clicks ($${totSpend.toFixed(0)} gastado)`;
-      else if (avgCtr < 0.3 && totSpend >= 15)
-        pauseReason = `CTR bajo (${avgCtr.toFixed(2)}%)`;
-      else if (targetCpl > 0 && totLeads > 0 && cpl > targetCpl * 2 && totSpend > 20)
-        pauseReason = `CPL alto ($${cpl.toFixed(0)} vs objetivo $${targetCpl})`;
+      else if (avgCtr < minCtr && totSpend >= minSpend * 1.5)
+        pauseReason = `CTR bajo (${avgCtr.toFixed(2)}% < ${minCtr}%)`;
+      else if (targetCpl > 0 && totLeads > 0 && cpl > targetCpl * cplMult && totSpend > 20)
+        pauseReason = `CPL alto ($${cpl.toFixed(0)} vs objetivo $${targetCpl} × ${cplMult})`;
 
       // Determine winner
       const isLeadWinner = targetCpl > 0 && totLeads >= 3 && cpl > 0 && cpl <= targetCpl * 0.7;
@@ -549,6 +554,35 @@ async function runPacingCheck(res) {
         await pushNotify('🔴 Meta: Presupuesto casi agotado', `${as.name}\n${Math.round(pacing*100)}% gastado — puede dejar de publicarse`);
       }
     }
+
+    // CTR drop alert: compare today's CTR vs 7-day average per active ad
+    if (dayProgress > 0.4) {
+      const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+      const since7 = new Date(); since7.setDate(since7.getDate() - 7);
+      const [todayMetrics, histMetrics] = await Promise.all([
+        sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=eq.${today}&select=entity_id,clicks,impressions`),
+        sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${isoDate(since7)}&date_start=lte.${isoDate(yesterday)}&select=entity_id,clicks,impressions`),
+      ]);
+      const hist7 = {};
+      for (const m of histMetrics) {
+        if (!hist7[m.entity_id]) hist7[m.entity_id] = { clicks: 0, impressions: 0 };
+        hist7[m.entity_id].clicks += parseInt(m.clicks || 0);
+        hist7[m.entity_id].impressions += parseInt(m.impressions || 0);
+      }
+      for (const m of todayMetrics) {
+        const todayCtr = m.impressions > 50 ? (parseInt(m.clicks||0) / parseInt(m.impressions)) * 100 : null;
+        const h = hist7[m.entity_id];
+        if (!todayCtr || !h || h.impressions < 500) continue;
+        const avg7Ctr = (h.clicks / h.impressions) * 100;
+        if (avg7Ctr > 0.3 && todayCtr < avg7Ctr * 0.6) {
+          const adRow = ads.find(a => a.id === m.entity_id) || { id: m.entity_id };
+          const adName = adRow.adset_id ? (await sbGet(`meta_ads?id=eq.${m.entity_id}&select=name`).catch(()=>[]))[0]?.name || m.entity_id : m.entity_id;
+          alerts.push({ type: 'ctr_drop', entity_id: m.entity_id, today_ctr: todayCtr.toFixed(2), avg7_ctr: avg7Ctr.toFixed(2) });
+          await pushNotify('📉 Meta: CTR cayó hoy', `${adName}\nHoy ${todayCtr.toFixed(2)}% vs promedio ${avg7Ctr.toFixed(2)}% (7d)`);
+        }
+      }
+    }
+
     return res.status(200).json({ ok: true, alerts, checked: adsets.length, day_pct: Math.round(dayProgress * 100) });
   } catch(err) {
     console.error('[meta-pacing]', err.message);
@@ -637,6 +671,45 @@ async function runUpdateBudget(req, res) {
   }
 }
 
+// ── TODAY REPORT ──────────────────────────────────────────────────────────────
+async function runTodayReport(res) {
+  try {
+    const today = isoDate(new Date());
+    const yesterday = isoDate(new Date(Date.now() - 86400000));
+    const weekAgo   = isoDate(new Date(Date.now() - 7 * 86400000));
+
+    const [todayRows, yestRows, weekRows] = await Promise.all([
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=eq.${today}&select=spend,impressions,clicks,leads,messages_started`),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=eq.${yesterday}&select=spend,impressions,clicks,leads,messages_started`),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${weekAgo}&date_start=lt.${today}&select=spend,impressions,clicks,leads,messages_started,date_start`),
+    ]);
+
+    const agg = (rows) => rows.reduce((a, r) => ({
+      spend: a.spend + parseFloat(r.spend || 0),
+      impressions: a.impressions + parseInt(r.impressions || 0),
+      clicks: a.clicks + parseInt(r.clicks || 0),
+      leads: a.leads + parseInt(r.leads || 0),
+      messages: a.messages + parseInt(r.messages_started || 0),
+    }), { spend: 0, impressions: 0, clicks: 0, leads: 0, messages: 0 });
+
+    const sameDayLastWeek = weekRows.filter(r => r.date_start === weekAgo);
+
+    return res.status(200).json({
+      ok: true,
+      today: agg(todayRows),
+      yesterday: agg(yestRows),
+      same_day_last_week: agg(sameDayLastWeek),
+      week_avg: (rows => {
+        const t = agg(rows); const n = 7;
+        return { spend: t.spend/n, impressions: t.impressions/n, clicks: t.clicks/n, leads: t.leads/n, messages: t.messages/n };
+      })(weekRows),
+      date: today,
+    });
+  } catch(err) {
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
@@ -649,5 +722,6 @@ export default async function handler(req, res) {
   if (action === 'sync_historical')   return runSyncHistorical(req, res);
   if (action === 'pacing_check')      return runPacingCheck(res);
   if (action === 'duplicate_ad')      return runDuplicateAd(req, res);
+  if (action === 'today_report')      return runTodayReport(res);
   return runSync(res);
 }

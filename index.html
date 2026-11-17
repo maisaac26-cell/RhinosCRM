@@ -800,12 +800,31 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="field" style="margin:0">
-          <label>CPL objetivo (ARS) <span style="font-size:10px;color:var(--text3)">— el agente pausa si CPL &gt; 2× este valor</span></label>
+          <label>CPL objetivo (ARS) <span style="font-size:10px;color:var(--text3)">— el agente pausa si CPL excede el límite</span></label>
           <input id="meta-cpl-input" type="number" placeholder="0 = deshabilitado" style="font-size:12px"/>
         </div>
         <div class="field" style="margin:0">
           <label>Token verificación webhook <span style="font-size:10px;color:var(--text3)">— para captura de leads</span></label>
           <input id="meta-webhook-token-input" type="text" placeholder="rhinos_meta_webhook_2026" style="font-size:12px"/>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;margin-top:4px">⚙️ Reglas del agente IA</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+        <div class="field" style="margin:0">
+          <label style="font-size:10px">CTR mínimo (%)</label>
+          <input id="meta-min-ctr-input" type="number" step="0.1" placeholder="0.3" style="font-size:12px"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label style="font-size:10px">Frecuencia máx</label>
+          <input id="meta-max-freq-input" type="number" step="0.5" placeholder="3.5" style="font-size:12px"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label style="font-size:10px">Mult. CPL para pausar</label>
+          <input id="meta-cpl-mult-input" type="number" step="0.5" placeholder="2" style="font-size:12px"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label style="font-size:10px">Gasto mín. para pausar ($)</label>
+          <input id="meta-min-spend-input" type="number" placeholder="10" style="font-size:12px"/>
         </div>
       </div>
       <div style="font-size:10px;color:var(--text3);padding:7px 10px;background:rgba(0,229,204,0.04);border:1px solid rgba(0,229,204,0.15);border-radius:var(--r);margin-bottom:10px;line-height:1.6">
@@ -826,6 +845,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div class="page-title">CAMPA<span>ÑAS</span></div>
         <div class="page-sub">Crear campañas nuevas y controlar las existentes.</div>
       </div>
+      <button class="btn btn-sm" onclick="metaTodayReport()" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);font-size:11px;align-self:center">📊 Hoy</button>
+    </div>
+    <div id="meta-today-panel" style="display:none;margin-bottom:12px;padding:12px 14px;background:var(--surface);border:1px solid rgba(0,229,204,0.2);border-radius:var(--r)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--cyan)">📊 Resumen de hoy</div>
+        <button onclick="document.getElementById('meta-today-panel').style.display='none'" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>
+      </div>
+      <div id="meta-today-content"><div class="empty">Cargando...</div></div>
     </div>
     <div style="display:flex;gap:4px;margin-bottom:1rem">
       <button class="btn btn-sm meta-ctab meta-ctab-active" data-tab="existentes" onclick="metaCampTab('existentes')">📋 Campañas existentes</button>
@@ -16162,6 +16189,10 @@ async function metaSaveConfig() {
   const pageId       = document.getElementById('meta-page-input')?.value.trim();
   const targetCpl    = document.getElementById('meta-cpl-input')?.value.trim();
   const webhookToken = document.getElementById('meta-webhook-token-input')?.value.trim();
+  const minCtr       = document.getElementById('meta-min-ctr-input')?.value.trim();
+  const maxFreq      = document.getElementById('meta-max-freq-input')?.value.trim();
+  const cplMult      = document.getElementById('meta-cpl-mult-input')?.value.trim();
+  const minSpend     = document.getElementById('meta-min-spend-input')?.value.trim();
   if (!token || !account) { metaToast('Completá Access Token y Ad Account ID', 'error'); return; }
   try {
     await callAPI('save_config', { key: 'meta_access_token', value: token });
@@ -16169,6 +16200,18 @@ async function metaSaveConfig() {
     if (pageId)       await callAPI('save_config', { key: 'meta_page_id', value: pageId });
     if (targetCpl)    await callAPI('save_config', { key: 'meta_target_cpl', value: parseFloat(targetCpl) });
     if (webhookToken) await callAPI('save_config', { key: 'meta_webhook_verify_token', value: webhookToken });
+    if (minCtr)       await callAPI('save_config', { key: 'meta_min_ctr', value: parseFloat(minCtr) });
+    if (maxFreq)      await callAPI('save_config', { key: 'meta_max_freq', value: parseFloat(maxFreq) });
+    if (cplMult)      await callAPI('save_config', { key: 'meta_max_cpl_mult', value: parseFloat(cplMult) });
+    if (minSpend)     await callAPI('save_config', { key: 'meta_min_spend_pause', value: parseFloat(minSpend) });
+    // persist agent thresholds locally too so forecast chip can read them
+    const cfg = JSON.parse(localStorage.getItem('meta_config')||'{}');
+    if (targetCpl)  cfg.meta_target_cpl = targetCpl;
+    if (minCtr)     cfg.meta_min_ctr    = minCtr;
+    if (maxFreq)    cfg.meta_max_freq   = maxFreq;
+    if (cplMult)    cfg.meta_max_cpl_mult = cplMult;
+    if (minSpend)   cfg.meta_min_spend_pause = minSpend;
+    localStorage.setItem('meta_config', JSON.stringify(cfg));
     const badge = document.getElementById('meta-conn-badge');
     if (badge) { badge.textContent = '✓ Guardado'; badge.style.color = 'var(--green)'; }
     metaToast('Configuración guardada ✓', 'ok');
@@ -16280,6 +16323,56 @@ async function metaDuplicateAd(adId, newName) {
     if (r.ok) { metaToast(`✓ Duplicado como "${r.name}" (pausado)`, 'ok'); setTimeout(metaLoadAllCampaigns, 1500); }
     else metaToast('Error: ' + (r.error || r.msg), 'err');
   } catch(e) { metaToast('Error: ' + e.message, 'err'); }
+}
+
+// ── TODAY REPORT ─────────────────────────────────────────────────────────────
+async function metaTodayReport() {
+  const panel   = document.getElementById('meta-today-panel');
+  const content = document.getElementById('meta-today-content');
+  if (!panel || !content) return;
+  panel.style.display = 'block';
+  content.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const r = await fetch('/api/meta?action=today_report').then(x => x.json());
+    if (!r.ok) { content.innerHTML = `<div class="empty">Error: ${r.error||r.msg}</div>`; return; }
+    const { today: t, yesterday: y, same_day_last_week: lw } = r;
+    const delta = (now, prev, fmt) => {
+      if (!prev || prev === 0) return '';
+      const d = now - prev; const pct = Math.abs(d / prev * 100).toFixed(0);
+      const col = d >= 0 ? 'var(--green)' : '#f87171';
+      return ` <span style="color:${col};font-size:10px">${d>=0?'↑':'↓'}${pct}%</span>`;
+    };
+    const row = (label, now, prev, fmt) => `<tr>
+      <td style="color:var(--text3);padding:4px 0;font-size:11px">${label}</td>
+      <td style="font-weight:600;padding:4px 8px;font-size:12px">${fmt(now)}${delta(now,prev,fmt)}</td>
+      <td style="color:var(--text3);font-size:10px;padding:4px 0">${fmt(prev||0)} ayer</td>
+      <td style="color:var(--text3);font-size:10px;padding:4px 0">${fmt((lw&&lw[Object.keys(t).find(k=>fmt(t[k])===fmt(now))])||0)} sem. ant.</td>
+    </tr>`;
+    content.innerHTML = `<table style="width:100%;border-collapse:collapse">
+      <tr>
+        <td style="color:var(--text3);font-size:10px;padding:4px 0">Métrica</td>
+        <td style="font-size:10px;padding:4px 8px;font-weight:600">Hoy</td>
+        <td style="color:var(--text3);font-size:10px">Ayer</td>
+        <td style="color:var(--text3);font-size:10px">Sem. ant.</td>
+      </tr>
+      <tr><td style="color:var(--text3);font-size:11px;padding:4px 0">Gasto</td>
+        <td style="font-weight:600;font-size:12px;padding:4px 8px">${fmtARS(t.spend)}${delta(t.spend,y.spend,fmtARS)}</td>
+        <td style="color:var(--text3);font-size:10px">${fmtARS(y.spend||0)}</td>
+        <td style="color:var(--text3);font-size:10px">${fmtARS(lw?.spend||0)}</td></tr>
+      <tr><td style="color:var(--text3);font-size:11px;padding:4px 0">Impresiones</td>
+        <td style="font-weight:600;font-size:12px;padding:4px 8px">${(t.impressions||0).toLocaleString('es-AR')}${delta(t.impressions,y.impressions,v=>v)}</td>
+        <td style="color:var(--text3);font-size:10px">${(y.impressions||0).toLocaleString('es-AR')}</td>
+        <td style="color:var(--text3);font-size:10px">${(lw?.impressions||0).toLocaleString('es-AR')}</td></tr>
+      <tr><td style="color:var(--text3);font-size:11px;padding:4px 0">Leads</td>
+        <td style="font-weight:600;font-size:12px;padding:4px 8px;color:var(--cyan)">${t.leads||0}${delta(t.leads,y.leads,v=>v)}</td>
+        <td style="color:var(--text3);font-size:10px">${y.leads||0}</td>
+        <td style="color:var(--text3);font-size:10px">${lw?.leads||0}</td></tr>
+      <tr><td style="color:var(--text3);font-size:11px;padding:4px 0">Mensajes</td>
+        <td style="font-weight:600;font-size:12px;padding:4px 8px">${t.messages||0}${delta(t.messages,y.messages,v=>v)}</td>
+        <td style="color:var(--text3);font-size:10px">${y.messages||0}</td>
+        <td style="color:var(--text3);font-size:10px">${lw?.messages||0}</td></tr>
+    </table>`;
+  } catch(e) { content.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 
 // ── CAMPAÑAS tabs ──
