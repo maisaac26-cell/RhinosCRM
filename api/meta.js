@@ -457,6 +457,146 @@ async function runWebhook(req, res) {
   }
 }
 
+// ── SYNC HISTÓRICO ────────────────────────────────────────────────────────────
+async function runSyncHistorical(req, res) {
+  const days = Math.min(parseInt(req.query?.days || req.body?.days || 30), 180);
+  const start = Date.now();
+  const log = [];
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    const rawId = cfg.meta_ad_account_id || '';
+    const accountId = rawId.replace(/^act_/i, '');
+    if (!token || token === 'pending' || !accountId)
+      return res.status(200).json({ ok: false, msg: 'Meta not configured' });
+
+    const today = new Date();
+    const since = new Date(today); since.setDate(since.getDate() - days);
+    const timeRange = encodeURIComponent(JSON.stringify({ since: isoDate(since), until: isoDate(today) }));
+    const fields = 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,ctr,cpc,cpm,frequency,actions,cost_per_action_type,purchase_roas';
+    const metricsData = await metaGet(token, `act_${accountId}/insights?level=ad&fields=${fields}&time_range=${timeRange}&time_increment=1&limit=2000`);
+    const metrics = metricsData.data || [];
+    log.push(`rows fetched: ${metrics.length}`);
+
+    if (metrics.length) {
+      const rows = metrics.map(m => {
+        const conversions      = parseInt((m.actions || []).find(a => a.action_type === 'purchase')?.value || 0);
+        const leads            = parseInt((m.actions || []).find(a => a.action_type === 'lead')?.value || 0);
+        const messages_started = parseInt((m.actions || []).find(a => a.action_type === 'onsite_conversion.messaging_conversation_started_7d')?.value || 0);
+        const cpa          = parseFloat((m.cost_per_action_type || []).find(a => a.action_type === 'purchase')?.value || 0);
+        const cost_per_lead = parseFloat((m.cost_per_action_type || []).find(a => a.action_type === 'lead')?.value || 0);
+        const roas         = parseFloat((m.purchase_roas || []).find(a => a.action_type === 'omni_purchase')?.value || 0);
+        return {
+          entity_type: 'ad', entity_id: m.ad_id, date_start: m.date_start,
+          impressions: parseInt(m.impressions || 0), clicks: parseInt(m.clicks || 0),
+          spend: parseFloat(m.spend || 0), reach: parseInt(m.reach || 0),
+          ctr: parseFloat(m.ctr || 0), cpc: parseFloat(m.cpc || 0), cpm: parseFloat(m.cpm || 0),
+          frequency: parseFloat(m.frequency || 0),
+          conversions, cost_per_result: cpa, roas, leads, messages_started, cost_per_lead,
+          raw_data: m, synced_at: new Date().toISOString(),
+        };
+      });
+      for (let i = 0; i < rows.length; i += 200) {
+        await sbReq('POST', 'meta_ad_metrics?on_conflict=entity_type,entity_id,date_start', rows.slice(i, i + 200));
+      }
+      log.push(`rows upserted: ${rows.length}`);
+    }
+    return res.status(200).json({ ok: true, log, days, ms: Date.now() - start });
+  } catch(err) {
+    console.error('[meta-sync-historical]', err.message);
+    return res.status(200).json({ ok: false, error: err.message, log, ms: Date.now() - start });
+  }
+}
+
+// ── PACING CHECK ──────────────────────────────────────────────────────────────
+async function runPacingCheck(res) {
+  const alerts = [];
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, msg: 'Meta not configured', alerts });
+
+    const today = isoDate(new Date());
+    const hourUTC = new Date().getUTCHours();
+    const dayProgress = hourUTC / 24;
+    if (dayProgress < 0.2) return res.status(200).json({ ok: true, msg: 'Too early', alerts: [], checked: 0 });
+
+    const [adsets, ads, metrics] = await Promise.all([
+      sbGet('meta_adsets?status=eq.ACTIVE&budget_daily=not.is.null&select=id,name,budget_daily'),
+      sbGet('meta_ads?select=id,adset_id'),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=eq.${today}&select=entity_id,spend`),
+    ]);
+
+    const adToAdset = {};
+    for (const a of ads) adToAdset[a.id] = a.adset_id;
+    const adsetSpend = {};
+    for (const m of metrics) {
+      const asId = adToAdset[m.entity_id];
+      if (asId) adsetSpend[asId] = (adsetSpend[asId] || 0) + parseFloat(m.spend || 0);
+    }
+
+    for (const as of adsets) {
+      const spend  = adsetSpend[as.id] || 0;
+      const budget = parseFloat(as.budget_daily || 0);
+      if (!budget || budget < 100) continue;
+      const pacing = spend / budget;
+
+      if (pacing < dayProgress * 0.35 && dayProgress > 0.3) {
+        alerts.push({ type: 'underpacing', name: as.name, pct: Math.round(pacing * 100), budget });
+        await pushNotify('⚠️ Meta: Presupuesto subutilizado', `${as.name}\nUsó ${Math.round(pacing*100)}% a esta hora ($${spend.toFixed(0)} / $${budget.toFixed(0)})`);
+      } else if (pacing > 0.88 && dayProgress < 0.75) {
+        alerts.push({ type: 'overpacing', name: as.name, pct: Math.round(pacing * 100), budget });
+        await pushNotify('🔴 Meta: Presupuesto casi agotado', `${as.name}\n${Math.round(pacing*100)}% gastado — puede dejar de publicarse`);
+      }
+    }
+    return res.status(200).json({ ok: true, alerts, checked: adsets.length, day_pct: Math.round(dayProgress * 100) });
+  } catch(err) {
+    console.error('[meta-pacing]', err.message);
+    return res.status(200).json({ ok: false, error: err.message, alerts });
+  }
+}
+
+// ── DUPLICATE AD ──────────────────────────────────────────────────────────────
+async function runDuplicateAd(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    const rawId = cfg.meta_ad_account_id || '';
+    const accountId = rawId.replace(/^act_/i, '');
+    if (!token || token === 'pending' || !accountId)
+      return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+
+    const { ad_id, new_name } = req.body || {};
+    if (!ad_id) return res.status(200).json({ ok: false, error: 'ad_id requerido' });
+
+    const original = await metaGet(token, `${ad_id}?fields=name,adset_id,campaign_id,creative{id}`);
+    const creativeId = original.creative?.id;
+    if (!creativeId) return res.status(200).json({ ok: false, error: 'No se encontró el creative del anuncio original' });
+
+    const finalName = new_name || (original.name + ' (copia)');
+    const newAd = await metaPost(token, `act_${accountId}/ads`, {
+      name: finalName,
+      adset_id: original.adset_id,
+      creative: { creative_id: creativeId },
+      status: 'PAUSED',
+    });
+
+    await sbReq('POST', 'meta_ads?on_conflict=id', [{
+      id: newAd.id,
+      adset_id: original.adset_id,
+      campaign_id: original.campaign_id || null,
+      name: finalName, status: 'PAUSED',
+      creative_id: creativeId,
+      updated_at: new Date().toISOString(),
+    }]).catch(() => {});
+
+    return res.status(200).json({ ok: true, ad_id: newAd.id, name: finalName });
+  } catch(err) {
+    console.error('[meta-duplicate-ad]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 // ── TOGGLE ADSET ─────────────────────────────────────────────────────────────
 async function runToggleAdset(req, res) {
   try {
@@ -499,12 +639,15 @@ async function runUpdateBudget(req, res) {
 
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
-  if (action === 'agent')          return runAgent(res);
-  if (action === 'webhook')        return runWebhook(req, res);
-  if (action === 'create_ad')      return runCreateAd(req, res);
-  if (action === 'toggle_ad')      return runToggleAd(req, res);
-  if (action === 'toggle_adset')   return runToggleAdset(req, res);
-  if (action === 'update_budget')  return runUpdateBudget(req, res);
-  if (action === 'bulk_toggle')    return runBulkToggle(req, res);
+  if (action === 'agent')             return runAgent(res);
+  if (action === 'webhook')           return runWebhook(req, res);
+  if (action === 'create_ad')         return runCreateAd(req, res);
+  if (action === 'toggle_ad')         return runToggleAd(req, res);
+  if (action === 'toggle_adset')      return runToggleAdset(req, res);
+  if (action === 'update_budget')     return runUpdateBudget(req, res);
+  if (action === 'bulk_toggle')       return runBulkToggle(req, res);
+  if (action === 'sync_historical')   return runSyncHistorical(req, res);
+  if (action === 'pacing_check')      return runPacingCheck(res);
+  if (action === 'duplicate_ad')      return runDuplicateAd(req, res);
   return runSync(res);
 }

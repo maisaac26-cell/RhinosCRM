@@ -795,7 +795,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <button class="btn btn-cyan" style="flex:1;justify-content:center" onclick="metaSaveConfig()">✅ Guardar credenciales</button>
-        <button class="btn" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)" onclick="metaForceSync()">↻ Forzar sincronización</button>
+        <button id="btn-meta-force-sync" class="btn" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)" onclick="metaForceSync()">↻ Forzar sincronización</button>
+        <button id="btn-meta-historical" class="btn" style="color:var(--text2);border-color:var(--border)" onclick="metaHistoricalSyncModal()">📥 Importar histórico</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="field" style="margin:0">
@@ -899,6 +900,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="btn btn-sm meta-ctab2 meta-ctab2-active" data-tab="creativos" onclick="metaContTab('creativos')">🎨 Creativos</button>
       <button class="btn btn-sm meta-ctab2" data-tab="subir" onclick="metaContTab('subir')">📤 Subir nuevo</button>
       <button class="btn btn-sm meta-ctab2" data-tab="arbol" onclick="metaContTab('arbol')">🌳 Árbol IA</button>
+      <button class="btn btn-sm meta-ctab2" data-tab="comparar" onclick="metaContTab('comparar')">⚖️ Comparar</button>
     </div>
 
     <!-- ── TAB: CREATIVOS ─────────────────────────────────────────── -->
@@ -1082,6 +1084,15 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           </div>
         </div>
       </div>
+    </div>
+
+    <div id="meta-cont-comparar" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <select id="comp-ad-a" style="flex:1;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px"><option value="">— Anuncio A —</option></select>
+        <select id="comp-ad-b" style="flex:1;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px"><option value="">— Anuncio B —</option></select>
+        <button class="btn btn-cyan btn-sm" onclick="metaRenderComparador()">⚖️ Comparar</button>
+      </div>
+      <div id="comp-result"></div>
     </div>
 
     <!-- ── MODAL DETALLE CREATIVO ─────────────────────────────────── -->
@@ -16169,10 +16180,106 @@ async function metaForceSync() {
   if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
   try {
     const r = await fetch('/api/meta?action=sync').then(x => x.json());
-    alert(r.ok ? `✓ Sincronizado: ${(r.log||[]).join(', ')}` : 'Error: ' + (r.error || r.msg));
-    if (r.ok) metaDashboardLoad();
-  } catch(e) { alert('Error: ' + e.message); }
+    if (r.ok) { metaToast(`✓ Sincronizado: ${(r.log||[]).join(', ')}`, 'ok'); metaDashboardLoad(); }
+    else metaToast('Error: ' + (r.error || r.msg), 'err');
+  } catch(e) { metaToast('Error: ' + e.message, 'err'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '↻ Forzar sincronización'; } }
+}
+
+function metaHistoricalSyncModal() {
+  const days = prompt('¿Cuántos días de historial importar? (máx 180)', '30');
+  if (!days) return;
+  const d = Math.min(Math.max(parseInt(days) || 30, 1), 180);
+  metaHistoricalSync(d);
+}
+
+async function metaHistoricalSync(days) {
+  const btn = document.getElementById('btn-meta-historical');
+  if (btn) { btn.disabled = true; btn.textContent = `Importando ${days}d...`; }
+  metaToast(`Importando ${days} días de historial...`, 'info');
+  try {
+    const r = await fetch(`/api/meta?action=sync_historical&days=${days}`).then(x => x.json());
+    if (r.ok) { metaToast(`✓ Histórico importado: ${(r.log||[]).join(', ')}`, 'ok'); metaDashboardLoad(); }
+    else metaToast('Error: ' + (r.error || r.msg), 'err');
+  } catch(e) { metaToast('Error: ' + e.message, 'err'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '📥 Importar histórico'; } }
+}
+
+// ── COMPARADOR DE CREATIVOS ───────────────────────────────────────────────────
+async function metaComparadorLoad() {
+  const [selA, selB] = ['comp-ad-a','comp-ad-b'].map(id => document.getElementById(id));
+  if (!selA || !selB) return;
+  if (selA.options.length > 1) return;
+  const ads = await fetch(`${META_SB_URL}/rest/v1/meta_ads?select=id,name&order=name.asc`, { headers: { apikey: META_SB_KEY, Authorization: `Bearer ${META_SB_KEY}` } }).then(r => r.json()).catch(()=>[]);
+  [selA, selB].forEach(sel => {
+    sel.innerHTML = '<option value="">— Elegir anuncio —</option>' + ads.map(a => `<option value="${a.id}">${a.name.slice(0,40)}</option>`).join('');
+  });
+}
+
+async function metaRenderComparador() {
+  const idA = document.getElementById('comp-ad-a')?.value;
+  const idB = document.getElementById('comp-ad-b')?.value;
+  const out = document.getElementById('comp-result');
+  if (!idA || !idB || idA === idB) { if(out) out.innerHTML = '<div class="empty">Elegí dos anuncios distintos</div>'; return; }
+  if (out) out.innerHTML = '<div class="empty">Cargando...</div>';
+  const [ads, metrics] = await Promise.all([
+    fetch(`${META_SB_URL}/rest/v1/meta_ads?id=in.(${idA},${idB})&select=id,name,status,thumbnail_url`, { headers: { apikey: META_SB_KEY, Authorization: `Bearer ${META_SB_KEY}` } }).then(r=>r.json()).catch(()=>[]),
+    fetch(`${META_SB_URL}/rest/v1/meta_ad_metrics?entity_type=eq.ad&entity_id=in.(${idA},${idB})&select=entity_id,spend,impressions,clicks,leads,messages_started,cost_per_lead`, { headers: { apikey: META_SB_KEY, Authorization: `Bearer ${META_SB_KEY}` } }).then(r=>r.json()).catch(()=>[]),
+  ]);
+  const agg = {};
+  for (const m of metrics) {
+    if (!agg[m.entity_id]) agg[m.entity_id] = { spend:0, impressions:0, clicks:0, leads:0, messages_started:0, cost_per_lead:0, _n:0 };
+    agg[m.entity_id].spend += parseFloat(m.spend||0);
+    agg[m.entity_id].impressions += parseInt(m.impressions||0);
+    agg[m.entity_id].clicks += parseInt(m.clicks||0);
+    agg[m.entity_id].leads += parseInt(m.leads||0);
+    agg[m.entity_id].messages_started += parseInt(m.messages_started||0);
+    agg[m.entity_id]._n++;
+  }
+  const renderCol = (ad) => {
+    const m = agg[ad.id] || {};
+    const ctr = m.impressions>0 ? (m.clicks/m.impressions*100).toFixed(2) : '—';
+    const cpl = m.leads>0 ? fmtARS(m.spend/m.leads) : '—';
+    const thumb = ad.thumbnail_url ? `<img src="${ad.thumbnail_url}" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px"/>` : '<div style="width:100%;height:80px;background:var(--surface2);border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;font-size:24px">🖼</div>';
+    return `<div style="flex:1;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)">
+      ${thumb}
+      <div style="font-weight:700;font-size:12px;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ad.name}</div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse">
+        <tr><td style="color:var(--text3);padding:3px 0">Gasto</td><td style="text-align:right;font-weight:600">${fmtARS(m.spend||0)}</td></tr>
+        <tr><td style="color:var(--text3);padding:3px 0">Impresiones</td><td style="text-align:right">${(m.impressions||0).toLocaleString('es-AR')}</td></tr>
+        <tr><td style="color:var(--text3);padding:3px 0">Clics</td><td style="text-align:right">${(m.clicks||0).toLocaleString('es-AR')}</td></tr>
+        <tr><td style="color:var(--text3);padding:3px 0">CTR</td><td style="text-align:right">${ctr}%</td></tr>
+        <tr><td style="color:var(--text3);padding:3px 0">Leads</td><td style="text-align:right;font-weight:600;color:var(--cyan)">${m.leads||0}</td></tr>
+        <tr><td style="color:var(--text3);padding:3px 0">CPL</td><td style="text-align:right;font-weight:600;color:var(--cyan)">${cpl}</td></tr>
+        <tr><td style="color:var(--text3);padding:3px 0">Mensajes</td><td style="text-align:right">${m.messages_started||0}</td></tr>
+      </table>
+    </div>`;
+  };
+  const [adA, adB] = [ads.find(a=>a.id===idA), ads.find(a=>a.id===idB)];
+  const mA = agg[idA]||{}, mB = agg[idB]||{};
+  const winner = !mA.leads&&!mB.leads ? '' : (mA.leads===mB.leads ? '' : (mA.leads>mB.leads ? adA?.name : adB?.name));
+  const winnerDiv = winner ? `<div style="text-align:center;padding:8px;background:rgba(0,229,204,0.08);border:1px solid rgba(0,229,204,0.3);border-radius:var(--r);font-size:12px;color:var(--cyan);margin-bottom:12px">🏆 Ganador por leads: <strong>${winner.slice(0,30)}</strong></div>` : '';
+  if (out) out.innerHTML = winnerDiv + `<div style="display:flex;gap:10px">${[adA,adB].filter(Boolean).map(renderCol).join('')}</div>`;
+}
+
+// ── DUPLICAR ANUNCIO ──────────────────────────────────────────────────────────
+function metaDuplicateAdModal(adId, adName) {
+  const newName = prompt(`Nombre del anuncio duplicado:`, `${adName} (copia)`);
+  if (newName === null) return;
+  metaDuplicateAd(adId, newName || `${adName} (copia)`);
+}
+
+async function metaDuplicateAd(adId, newName) {
+  metaToast('Duplicando anuncio...', 'info');
+  try {
+    const r = await fetch('/api/meta?action=duplicate_ad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ad_id: adId, new_name: newName }),
+    }).then(x => x.json());
+    if (r.ok) { metaToast(`✓ Duplicado como "${r.name}" (pausado)`, 'ok'); setTimeout(metaLoadAllCampaigns, 1500); }
+    else metaToast('Error: ' + (r.error || r.msg), 'err');
+  } catch(e) { metaToast('Error: ' + e.message, 'err'); }
 }
 
 // ── CAMPAÑAS tabs ──
@@ -16287,7 +16394,7 @@ async function metaLoadAllCampaigns() {
         <div style="flex:1;min-width:0">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
             <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${ad.name}</div>
-            <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${badge(ad.status)}${togBtn('ad',ad.id,ad.status)}</div>
+            <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${badge(ad.status)}<button title="Duplicar anuncio" onclick="metaDuplicateAdModal('${ad.id}','${ad.name.replace(/'/g,"&#39;")}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text3);cursor:pointer;padding:2px 5px;font-size:11px">📋</button>${togBtn('ad',ad.id,ad.status)}</div>
           </div>
           ${chips(m)}
         </div>
@@ -16337,6 +16444,18 @@ async function metaLoadAllCampaigns() {
               <div style="flex-shrink:0">${togBtn('campaign',c.id,c.status)}</div>
             </div>
             ${chips(m)}
+            ${(()=>{
+              const cfg=JSON.parse(localStorage.getItem('meta_config')||'{}');
+              const targetCpl=parseFloat(cfg.meta_target_cpl||0);
+              const spend=parseFloat(m.spend||0); const leads=parseInt(m.leads||0);
+              const budget=parseFloat(c.budget_daily||0);
+              if(!budget||!targetCpl||targetCpl<=0) return '';
+              const today=new Date(); const daysLeft=new Date(today.getFullYear(),today.getMonth()+1,0).getDate()-today.getDate();
+              const remainBudget=budget*daysLeft; const cpl=leads>0?(spend/leads):targetCpl;
+              const projLeads=Math.round(remainBudget/cpl);
+              const color=projLeads>5?'var(--green)':projLeads>2?'#f59e0b':'var(--red,#ef4444)';
+              return `<div style="margin-top:5px;font-size:10px;color:${color}">📈 Forecast: ~${projLeads} leads más este mes (${daysLeft}d restantes · CPL $${Math.round(cpl).toLocaleString('es-AR')})</div>`;
+            })()}
             ${adsetsHere.length?`<button class="btn btn-sm" onclick="metaToggleCampExpand('${c.id}')" style="margin-top:8px;font-size:10px;color:var(--text3)">
               ${isExp?'▲ Ocultar':'▼ Ver'} ${adsetsHere.length} adset${adsetsHere.length>1?'s':''} · ${totalAds} anuncio${totalAds>1?'s':''}
             </button>`:`<div style="font-size:10px;color:var(--text3);margin-top:6px">Sin adsets — sincronizá primero</div>`}
@@ -16384,13 +16503,14 @@ async function metaCreateCampaign() {
 // ── CONTENIDO tabs ──
 function metaContTab(tab) {
   document.querySelectorAll('.meta-ctab2').forEach(b => b.classList.toggle('meta-ctab2-active', b.dataset.tab === tab));
-  ['creativos','subir','arbol'].forEach(t => {
+  ['creativos','subir','arbol','comparar'].forEach(t => {
     const el = document.getElementById(`meta-cont-${t}`);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
   if (tab === 'creativos') metaCreativosLoad();
   if (tab === 'subir')     metaNewAdLoad();
   if (tab === 'arbol')     metaTreeLoad();
+  if (tab === 'comparar')  metaComparadorLoad();
 }
 
 function metaArbolSubTab(subtab) {
