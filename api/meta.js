@@ -264,6 +264,12 @@ async function runAgent(res) {
       await pushNotify('🤖 Meta agente — resumen', summary);
     }
 
+    // persist last run summary for dashboard
+    await sbReq('POST', 'rhinos_config?on_conflict=key', [{
+      key: 'meta_agent_last_run',
+      value: JSON.stringify({ ts: new Date().toISOString(), actions: actions.slice(0, 20), skipped_count: skipped.length }),
+    }]).catch(() => {});
+
     return res.status(200).json({ ok: true, actions, skipped, _v: 'agent-v2' });
   } catch (err) {
     console.error('[meta-agent]', err.message);
@@ -671,6 +677,43 @@ async function runUpdateBudget(req, res) {
   }
 }
 
+// ── LEAD QUALITY ──────────────────────────────────────────────────────────────
+async function runLeadQuality(res) {
+  try {
+    const [metaLeads, rhinosLeads, ads] = await Promise.all([
+      sbGet('meta_leads_wa?select=id,ad_id,telefono,estado&limit=2000'),
+      sbGet('rhinos_leads?select=phone,status&limit=5000'),
+      sbGet('meta_ads?select=id,name&limit=500'),
+    ]);
+
+    const adNameMap = {};
+    for (const a of ads) adNameMap[a.id] = a.name;
+
+    // Build set of phones that advanced past "nuevo"
+    const advancedPhones = new Set();
+    for (const l of rhinosLeads) {
+      if (l.phone && !['nuevo','sin_respuesta'].includes(l.status)) advancedPhones.add(l.phone.replace(/\D/g,''));
+    }
+
+    const byAd = {};
+    for (const ml of metaLeads) {
+      const id = ml.ad_id || 'unknown';
+      if (!byAd[id]) byAd[id] = { total: 0, advanced: 0, name: adNameMap[id] || id };
+      byAd[id].total++;
+      const phone = (ml.telefono || '').replace(/\D/g,'');
+      if (phone && advancedPhones.has(phone)) byAd[id].advanced++;
+    }
+
+    const result = Object.entries(byAd)
+      .map(([id, v]) => ({ ad_id: id, name: v.name, total_leads: v.total, advanced: v.advanced, quality_pct: v.total > 0 ? Math.round(v.advanced / v.total * 100) : 0 }))
+      .sort((a, b) => b.quality_pct - a.quality_pct);
+
+    return res.status(200).json({ ok: true, result, total_leads: metaLeads.length });
+  } catch(err) {
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 // ── TODAY REPORT ──────────────────────────────────────────────────────────────
 async function runTodayReport(res) {
   try {
@@ -723,5 +766,6 @@ export default async function handler(req, res) {
   if (action === 'pacing_check')      return runPacingCheck(res);
   if (action === 'duplicate_ad')      return runDuplicateAd(req, res);
   if (action === 'today_report')      return runTodayReport(res);
+  if (action === 'lead_quality')      return runLeadQuality(res);
   return runSync(res);
 }

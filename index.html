@@ -774,6 +774,23 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
     </div>
 
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          🤖 Últimas acciones del agente
+          <button class="btn btn-sm" onclick="metaAgentLogLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-agent-log"><div class="empty">Sin historial</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          🎯 Calidad de leads por anuncio
+          <button class="btn btn-sm" onclick="metaLeadQualityLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-lead-quality"><div class="empty">Sin datos</div></div>
+      </div>
+    </div>
+
     <div class="card" id="meta-config-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         📡 Conexión Meta Marketing API
@@ -16065,8 +16082,10 @@ async function metaDashboardLoad() {
     if (noConf) noConf.style.display = !campaigns.length ? 'block' : 'none';
     if (badge) { badge.style.display = 'inline'; badge.textContent = `✓ ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`; }
 
-    // Top/low ads
+    // Top/low ads + agent log + lead quality
     metaLoadTopAds(since7str);
+    metaAgentLogLoad();
+    metaLeadQualityLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
@@ -16118,6 +16137,59 @@ async function metaLoadTopAds(since7str) {
         </div>`).join('')
       : '<div class="empty" style="font-size:12px;color:var(--green)">Sin anuncios a pausar 🎉</div>';
   } catch(e) { /* silent */ }
+}
+
+async function metaAgentLogLoad() {
+  const el = document.getElementById('meta-agent-log');
+  if (!el) return;
+  try {
+    const rows = await metaSbGet('rhinos_config?key=eq.meta_agent_last_run&select=value');
+    if (!rows.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Agente no ha corrido aún</div>'; return; }
+    let data;
+    try { data = JSON.parse(typeof rows[0].value === 'string' ? rows[0].value : JSON.stringify(rows[0].value)); } catch(e) { el.innerHTML = '<div class="empty">Error parseando log</div>'; return; }
+    const ts = data.ts ? new Date(data.ts).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    const acts = data.actions || [];
+    el.innerHTML = `<div style="font-size:10px;color:var(--text3);margin-bottom:8px">Última ejecución: ${ts} · ${data.skipped_count||0} ads saltados</div>` +
+      (acts.length ? acts.map(a => {
+        const isScale = a.action?.includes('scaled');
+        const col = isScale ? 'var(--green)' : '#f87171';
+        const icon = isScale ? '📈' : '⏸';
+        return `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);align-items:flex-start">
+          <span style="font-size:14px">${icon}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name||a.id}</div>
+            <div style="font-size:10px;color:${col}">${a.action}${a.reason ? ' — ' + a.reason : ''}${a.detail ? ' — ' + a.detail : ''}</div>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty" style="font-size:12px">Sin acciones en la última ejecución</div>');
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+async function metaLeadQualityLoad() {
+  const el = document.getElementById('meta-lead-quality');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const r = await fetch('/api/meta?action=lead_quality').then(x => x.json());
+    if (!r.ok) { el.innerHTML = `<div class="empty">Error: ${r.error||r.msg}</div>`; return; }
+    const list = r.result || [];
+    if (!list.length) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin leads en meta_leads_wa</div>'; return; }
+    el.innerHTML = `<div style="font-size:10px;color:var(--text3);margin-bottom:8px">Total leads capturados: ${r.total_leads}</div>` +
+      list.slice(0, 8).map(a => {
+        const bar = Math.round(a.quality_pct);
+        const col = bar >= 50 ? 'var(--green)' : bar >= 25 ? '#f59e0b' : '#f87171';
+        return `<div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${(a.name||a.ad_id).slice(0,32)}</span>
+            <span style="color:${col};font-weight:600;margin-left:8px;flex-shrink:0">${bar}%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;height:5px;background:var(--surface2);border-radius:3px"><div style="width:${bar}%;height:100%;background:${col};border-radius:3px;transition:width 0.5s"></div></div>
+            <span style="font-size:10px;color:var(--text3)">${a.advanced}/${a.total_leads}</span>
+          </div>
+        </div>`;
+      }).join('');
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 
 async function metaToggleCampaign(id, currentStatus) {
@@ -17376,6 +17448,16 @@ async function metaQualifyLead() {
 
 // Auto-load dashboard when section shows
 document.querySelector('.nav-btn[data-sec="meta-dashboard"]')?.addEventListener('click', () => setTimeout(metaDashboardLoad, 100));
+
+// Auto-refresh meta dashboard every 30 min while page is open
+let _metaAutoRefreshTimer = null;
+document.querySelector('.nav-btn[data-sec="meta-dashboard"]')?.addEventListener('click', () => {
+  clearInterval(_metaAutoRefreshTimer);
+  _metaAutoRefreshTimer = setInterval(() => {
+    const active = document.querySelector('.nav-btn.active[data-sec="meta-dashboard"]');
+    if (active) metaDashboardLoad();
+  }, 30 * 60 * 1000);
+});
 document.querySelector('.nav-btn[data-sec="meta-campanas"]')?.addEventListener('click', () => setTimeout(() => metaLoadAllCampaigns(), 100));
 document.querySelector('.nav-btn[data-sec="meta-leads"]')?.addEventListener('click', () => setTimeout(metaLeadsLoad, 100));
 document.querySelector('.nav-btn[data-sec="meta-contenido"]')?.addEventListener('click', () => setTimeout(metaCreativosLoad, 100));
