@@ -1516,21 +1516,22 @@ async function runBatchLaunchStart(req, res) {
     if (!campaign_name) return res.status(200).json({ ok: false, error: 'Nombre de campaña requerido' });
     if (!budget_daily)  return res.status(200).json({ ok: false, error: 'Presupuesto diario requerido' });
 
-    const obj = objective || 'OUTCOME_LEADS';
+    const obj = objective || 'OUTCOME_TRAFFIC';
     const objMap = {
-      OUTCOME_LEADS:     { opt: 'LINK_CLICKS', bill: 'LINK_CLICKS' },
-      OUTCOME_TRAFFIC:   { opt: 'LINK_CLICKS', bill: 'LINK_CLICKS' },
+      OUTCOME_LEADS:     { opt: 'LINK_CLICKS', bill: 'IMPRESSIONS' },
+      OUTCOME_TRAFFIC:   { opt: 'LINK_CLICKS', bill: 'IMPRESSIONS' },
       OUTCOME_AWARENESS: { opt: 'REACH',       bill: 'IMPRESSIONS' },
-      OUTCOME_ENGAGEMENT:{ opt: 'POST_ENGAGEMENT', bill: 'POST_ENGAGEMENT' },
+      OUTCOME_ENGAGEMENT:{ opt: 'POST_ENGAGEMENT', bill: 'IMPRESSIONS' },
     };
-    const { opt, bill } = objMap[obj] || objMap['OUTCOME_LEADS'];
+    const { opt, bill } = objMap[obj] || objMap['OUTCOME_TRAFFIC'];
 
     // 1. Create campaign
     const campaign = await metaPost(token, `act_${accountId}/campaigns`, {
       name: campaign_name,
       objective: obj,
-      status: 'ACTIVE',
+      status: 'PAUSED',
       special_ad_categories: [],
+      buying_type: 'AUCTION',
     });
 
     // 2. Create adset
@@ -1541,12 +1542,13 @@ async function runBatchLaunchStart(req, res) {
       daily_budget: budgetCents,
       billing_event: bill,
       optimization_goal: opt,
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
       targeting: {
         age_min: parseInt(age_min) || 28,
         age_max: parseInt(age_max) || 60,
         geo_locations: { countries: ['AR'] },
       },
-      status: 'ACTIVE',
+      status: 'PAUSED',
     });
 
     // Save to Supabase (non-fatal)
