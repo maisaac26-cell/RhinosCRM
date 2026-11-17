@@ -259,6 +259,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 .cre-queue-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:var(--r);margin-bottom:5px;border:1px solid var(--border)}
 .meta-toast{padding:10px 14px;border-radius:var(--r);font-size:12px;font-weight:500;pointer-events:auto;box-shadow:0 4px 16px rgba(0,0,0,0.3);border:1px solid;max-width:300px;animation:meta-toast-in 0.2s ease-out}
 @keyframes meta-toast-in{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+.camp-chip{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-weight:500;white-space:nowrap}
+.camp-chip-lead{background:rgba(0,229,204,0.08)!important;border-color:rgba(0,229,204,0.3)!important;color:var(--cyan)!important}
+.camp-chip-msg{background:rgba(99,102,241,0.08)!important;border-color:rgba(99,102,241,0.3)!important;color:#818cf8!important}
 .tab-row{display:flex;gap:4px;margin-bottom:1rem;background:var(--surface2);border-radius:var(--r);padding:3px}
 .tab-btn{flex:1;padding:7px 8px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:11px;color:var(--text2);font-family:var(--font);transition:all 0.15s;text-align:center;font-weight:500}
 .tab-btn.active{background:var(--surface);color:var(--cyan);border:1px solid var(--border)}
@@ -16067,12 +16070,65 @@ async function metaLoadTopAds(since7str) {
 
 async function metaToggleCampaign(id, currentStatus) {
   const newStatus = currentStatus === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-  if (!confirm(`¿${newStatus === 'PAUSED' ? 'Pausar' : 'Activar'} esta campaña?`)) return;
+  metaToast(`${newStatus === 'PAUSED' ? 'Pausando' : 'Activando'} campaña...`, 'info');
   try {
     const r = await callAPI('meta_toggle_campaign', { campaign_id: id, new_status: newStatus });
-    if (r.ok) metaDashboardLoad();
-    else alert('Error: ' + (r.error || r.msg));
-  } catch(e) { alert('Error de red: ' + e.message); }
+    if (r.ok) { metaToast(`Campaña ${newStatus === 'PAUSED' ? 'pausada' : 'activada'} ✓`, 'ok'); metaLoadAllCampaigns(); }
+    else metaToast('Error: ' + (r.error || r.msg), 'error');
+  } catch(e) { metaToast('Error de red: ' + e.message, 'error'); }
+}
+
+async function metaToggleAdset(id, currentStatus) {
+  const newStatus = currentStatus === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+  metaToast(`${newStatus === 'PAUSED' ? 'Pausando' : 'Activando'} adset...`, 'info');
+  try {
+    const r = await fetch('/api/meta?action=toggle_adset', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ adset_id: id, new_status: newStatus })
+    }).then(x => x.json());
+    if (r.ok) { metaToast(`Adset ${newStatus === 'PAUSED' ? 'pausado' : 'activado'} ✓`, 'ok'); metaLoadAllCampaigns(); }
+    else metaToast('Error: ' + (r.error || r.msg), 'error');
+  } catch(e) { metaToast('Error de red: ' + e.message, 'error'); }
+}
+
+function metaInlineBudget(entityType, entityId, currentBudget) {
+  const existing = document.getElementById('meta-budget-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'meta-budget-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;width:300px;max-width:92vw">
+    <div style="font-weight:700;font-size:13px;margin-bottom:4px">Editar presupuesto diario</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Actual: ${fmtARS(currentBudget)}/día · ${entityType === 'campaign' ? 'Campaña' : 'Adset'}</div>
+    <input id="meta-budget-input" type="number" value="${currentBudget||0}" min="100" step="100" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box"/>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-cyan btn-full" onclick="metaSaveBudget('${entityType}','${entityId}')">Guardar</button>
+      <button class="btn btn-full" onclick="document.getElementById('meta-budget-overlay').remove()">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const inp = overlay.querySelector('#meta-budget-input');
+  inp.focus(); inp.select();
+  overlay.addEventListener('keydown', e => {
+    if (e.key === 'Escape') overlay.remove();
+    if (e.key === 'Enter') metaSaveBudget(entityType, entityId);
+  });
+}
+
+async function metaSaveBudget(entityType, entityId) {
+  const input = document.getElementById('meta-budget-input');
+  const daily_budget = parseFloat(input?.value || 0);
+  if (!daily_budget || daily_budget < 100) { metaToast('Presupuesto mínimo: $100', 'error'); return; }
+  document.getElementById('meta-budget-overlay')?.remove();
+  metaToast('Actualizando presupuesto...', 'info');
+  try {
+    const r = await fetch('/api/meta?action=update_budget', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ entity_type: entityType, entity_id: entityId, daily_budget })
+    }).then(x => x.json());
+    if (r.ok) { metaToast(`Presupuesto actualizado a ${fmtARS(daily_budget)}/día ✓`, 'ok'); metaLoadAllCampaigns(); }
+    else metaToast('Error: ' + (r.error || r.msg), 'error');
+  } catch(e) { metaToast('Error de red: ' + e.message, 'error'); }
 }
 
 async function metaSaveConfig() {
@@ -16108,28 +16164,168 @@ function metaCampTab(tab) {
   if (tab === 'existentes') metaLoadAllCampaigns();
 }
 
+let _metaCampRange = 7;
+let _metaCampExpanded = new Set();
+let _metaAdsetExpanded = new Set();
+
+function metaToggleCampExpand(id) {
+  if (_metaCampExpanded.has(id)) _metaCampExpanded.delete(id); else _metaCampExpanded.add(id);
+  metaLoadAllCampaigns();
+}
+function metaToggleAdsetExpand(id) {
+  if (_metaAdsetExpanded.has(id)) _metaAdsetExpanded.delete(id); else _metaAdsetExpanded.add(id);
+  metaLoadAllCampaigns();
+}
+
 async function metaLoadAllCampaigns() {
   const el = document.getElementById('meta-all-campaigns-list');
   if (!el) return;
   el.innerHTML = '<div class="empty"><div class="loader"></div><br>Cargando...</div>';
   try {
-    const camps = await metaSbGet('meta_campaigns?order=updated_at.desc&limit=100');
+    const [camps, adsets, ads] = await Promise.all([
+      metaSbGet('meta_campaigns?order=updated_at.desc&limit=100'),
+      metaSbGet('meta_adsets?limit=500&select=id,campaign_id,name,status,budget_daily,optimization_goal'),
+      metaSbGet('meta_ads?limit=1000&select=id,adset_id,campaign_id,name,status,thumbnail_url,created_at'),
+    ]);
     if (!camps.length) { el.innerHTML = '<div class="empty">No hay campañas. Configurá Meta y sincronizá primero.</div>'; return; }
-    el.innerHTML = camps.map(c => `
-      <div class="card" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div>
-            <div style="font-weight:600;color:var(--text);font-size:13px">${c.name}</div>
-            <div style="font-size:11px;color:var(--text3)">${(c.objective||'').replace('OUTCOME_','')} · Budget/día: ${fmtARS(c.budget_daily)}</div>
+
+    const sinceDate = new Date(); sinceDate.setDate(sinceDate.getDate() - _metaCampRange);
+    const since = sinceDate.toISOString().slice(0,10);
+    let metrics = [];
+    if (ads.length) metrics = await metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since}&select=entity_id,impressions,clicks,spend,reach,leads,messages_started&limit=5000`);
+
+    // Aggregate per ad
+    const adM = {};
+    for (const m of metrics) {
+      if (!adM[m.entity_id]) adM[m.entity_id] = {impressions:0,clicks:0,spend:0,reach:0,leads:0,messages:0};
+      adM[m.entity_id].impressions += parseInt(m.impressions||0);
+      adM[m.entity_id].clicks      += parseInt(m.clicks||0);
+      adM[m.entity_id].spend       += parseFloat(m.spend||0);
+      adM[m.entity_id].reach       += parseInt(m.reach||0);
+      adM[m.entity_id].leads       += parseInt(m.leads||0);
+      adM[m.entity_id].messages    += parseInt(m.messages_started||0);
+    }
+
+    // Group ads + aggregate per adset
+    const adsByAdset = {}, adsetM = {};
+    for (const a of ads) {
+      (adsByAdset[a.adset_id] = adsByAdset[a.adset_id]||[]).push(a);
+      const m = adM[a.id]||{};
+      if (!adsetM[a.adset_id]) adsetM[a.adset_id] = {impressions:0,clicks:0,spend:0,reach:0,leads:0,messages:0};
+      adsetM[a.adset_id].impressions += m.impressions||0;
+      adsetM[a.adset_id].clicks      += m.clicks||0;
+      adsetM[a.adset_id].spend       += m.spend||0;
+      adsetM[a.adset_id].reach       += m.reach||0;
+      adsetM[a.adset_id].leads       += m.leads||0;
+      adsetM[a.adset_id].messages    += m.messages||0;
+    }
+
+    // Group adsets + aggregate per campaign
+    const adsetsByCamp = {}, campM = {};
+    for (const a of adsets) {
+      (adsetsByCamp[a.campaign_id] = adsetsByCamp[a.campaign_id]||[]).push(a);
+      const m = adsetM[a.id]||{};
+      if (!campM[a.campaign_id]) campM[a.campaign_id] = {impressions:0,clicks:0,spend:0,reach:0,leads:0,messages:0};
+      campM[a.campaign_id].impressions += m.impressions||0;
+      campM[a.campaign_id].clicks      += m.clicks||0;
+      campM[a.campaign_id].spend       += m.spend||0;
+      campM[a.campaign_id].reach       += m.reach||0;
+      campM[a.campaign_id].leads       += m.leads||0;
+      campM[a.campaign_id].messages    += m.messages||0;
+    }
+
+    function fmtNum(n) { n=Number(n)||0; if(n>=1000000) return (n/1000000).toFixed(1)+'M'; if(n>=1000) return (n/1000).toFixed(1)+'k'; return n.toLocaleString(); }
+    function fmtCTR(c,i) { return i>0?((c/i)*100).toFixed(2)+'%':'—'; }
+    function fmtCPL(s,l) { return l>0?fmtARS(s/l):'—'; }
+
+    function chips(m) {
+      const ctr=fmtCTR(m.clicks||0,m.impressions||0), cpl=fmtCPL(m.spend||0,m.leads||0);
+      return `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">
+        <span class="camp-chip">💰 ${fmtARS(m.spend||0)}</span>
+        <span class="camp-chip">👁 ${fmtNum(m.impressions||0)}</span>
+        <span class="camp-chip">🖱 ${fmtNum(m.clicks||0)}</span>
+        <span class="camp-chip">📊 ${ctr}</span>
+        ${(m.leads||0)>0?`<span class="camp-chip camp-chip-lead">🎯 ${m.leads} leads</span><span class="camp-chip">CPL ${cpl}</span>`:''}
+        ${(m.messages||0)>0?`<span class="camp-chip camp-chip-msg">💬 ${m.messages} msg</span>`:''}
+        ${(m.reach||0)>0?`<span class="camp-chip">👥 ${fmtNum(m.reach||0)}</span>`:''}
+      </div>`;
+    }
+
+    function badge(s) { return s==='ACTIVE'
+      ? '<span style="font-size:9px;padding:2px 8px;border-radius:8px;background:rgba(34,197,94,0.12);color:var(--green);font-weight:700">ACTIVA</span>'
+      : '<span style="font-size:9px;padding:2px 8px;border-radius:8px;background:rgba(248,113,113,0.1);color:#f87171;font-weight:700">PAUSADA</span>'; }
+
+    function togBtn(type,id,s) { const isA=s==='ACTIVE'; const fn=type==='campaign'?'metaToggleCampaign':type==='adset'?'metaToggleAdset':'metaToggleAd';
+      return `<button class="btn btn-sm" onclick="${fn}('${id}','${s}')" style="font-size:10px;padding:2px 7px;color:${isA?'#f87171':'var(--green)'}" title="${isA?'Pausar':'Activar'}">${isA?'⏸':'▶'}</button>`; }
+
+    function budgetLink(type,id,b) { return `<span onclick="metaInlineBudget('${type}','${id}',${b||0})" style="cursor:pointer;color:var(--cyan);font-size:10px" title="Editar presupuesto">${fmtARS(b)}/día ✏️</span>`; }
+
+    function renderAd(ad) {
+      const m=adM[ad.id]||{}, isA=ad.status==='ACTIVE';
+      const thumb=ad.thumbnail_url?`<img src="${ad.thumbnail_url}" style="width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid var(--border);flex-shrink:0"/>` : '<div style="width:38px;height:38px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🖼</div>';
+      return `<div style="display:flex;gap:8px;padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:4px;opacity:${isA?1:0.6}">
+        ${thumb}
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+            <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${ad.name}</div>
+            <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${badge(ad.status)}${togBtn('ad',ad.id,ad.status)}</div>
           </div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${c.status==='ACTIVE'?'rgba(34,197,94,0.12)':'rgba(99,102,241,0.12)'};color:${c.status==='ACTIVE'?'var(--green)':'#818cf8'}">${c.status}</span>
-            <button onclick="metaToggleCampaign('${c.id}','${c.status}')" class="btn btn-sm" style="font-size:11px;color:${c.status==='ACTIVE'?'#f87171':'var(--green)'}">
-              ${c.status==='ACTIVE'?'⏸ Pausar':'▶ Activar'}
-            </button>
+          ${chips(m)}
+        </div>
+      </div>`;
+    }
+
+    function renderAdset(as) {
+      const m=adsetM[as.id]||{}, isA=as.status==='ACTIVE', adsHere=adsByAdset[as.id]||[], isExp=_metaAdsetExpanded.has(as.id);
+      return `<div style="margin-bottom:5px">
+        <div style="display:flex;gap:6px;padding:8px 10px;background:rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--r);opacity:${isA?1:0.7}">
+          <button class="btn btn-sm" onclick="metaToggleAdsetExpand('${as.id}')" style="font-size:10px;padding:1px 6px;flex-shrink:0;color:var(--text3)">${isExp?'▲':'▼'}</button>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px">
+              <div style="min-width:0">
+                <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${as.name}</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px">${(as.optimization_goal||'').replace(/_/g,' ')||'—'} · ${budgetLink('adset',as.id,as.budget_daily)}</div>
+              </div>
+              <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${badge(as.status)}${togBtn('adset',as.id,as.status)}</div>
+            </div>
+            ${chips(m)}
+            ${adsHere.length?`<div style="font-size:10px;color:var(--text3);margin-top:5px;cursor:pointer" onclick="metaToggleAdsetExpand('${as.id}')">${isExp?'▲ Ocultar':'▼ Ver'} ${adsHere.length} anuncio${adsHere.length>1?'s':''}</div>`:'<div style="font-size:10px;color:var(--text3);margin-top:5px">Sin anuncios</div>'}
           </div>
         </div>
-      </div>`).join('');
+        ${isExp&&adsHere.length?`<div style="padding:5px 0 0 14px">${adsHere.map(renderAd).join('')}</div>`:''}
+      </div>`;
+    }
+
+    el.innerHTML = `
+      <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text3);font-weight:600">Período:</span>
+        ${[7,14,30].map(d=>`<button class="btn btn-sm cre-range ${d===_metaCampRange?'cre-range-active':''}" onclick="_metaCampRange=${d};metaLoadAllCampaigns()">${d}d</button>`).join('')}
+        <button class="btn btn-sm" style="margin-left:auto;font-size:11px" onclick="metaLoadAllCampaigns()">↻</button>
+      </div>
+      ${camps.map(c => {
+        const m=campM[c.id]||{}, adsetsHere=adsetsByCamp[c.id]||[], isExp=_metaCampExpanded.has(c.id), isA=c.status==='ACTIVE';
+        const totalAds=adsetsHere.reduce((s,a)=>s+(adsByAdset[a.id]||[]).length,0);
+        return `<div style="margin-bottom:10px">
+          <div style="padding:12px 14px;background:var(--surface);border:1px solid ${isA?'rgba(0,229,204,0.2)':'var(--border)'};border-radius:var(--r);transition:opacity 0.2s;opacity:${isA?1:0.75}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+                  <div style="font-weight:700;font-size:13px">${c.name}</div>
+                  ${badge(c.status)}
+                </div>
+                <div style="font-size:10px;color:var(--text3)">${(c.objective||'').replace('OUTCOME_','').replace('_',' ')||'—'} · ${budgetLink('campaign',c.id,c.budget_daily)}</div>
+              </div>
+              <div style="flex-shrink:0">${togBtn('campaign',c.id,c.status)}</div>
+            </div>
+            ${chips(m)}
+            ${adsetsHere.length?`<button class="btn btn-sm" onclick="metaToggleCampExpand('${c.id}')" style="margin-top:8px;font-size:10px;color:var(--text3)">
+              ${isExp?'▲ Ocultar':'▼ Ver'} ${adsetsHere.length} adset${adsetsHere.length>1?'s':''} · ${totalAds} anuncio${totalAds>1?'s':''}
+            </button>`:`<div style="font-size:10px;color:var(--text3);margin-top:6px">Sin adsets — sincronizá primero</div>`}
+          </div>
+          ${isExp?`<div style="padding:6px 0 0 10px">${adsetsHere.map(renderAdset).join('')}</div>`:''}
+        </div>`;
+      }).join('')}
+    `;
   } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 

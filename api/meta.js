@@ -125,20 +125,25 @@ async function runSync(res) {
     const today = new Date();
     const since = new Date(today); since.setDate(since.getDate() - 7);
     const timeRange = encodeURIComponent(JSON.stringify({ since: isoDate(since), until: isoDate(today) }));
-    const fields = 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,ctr,cpc,cpm,actions,cost_per_action_type,purchase_roas';
+    const fields = 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,ctr,cpc,cpm,frequency,actions,cost_per_action_type,purchase_roas';
     const metricsData = await metaGet(token, `act_${accountId}/insights?level=ad&fields=${fields}&time_range=${timeRange}&time_increment=1&limit=1000`);
     const metrics = metricsData.data || [];
     if (metrics.length) {
       const rows = metrics.map(m => {
-        const conversions = (m.actions || []).find(a => a.action_type === 'purchase')?.value || 0;
-        const cpa  = (m.cost_per_action_type || []).find(a => a.action_type === 'purchase')?.value || 0;
-        const roas = (m.purchase_roas || []).find(a => a.action_type === 'omni_purchase')?.value || 0;
+        const conversions      = parseInt((m.actions || []).find(a => a.action_type === 'purchase')?.value || 0);
+        const leads            = parseInt((m.actions || []).find(a => a.action_type === 'lead')?.value || 0);
+        const messages_started = parseInt((m.actions || []).find(a => a.action_type === 'onsite_conversion.messaging_conversation_started_7d')?.value || 0);
+        const cpa          = parseFloat((m.cost_per_action_type || []).find(a => a.action_type === 'purchase')?.value || 0);
+        const cost_per_lead = parseFloat((m.cost_per_action_type || []).find(a => a.action_type === 'lead')?.value || 0);
+        const roas         = parseFloat((m.purchase_roas || []).find(a => a.action_type === 'omni_purchase')?.value || 0);
         return {
           entity_type: 'ad', entity_id: m.ad_id, date_start: m.date_start,
           impressions: parseInt(m.impressions || 0), clicks: parseInt(m.clicks || 0),
           spend: parseFloat(m.spend || 0), reach: parseInt(m.reach || 0),
           ctr: parseFloat(m.ctr || 0), cpc: parseFloat(m.cpc || 0), cpm: parseFloat(m.cpm || 0),
-          conversions: parseInt(conversions), cost_per_result: parseFloat(cpa), roas: parseFloat(roas),
+          frequency: parseFloat(m.frequency || 0),
+          conversions, cost_per_result: cpa, roas,
+          leads, messages_started, cost_per_lead,
           raw_data: m, synced_at: new Date().toISOString(),
         };
       });
@@ -335,11 +340,53 @@ async function runBulkToggle(req, res) {
   }
 }
 
+// ── TOGGLE ADSET ─────────────────────────────────────────────────────────────
+async function runToggleAdset(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending')
+      return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { adset_id, new_status } = req.body || {};
+    if (!adset_id || !new_status)
+      return res.status(200).json({ ok: false, error: 'adset_id y new_status son requeridos' });
+    await metaPatch(token, adset_id, { status: new_status });
+    await sbReq('PATCH', `meta_adsets?id=eq.${adset_id}`, { status: new_status, updated_at: new Date().toISOString() });
+    return res.status(200).json({ ok: true, adset_id, new_status });
+  } catch (err) {
+    console.error('[meta-toggle-adset]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
+// ── UPDATE BUDGET ─────────────────────────────────────────────────────────────
+async function runUpdateBudget(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending')
+      return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { entity_type, entity_id, daily_budget } = req.body || {};
+    if (!entity_id || !entity_type || daily_budget == null)
+      return res.status(200).json({ ok: false, error: 'entity_type, entity_id y daily_budget requeridos' });
+    const budgetCents = Math.round(parseFloat(daily_budget) * 100);
+    await metaPatch(token, entity_id, { daily_budget: budgetCents });
+    const table = entity_type === 'campaign' ? 'meta_campaigns' : 'meta_adsets';
+    await sbReq('PATCH', `${table}?id=eq.${entity_id}`, { budget_daily: parseFloat(daily_budget), updated_at: new Date().toISOString() });
+    return res.status(200).json({ ok: true, entity_id, daily_budget: parseFloat(daily_budget) });
+  } catch (err) {
+    console.error('[meta-update-budget]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
-  if (action === 'agent')       return runAgent(res);
-  if (action === 'create_ad')   return runCreateAd(req, res);
-  if (action === 'toggle_ad')   return runToggleAd(req, res);
-  if (action === 'bulk_toggle') return runBulkToggle(req, res);
+  if (action === 'agent')          return runAgent(res);
+  if (action === 'create_ad')      return runCreateAd(req, res);
+  if (action === 'toggle_ad')      return runToggleAd(req, res);
+  if (action === 'toggle_adset')   return runToggleAdset(req, res);
+  if (action === 'update_budget')  return runUpdateBudget(req, res);
+  if (action === 'bulk_toggle')    return runBulkToggle(req, res);
   return runSync(res);
 }
