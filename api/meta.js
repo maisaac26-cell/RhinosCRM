@@ -1053,6 +1053,97 @@ async function runAdsetEfficiency(res) {
   } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
 }
 
+async function runMorningBrief(res) {
+  try {
+    const yesterday = isoDate(new Date(Date.now() - 86400000));
+    const since7    = isoDate(new Date(Date.now() - 6 * 86400000));
+
+    const [yMetrics, w7Metrics, ads, cfgGoals, cfgWa] = await Promise.all([
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=eq.${yesterday}&select=entity_id,spend,impressions,clicks,leads,messages_started`),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7}&select=entity_id,spend,leads`),
+      sbGet('meta_ads?select=id,name&limit=200'),
+      sbGet('rhinos_config?key=in.(meta_goal_leads_month,meta_goal_spend_month)&select=key,value'),
+      sbGet('rhinos_config?key=eq.wa_recipients&select=value'),
+    ]);
+
+    let WA_RECIPIENTS = [];
+    if (cfgWa[0]) {
+      try { WA_RECIPIENTS = JSON.parse(cfgWa[0].value.replace(/^"|"$/g,'')); } catch(e) {}
+    }
+    if (!WA_RECIPIENTS.length) return res.status(200).json({ ok: false, msg: 'No wa_recipients configured' });
+
+    const adNameMap = {}; for (const a of ads) adNameMap[a.id] = a.name;
+    const cfgMap = {}; for (const c of cfgGoals) cfgMap[c.key] = parseFloat(c.value) || 0;
+
+    const yAgg = {}, w7Agg = {};
+    for (const m of yMetrics) {
+      if (!yAgg[m.entity_id]) yAgg[m.entity_id] = { spend:0, impressions:0, clicks:0, leads:0, messages:0 };
+      yAgg[m.entity_id].spend       += parseFloat(m.spend||0);
+      yAgg[m.entity_id].impressions += parseInt(m.impressions||0);
+      yAgg[m.entity_id].clicks      += parseInt(m.clicks||0);
+      yAgg[m.entity_id].leads       += parseInt(m.leads||0);
+      yAgg[m.entity_id].messages    += parseInt(m.messages_started||0);
+    }
+    for (const m of w7Metrics) {
+      if (!w7Agg[m.entity_id]) w7Agg[m.entity_id] = { spend:0, leads:0 };
+      w7Agg[m.entity_id].spend += parseFloat(m.spend||0);
+      w7Agg[m.entity_id].leads += parseInt(m.leads||0);
+    }
+
+    const yTotSpend = Object.values(yAgg).reduce((s,a) => s + a.spend, 0);
+    const yTotLeads = Object.values(yAgg).reduce((s,a) => s + a.leads, 0);
+    const yTotImpr  = Object.values(yAgg).reduce((s,a) => s + a.impressions, 0);
+    const yTotMsg   = Object.values(yAgg).reduce((s,a) => s + a.messages, 0);
+    const w7Leads   = Object.values(w7Agg).reduce((s,a) => s + a.leads, 0);
+
+    const yCandidates = Object.entries(yAgg).filter(([,m]) => m.spend > 1);
+    const bestYAd  = yCandidates.filter(([,m]) => m.leads > 0).sort((a,b) => (a[1].spend/a[1].leads) - (b[1].spend/b[1].leads))[0];
+    const worstYAd = yCandidates.filter(([,m]) => m.leads === 0).sort((a,b) => b[1].spend - a[1].spend)[0];
+
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const goalLeads = cfgMap['meta_goal_leads_month'] || 0;
+    const avgDailyLeads = w7Leads / 7;
+
+    const fechaAyer = new Date(Date.now() - 86400000).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'short' });
+    const fA = n => '$' + Math.round(n).toLocaleString('es-AR');
+
+    let msg = `🌅 *Buenos días — Meta Ads*\n`;
+    msg += `📅 Ayer (${fechaAyer})\n`;
+    msg += `━━━━━━━━━━━━━━━\n\n`;
+
+    if (yTotSpend === 0) {
+      msg += `Sin actividad registrada ayer.\n`;
+    } else {
+      msg += `💰 Gasto: ${fA(yTotSpend)}\n`;
+      msg += `👁 Impresiones: ${yTotImpr.toLocaleString('es-AR')}\n`;
+      if (yTotLeads > 0) msg += `🎯 Leads: ${yTotLeads} · CPL: ${fA(yTotSpend / yTotLeads)}\n`;
+      else msg += `🎯 Leads: 0\n`;
+      if (yTotMsg > 0) msg += `💬 Mensajes WA: ${yTotMsg}\n`;
+    }
+    if (bestYAd) {
+      const [id, m] = bestYAd;
+      msg += `\n🏆 Mejor ayer: ${(adNameMap[id]||id).slice(0,28)}\n`;
+      msg += `   ${m.leads} leads · CPL ${fA(m.spend/m.leads)}\n`;
+    }
+    if (worstYAd) {
+      const [id, m] = worstYAd;
+      msg += `\n⚠️ Sin leads: ${(adNameMap[id]||id).slice(0,28)} (${fA(m.spend)} gastado)\n`;
+    }
+    if (goalLeads > 0) {
+      const trend = Math.round(avgDailyLeads * daysInMonth);
+      msg += `\n📊 Proyección: ~${trend} leads (meta: ${goalLeads})\n`;
+    }
+    msg += `\n💪 Que hoy sea un gran día 🦏`;
+
+    for (const r of WA_RECIPIENTS) {
+      await fetch(`https://api.callmebot.com/whatsapp.php?phone=${r.phone}&text=${encodeURIComponent(msg)}&apikey=${r.apikey}`).catch(() => {});
+    }
+
+    return res.status(200).json({ ok: true, sent: WA_RECIPIENTS.length, yTotLeads, yTotSpend: Math.round(yTotSpend) });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
 async function runCplTrend(res) {
   try {
     const since8w = new Date(); since8w.setDate(since8w.getDate() - 55);
@@ -1180,6 +1271,7 @@ export default async function handler(req, res) {
   if (action === 'leaderboard')       return runLeaderboard(res);
   if (action === 'decay_check')       return runDecayCheck(res);
   if (action === 'adset_efficiency')  return runAdsetEfficiency(res);
+  if (action === 'morning_brief')     return runMorningBrief(res);
   if (action === 'cpl_trend')         return runCplTrend(res);
   if (action === 'account_health')    return runAccountHealth(res);
   return runSync(res);
