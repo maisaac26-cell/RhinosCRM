@@ -816,6 +816,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <button class="btn btn-cyan" style="flex:1;justify-content:center" onclick="metaSaveConfig()">✅ Guardar credenciales</button>
         <button id="btn-meta-force-sync" class="btn" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)" onclick="metaForceSync()">↻ Forzar sincronización</button>
         <button id="btn-meta-historical" class="btn" style="color:var(--text2);border-color:var(--border)" onclick="metaHistoricalSyncModal()">📥 Importar histórico</button>
+        <button class="btn btn-sm" title="Testear webhook" onclick="metaWebhookTest()" style="color:var(--text3);font-size:11px">🔗 Test webhook</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="field" style="margin:0">
@@ -1164,14 +1165,16 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div class="metric-card"><div class="m-label">Agendados</div><div class="m-val" id="ml-agendados">—</div><div class="m-sub">con cita confirmada</div></div>
       <div class="metric-card"><div class="m-label">Descartados</div><div class="m-val" id="ml-descartados">—</div><div class="m-sub">no calificaron</div></div>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-sm meta-lf meta-lf-active" data-estado="todos" onclick="metaLeadsFilter('todos')">Todos</button>
       <button class="btn btn-sm meta-lf" data-estado="nuevo" onclick="metaLeadsFilter('nuevo')">🆕 Nuevos</button>
       <button class="btn btn-sm meta-lf" data-estado="calificado" onclick="metaLeadsFilter('calificado')">✅ Calificados</button>
       <button class="btn btn-sm meta-lf" data-estado="agendado" onclick="metaLeadsFilter('agendado')">📅 Agendados</button>
       <button class="btn btn-sm meta-lf" data-estado="descartado" onclick="metaLeadsFilter('descartado')">🚫 Descartados</button>
+      <button class="btn btn-sm" onclick="metaLeadsExportCSV()" style="margin-left:auto;color:var(--text3)" title="Exportar a CSV">📥 CSV</button>
     </div>
     <div id="meta-leads-list"><div class="empty"><div class="loader"></div><br>Cargando leads...</div></div>
+    <div id="meta-leads-by-ad" style="margin-top:12px"></div>
     <div class="card" style="margin-top:1rem">
       <div class="card-title">🤖 Bot calificador — probar manualmente</div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
@@ -17427,6 +17430,35 @@ async function metaLeadsLoad() {
     setCount('ml-agendados', 'agendado');
     setCount('ml-descartados', 'descartado');
 
+    // By-ad stats
+    const byAdPanel = document.getElementById('meta-leads-by-ad');
+    if (byAdPanel && _metaLeadsFilter === 'todos') {
+      const byAd = {};
+      for (const l of all) {
+        const id = l.ad_id || 'Sin anuncio';
+        if (!byAd[id]) byAd[id] = { total: 0, calificados: 0, agendados: 0 };
+        byAd[id].total++;
+        if (l.estado === 'calificado' || l.estado === 'agendado') byAd[id].calificados++;
+        if (l.estado === 'agendado') byAd[id].agendados++;
+      }
+      const adIds = Object.keys(byAd).filter(id => id !== 'Sin anuncio');
+      let adNames = {};
+      if (adIds.length) {
+        const adRows = await metaSbGet(`meta_ads?id=in.(${adIds.join(',')})&select=id,name`).catch(()=>[]);
+        for (const a of adRows) adNames[a.id] = a.name;
+      }
+      const rows = Object.entries(byAd).sort((a,b)=>b[1].total-a[1].total).slice(0,6);
+      byAdPanel.innerHTML = rows.length ? `<div class="card" style="margin-top:0">
+        <div class="card-title">📊 Leads por anuncio</div>
+        ${rows.map(([id, v]) => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);font-size:11px">
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${(adNames[id]||id).slice(0,35)}</span>
+          <span style="color:var(--cyan);font-weight:600;flex-shrink:0">${v.total}</span>
+          <span style="color:var(--green);flex-shrink:0">${v.calificados>0?v.calificados+'✅':''}</span>
+          <span style="color:var(--cyan);flex-shrink:0">${v.agendados>0?v.agendados+'📅':''}</span>
+        </div>`).join('')}
+      </div>` : '';
+    } else if (byAdPanel) { byAdPanel.innerHTML = ''; }
+
     const leads = _metaLeadsFilter === 'todos' ? all : all.filter(l => l.estado === _metaLeadsFilter);
     if (!leads.length) { el.innerHTML = '<div class="empty">Sin leads en este estado</div>'; return; }
 
@@ -17438,6 +17470,7 @@ async function metaLeadsLoad() {
           <div>
             <div style="font-weight:600;font-size:13px;color:var(--text)">${l.nombre || 'Sin nombre'}</div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px">${l.empresa || ''} · ${l.telefono || ''} · ${l.email || ''}</div>
+            ${l.ad_id ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">📱 ${l.ad_id.slice(0,16)}... · ${l.fecha_lead ? new Date(l.fecha_lead).toLocaleDateString('es-AR') : ''}</div>` : ''}
             ${l.notas ? `<div style="font-size:11px;color:var(--text2);margin-top:4px">${l.notas}</div>` : ''}
           </div>
           <div style="display:flex;gap:6px;align-items:center">
@@ -17463,6 +17496,34 @@ async function metaLeadChangeEstado(id, estado) {
     await metaSbPatch(`meta_leads_wa?id=eq.${id}`, { estado, updated_at: new Date().toISOString() });
     metaLeadsLoad();
   } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function metaLeadsExportCSV() {
+  try {
+    const all = await metaSbGet('meta_leads_wa?order=created_at.desc&limit=2000');
+    if (!all.length) { metaToast('Sin leads para exportar', 'err'); return; }
+    const cols = ['id','nombre','empresa','telefono','email','ad_id','campaign_id','estado','fecha_lead','created_at'];
+    const rows = [cols.join(','), ...all.map(l => cols.map(k => `"${(l[k]||'').toString().replace(/"/g,'""')}"`).join(','))];
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `meta_leads_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    metaToast(`✓ CSV exportado (${all.length} leads)`, 'ok');
+  } catch(e) { metaToast('Error exportando: ' + e.message, 'err'); }
+}
+
+async function metaWebhookTest() {
+  const token = document.getElementById('meta-webhook-token-input')?.value.trim();
+  if (!token) { metaToast('Ingresá el token de verificación primero', 'err'); return; }
+  try {
+    const url = `/api/meta?action=webhook&hub.mode=subscribe&hub.verify_token=${encodeURIComponent(token)}&hub.challenge=test_ok_123`;
+    const r = await fetch(url);
+    const text = await r.text();
+    if (text === 'test_ok_123' || r.ok) metaToast('✓ Webhook activo y verificando correctamente', 'ok');
+    else metaToast(`Respuesta inesperada: ${text.slice(0,60)}`, 'err');
+  } catch(e) { metaToast('Error: ' + e.message, 'err'); }
 }
 
 async function metaQualifyLead() {
