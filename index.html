@@ -856,6 +856,23 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-leaderboard-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
     </div>
 
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          📆 Rendimiento por día de semana (30d)
+          <button class="btn btn-sm" onclick="metaDaypartLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-daypart-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          🎯 Embudo de leads
+          <button class="btn btn-sm" onclick="metaFunnelLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+        </div>
+        <div id="meta-funnel-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+      </div>
+    </div>
+
     <div class="card" id="meta-config-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         📡 Conexión Meta Marketing API
@@ -1240,7 +1257,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div class="metric-card"><div class="m-label">Agendados</div><div class="m-val" id="ml-agendados">—</div><div class="m-sub">con cita confirmada</div></div>
       <div class="metric-card"><div class="m-label">Descartados</div><div class="m-val" id="ml-descartados">—</div><div class="m-sub">no calificaron</div></div>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-sm meta-lf meta-lf-active" data-estado="todos" onclick="metaLeadsFilter('todos')">Todos</button>
       <button class="btn btn-sm meta-lf" data-estado="nuevo" onclick="metaLeadsFilter('nuevo')">🆕 Nuevos</button>
       <button class="btn btn-sm meta-lf" data-estado="calificado" onclick="metaLeadsFilter('calificado')">✅ Calificados</button>
@@ -1248,6 +1265,10 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="btn btn-sm meta-lf" data-estado="descartado" onclick="metaLeadsFilter('descartado')">🚫 Descartados</button>
       <button class="btn btn-sm" onclick="metaLeadsExportCSV()" style="margin-left:auto;color:var(--text3)" title="Exportar a CSV">📥 CSV</button>
     </div>
+    <div style="margin-bottom:10px">
+      <input id="meta-leads-search" type="text" placeholder="Buscar por nombre, empresa, teléfono, email..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text);font-size:12px;box-sizing:border-box" oninput="metaLeadsSearch(this.value)"/>
+    </div>
+    <div id="meta-leads-funnel" style="margin-bottom:12px"></div>
     <div id="meta-leads-list"><div class="empty"><div class="loader"></div><br>Cargando leads...</div></div>
     <div id="meta-leads-by-ad" style="margin-top:12px"></div>
     <div class="card" style="margin-top:1rem">
@@ -16096,6 +16117,86 @@ function fmtARS(n) {
 function fmtPct(n) { return n != null ? parseFloat(n).toFixed(2) + '%' : '—'; }
 function fmtNum(n) { return n != null ? parseInt(n).toLocaleString('es-AR') : '—'; }
 
+// ── DAY-OF-WEEK ANALYSIS ─────────────────────────────────────────────────────
+async function metaDaypartLoad() {
+  const el = document.getElementById('meta-daypart-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const since30 = new Date(); since30.setDate(since30.getDate() - 29);
+    const rows = await metaSbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since30.toISOString().slice(0,10)}&select=date_start,spend,leads,clicks,impressions`);
+    const days = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const agg = Array.from({length:7}, () => ({spend:0,leads:0,clicks:0,impressions:0,n:0}));
+    for (const r of rows) {
+      const dow = new Date(r.date_start + 'T12:00:00').getDay();
+      agg[dow].spend       += parseFloat(r.spend||0);
+      agg[dow].leads       += parseInt(r.leads||0);
+      agg[dow].clicks      += parseInt(r.clicks||0);
+      agg[dow].impressions += parseInt(r.impressions||0);
+      agg[dow].n++;
+    }
+    const maxLeads = Math.max(...agg.map(d => d.leads), 1);
+    const maxSpend = Math.max(...agg.map(d => d.spend), 1);
+    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center">
+      ${agg.map((d, i) => {
+        const spendH = Math.round((d.spend / maxSpend) * 48);
+        const leadH  = Math.round((d.leads / maxLeads) * 48);
+        const isToday = new Date().getDay() === i;
+        return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px${isToday?';border-bottom:2px solid var(--cyan)':''}">
+          <div style="font-size:9px;color:var(--text3);font-weight:${isToday?'700':'400'}">${days[i]}</div>
+          <div style="display:flex;gap:2px;align-items:flex-end;height:52px">
+            <div title="Gasto" style="width:12px;background:rgba(167,139,250,0.4);height:${spendH||2}px;border-radius:2px 2px 0 0"></div>
+            <div title="Leads" style="width:12px;background:${d.leads>0?'var(--cyan)':'rgba(0,229,204,0.15)'};height:${leadH||2}px;border-radius:2px 2px 0 0"></div>
+          </div>
+          <div style="font-size:9px;font-weight:700;color:var(--cyan)">${d.leads||0}</div>
+          <div style="font-size:8px;color:var(--text3)">${d.spend>0?(d.spend/1000).toFixed(1)+'k':''}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:12px;margin-top:8px;font-size:9px;color:var(--text3);justify-content:center">
+      <span style="display:flex;gap:4px;align-items:center"><span style="width:10px;height:10px;background:rgba(167,139,250,0.4);border-radius:2px;display:inline-block"></span>Gasto</span>
+      <span style="display:flex;gap:4px;align-items:center"><span style="width:10px;height:10px;background:var(--cyan);border-radius:2px;display:inline-block"></span>Leads</span>
+    </div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── LEAD FUNNEL ───────────────────────────────────────────────────────────────
+async function metaFunnelLoad() {
+  const el = document.getElementById('meta-funnel-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="loader"></div></div>';
+  try {
+    const all = await metaSbGet('meta_leads_wa?select=estado&limit=2000');
+    const counts = { nuevo: 0, contactado: 0, calificado: 0, agendado: 0, descartado: 0 };
+    for (const l of all) if (counts[l.estado] !== undefined) counts[l.estado]++;
+    const total = all.length;
+    const stages = [
+      { key: 'nuevo',      label: 'Nuevos',      col: 'rgba(99,102,241,0.6)',   emoji: '🆕' },
+      { key: 'contactado', label: 'Contactados',  col: 'rgba(251,191,36,0.6)',   emoji: '📞' },
+      { key: 'calificado', label: 'Calificados',  col: 'rgba(34,197,94,0.6)',    emoji: '✅' },
+      { key: 'agendado',   label: 'Agendados',    col: 'rgba(0,229,204,0.7)',    emoji: '📅' },
+    ];
+    if (!total) { el.innerHTML = '<div class="empty" style="font-size:12px">Sin leads aún</div>'; return; }
+    el.innerHTML = stages.map(s => {
+      const n = counts[s.key];
+      const pct = total > 0 ? (n / total * 100) : 0;
+      const barW = Math.max(pct, 3);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+        <span style="font-size:14px;flex-shrink:0">${s.emoji}</span>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px">
+            <span style="color:var(--text2)">${s.label}</span>
+            <span style="color:var(--text);font-weight:600">${n} <span style="color:var(--text3);font-weight:400">(${pct.toFixed(0)}%)</span></span>
+          </div>
+          <div style="height:7px;background:var(--border);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${barW}%;background:${s.col};border-radius:4px;transition:width 0.5s ease"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('') + `<div style="margin-top:8px;font-size:10px;color:var(--text3)">Total leads: ${total} · Descartados: ${counts.descartado}</div>`;
+  } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── WEEK-OVER-WEEK COMPARISON ─────────────────────────────────────────────────
 async function metaWoWLoad() {
   try {
@@ -16526,6 +16627,8 @@ async function metaDashboardLoad() {
     metaAutoRulesLoad();
     metaAutoRulesEval();
     metaLeaderboardLoad();
+    metaDaypartLoad();
+    metaFunnelLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
@@ -17991,13 +18094,82 @@ async function metaAnalyzeCreative() {
 
 // ── LEADS WA ──
 let _metaLeadsFilter = 'todos';
+let _metaLeadsAll = [];
+let _metaLeadsSearchQ = '';
+
+function metaLeadsSearch(q) {
+  _metaLeadsSearchQ = q.toLowerCase();
+  metaLeadsRender();
+}
+
+function metaLeadsRender() {
+  const el = document.getElementById('meta-leads-list');
+  if (!el) return;
+  let leads = _metaLeadsFilter === 'todos' ? _metaLeadsAll : _metaLeadsAll.filter(l => l.estado === _metaLeadsFilter);
+  if (_metaLeadsSearchQ) {
+    leads = leads.filter(l =>
+      (l.nombre||'').toLowerCase().includes(_metaLeadsSearchQ) ||
+      (l.empresa||'').toLowerCase().includes(_metaLeadsSearchQ) ||
+      (l.telefono||'').toLowerCase().includes(_metaLeadsSearchQ) ||
+      (l.email||'').toLowerCase().includes(_metaLeadsSearchQ)
+    );
+  }
+  if (!leads.length) { el.innerHTML = `<div class="empty">Sin leads${_metaLeadsSearchQ ? ' que coincidan con la búsqueda' : ' en este estado'}</div>`; return; }
+  const estadoColors = { nuevo:'rgba(99,102,241,0.12)', contactado:'rgba(251,191,36,0.12)', calificado:'rgba(34,197,94,0.12)', agendado:'rgba(0,229,204,0.12)', descartado:'rgba(248,113,113,0.12)' };
+  const estadoText   = { nuevo:'🆕 Nuevo', contactado:'📞 Contactado', calificado:'✅ Calificado', agendado:'📅 Agendado', descartado:'🚫 Descartado' };
+  el.innerHTML = leads.map(l => {
+    const phone = (l.telefono || '').replace(/\D/g,'');
+    const waLink = phone ? `<a href="https://wa.me/${phone.startsWith('54')?phone:'54'+phone}" target="_blank" class="btn btn-sm" style="font-size:10px;color:var(--green);border-color:rgba(34,197,94,0.3);flex-shrink:0;padding:4px 8px" title="Abrir WhatsApp">💬 WA</a>` : '';
+    return `<div class="card" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:600;font-size:13px;color:var(--text)">${l.nombre || 'Sin nombre'}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${[l.empresa,l.telefono,l.email].filter(Boolean).join(' · ')}</div>
+          ${l.ad_id ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">📱 ${l.ad_id.slice(0,16)}... · ${l.fecha_lead ? new Date(l.fecha_lead).toLocaleDateString('es-AR') : ''}</div>` : ''}
+          ${l.notas ? `<div style="font-size:11px;color:var(--text2);margin-top:4px">${l.notas}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:5px;align-items:flex-start;flex-wrap:wrap;flex-shrink:0">
+          <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${estadoColors[l.estado]||''};color:var(--text2)">${estadoText[l.estado]||l.estado}</span>
+          ${waLink}
+          <select onchange="metaLeadChangeEstado(${l.id},this.value)" style="font-size:11px;padding:3px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text2)">
+            ${['nuevo','contactado','calificado','agendado','descartado'].map(s => `<option value="${s}" ${s===l.estado?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Render lead funnel inline in leads section
+function metaLeadsFunnelRender(all) {
+  const el = document.getElementById('meta-leads-funnel');
+  if (!el) return;
+  const total = all.length;
+  if (!total) { el.innerHTML = ''; return; }
+  const counts = { nuevo:0, contactado:0, calificado:0, agendado:0, descartado:0 };
+  for (const l of all) if (counts[l.estado]!==undefined) counts[l.estado]++;
+  const stages = [
+    { key:'nuevo', col:'rgba(99,102,241,0.7)' },
+    { key:'contactado', col:'rgba(251,191,36,0.7)' },
+    { key:'calificado', col:'rgba(34,197,94,0.7)' },
+    { key:'agendado', col:'rgba(0,229,204,0.8)' },
+    { key:'descartado', col:'rgba(248,113,113,0.5)' },
+  ];
+  el.innerHTML = `<div style="display:flex;gap:3px;height:18px;border-radius:6px;overflow:hidden;margin-bottom:4px">
+    ${stages.map(s => counts[s.key]>0 ? `<div style="flex:${counts[s.key]};background:${s.col};display:flex;align-items:center;justify-content:center;font-size:9px;color:white;font-weight:700;min-width:${counts[s.key]/total*100>5?'0':'0'}" title="${s.key}: ${counts[s.key]}">${counts[s.key]/total*100>8?counts[s.key]:''}</div>` : '').join('')}
+  </div>
+  <div style="display:flex;gap:10px;font-size:9px;color:var(--text3);flex-wrap:wrap">
+    ${stages.map(s => counts[s.key]>0 ? `<span style="display:flex;gap:3px;align-items:center"><span style="width:8px;height:8px;background:${s.col};border-radius:2px;display:inline-block"></span>${s.key}: ${counts[s.key]}</span>` : '').join('')}
+  </div>`;
+}
 
 async function metaLeadsLoad() {
   const el = document.getElementById('meta-leads-list');
   if (!el) return;
   el.innerHTML = '<div class="empty"><div class="loader"></div><br>Cargando leads...</div>';
   try {
-    const all = await metaSbGet('meta_leads_wa?order=created_at.desc&limit=200');
+    const all = await metaSbGet('meta_leads_wa?order=created_at.desc&limit=500');
+    _metaLeadsAll = all;
 
     // Counts
     const setCount = (id, estado) => { const e = document.getElementById(id); if (e) e.textContent = all.filter(l => l.estado === estado).length; };
@@ -18005,6 +18177,9 @@ async function metaLeadsLoad() {
     setCount('ml-calificados', 'calificado');
     setCount('ml-agendados', 'agendado');
     setCount('ml-descartados', 'descartado');
+
+    // Funnel inline
+    metaLeadsFunnelRender(all);
 
     // By-ad stats
     const byAdPanel = document.getElementById('meta-leads-by-ad');
@@ -18035,36 +18210,14 @@ async function metaLeadsLoad() {
       </div>` : '';
     } else if (byAdPanel) { byAdPanel.innerHTML = ''; }
 
-    const leads = _metaLeadsFilter === 'todos' ? all : all.filter(l => l.estado === _metaLeadsFilter);
-    if (!leads.length) { el.innerHTML = '<div class="empty">Sin leads en este estado</div>'; return; }
-
-    el.innerHTML = leads.map(l => {
-      const estadoColors = { nuevo:'rgba(99,102,241,0.12)', contactado:'rgba(251,191,36,0.12)', calificado:'rgba(34,197,94,0.12)', agendado:'rgba(0,229,204,0.12)', descartado:'rgba(248,113,113,0.12)' };
-      const estadoText   = { nuevo:'🆕 Nuevo', contactado:'📞 Contactado', calificado:'✅ Calificado', agendado:'📅 Agendado', descartado:'🚫 Descartado' };
-      return `<div class="card" style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <div style="font-weight:600;font-size:13px;color:var(--text)">${l.nombre || 'Sin nombre'}</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px">${l.empresa || ''} · ${l.telefono || ''} · ${l.email || ''}</div>
-            ${l.ad_id ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">📱 ${l.ad_id.slice(0,16)}... · ${l.fecha_lead ? new Date(l.fecha_lead).toLocaleDateString('es-AR') : ''}</div>` : ''}
-            ${l.notas ? `<div style="font-size:11px;color:var(--text2);margin-top:4px">${l.notas}</div>` : ''}
-          </div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${estadoColors[l.estado]||''};color:var(--text2)">${estadoText[l.estado]||l.estado}</span>
-            <select onchange="metaLeadChangeEstado(${l.id},this.value)" style="font-size:11px;padding:3px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text2)">
-              ${['nuevo','contactado','calificado','agendado','descartado'].map(s => `<option value="${s}" ${s===l.estado?'selected':''}>${s}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    metaLeadsRender();
   } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 
 function metaLeadsFilter(estado) {
   _metaLeadsFilter = estado;
   document.querySelectorAll('.meta-lf').forEach(b => b.classList.toggle('meta-lf-active', b.dataset.estado === estado));
-  metaLeadsLoad();
+  if (_metaLeadsAll.length) metaLeadsRender(); else metaLeadsLoad();
 }
 
 async function metaLeadChangeEstado(id, estado) {
