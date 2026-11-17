@@ -677,6 +677,62 @@ async function runUpdateBudget(req, res) {
   }
 }
 
+// ── BUDGET RECOMMENDATIONS ────────────────────────────────────────────────────
+async function runBudgetRecs(res) {
+  try {
+    const cfg    = await getMetaConfig();
+    const targetCpl = parseFloat(cfg.meta_target_cpl || 0);
+    const since7 = isoDate(new Date(Date.now() - 7 * 86400000));
+
+    const [adsets, ads, metrics] = await Promise.all([
+      sbGet('meta_adsets?status=eq.ACTIVE&budget_daily=not.is.null&select=id,name,budget_daily,campaign_id'),
+      sbGet('meta_ads?select=id,adset_id'),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7}&select=entity_id,spend,impressions,clicks,leads,frequency`),
+    ]);
+
+    const adToAdset = {};
+    for (const a of ads) adToAdset[a.id] = a.adset_id;
+
+    const adsetAgg = {};
+    for (const m of metrics) {
+      const asId = adToAdset[m.entity_id];
+      if (!asId) continue;
+      if (!adsetAgg[asId]) adsetAgg[asId] = { spend:0, impressions:0, clicks:0, leads:0, freq_sum:0, freq_n:0 };
+      adsetAgg[asId].spend += parseFloat(m.spend||0);
+      adsetAgg[asId].impressions += parseInt(m.impressions||0);
+      adsetAgg[asId].clicks += parseInt(m.clicks||0);
+      adsetAgg[asId].leads += parseInt(m.leads||0);
+      if (m.frequency) { adsetAgg[asId].freq_sum += parseFloat(m.frequency); adsetAgg[asId].freq_n++; }
+    }
+
+    const recs = [];
+    for (const as of adsets) {
+      const agg = adsetAgg[as.id];
+      if (!agg || agg.spend < 5) continue;
+      const cpl = agg.leads > 0 ? agg.spend / agg.leads : 0;
+      const ctr = agg.impressions > 0 ? (agg.clicks / agg.impressions) * 100 : 0;
+      const freq = agg.freq_n > 0 ? agg.freq_sum / agg.freq_n : 0;
+      const budget = parseFloat(as.budget_daily || 0);
+
+      if (targetCpl > 0 && cpl > 0 && cpl < targetCpl * 0.7 && freq < 2.5 && budget > 0) {
+        recs.push({ type: 'increase', name: as.name, id: as.id, budget, cpl, ctr: ctr.toFixed(2), leads: agg.leads,
+          reason: `CPL $${cpl.toFixed(0)} < 70% objetivo · freq ${freq.toFixed(1)} · ${agg.leads} leads`,
+          suggested: Math.round(budget * 1.3) });
+      } else if (agg.leads === 0 && agg.spend > 15 && ctr < 0.4) {
+        recs.push({ type: 'decrease', name: as.name, id: as.id, budget, cpl: 0, ctr: ctr.toFixed(2), leads: 0,
+          reason: `Sin leads · ${agg.spend.toFixed(0)} gastado · CTR ${ctr.toFixed(2)}%`,
+          suggested: Math.round(budget * 0.6) });
+      } else if (freq > 3.2 && budget > 0) {
+        recs.push({ type: 'refresh', name: as.name, id: as.id, budget, cpl, ctr: ctr.toFixed(2), leads: agg.leads,
+          reason: `Fatiga: freq ${freq.toFixed(1)} — renovar creativos` });
+      }
+    }
+    return res.status(200).json({ ok: true, recs, analyzed: adsets.length });
+  } catch(err) {
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 // ── LEAD QUALITY ──────────────────────────────────────────────────────────────
 async function runLeadQuality(res) {
   try {
@@ -767,5 +823,6 @@ export default async function handler(req, res) {
   if (action === 'duplicate_ad')      return runDuplicateAd(req, res);
   if (action === 'today_report')      return runTodayReport(res);
   if (action === 'lead_quality')      return runLeadQuality(res);
+  if (action === 'budget_recs')       return runBudgetRecs(res);
   return runSync(res);
 }
