@@ -973,6 +973,14 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-journal-list"><div class="empty" style="font-size:12px">Sin entradas aún</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-period-compare-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        📅 Comparación de períodos
+        <button class="btn btn-sm" onclick="metaPeriodCompareLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div id="meta-period-compare-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:1.25rem" id="meta-ad-score-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         ⭐ Puntuación de anuncios
@@ -17215,6 +17223,95 @@ async function _metaJournalDelete(id) {
   }
 }
 
+// ── PERIOD COMPARISON ────────────────────────────────────────────────────────
+async function metaPeriodCompareLoad() {
+  const el = document.getElementById('meta-period-compare-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Calculando...</div>';
+  try {
+    const daysAgo = d => new Date(Date.now() - d * 86400000).toISOString().slice(0,10);
+    const now = new Date();
+    // This month: 1st of current month to today
+    const curMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+    // Last month: 1st to last day of prior month
+    const prevMonthEnd  = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0,10);
+    const prevMonthStart= new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,10);
+
+    const metrics = await metaSbGet(
+      `meta_ad_metrics?entity_type=eq.ad&date_start=gte.${prevMonthStart}&select=date_start,spend,impressions,clicks,leads`
+    );
+
+    const cur={spend:0,impressions:0,clicks:0,leads:0,days:0};
+    const prv={spend:0,impressions:0,clicks:0,leads:0,days:0};
+    const curDays=new Set(), prvDays=new Set();
+    for (const m of metrics) {
+      const d=m.date_start;
+      if (d>=curMonthStart) {
+        cur.spend+=parseFloat(m.spend||0); cur.impressions+=parseInt(m.impressions||0);
+        cur.clicks+=parseInt(m.clicks||0); cur.leads+=parseInt(m.leads||0);
+        curDays.add(d);
+      } else if (d>=prevMonthStart && d<=prevMonthEnd) {
+        prv.spend+=parseFloat(m.spend||0); prv.impressions+=parseInt(m.impressions||0);
+        prv.clicks+=parseInt(m.clicks||0); prv.leads+=parseInt(m.leads||0);
+        prvDays.add(d);
+      }
+    }
+    cur.days=curDays.size; prv.days=prvDays.size;
+
+    const curCpl = cur.leads>0 ? cur.spend/cur.leads : 0;
+    const prvCpl = prv.leads>0 ? prv.spend/prv.leads : 0;
+    const curCtr = cur.impressions>0 ? cur.clicks/cur.impressions*100 : 0;
+    const prvCtr = prv.impressions>0 ? prv.clicks/prv.impressions*100 : 0;
+
+    const curLabel = now.toLocaleDateString('es-AR',{month:'long'});
+    const prvLabel = new Date(now.getFullYear(), now.getMonth()-1, 1).toLocaleDateString('es-AR',{month:'long'});
+
+    function delta(cur, prv, higherIsBetter=true, fmt=(v)=>v) {
+      if (prv===0) return '<span style="color:var(--text3)">—</span>';
+      const pct=((cur-prv)/prv*100);
+      const good=(higherIsBetter&&pct>=0)||(!higherIsBetter&&pct<=0);
+      const col=good?'var(--green)':'#f87171';
+      const arrow=pct>=0?'↑':'↓';
+      return `<span style="color:${col}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+    }
+    const fARS = n => '$'+Math.round(n).toLocaleString('es-AR');
+    // Days factor for fair comparison (prorate current month)
+    const daysInCurMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const daysInPrvMonth = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    const curPace = cur.days>0 ? (cur.spend/cur.days)*daysInCurMonth : 0;
+    const prvPace = prv.days>0 ? (prv.spend/prv.days)*daysInPrvMonth : 0;
+    const curLeadPace = cur.days>0 ? Math.round((cur.leads/cur.days)*daysInCurMonth) : 0;
+    const prvLeadPace = prv.days>0 ? Math.round((prv.leads/prv.days)*daysInPrvMonth) : 0;
+
+    const rows = [
+      {label:'Gasto real',      cur:fARS(cur.spend),  prv:fARS(prv.spend),  d:delta(cur.spend, prv.spend, false)},
+      {label:'Gasto proyectado',cur:fARS(curPace),     prv:fARS(prvPace),    d:delta(curPace, prvPace, false)},
+      {label:'Leads reales',    cur:cur.leads,          prv:prv.leads,         d:delta(cur.leads, prv.leads, true)},
+      {label:'Leads proyectados',cur:curLeadPace,       prv:prvLeadPace,       d:delta(curLeadPace, prvLeadPace, true)},
+      {label:'CPL',             cur:curCpl>0?fARS(curCpl):'—', prv:prvCpl>0?fARS(prvCpl):'—', d:curCpl>0&&prvCpl>0?delta(curCpl,prvCpl,false):'<span style="color:var(--text3)">—</span>'},
+      {label:'CTR',             cur:curCtr.toFixed(2)+'%', prv:prvCtr.toFixed(2)+'%', d:delta(curCtr, prvCtr, true)},
+      {label:'Días con datos',  cur:cur.days+' d',      prv:prv.days+' d',    d:''},
+    ];
+
+    el.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="color:var(--text3);border-bottom:1px solid var(--border)">
+        <th style="padding:5px 8px 7px 0;text-align:left;font-weight:500">Métrica</th>
+        <th style="padding:5px 8px 7px;text-align:right;font-weight:500;color:var(--cyan)">${curLabel.charAt(0).toUpperCase()+curLabel.slice(1)}</th>
+        <th style="padding:5px 8px 7px;text-align:right;font-weight:500;color:var(--text3)">${prvLabel.charAt(0).toUpperCase()+prvLabel.slice(1)}</th>
+        <th style="padding:5px 0 7px 8px;text-align:right;font-weight:500">Cambio</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>`
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+          <td style="padding:7px 8px 7px 0;color:var(--text2)">${r.label}</td>
+          <td style="padding:7px 8px;text-align:right;color:var(--text);font-weight:500">${r.cur}</td>
+          <td style="padding:7px 8px;text-align:right;color:var(--text3)">${r.prv}</td>
+          <td style="padding:7px 0 7px 8px;text-align:right">${r.d}</td>
+        </tr>`).join('')}
+      </tbody></table></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">* Proyección al fin de mes basada en ritmo actual</div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
 // ── AD SCORE ─────────────────────────────────────────────────────────────────
 async function metaAdScoreLoad() {
   const el = document.getElementById('meta-ad-score-content');
@@ -17551,6 +17648,7 @@ async function metaDashboardLoad() {
     metaCplTrendLoad();
     metaJournalLoad();
     metaAdScoreLoad();
+    metaPeriodCompareLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
