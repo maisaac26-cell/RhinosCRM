@@ -952,6 +952,27 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-cpl-trend-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-journal-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        📓 Bitácora de cambios
+        <button class="btn btn-sm" onclick="metaJournalLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <input id="meta-journal-text" type="text" placeholder="¿Qué cambiaste hoy? (nuevo creativo, presupuesto, audiencia...)" style="flex:1;min-width:0;padding:7px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text)"/>
+        <input id="meta-journal-date" type="date" style="width:130px;padding:7px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text)"/>
+        <select id="meta-journal-cat" style="padding:7px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text)">
+          <option value="otro">🔖 Otro</option>
+          <option value="creativo">🎨 Creativo</option>
+          <option value="presupuesto">💰 Presupuesto</option>
+          <option value="audiencia">🎯 Audiencia</option>
+          <option value="pausa">⏸ Pausa/Activación</option>
+          <option value="campaña">📢 Campaña</option>
+        </select>
+        <button class="btn btn-sm" onclick="metaJournalAdd()" style="font-size:11px;color:var(--cyan);border-color:rgba(0,229,204,0.4);flex-shrink:0">+ Agregar</button>
+      </div>
+      <div id="meta-journal-list"><div class="empty" style="font-size:12px">Sin entradas aún</div></div>
+    </div>
+
     <div class="card" id="meta-config-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         📡 Conexión Meta Marketing API
@@ -17094,6 +17115,98 @@ function metaDigestCopy() {
   navigator.clipboard.writeText(_metaDigestText).then(() => metaToast('✓ Copiado al portapapeles', 'ok')).catch(() => metaToast('No se pudo copiar', 'err'));
 }
 
+// ── PERFORMANCE JOURNAL ──────────────────────────────────────────────────────
+const _JOURNAL_KEY = 'meta_journal';
+const _JOURNAL_CATS = {
+  creativo:    '🎨',
+  presupuesto: '💰',
+  audiencia:   '🎯',
+  pausa:       '⏸',
+  campaña:     '📢',
+  otro:        '🔖',
+};
+
+async function metaJournalLoad() {
+  const el = document.getElementById('meta-journal-list');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="font-size:12px">Cargando...</div>';
+  try {
+    const cfg = await metaSbGet(`rhinos_config?key=eq.${_JOURNAL_KEY}&select=value`);
+    let entries = [];
+    if (cfg[0]) {
+      try { entries = JSON.parse(cfg[0].value.replace(/^"|"$/g, '')); } catch(e) {}
+    }
+    if (!Array.isArray(entries)) entries = [];
+    entries.sort((a, b) => (b.date + b.id).localeCompare(a.date + a.id));
+
+    // Set today's date as default in input
+    const dateEl = document.getElementById('meta-journal-date');
+    if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
+
+    if (!entries.length) {
+      el.innerHTML = '<div class="empty" style="font-size:12px">Sin entradas aún. Registrá tus cambios para analizar su impacto.</div>';
+      return;
+    }
+    el.innerHTML = entries.map(e => {
+      const icon = _JOURNAL_CATS[e.cat] || '🔖';
+      const dateLabel = new Date(e.date + 'T12:00:00').toLocaleDateString('es-AR', { weekday:'short', day:'numeric', month:'short' });
+      return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:16px;line-height:1.4">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:2px">${dateLabel}</div>
+          <div style="font-size:12px;color:var(--text);line-height:1.4">${e.text}</div>
+        </div>
+        <button onclick="_metaJournalDelete('${e.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:2px 4px;line-height:1" title="Eliminar">×</button>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="empty" style="font-size:12px;color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+async function metaJournalAdd() {
+  const textEl = document.getElementById('meta-journal-text');
+  const dateEl = document.getElementById('meta-journal-date');
+  const catEl  = document.getElementById('meta-journal-cat');
+  const text = (textEl?.value || '').trim();
+  const date = dateEl?.value || new Date().toISOString().slice(0,10);
+  const cat  = catEl?.value || 'otro';
+  if (!text) { metaToast('Escribí una nota primero', 'info'); return; }
+
+  try {
+    const cfg = await metaSbGet(`rhinos_config?key=eq.${_JOURNAL_KEY}&select=value`);
+    let entries = [];
+    if (cfg[0]) {
+      try { entries = JSON.parse(cfg[0].value.replace(/^"|"$/g, '')); } catch(e) {}
+    }
+    if (!Array.isArray(entries)) entries = [];
+    entries.push({ id: Date.now().toString(36), date, cat, text, created_at: new Date().toISOString() });
+    await callAPI('save_config', { key: _JOURNAL_KEY, value: JSON.stringify(entries) });
+    if (textEl) textEl.value = '';
+    metaToast('✓ Entrada guardada', 'ok');
+    metaJournalLoad();
+  } catch(e) {
+    metaToast('Error al guardar: ' + e.message, 'err');
+  }
+}
+
+async function _metaJournalDelete(id) {
+  try {
+    const cfg = await metaSbGet(`rhinos_config?key=eq.${_JOURNAL_KEY}&select=value`);
+    let entries = [];
+    if (cfg[0]) {
+      try { entries = JSON.parse(cfg[0].value.replace(/^"|"$/g, '')); } catch(e) {}
+    }
+    if (!Array.isArray(entries)) entries = [];
+    entries = entries.filter(e => e.id !== id);
+    await callAPI('save_config', { key: _JOURNAL_KEY, value: JSON.stringify(entries) });
+    metaToast('Entrada eliminada', 'ok');
+    metaJournalLoad();
+  } catch(e) {
+    metaToast('Error al eliminar: ' + e.message, 'err');
+  }
+}
+
 // ── ATTRIBUTION BY CAMPAIGN ──────────────────────────────────────────────────
 let _metaAttrData = null;
 let _metaAttrMetric = 'spend';
@@ -17335,6 +17448,7 @@ async function metaDashboardLoad() {
     metaAdsetEfficiencyLoad();
     metaAccountHealthLoad();
     metaCplTrendLoad();
+    metaJournalLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
