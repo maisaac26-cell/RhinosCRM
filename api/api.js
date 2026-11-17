@@ -1975,6 +1975,22 @@ La respuesta debe:
       }
     }
 
+    else if (action === 'save_config') {
+      const { key, value } = body;
+      if (!key) { return res.status(400).json({ error: 'key requerido' }); }
+      const sbPayload = JSON.stringify([{ key, value: JSON.stringify(value) }]);
+      await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: new URL(SB_URL_CONF).hostname, path: '/rest/v1/rhinos_config', method: 'POST',
+          headers: { 'apikey': SB_KEY_CONF, 'Authorization': 'Bearer ' + SB_KEY_CONF,
+            'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal',
+            'Content-Length': Buffer.byteLength(sbPayload) }
+        }, (r) => { let raw=''; r.on('data',c=>raw+=c); r.on('end',()=>resolve(raw)); });
+        req.on('error', reject); req.write(sbPayload); req.end();
+      });
+      result = { ok: true };
+    }
+
     else {
       return res.status(400).json({ error: 'Unknown action: ' + action });
     }
