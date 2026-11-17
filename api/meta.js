@@ -1250,6 +1250,19 @@ async function runAccountHealth(res) {
   } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
 }
 
+async function runUpdateLead(req, res) {
+  try {
+    const { id, calificado, estado, notas } = req.body || {};
+    if (!id) return res.status(400).json({ ok: false, error: 'id required' });
+    const updates = { updated_at: new Date().toISOString() };
+    if (calificado !== undefined) updates.calificado = calificado;
+    if (estado !== undefined) updates.estado = estado;
+    if (notas !== undefined) updates.notas = notas;
+    await sbReq('PATCH', `meta_leads_wa?id=eq.${id}`, updates);
+    return res.status(200).json({ ok: true });
+  } catch(err) { return res.status(200).json({ ok: false, error: err.message }); }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
@@ -1274,5 +1287,6 @@ export default async function handler(req, res) {
   if (action === 'morning_brief')     return runMorningBrief(res);
   if (action === 'cpl_trend')         return runCplTrend(res);
   if (action === 'account_health')    return runAccountHealth(res);
+  if (action === 'update_lead')       return runUpdateLead(req, res);
   return runSync(res);
 }

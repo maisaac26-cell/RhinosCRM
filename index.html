@@ -973,6 +973,29 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <div id="meta-journal-list"><div class="empty" style="font-size:12px">Sin entradas aún</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:1.25rem" id="meta-leads-table-card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        📋 Leads recientes
+        <button class="btn btn-sm" onclick="metaLeadsTableLoad()" style="font-size:10px;color:var(--text3)">↻</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <input id="mlt-search" type="text" placeholder="Buscar nombre, teléfono..." oninput="metaLeadsTableLoad()" style="flex:1;min-width:0;padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text)"/>
+        <select id="mlt-estado" onchange="metaLeadsTableLoad()" style="padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text)">
+          <option value="">Todos los estados</option>
+          <option value="nuevo">Nuevo</option>
+          <option value="contactado">Contactado</option>
+          <option value="calificado">Calificado</option>
+          <option value="rechazado">Rechazado</option>
+        </select>
+        <select id="mlt-calificado" onchange="metaLeadsTableLoad()" style="padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text)">
+          <option value="">Calificación</option>
+          <option value="true">✅ Calificados</option>
+          <option value="false">❌ No calificados</option>
+        </select>
+      </div>
+      <div id="meta-leads-table-content"><div class="empty" style="font-size:12px">Cargando...</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:1.25rem" id="meta-hourly-heatmap-card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         🕐 Leads por hora del día
@@ -17231,6 +17254,104 @@ async function _metaJournalDelete(id) {
   }
 }
 
+// ── LEADS TABLE ──────────────────────────────────────────────────────────────
+let _mltPage = 0;
+const _MLT_PAGE_SIZE = 25;
+
+async function metaLeadsTableLoad(resetPage = true) {
+  const el = document.getElementById('meta-leads-table-content');
+  if (!el) return;
+  if (resetPage) _mltPage = 0;
+  const search   = (document.getElementById('mlt-search')?.value || '').trim().toLowerCase();
+  const estado   = document.getElementById('mlt-estado')?.value || '';
+  const calFiltr = document.getElementById('mlt-calificado')?.value || '';
+
+  let qs = `meta_leads_wa?order=fecha_lead.desc&limit=${_MLT_PAGE_SIZE}&offset=${_mltPage * _MLT_PAGE_SIZE}&select=id,nombre,telefono,email,ad_id,estado,calificado,notas,fecha_lead`;
+  if (estado)   qs += `&estado=eq.${estado}`;
+  if (calFiltr) qs += `&calificado=eq.${calFiltr}`;
+
+  el.innerHTML = '<div class="empty" style="font-size:12px">Cargando...</div>';
+  try {
+    const [leads, ads] = await Promise.all([
+      metaSbGet(qs),
+      metaSbGet('meta_ads?select=id,name&limit=200'),
+    ]);
+    const adMap = {}; for (const a of ads) adMap[a.id] = a.name;
+
+    let filtered = leads;
+    if (search) {
+      filtered = leads.filter(l =>
+        (l.nombre||'').toLowerCase().includes(search) ||
+        (l.telefono||'').toLowerCase().includes(search) ||
+        (l.email||'').toLowerCase().includes(search)
+      );
+    }
+
+    if (!filtered.length) {
+      el.innerHTML = '<div class="empty" style="font-size:12px">Sin resultados</div>';
+      return;
+    }
+
+    const estadoColors = { nuevo:'#60a5fa', contactado:'#f59e0b', calificado:'var(--green)', rechazado:'#f87171' };
+    const rows = filtered.map(l => {
+      const fechaStr = l.fecha_lead ? new Date(l.fecha_lead).toLocaleDateString('es-AR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      const adName = adMap[l.ad_id] ? adMap[l.ad_id].slice(0,20) : (l.ad_id||'').slice(0,12);
+      const calIcon = l.calificado ? '✅' : '❌';
+      const estColor = estadoColors[l.estado] || 'var(--text3)';
+      const estados = ['nuevo','contactado','calificado','rechazado'];
+      const estOpts = estados.map(s=>`<option value="${s}"${l.estado===s?' selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('');
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04)" id="mlt-row-${l.id}">
+        <td style="padding:7px 8px 7px 0;font-size:11px;color:var(--text)">${l.nombre||'—'}</td>
+        <td style="padding:7px 6px;font-size:11px;color:var(--text3)">${l.telefono||'—'}</td>
+        <td style="padding:7px 6px;font-size:10px;color:var(--text3)">${adName}</td>
+        <td style="padding:7px 6px;font-size:10px;color:var(--text3)">${fechaStr}</td>
+        <td style="padding:7px 6px;text-align:center">
+          <select onchange="_mltUpdateLead(${l.id},'estado',this.value)" style="font-size:10px;border:1px solid ${estColor};border-radius:4px;background:var(--surface2);color:${estColor};padding:2px 4px">
+            ${estOpts}
+          </select>
+        </td>
+        <td style="padding:7px 6px;text-align:center">
+          <button onclick="_mltToggleCal(${l.id},${!l.calificado})" style="background:none;border:none;cursor:pointer;font-size:14px" title="Toggle calificado">${calIcon}</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    el.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="color:var(--text3);border-bottom:1px solid var(--border)">
+        <th style="padding:5px 8px 7px 0;text-align:left">Nombre</th>
+        <th style="padding:5px 6px 7px;text-align:left">Teléfono</th>
+        <th style="padding:5px 6px 7px;text-align:left">Anuncio</th>
+        <th style="padding:5px 6px 7px;text-align:left">Fecha</th>
+        <th style="padding:5px 6px 7px;text-align:center">Estado</th>
+        <th style="padding:5px 6px 7px;text-align:center">Cal.</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+      ${_mltPage>0 ? `<button class="btn btn-sm" onclick="_mltChangePage(-1)" style="font-size:11px">← Anterior</button>` : ''}
+      <span style="font-size:11px;color:var(--text3)">Página ${_mltPage+1} · ${filtered.length} resultados</span>
+      ${filtered.length===_MLT_PAGE_SIZE ? `<button class="btn btn-sm" onclick="_mltChangePage(1)" style="font-size:11px">Siguiente →</button>` : ''}
+    </div>`;
+  } catch(e) { el.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+function _mltChangePage(dir) { _mltPage=Math.max(0,_mltPage+dir); metaLeadsTableLoad(false); }
+
+async function _mltUpdateLead(id, field, value) {
+  try {
+    const body = { id };
+    if (field === 'estado') body.estado = value;
+    if (field === 'calificado') body.calificado = value;
+    const r = await fetch('/api/meta?action=update_lead', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }).then(r=>r.json());
+    if (!r.ok) metaToast('Error actualizando lead', 'err');
+  } catch(e) { metaToast('Error: '+e.message, 'err'); }
+}
+
+async function _mltToggleCal(id, newVal) {
+  await _mltUpdateLead(id, 'calificado', newVal);
+  metaLeadsTableLoad(false);
+}
+
 // ── HOURLY LEADS HEATMAP ─────────────────────────────────────────────────────
 async function metaHourlyHeatmapLoad() {
   const el = document.getElementById('meta-hourly-heatmap-content');
@@ -17732,6 +17853,7 @@ async function metaDashboardLoad() {
     metaAdScoreLoad();
     metaPeriodCompareLoad();
     metaHourlyHeatmapLoad();
+    metaLeadsTableLoad();
 
   } catch (e) {
     console.warn('[meta-dashboard]', e.message);
