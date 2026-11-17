@@ -797,6 +797,20 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <button class="btn btn-cyan" style="flex:1;justify-content:center" onclick="metaSaveConfig()">✅ Guardar credenciales</button>
         <button class="btn" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)" onclick="metaForceSync()">↻ Forzar sincronización</button>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="field" style="margin:0">
+          <label>CPL objetivo (ARS) <span style="font-size:10px;color:var(--text3)">— el agente pausa si CPL &gt; 2× este valor</span></label>
+          <input id="meta-cpl-input" type="number" placeholder="0 = deshabilitado" style="font-size:12px"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label>Token verificación webhook <span style="font-size:10px;color:var(--text3)">— para captura de leads</span></label>
+          <input id="meta-webhook-token-input" type="text" placeholder="rhinos_meta_webhook_2026" style="font-size:12px"/>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);padding:7px 10px;background:rgba(0,229,204,0.04);border:1px solid rgba(0,229,204,0.15);border-radius:var(--r);margin-bottom:10px;line-height:1.6">
+        🔗 <strong>URL webhook de leads:</strong> <code style="font-size:10px;color:var(--cyan)">https://rhinos-crm.vercel.app/api/meta?action=webhook</code><br/>
+        Configurala en <strong>Meta Business Suite → Webhooks → Página → leadgen</strong> con el token de verificación de arriba.
+      </div>
       <div style="font-size:11px;color:var(--text3);line-height:1.6">
         💡 Token en <strong>Meta Business Suite → Configuración → Usuarios del sistema</strong>.
         Ad Account ID en Administrador de anuncios → URL. Page ID en tu Página de Facebook → Acerca de → Page ID.
@@ -16132,17 +16146,22 @@ async function metaSaveBudget(entityType, entityId) {
 }
 
 async function metaSaveConfig() {
-  const token   = document.getElementById('meta-token-input')?.value.trim();
-  const account = document.getElementById('meta-account-input')?.value.trim();
-  const pageId  = document.getElementById('meta-page-input')?.value.trim();
-  if (!token || !account) { alert('Completá Access Token y Ad Account ID'); return; }
+  const token        = document.getElementById('meta-token-input')?.value.trim();
+  const account      = document.getElementById('meta-account-input')?.value.trim();
+  const pageId       = document.getElementById('meta-page-input')?.value.trim();
+  const targetCpl    = document.getElementById('meta-cpl-input')?.value.trim();
+  const webhookToken = document.getElementById('meta-webhook-token-input')?.value.trim();
+  if (!token || !account) { metaToast('Completá Access Token y Ad Account ID', 'error'); return; }
   try {
     await callAPI('save_config', { key: 'meta_access_token', value: token });
     await callAPI('save_config', { key: 'meta_ad_account_id', value: account });
-    if (pageId) await callAPI('save_config', { key: 'meta_page_id', value: pageId });
+    if (pageId)       await callAPI('save_config', { key: 'meta_page_id', value: pageId });
+    if (targetCpl)    await callAPI('save_config', { key: 'meta_target_cpl', value: parseFloat(targetCpl) });
+    if (webhookToken) await callAPI('save_config', { key: 'meta_webhook_verify_token', value: webhookToken });
     const badge = document.getElementById('meta-conn-badge');
     if (badge) { badge.textContent = '✓ Guardado'; badge.style.color = 'var(--green)'; }
-  } catch(e) { alert('Error: ' + e.message); }
+    metaToast('Configuración guardada ✓', 'ok');
+  } catch(e) { metaToast('Error: ' + e.message, 'error'); }
 }
 
 async function metaForceSync() {

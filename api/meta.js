@@ -60,10 +60,20 @@ async function metaPost(token, path, body) {
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
 async function getMetaConfig() {
-  const rows = await sbGet('rhinos_config?key=in.(meta_access_token,meta_ad_account_id,meta_page_id)&select=key,value');
+  const rows = await sbGet('rhinos_config?key=in.(meta_access_token,meta_ad_account_id,meta_page_id,meta_webhook_verify_token,meta_target_cpl)&select=key,value');
   const cfg = {};
   for (const { key, value } of rows) cfg[key] = (typeof value === 'string' ? value : JSON.stringify(value)).replace(/^"|"$/g, '').trim();
   return cfg;
+}
+
+async function pushNotify(title, body) {
+  try {
+    await fetch('https://rhinos-crm.vercel.app/api/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'send', title, body, tag: 'meta-agent' }),
+    });
+  } catch(e) {}
 }
 
 // ── SYNC ──────────────────────────────────────────────────────────────────────
@@ -158,18 +168,19 @@ async function runSync(res) {
   }
 }
 
-// ── AGENT ─────────────────────────────────────────────────────────────────────
+// ── AGENT v2 ──────────────────────────────────────────────────────────────────
 async function runAgent(res) {
   const actions = [];
   const skipped = [];
   try {
-    const cfg = await getMetaConfig();
+    const cfg       = await getMetaConfig();
     const token     = cfg.meta_access_token  || '';
     const rawId2    = cfg.meta_ad_account_id || '';
     const accountId = rawId2.replace(/^act_/i, '');
+    const targetCpl = parseFloat(cfg.meta_target_cpl || 0); // 0 = deshabilitado
 
     if (!token || token === 'pending' || !accountId || rawId2 === 'pending') {
-      return res.status(200).json({ ok: false, msg: 'Meta not configured', _v: 'agent-v1' });
+      return res.status(200).json({ ok: false, msg: 'Meta not configured', _v: 'agent-v2' });
     }
 
     const ads = await sbGet('meta_ads?status=eq.ACTIVE&select=id,name,adset_id,campaign_id,created_at');
@@ -181,28 +192,45 @@ async function runAgent(res) {
       const ageDays = (today - new Date(ad.created_at)) / 86400000;
       if (ageDays < 7) { skipped.push({ id: ad.id, reason: 'learning_period' }); continue; }
 
-      const rows = await sbGet(`meta_ad_metrics?entity_type=eq.ad&entity_id=eq.${ad.id}&date_start=gte.${since7str}&select=spend,clicks,impressions,conversions,roas,ctr`);
+      const rows = await sbGet(`meta_ad_metrics?entity_type=eq.ad&entity_id=eq.${ad.id}&date_start=gte.${since7str}&select=spend,clicks,impressions,conversions,roas,ctr,leads,frequency`);
       if (!rows.length) { skipped.push({ id: ad.id, reason: 'no_data' }); continue; }
 
       const totSpend       = rows.reduce((s, r) => s + parseFloat(r.spend || 0), 0);
       const totClicks      = rows.reduce((s, r) => s + parseInt(r.clicks || 0), 0);
       const totImpressions = rows.reduce((s, r) => s + parseInt(r.impressions || 0), 0);
       const totConversions = rows.reduce((s, r) => s + parseInt(r.conversions || 0), 0);
-      const avgCtr  = totImpressions > 0 ? (totClicks / totImpressions) * 100 : 0;
-      const avgRoas = rows.reduce((s, r) => s + parseFloat(r.roas || 0), 0) / rows.length;
+      const totLeads       = rows.reduce((s, r) => s + parseInt(r.leads || 0), 0);
+      const avgCtr         = totImpressions > 0 ? (totClicks / totImpressions) * 100 : 0;
+      const avgRoas        = rows.reduce((s, r) => s + parseFloat(r.roas || 0), 0) / rows.length;
+      const avgFreq        = rows.reduce((s, r) => s + parseFloat(r.frequency || 0), 0) / rows.length;
+      const cpl            = totLeads > 0 ? totSpend / totLeads : 0;
 
-      const isLoser  = (totSpend >= 5 && totClicks === 0) || (avgCtr < 0.3 && totSpend >= 10);
-      const isWinner = avgCtr >= 1.5 && (avgRoas >= 2 || totConversions >= 3);
+      // Determine pause reason (priority order)
+      let pauseReason = null;
+      if (avgFreq > 3.5 && totImpressions > 300)
+        pauseReason = `fatiga creativa (freq ${avgFreq.toFixed(1)}x)`;
+      else if (totSpend >= 10 && totClicks === 0)
+        pauseReason = `sin clicks ($${totSpend.toFixed(0)} gastado)`;
+      else if (avgCtr < 0.3 && totSpend >= 15)
+        pauseReason = `CTR bajo (${avgCtr.toFixed(2)}%)`;
+      else if (targetCpl > 0 && totLeads > 0 && cpl > targetCpl * 2 && totSpend > 20)
+        pauseReason = `CPL alto ($${cpl.toFixed(0)} vs objetivo $${targetCpl})`;
 
-      if (isLoser) {
+      // Determine winner
+      const isLeadWinner = targetCpl > 0 && totLeads >= 3 && cpl > 0 && cpl <= targetCpl * 0.7;
+      const isCtrWinner  = avgCtr >= 1.5 && (avgRoas >= 2 || totConversions >= 3);
+      const isWinner     = (isLeadWinner || isCtrWinner) && !pauseReason;
+
+      if (pauseReason) {
         try {
           await metaPatch(token, ad.id, { status: 'PAUSED' });
           await sbReq('PATCH', `meta_ads?id=eq.${ad.id}`, { status: 'PAUSED', updated_at: new Date().toISOString() });
-          actions.push({ id: ad.id, name: ad.name, action: 'paused', spend: totSpend, ctr: avgCtr.toFixed(2) });
+          actions.push({ id: ad.id, name: ad.name, action: 'paused', reason: pauseReason, spend: totSpend });
+          await pushNotify('⏸ Meta: Anuncio pausado', `${ad.name}\nMotivo: ${pauseReason}`);
         } catch (e) { skipped.push({ id: ad.id, reason: e.message }); }
 
       } else if (isWinner) {
-        const adsetRows = await sbGet(`meta_adsets?id=eq.${ad.adset_id}&select=id,budget_daily,budget_total,updated_at`);
+        const adsetRows = await sbGet(`meta_adsets?id=eq.${ad.adset_id}&select=id,budget_daily,updated_at`);
         if (!adsetRows.length) { skipped.push({ id: ad.id, reason: 'adset_missing' }); continue; }
         const adset = adsetRows[0];
         const daysSinceScale = (today - new Date(adset.updated_at)) / 86400000;
@@ -213,15 +241,28 @@ async function runAgent(res) {
           try {
             await metaPatch(token, adset.id, { daily_budget: newBudget });
             await sbReq('PATCH', `meta_adsets?id=eq.${adset.id}`, { budget_daily: newBudget / 100, updated_at: new Date().toISOString() });
-            actions.push({ id: ad.id, name: ad.name, action: 'scaled_+25%', new_budget_ars: newBudget / 100, ctr: avgCtr.toFixed(2), roas: avgRoas.toFixed(2) });
+            const winDetail = isLeadWinner
+              ? `${totLeads} leads · CPL $${cpl.toFixed(0)}`
+              : `CTR ${avgCtr.toFixed(2)}% · ROAS ${avgRoas.toFixed(1)}x`;
+            actions.push({ id: ad.id, name: ad.name, action: 'scaled_+25%', new_budget_ars: newBudget / 100, detail: winDetail });
+            await pushNotify('📈 Meta: Presupuesto escalado +25%', `${ad.name}\n${winDetail} → $${(newBudget/100).toLocaleString('es-AR')}/día`);
           } catch (e) { skipped.push({ id: ad.id, reason: e.message }); }
         }
       }
     }
-    return res.status(200).json({ ok: true, actions, skipped, _v: 'agent-v1' });
+
+    // Push resumen si hubo acciones
+    if (actions.length > 0) {
+      const paused  = actions.filter(a => a.action === 'paused').length;
+      const scaled  = actions.filter(a => a.action === 'scaled_+25%').length;
+      const summary = [paused > 0 ? `${paused} pausado${paused > 1 ? 's' : ''}` : null, scaled > 0 ? `${scaled} escalado${scaled > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ');
+      await pushNotify('🤖 Meta agente — resumen', summary);
+    }
+
+    return res.status(200).json({ ok: true, actions, skipped, _v: 'agent-v2' });
   } catch (err) {
     console.error('[meta-agent]', err.message);
-    return res.status(200).json({ ok: false, error: err.message, actions, skipped, _v: 'agent-v1' });
+    return res.status(200).json({ ok: false, error: err.message, actions, skipped, _v: 'agent-v2' });
   }
 }
 
@@ -340,6 +381,82 @@ async function runBulkToggle(req, res) {
   }
 }
 
+// ── LEAD WEBHOOK ─────────────────────────────────────────────────────────────
+async function runWebhook(req, res) {
+  // GET: verificación inicial de Meta
+  if (req.method === 'GET') {
+    const mode      = req.query['hub.mode'];
+    const token     = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+    let verifyToken = 'rhinos_meta_webhook_2026';
+    try { const cfg = await getMetaConfig(); verifyToken = cfg.meta_webhook_verify_token || verifyToken; } catch(e) {}
+    if (mode === 'subscribe' && token === verifyToken) return res.status(200).send(challenge);
+    return res.status(403).json({ error: 'Token de verificación incorrecto' });
+  }
+
+  // POST: lead recibido desde Meta
+  try {
+    const cfg    = await getMetaConfig();
+    const token  = cfg.meta_access_token || '';
+    const entries = req.body?.entry || [];
+    const saved  = [];
+
+    for (const entry of entries) {
+      for (const change of (entry.changes || [])) {
+        if (change.field !== 'leadgen') continue;
+        const v = change.value || {};
+        const leadgenId = v.leadgen_id;
+        if (!leadgenId) continue;
+
+        // Fetch lead details (nombre, teléfono, email, etc.)
+        let leadData = {}, fields = {};
+        if (token && token !== 'pending') {
+          try {
+            leadData = await metaGet(token, `${leadgenId}?fields=field_data,ad_id,adset_id,campaign_id,created_time`);
+            for (const f of (leadData.field_data || [])) fields[f.name] = f.values?.[0] || '';
+          } catch(e) {}
+        }
+
+        const nombre  = fields.full_name || fields.nombre || fields.name || '';
+        const phone   = fields.phone_number || fields.phone || fields.telefono || '';
+        const email   = fields.email || '';
+        const empresa = fields.company || fields.empresa || '';
+        const adId    = v.ad_id || leadData.ad_id || null;
+        const campId  = v.campaign_id || leadData.campaign_id || null;
+
+        // Guardar en rhinos_leads
+        const leadNote = `Lead Meta ID: ${leadgenId}${adId ? '\nAd: ' + adId : ''}${campId ? '\nCampaña: ' + campId : ''}`;
+        await sbReq('POST', 'rhinos_leads', [{
+          name:        nombre || `Lead Meta ${leadgenId.slice(-6)}`,
+          phone:       phone  || null,
+          email:       email  || null,
+          company:     empresa || null,
+          source:      'meta_lead_form',
+          status:      'nuevo',
+          temperature: 'caliente',
+          notes:       leadNote,
+        }]).catch(() => {});
+
+        // Guardar en meta_leads_wa (tabla de leads Meta)
+        await sbReq('POST', 'meta_leads_wa?on_conflict=lead_id', [{
+          lead_id:    leadgenId,
+          ad_id:      adId,
+          campaign_id: campId,
+          nombre, telefono: phone, email,
+          fecha_lead: new Date((v.created_time || Date.now() / 1000) * 1000).toISOString(),
+        }]).catch(() => {});
+
+        saved.push({ leadgen_id: leadgenId, nombre, phone });
+        await pushNotify('🎯 Nuevo lead de Meta!', `${nombre || 'Sin nombre'}\n${phone || email || 'Sin contacto'}`);
+      }
+    }
+    return res.status(200).json({ ok: true, saved });
+  } catch (err) {
+    console.error('[meta-webhook]', err.message);
+    return res.status(200).json({ ok: false, error: err.message }); // siempre 200 para webhooks
+  }
+}
+
 // ── TOGGLE ADSET ─────────────────────────────────────────────────────────────
 async function runToggleAdset(req, res) {
   try {
@@ -383,6 +500,7 @@ async function runUpdateBudget(req, res) {
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')          return runAgent(res);
+  if (action === 'webhook')        return runWebhook(req, res);
   if (action === 'create_ad')      return runCreateAd(req, res);
   if (action === 'toggle_ad')      return runToggleAd(req, res);
   if (action === 'toggle_adset')   return runToggleAdset(req, res);

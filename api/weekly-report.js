@@ -67,9 +67,12 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const [txs, tcData] = await Promise.all([
+    const weekAgoStr = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const [txs, tcData, metaMetrics, metaAds] = await Promise.all([
       sbGet('rhinos_transactions?order=date.desc'),
-      httpGet('https://api.bluelytics.com.ar/v2/latest').catch(() => null)
+      httpGet('https://api.bluelytics.com.ar/v2/latest').catch(() => null),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${weekAgoStr}&select=entity_id,spend,impressions,clicks,leads`).catch(() => []),
+      sbGet('meta_ads?select=id,name&limit=200').catch(() => []),
     ]);
 
     const tcOficial = tcData?.oficial?.value_sell || 0;
@@ -134,6 +137,46 @@ module.exports = async function handler(req, res) {
       });
       if (pendientes.length > 3) msg += `• ...y ${pendientes.length - 3} más\n`;
       msg += `Total comprometido: ${fmtARS(totalPendienteARS)}\n`;
+    }
+
+    // ── Meta Ads digest
+    if (Array.isArray(metaMetrics) && metaMetrics.length > 0) {
+      const adNameMap = {};
+      for (const a of (metaAds || [])) adNameMap[a.id] = a.name;
+
+      const adAgg = {};
+      for (const m of metaMetrics) {
+        if (!adAgg[m.entity_id]) adAgg[m.entity_id] = { spend: 0, impressions: 0, clicks: 0, leads: 0 };
+        adAgg[m.entity_id].spend       += parseFloat(m.spend || 0);
+        adAgg[m.entity_id].impressions += parseInt(m.impressions || 0);
+        adAgg[m.entity_id].clicks      += parseInt(m.clicks || 0);
+        adAgg[m.entity_id].leads       += parseInt(m.leads || 0);
+      }
+
+      const totSpend = Object.values(adAgg).reduce((s, a) => s + a.spend, 0);
+      const totLeads = Object.values(adAgg).reduce((s, a) => s + a.leads, 0);
+      const totImpr  = Object.values(adAgg).reduce((s, a) => s + a.impressions, 0);
+
+      // Mejor ad (más leads, menor CPL)
+      const adsWithLeads = Object.entries(adAgg).filter(([,a]) => a.leads > 0).sort((a, b) => (a[1].spend / a[1].leads) - (b[1].spend / b[1].leads));
+      const worstAd      = Object.entries(adAgg).filter(([,a]) => a.spend > 5 && a.leads === 0).sort((a, b) => b[1].spend - a[1].spend)[0];
+
+      msg += `\n\n📱 *Meta Ads — semana:*\n`;
+      msg += `💰 Gasto: ${fmtARS(totSpend)}\n`;
+      msg += `👁 Impresiones: ${totImpr.toLocaleString('es-AR')}\n`;
+      if (totLeads > 0) {
+        msg += `🎯 Leads: ${totLeads} · CPL: ${fmtARS(totSpend / totLeads)}\n`;
+      } else {
+        msg += `🎯 Leads: 0\n`;
+      }
+      if (adsWithLeads.length > 0) {
+        const [bestId, bestM] = adsWithLeads[0];
+        msg += `🏆 Mejor: ${(adNameMap[bestId] || bestId).slice(0, 25)} (${bestM.leads} leads · CPL ${fmtARS(bestM.spend / bestM.leads)})\n`;
+      }
+      if (worstAd) {
+        const [wId, wM] = worstAd;
+        msg += `⚠️ Sin leads: ${(adNameMap[wId] || wId).slice(0, 25)} (${fmtARS(wM.spend)} gastado)\n`;
+      }
     }
 
     msg += `\n_RhinosApp 🦏_`;
