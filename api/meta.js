@@ -467,7 +467,7 @@ async function runWebhook(req, res) {
             adId ? sbGet(`meta_ads?id=eq.${adId}&select=name&limit=1`) : Promise.resolve([]),
           ]);
           let waList = [];
-          if (waRaw[0]) { try { waList = JSON.parse(waRaw[0].value.replace(/^"|"$/g, '')); } catch(e) {} }
+          if (waRaw[0]) { try { let _v = JSON.parse(waRaw[0].value); waList = typeof _v === 'string' ? JSON.parse(_v) : _v; } catch(e) {} }
           if (waList.length) {
             const adName = adRaw[0]?.name || 'Desconocido';
             const hora   = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
@@ -1086,7 +1086,7 @@ async function runMorningBrief(res) {
 
     let WA_RECIPIENTS = [];
     if (cfgWa[0]) {
-      try { WA_RECIPIENTS = JSON.parse(cfgWa[0].value.replace(/^"|"$/g,'')); } catch(e) {}
+      try { let _v = JSON.parse(cfgWa[0].value); WA_RECIPIENTS = typeof _v === 'string' ? JSON.parse(_v) : _v; } catch(e) {}
     }
     if (!WA_RECIPIENTS.length) return res.status(200).json({ ok: false, msg: 'No wa_recipients configured' });
 
