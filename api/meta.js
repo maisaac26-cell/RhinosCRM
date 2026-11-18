@@ -1578,6 +1578,36 @@ async function runBatchLaunchStart(req, res) {
   }
 }
 
+async function runDeleteCampaign(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { campaign_id } = req.body || {};
+    if (!campaign_id) return res.status(200).json({ ok: false, error: 'campaign_id requerido' });
+
+    // Delete from Meta API
+    const r = await fetch(`https://graph.facebook.com/${META_V}/${campaign_id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: token }),
+    });
+    const j = await r.json();
+    if (j.error) return res.status(200).json({ ok: false, error: j.error.message });
+
+    // Delete from Supabase (cascade: ads + adsets + campaign)
+    await Promise.all([
+      sbReq('DELETE', `meta_ads?campaign_id=eq.${campaign_id}`),
+      sbReq('DELETE', `meta_adsets?campaign_id=eq.${campaign_id}`),
+    ]);
+    await sbReq('DELETE', `meta_campaigns?id=eq.${campaign_id}`);
+
+    return res.status(200).json({ ok: true });
+  } catch(err) {
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
@@ -1607,5 +1637,6 @@ export default async function handler(req, res) {
   if (action === 'rebalance_budget')   return runRebalanceBudget(req, res);
   if (action === 'batch_launch_start') return runBatchLaunchStart(req, res);
   if (action === 'create_video_ad')    return runCreateVideoAd(req, res);
+  if (action === 'delete_campaign')    return runDeleteCampaign(req, res);
   return runSync(res);
 }

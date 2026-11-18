@@ -19145,9 +19145,12 @@ async function metaDashboardLoad() {
               <td style="padding:7px 8px;text-align:center;font-weight:600;color:${(m.leads||0)>0?'var(--cyan)':'var(--text3)'};font-size:12px">${m.leads||0}</td>
               <td style="padding:7px 8px;text-align:center;color:${ctr&&parseFloat(ctr)>=1.5?'var(--green)':ctr&&parseFloat(ctr)>=0.5?'var(--cyan)':'var(--text3)'};font-size:11px">${ctr ? ctr+'%' : '—'}</td>
               <td style="padding:7px 8px;text-align:center">
-                <button onclick="metaToggleCampaign('${c.id}','${c.status}')" class="btn btn-sm" style="font-size:10px;padding:3px 7px;color:${c.status==='ACTIVE'?'#f87171':'var(--green)'}">
-                  ${c.status==='ACTIVE'?'⏸':'▶'}
-                </button>
+                <div style="display:flex;gap:4px;justify-content:center">
+                  <button onclick="metaToggleCampaign('${c.id}','${c.status}')" class="btn btn-sm" style="font-size:10px;padding:3px 7px;color:${c.status==='ACTIVE'?'#f87171':'var(--green)'}">
+                    ${c.status==='ACTIVE'?'⏸':'▶'}
+                  </button>
+                  <button onclick="metaDeleteCampaign('${c.id}','${c.name}')" class="btn btn-sm" style="font-size:10px;padding:3px 7px;color:#f87171;border-color:rgba(248,113,113,0.3)" title="Eliminar campaña">🗑</button>
+                </div>
               </td>
             </tr>`;
           }).join('')}
@@ -19312,6 +19315,19 @@ async function metaLeadQualityLoad() {
         </div>`;
       }).join('');
   } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+async function metaDeleteCampaign(id, name) {
+  if (!confirm(`¿Eliminar la campaña "${name}"?\nEsto la borra de Meta y del CRM. No se puede deshacer.`)) return;
+  metaToast('Eliminando campaña...', 'info');
+  try {
+    const r = await fetch('/api/meta?action=delete_campaign', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ campaign_id: id })
+    }).then(x => x.json());
+    if (r.ok) { metaToast('Campaña eliminada ✓', 'ok'); metaLoadAllCampaigns(); }
+    else metaToast('Error: ' + (r.error || 'No se pudo eliminar'), 'error');
+  } catch(e) { metaToast('Error de red: ' + e.message, 'error'); }
 }
 
 async function metaToggleCampaign(id, currentStatus) {
