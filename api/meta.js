@@ -1769,17 +1769,30 @@ async function runDeleteCampaign(req, res) {
     const { campaign_id } = req.body || {};
     if (!campaign_id) return res.status(200).json({ ok: false, error: 'campaign_id requerido' });
 
-    // POST with status=DELETED is more reliable than HTTP DELETE for Meta Graph API
-    await metaPatch(token, campaign_id, { status: 'DELETED' });
+    // Try to delete/archive in Meta (requires Admin role on ad account)
+    let metaOk = false, metaWarning = null;
+    try {
+      await metaPatch(token, campaign_id, { status: 'DELETED' });
+      metaOk = true;
+    } catch(metaErr) {
+      // Fallback: try ARCHIVED status (lower permission requirement)
+      try {
+        await metaPatch(token, campaign_id, { status: 'ARCHIVED' });
+        metaOk = true;
+        metaWarning = 'Campaña archivada en Meta (para eliminarla definitivamente, necesitás rol Admin en la cuenta de anuncios)';
+      } catch {
+        metaWarning = 'No se pudo eliminar de Meta (el System User necesita rol Admin en la cuenta de anuncios). Eliminado solo del CRM.';
+      }
+    }
 
-    // Clean up Supabase
+    // Always clean up Supabase so it disappears from the CRM
     await Promise.all([
       sbReq('DELETE', `meta_ads?campaign_id=eq.${campaign_id}`),
       sbReq('DELETE', `meta_adsets?campaign_id=eq.${campaign_id}`),
     ]);
     await sbReq('DELETE', `meta_campaigns?id=eq.${campaign_id}`);
 
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, warning: metaWarning });
   } catch(err) {
     return res.status(200).json({ ok: false, error: err.message });
   }

@@ -19445,7 +19445,7 @@ async function metaDeleteCampaign(id, name) {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ campaign_id: id })
     }).then(x => x.json());
-    if (r.ok) { metaToast('Campaña eliminada ✓', 'ok'); metaLoadAllCampaigns(); }
+    if (r.ok) { metaToast(r.warning || 'Campaña eliminada ✓', r.warning ? 'warn' : 'ok'); metaLoadAllCampaigns(); }
     else metaToast('Error: ' + (r.error || 'No se pudo eliminar'), 'error');
   } catch(e) { metaToast('Error de red: ' + e.message, 'error'); }
 }
