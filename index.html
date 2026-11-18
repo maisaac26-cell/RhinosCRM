@@ -20260,7 +20260,7 @@ async function metaLoadAllCampaigns() {
     const [camps, adsets, ads] = await Promise.all([
       metaSbGet('meta_campaigns?order=updated_at.desc&limit=100'),
       metaSbGet('meta_adsets?limit=500&select=id,campaign_id,name,status,budget_daily,optimization_goal'),
-      metaSbGet('meta_ads?limit=1000&select=id,adset_id,campaign_id,name,status,thumbnail_url,created_at'),
+      metaSbGet('meta_ads?limit=1000&select=id,adset_id,campaign_id,name,status,effective_status,thumbnail_url,created_at'),
     ]);
     if (!camps.length) { el.innerHTML = '<div class="empty">No hay campañas. Configurá Meta y sincronizá primero.</div>'; return; }
 
@@ -20410,7 +20410,28 @@ async function metaLoadAllCampaigns() {
       </div>`;
     }
 
+    // Detect ads with delivery issues
+    const issueStatuses = ['WITH_ISSUES','DISAPPROVED','PENDING_REVIEW'];
+    const adsWithIssues = ads.filter(a => issueStatuses.includes(a.effective_status));
+    const issuesBanner = adsWithIssues.length ? (() => {
+      const withIssues = adsWithIssues.filter(a => a.effective_status === 'WITH_ISSUES').length;
+      const disapproved = adsWithIssues.filter(a => a.effective_status === 'DISAPPROVED').length;
+      const pending = adsWithIssues.filter(a => a.effective_status === 'PENDING_REVIEW').length;
+      const parts = [];
+      if (withIssues) parts.push(`${withIssues} con problemas`);
+      if (disapproved) parts.push(`${disapproved} rechazado${disapproved>1?'s':''}`);
+      if (pending) parts.push(`${pending} en revisión`);
+      return `<div style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.35);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:16px;flex-shrink:0">⚠️</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700;color:#f87171;margin-bottom:3px">${adsWithIssues.length} anuncio${adsWithIssues.length>1?'s':''} con problema de entrega (${parts.join(', ')})</div>
+          <div style="font-size:11px;color:var(--text3)">Los anuncios con estado <strong style="color:#fbbf24">Con problemas</strong> no se están mostrando. Revisá Meta Ads Manager para ver el motivo específico. En tu caso, probablemente el número de WhatsApp está desconectado de la página de Facebook.</div>
+        </div>
+      </div>`;
+    })() : '';
+
     el.innerHTML = `
+      ${issuesBanner}
       <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
         <span style="font-size:11px;color:var(--text3);font-weight:600">Período:</span>
         ${[7,14,30].map(d=>`<button class="btn btn-sm cre-range ${d===_metaCampRange?'cre-range-active':''}" onclick="_metaCampRange=${d};metaLoadAllCampaigns()">${d}d</button>`).join('')}
