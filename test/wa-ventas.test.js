@@ -102,6 +102,7 @@ test('primer mensaje: crea lead, responde y guarda la conversación', async () =
   assert.strictEqual(w.sent[0].to, '5491122334455');
   assert.strictEqual(w.db.rhinos_wa_ventas_msgs.length, 2);
   assert.match(w.prompts[0].system, /278\.600/);
+  assert.match(w.prompts[0].system, /MÁS IVA/);
   assert.match(w.prompts[0].system, /primer mensaje/);
   assert.strictEqual(w.notified.length, 0);
 });
