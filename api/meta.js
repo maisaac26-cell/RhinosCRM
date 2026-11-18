@@ -1969,5 +1969,93 @@ export default async function handler(req, res) {
   if (action === 'update_ad_cta')      return runUpdateAdCta(req, res);
   if (action === 'duplicate_ad_cta')   return runDuplicateAdCta(req, res);
   if (action === 'get_ad_preview')     return runGetAdPreview(req, res);
+  if (action === 'budget_alert')       return runBudgetAlert(res);
   return runSync(res);
+}
+
+async function runBudgetAlert(res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token;
+    const accountId = cfg.meta_ad_account_id;
+    if (!token || !accountId) return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+
+    const LIMIT_USD = 5; // alerta si supera este valor
+    const adsetsData = await metaGet(token, `act_${accountId}/adsets?fields=id,name,status,daily_budget&limit=100`);
+    const adsets = (adsetsData.data || []).filter(a => a.status === 'ACTIVE' && a.daily_budget);
+
+    const offenders = adsets
+      .map(a => ({ id: a.id, name: a.name, budget_usd: parseFloat(a.daily_budget) / 100 }))
+      .filter(a => a.budget_usd > LIMIT_USD);
+
+    if (!offenders.length) {
+      return res.status(200).json({ ok: true, alert: false, msg: `Todo OK — ${adsets.length} adsets activos dentro del límite de USD ${LIMIT_USD}/día` });
+    }
+
+    // Build alarm email
+    const rows = offenders.map(a =>
+      `<tr>
+        <td style="padding:12px 16px;border-bottom:1px solid #450a0a;color:#fca5a5;font-size:13px">${a.name}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #450a0a;text-align:right;font-size:16px;font-weight:800;color:#f87171">USD ${a.budget_usd.toFixed(2)}/día</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #450a0a;text-align:right;font-size:13px;color:#fca5a5">USD ${(a.budget_usd * 30).toFixed(0)}/mes estimado</td>
+      </tr>`
+    ).join('');
+
+    const totalDay = offenders.reduce((s, a) => s + a.budget_usd, 0);
+
+    const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#0a0000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<div style="max-width:600px;margin:0 auto;padding:32px 16px">
+
+  <!-- ALARM HEADER -->
+  <div style="background:#7f1d1d;border:3px solid #ef4444;border-radius:16px;padding:32px 28px;text-align:center;margin-bottom:24px">
+    <div style="font-size:48px;margin-bottom:8px">🚨</div>
+    <div style="font-size:11px;font-weight:800;letter-spacing:0.2em;color:#fca5a5;margin-bottom:8px">ALERTA DE PRESUPUESTO META</div>
+    <div style="font-size:28px;font-weight:900;color:#ff4444;line-height:1.1;margin-bottom:12px">PRESUPUESTO EXCEDE USD ${LIMIT_USD}/DÍA</div>
+    <div style="font-size:14px;color:#fca5a5">Revisión automática · ${new Date().toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+  </div>
+
+  <!-- OFFENDERS TABLE -->
+  <div style="background:#1a0000;border:1px solid #7f1d1d;border-radius:12px;overflow:hidden;margin-bottom:20px">
+    <div style="background:#450a0a;padding:14px 16px">
+      <span style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#f87171">⚠️ ADSETS CON PRESUPUESTO EXCEDIDO (${offenders.length})</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#2d0000">
+          <th style="padding:10px 16px;text-align:left;font-size:10px;color:#9ca3af;font-weight:700;letter-spacing:0.1em">ADSET</th>
+          <th style="padding:10px 16px;text-align:right;font-size:10px;color:#9ca3af;font-weight:700;letter-spacing:0.1em">PRESUPUESTO DIARIO</th>
+          <th style="padding:10px 16px;text-align:right;font-size:10px;color:#9ca3af;font-weight:700;letter-spacing:0.1em">ESTIMADO MENSUAL</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="padding:14px 16px;background:#2d0000;border-top:1px solid #450a0a;text-align:right">
+      <span style="font-size:12px;color:#fca5a5">Total diario: </span>
+      <span style="font-size:18px;font-weight:900;color:#ff4444">USD ${totalDay.toFixed(2)}/día</span>
+      <span style="font-size:12px;color:#fca5a5"> · USD ${(totalDay * 30).toFixed(0)}/mes</span>
+    </div>
+  </div>
+
+  <!-- ACTION -->
+  <div style="background:#1c1400;border:1px solid #854d0e;border-radius:12px;padding:20px 20px;margin-bottom:20px">
+    <div style="font-size:13px;font-weight:700;color:#fbbf24;margin-bottom:8px">🛠 Qué hacer ahora</div>
+    <div style="font-size:13px;color:#fde68a;line-height:1.6">
+      Entrá al CRM → módulo <strong>Meta ADS</strong> → hacé clic en el ✏️ del presupuesto de cada adset afectado y bajalo a <strong>USD 5/día o menos</strong>.
+    </div>
+  </div>
+
+  <div style="text-align:center;font-size:11px;color:#6b7280;padding-top:12px">
+    Rhinos CRM · Alerta automática de presupuesto cada 5 días
+  </div>
+</div></body></html>`;
+
+    const gmailCfg = await sbGet('rhinos_config?key=eq.gmail_from');
+    const toAddress = (gmailCfg[0]?.value || '').replace(/^"|"$/g,'') || 'comercial@rhinosapp.com';
+    const subject = `🚨 ALERTA: Presupuesto Meta excede USD ${LIMIT_USD}/día — ${offenders.length} adset${offenders.length > 1 ? 's' : ''} afectado${offenders.length > 1 ? 's' : ''}`;
+
+    await sendMetaDigestEmail(toAddress, subject, html);
+    return res.status(200).json({ ok: true, alert: true, offenders: offenders.length, total_day_usd: totalDay.toFixed(2) });
+  } catch (e) {
+    return res.status(200).json({ ok: false, error: e.message });
+  }
 }
