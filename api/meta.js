@@ -1534,6 +1534,7 @@ async function runBatchLaunchStart(req, res) {
       objective: 'OUTCOME_TRAFFIC',
       status: 'PAUSED',
       special_ad_categories: [],
+      is_adset_budget_sharing_enabled: false,
     };
     const campaign = await metaPost(token, `act_${accountId}/campaigns`, campaignObj);
 
