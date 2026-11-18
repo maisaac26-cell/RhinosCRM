@@ -1608,6 +1608,22 @@ async function runDeleteCampaign(req, res) {
   }
 }
 
+async function runGetAdPreview(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { ad_id, format = 'INSTAGRAM_STANDARD' } = req.body || {};
+    if (!ad_id) return res.status(200).json({ ok: false, error: 'ad_id requerido' });
+    const r = await fetch(`https://graph.facebook.com/${META_V}/${ad_id}/previews?ad_format=${encodeURIComponent(format)}&access_token=${token}`);
+    const j = await r.json();
+    if (j.error) return res.status(200).json({ ok: false, error: j.error.message });
+    return res.status(200).json({ ok: true, preview: j.data?.[0]?.body || '' });
+  } catch(err) {
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 export default async function handler(req, res) {
   const action = req.query?.action || 'sync';
   if (action === 'agent')             return runAgent(res);
@@ -1638,5 +1654,6 @@ export default async function handler(req, res) {
   if (action === 'batch_launch_start') return runBatchLaunchStart(req, res);
   if (action === 'create_video_ad')    return runCreateVideoAd(req, res);
   if (action === 'delete_campaign')    return runDeleteCampaign(req, res);
+  if (action === 'get_ad_preview')     return runGetAdPreview(req, res);
   return runSync(res);
 }
