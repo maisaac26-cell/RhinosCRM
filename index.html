@@ -1405,13 +1405,49 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
           <!-- Video panel -->
           <div id="bl-video-panel" style="display:none;flex-direction:column;gap:10px">
-            <div style="font-size:11px;color:var(--text3)">Pegá el link directo a tu video · Meta lo descarga solo · Google Drive, Dropbox, MP4 público</div>
-            <div style="padding:10px;border-radius:var(--r);border:1px solid rgba(251,191,36,0.2);background:rgba(251,191,36,0.04);font-size:11px;color:#fbbf24;line-height:1.6">
-              💡 <strong>Google Drive:</strong> Compartí el archivo como "Cualquiera con el link" y usá el link directo:<br/>
-              <code style="font-size:10px;color:var(--cyan)">drive.google.com/uc?export=download&id=TU_ID</code>
+            <!-- Sub-tabs -->
+            <div style="display:flex;gap:6px">
+              <button id="bl-vt-upload" class="btn btn-sm bl-ctype-active" onclick="metaBlVideoTab('upload')" style="font-size:11px">📎 Subir archivo</button>
+              <button id="bl-vt-url" class="btn btn-sm" onclick="metaBlVideoTab('url')" style="font-size:11px;color:var(--text3)">🔗 Pegar URL</button>
             </div>
-            <div id="bl-video-list" style="display:flex;flex-direction:column;gap:8px"></div>
-            <button class="btn btn-sm" onclick="metaBlAddVideoRow()" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);font-size:11px;width:100%;justify-content:center">+ Agregar video</button>
+
+            <!-- Upload sub-panel -->
+            <div id="bl-vupload-panel" style="display:flex;flex-direction:column;gap:8px">
+              <div
+                id="bl-video-dropzone"
+                onclick="document.getElementById('bl-video-file-input').click()"
+                ondragover="event.preventDefault();this.style.borderColor='var(--cyan)'"
+                ondragleave="this.style.borderColor='var(--border)'"
+                ondrop="metaBlVideoDrop(event)"
+                style="border:2px dashed var(--border);border-radius:var(--r);padding:24px 16px;text-align:center;cursor:pointer;transition:border-color 0.2s">
+                <div style="font-size:28px;margin-bottom:6px">🎬</div>
+                <div style="font-size:13px;color:var(--text2)">Arrastrá tu video acá</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:4px">o hacé click · MP4, MOV, AVI · máx 500MB</div>
+              </div>
+              <input type="file" id="bl-video-file-input" accept="video/*" style="display:none" onchange="metaBlVideoFileSelected(this.files[0])"/>
+              <div id="bl-video-upload-status" style="display:none;flex-direction:column;gap:6px">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2)">
+                  <span id="bl-video-upload-name"></span>
+                  <span id="bl-video-upload-pct">0%</span>
+                </div>
+                <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+                  <div id="bl-video-upload-bar" style="height:100%;background:var(--cyan);width:0%;transition:width 0.2s;border-radius:4px"></div>
+                </div>
+                <div id="bl-video-upload-msg" style="font-size:10px;color:var(--text3)"></div>
+              </div>
+              <div id="bl-video-upload-list" style="display:flex;flex-direction:column;gap:6px"></div>
+            </div>
+
+            <!-- URL sub-panel -->
+            <div id="bl-vurl-panel" style="display:none;flex-direction:column;gap:8px">
+              <div style="font-size:11px;color:var(--text3)">Meta descarga el video directo desde la URL · Google Drive, Dropbox, MP4 público</div>
+              <div style="padding:10px;border-radius:var(--r);border:1px solid rgba(251,191,36,0.2);background:rgba(251,191,36,0.04);font-size:11px;color:#fbbf24;line-height:1.6">
+                💡 <strong>Google Drive:</strong> Compartí como "Cualquiera con el link" y usá:<br/>
+                <code style="font-size:10px;color:var(--cyan)">drive.google.com/uc?export=download&id=TU_ID</code>
+              </div>
+              <div id="bl-video-list" style="display:flex;flex-direction:column;gap:8px"></div>
+              <button class="btn btn-sm" onclick="metaBlAddVideoRow()" style="color:var(--cyan);border-color:rgba(0,229,204,0.3);font-size:11px;width:100%;justify-content:center">+ Agregar video</button>
+            </div>
           </div>
         </div>
       </div>
@@ -19843,14 +19879,121 @@ function metaBlAddVideoRow() {
   metaBlUpdateSummary();
 }
 
+const SB_STORAGE_URL = 'https://konbqkvrcnxzpltxjdyj.supabase.co/storage/v1';
+const SB_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvbmJxa3ZyY254enBsdHhqZHlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDg1MDQsImV4cCI6MjA4OTYyNDUwNH0.vya3WNSXf-GLaF9i1atTyB_l5LN91g45-SwhE-Dhalc';
+
+function metaBlVideoTab(tab) {
+  const uploadPanel = document.getElementById('bl-vupload-panel');
+  const urlPanel = document.getElementById('bl-vurl-panel');
+  const btnUpload = document.getElementById('bl-vt-upload');
+  const btnUrl = document.getElementById('bl-vt-url');
+  if (!uploadPanel || !urlPanel) return;
+  uploadPanel.style.display = tab === 'upload' ? 'flex' : 'none';
+  urlPanel.style.display = tab === 'url' ? 'flex' : 'none';
+  if (btnUpload) { btnUpload.classList.toggle('bl-ctype-active', tab === 'upload'); btnUpload.style.color = tab === 'upload' ? '' : 'var(--text3)'; }
+  if (btnUrl) { btnUrl.classList.toggle('bl-ctype-active', tab === 'url'); btnUrl.style.color = tab === 'url' ? '' : 'var(--text3)'; }
+}
+
+function metaBlVideoDrop(e) {
+  e.preventDefault();
+  const zone = document.getElementById('bl-video-dropzone');
+  if (zone) zone.style.borderColor = 'var(--border)';
+  const file = e.dataTransfer?.files?.[0];
+  if (file) metaBlVideoFileSelected(file);
+}
+
+let _blUploadedVideos = [];
+
+async function metaBlVideoFileSelected(file) {
+  if (!file) return;
+  if (!file.type.startsWith('video/')) { metaToast('Solo se aceptan archivos de video', 'error'); return; }
+  if (file.size > 524288000) { metaToast('El video no puede superar los 500MB', 'error'); return; }
+
+  const status = document.getElementById('bl-video-upload-status');
+  const nameEl = document.getElementById('bl-video-upload-name');
+  const pctEl = document.getElementById('bl-video-upload-pct');
+  const bar = document.getElementById('bl-video-upload-bar');
+  const msg = document.getElementById('bl-video-upload-msg');
+
+  if (status) status.style.display = 'flex';
+  if (nameEl) nameEl.textContent = file.name;
+  if (pctEl) pctEl.textContent = '0%';
+  if (bar) bar.style.width = '0%';
+  if (msg) msg.textContent = 'Subiendo a Supabase Storage...';
+
+  // Unique filename
+  const ext = file.name.split('.').pop();
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+  try {
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${SB_STORAGE_URL}/object/ad-videos/${filename}`);
+      xhr.setRequestHeader('Authorization', `Bearer ${SB_ANON_KEY}`);
+      xhr.setRequestHeader('x-upsert', 'true');
+      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        const pct = Math.round((e.loaded / e.total) * 100);
+        if (bar) bar.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+      };
+      xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText}`));
+      xhr.onerror = () => reject(new Error('Error de red'));
+      xhr.send(file);
+    });
+
+    const publicUrl = `${SB_STORAGE_URL}/object/public/ad-videos/${filename}`;
+    if (bar) bar.style.width = '100%';
+    if (pctEl) pctEl.textContent = '100%';
+    if (msg) { msg.textContent = '✓ Subido correctamente'; msg.style.color = 'var(--green)'; }
+
+    // Add to uploaded list
+    _blUploadedVideos.push({ url: publicUrl, name: file.name.replace(/\.[^.]+$/, '') });
+    const listEl = document.getElementById('bl-video-upload-list');
+    if (listEl) {
+      const row = document.createElement('div');
+      const vidIdx = _blUploadedVideos.length - 1;
+      row.style.cssText = 'display:flex;gap:6px;align-items:center;border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;background:var(--surface)';
+      row.innerHTML = `
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+          <input placeholder="Nombre del anuncio" value="${file.name.replace(/\.[^.]+$/, '')}" style="font-size:11px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:2px 0;outline:none" data-vname-upload="${vidIdx}" oninput="_blUploadedVideos[${vidIdx}].name=this.value;metaBlUpdateSummary()"/>
+          <div style="font-size:10px;color:var(--green)">✓ ${file.name} · ${(file.size/1048576).toFixed(1)}MB</div>
+        </div>
+        <button onclick="this.parentElement.remove();_blUploadedVideos.splice(${vidIdx},1);metaBlUpdateSummary()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>`;
+      listEl.appendChild(row);
+    }
+
+    // Reset for next upload
+    setTimeout(() => {
+      if (status) status.style.display = 'none';
+      if (bar) bar.style.width = '0%';
+      if (pctEl) pctEl.textContent = '0%';
+      if (msg) { msg.textContent = ''; msg.style.color = ''; }
+    }, 2000);
+
+    metaBlUpdateSummary();
+  } catch(err) {
+    if (msg) { msg.textContent = 'Error: ' + err.message; msg.style.color = '#f87171'; }
+    if (bar) bar.style.width = '0%';
+    if (pctEl) pctEl.textContent = '0%';
+    metaToast('Error al subir: ' + err.message, 'error');
+  }
+}
+
 function metaBlGetVideoRows() {
   const rows = [];
+  // URL-tab rows
   document.querySelectorAll('[data-vurl]').forEach(inp => {
     const url = inp.value.trim();
     if (!url) return;
     const idx = inp.dataset.vurl;
     const nameEl = document.querySelector(`[data-vname="${idx}"]`);
     rows.push({ url, name: nameEl?.value.trim() || `Video ${rows.length + 1}` });
+  });
+  // Upload-tab rows
+  (_blUploadedVideos || []).forEach(v => {
+    if (v && v.url) rows.push({ url: v.url, name: v.name || `Video ${rows.length + 1}` });
   });
   return rows;
 }
