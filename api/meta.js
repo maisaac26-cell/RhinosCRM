@@ -62,6 +62,177 @@ async function metaPost(token, path, body) {
 
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
+// ─── Gmail helper (reutiliza tokens de Supabase igual que vendedor-auto.js) ───
+async function getGmailTokenMeta() {
+  const cfg = await sbGet('rhinos_config?key=in.(gmail_refresh_token,gmail_access_token,gmail_token_expiry,gmail_from)');
+  const map = {}; for (const { key, value } of cfg) map[key] = typeof value === 'string' ? value.replace(/^"|"$/g,'').trim() : value;
+  if (!map.gmail_refresh_token) throw new Error('gmail_refresh_token no configurado');
+  const expired = !map.gmail_token_expiry || new Date(map.gmail_token_expiry) < new Date(Date.now() + 60000);
+  if (!expired && map.gmail_access_token) return { token: map.gmail_access_token, from: map.gmail_from || 'comercial@rhinosapp.com' };
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ refresh_token: map.gmail_refresh_token, client_id: process.env.GMAIL_CLIENT_ID, client_secret: process.env.GMAIL_CLIENT_SECRET, grant_type: 'refresh_token' }),
+  });
+  const refreshed = await r.json();
+  if (!refreshed.access_token) throw new Error('No se pudo refrescar Gmail token');
+  const newExpiry = new Date(Date.now() + (refreshed.expires_in || 3600) * 1000).toISOString();
+  await sbReq('POST', 'rhinos_config?on_conflict=key', [
+    { key: 'gmail_access_token', value: refreshed.access_token, updated_at: new Date().toISOString() },
+    { key: 'gmail_token_expiry', value: newExpiry, updated_at: new Date().toISOString() },
+  ]);
+  return { token: refreshed.access_token, from: map.gmail_from || 'comercial@rhinosapp.com' };
+}
+
+async function sendMetaDigestEmail(toAddress, subject, htmlBody) {
+  const { token, from } = await getGmailTokenMeta();
+  const raw = [
+    `From: Rhinos CRM <${from}>`,
+    `To: ${toAddress}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=utf-8',
+    '',
+    htmlBody,
+  ].join('\r\n');
+  const encoded = Buffer.from(raw).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw: encoded }),
+  });
+  if (!resp.ok) throw new Error(`Gmail send failed: ${resp.status}`);
+  return true;
+}
+
+async function runAdDigestEmail(res) {
+  try {
+    const cfg = await getMetaConfig();
+    const targetCpl = parseFloat(cfg.meta_target_cpl || 0);
+    const since7 = isoDate(new Date(Date.now() - 6 * 86400000));
+    const yesterday = isoDate(new Date(Date.now() - 86400000));
+
+    const [ads, metrics7, metricsY, goals] = await Promise.all([
+      sbGet('meta_ads?select=id,name,status,campaign_id,adset_id&limit=200'),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7}&select=entity_id,spend,impressions,clicks,leads,messages_started`),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=eq.${yesterday}&select=entity_id,spend,leads,impressions,clicks`),
+      sbGet('rhinos_config?key=in.(meta_goal_leads_month,meta_digest_email)&select=key,value'),
+    ]);
+
+    const goalMap = {}; for (const g of goals) goalMap[g.key] = typeof g.value === 'string' ? g.value.replace(/^"|"$/g,'').trim() : String(g.value);
+    const digestEmail = goalMap['meta_digest_email'];
+    if (!digestEmail) return res.status(200).json({ ok: false, msg: 'meta_digest_email no configurado en rhinos_config' });
+
+    // Aggregate 7-day metrics per ad
+    const agg7 = {}, aggY = {};
+    for (const m of metrics7) {
+      if (!agg7[m.entity_id]) agg7[m.entity_id] = { spend:0, impressions:0, clicks:0, leads:0, messages:0 };
+      agg7[m.entity_id].spend       += parseFloat(m.spend||0);
+      agg7[m.entity_id].impressions += parseInt(m.impressions||0);
+      agg7[m.entity_id].clicks      += parseInt(m.clicks||0);
+      agg7[m.entity_id].leads       += parseInt(m.leads||0);
+      agg7[m.entity_id].messages    += parseInt(m.messages_started||0);
+    }
+    for (const m of metricsY) {
+      if (!aggY[m.entity_id]) aggY[m.entity_id] = { spend:0, leads:0 };
+      aggY[m.entity_id].spend += parseFloat(m.spend||0);
+      aggY[m.entity_id].leads += parseInt(m.leads||0);
+    }
+
+    const fARS = n => '$' + Math.round(n).toLocaleString('es-AR');
+    const fPct = n => n.toFixed(2) + '%';
+
+    // Build rows sorted: best performers first
+    const activeAds = ads.filter(a => a.status === 'ACTIVE');
+    const rows = activeAds.map(ad => {
+      const m = agg7[ad.id] || { spend:0, impressions:0, clicks:0, leads:0, messages:0 };
+      const ctr = m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0;
+      const cpl = m.leads > 0 ? m.spend / m.leads : 0;
+      const noData = m.spend < 1;
+      const statusEmoji = noData ? '⚪' : m.leads >= 3 && targetCpl > 0 && cpl <= targetCpl * 0.7 ? '🟢' : m.leads === 0 && m.spend > 500 ? '🔴' : m.leads > 0 && targetCpl > 0 && cpl > targetCpl * 2 ? '🔴' : '🟡';
+      const suggestion = noData ? 'Sin datos aún' : statusEmoji === '🟢' ? 'Escalar presupuesto' : statusEmoji === '🔴' ? '⚠️ Considerar pausar' : 'Monitorear';
+      return { ...ad, m, ctr, cpl, statusEmoji, suggestion, score: m.leads * 100 - (cpl || 9999) };
+    }).sort((a, b) => b.score - a.score);
+
+    const totSpend7 = rows.reduce((s, r) => s + r.m.spend, 0);
+    const totLeads7 = rows.reduce((s, r) => s + r.m.leads, 0);
+    const ySpend = Object.values(aggY).reduce((s, m) => s + m.spend, 0);
+    const yLeads = Object.values(aggY).reduce((s, m) => s + m.leads, 0);
+    const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    const tableRows = rows.map(r => `
+      <tr style="border-bottom:1px solid #2a2a3a">
+        <td style="padding:8px 10px;font-size:12px">${r.statusEmoji} ${r.name}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px">${r.m.impressions > 0 ? r.m.impressions.toLocaleString('es-AR') : '—'}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px">${r.m.impressions > 0 ? fPct(r.ctr) : '—'}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:600;color:${r.m.leads > 0 ? '#00e5cc' : '#888'}">${r.m.leads > 0 ? r.m.leads : '0'}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px">${r.m.spend > 0 ? fARS(r.m.spend) : '—'}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px;color:${r.cpl > 0 && targetCpl > 0 ? (r.cpl <= targetCpl ? '#4ade80' : r.cpl <= targetCpl * 2 ? '#fbbf24' : '#f87171') : '#888'}">${r.cpl > 0 ? fARS(r.cpl) : '—'}</td>
+        <td style="padding:8px 10px;font-size:11px;color:${r.statusEmoji === '🔴' ? '#f87171' : r.statusEmoji === '🟢' ? '#4ade80' : '#888'}">${r.suggestion}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#0d0d1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e5e7eb">
+<div style="max-width:720px;margin:0 auto;padding:24px 16px">
+  <div style="background:#111827;border:1px solid #1e293b;border-radius:12px;overflow:hidden">
+    <div style="background:linear-gradient(135deg,#1e293b,#0f172a);padding:20px 24px;border-bottom:1px solid #1e293b">
+      <div style="font-size:11px;color:#00e5cc;font-weight:700;letter-spacing:1px;text-transform:uppercase">RHINOS CRM · META ADS</div>
+      <div style="font-size:22px;font-weight:800;margin-top:4px">Resumen de rendimiento</div>
+      <div style="font-size:12px;color:#9ca3af;margin-top:2px">${dateStr}</div>
+    </div>
+
+    <div style="display:flex;gap:0;border-bottom:1px solid #1e293b">
+      <div style="flex:1;padding:16px 20px;border-right:1px solid #1e293b">
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Gasto ayer</div>
+        <div style="font-size:24px;font-weight:700;margin-top:4px">${ySpend > 0 ? fARS(ySpend) : '—'}</div>
+      </div>
+      <div style="flex:1;padding:16px 20px;border-right:1px solid #1e293b">
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Leads ayer</div>
+        <div style="font-size:24px;font-weight:700;color:${yLeads > 0 ? '#00e5cc' : '#6b7280'};margin-top:4px">${yLeads}</div>
+      </div>
+      <div style="flex:1;padding:16px 20px;border-right:1px solid #1e293b">
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Leads 7 días</div>
+        <div style="font-size:24px;font-weight:700;color:${totLeads7 > 0 ? '#00e5cc' : '#6b7280'};margin-top:4px">${totLeads7}</div>
+      </div>
+      <div style="flex:1;padding:16px 20px">
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Gasto 7 días</div>
+        <div style="font-size:24px;font-weight:700;margin-top:4px">${totSpend7 > 0 ? fARS(totSpend7) : '—'}</div>
+      </div>
+    </div>
+
+    <div style="padding:20px 24px">
+      <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Anuncios activos — últimos 7 días</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:1px solid #2a2a3a">
+              <th style="text-align:left;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">ANUNCIO</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">IMPRES.</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">CTR</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">LEADS</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">GASTO</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">CPL</th>
+              <th style="text-align:left;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">SUGERENCIA</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+      ${targetCpl > 0 ? `<div style="font-size:11px;color:#6b7280;margin-top:12px">🎯 CPL objetivo: ${fARS(targetCpl)} · 🟢 ≤ ${fARS(targetCpl)} · 🟡 ≤ ${fARS(targetCpl*2)} · 🔴 > ${fARS(targetCpl*2)}</div>` : ''}
+    </div>
+
+    <div style="padding:16px 24px;border-top:1px solid #1e293b;text-align:center">
+      <a href="https://rhinos-crm.vercel.app" style="display:inline-block;background:#00e5cc;color:#0d0d1a;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none">Gestionar campañas →</a>
+    </div>
+  </div>
+  <div style="text-align:center;font-size:10px;color:#374151;margin-top:12px">Rhinos CRM · Meta Ads Digest · El agente auto-pausa ads con bajo rendimiento a las 11am</div>
+</div></body></html>`;
+
+    const sent = await sendMetaDigestEmail(digestEmail, `🦏 Meta Ads — ${dateStr}`, html);
+    return res.status(200).json({ ok: true, sent, to: digestEmail, ads: rows.length, leads7: totLeads7, spend7: Math.round(totSpend7) });
+  } catch(err) {
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 async function getMetaConfig() {
   const keys = 'meta_access_token,meta_ad_account_id,meta_page_id,meta_webhook_verify_token,meta_target_cpl,meta_min_ctr,meta_max_freq,meta_max_cpl_mult,meta_min_spend_pause';
   const rows = await sbGet(`rhinos_config?key=in.(${keys})&select=key,value`);
@@ -1646,6 +1817,7 @@ export default async function handler(req, res) {
   if (action === 'decay_check')       return runDecayCheck(res);
   if (action === 'adset_efficiency')  return runAdsetEfficiency(res);
   if (action === 'morning_brief')     return runMorningBrief(res);
+  if (action === 'ad_digest_email')   return runAdDigestEmail(res);
   if (action === 'cpl_trend')         return runCplTrend(res);
   if (action === 'account_health')    return runAccountHealth(res);
   if (action === 'update_lead')        return runUpdateLead(req, res);

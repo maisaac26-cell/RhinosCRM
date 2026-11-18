@@ -1476,6 +1476,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       <button class="btn btn-sm meta-ctab2" data-tab="arbol" onclick="metaContTab('arbol')">🌳 Árbol IA</button>
       <button class="btn btn-sm meta-ctab2" data-tab="comparar" onclick="metaContTab('comparar')">⚖️ Comparar</button>
       <button class="btn btn-sm meta-ctab2" data-tab="ab" onclick="metaContTab('ab')">🔬 A/B Tests</button>
+      <button class="btn btn-sm meta-ctab2" data-tab="ranking" onclick="metaContTab('ranking');metaRankingLoad()">📊 Ranking</button>
     </div>
 
     <!-- ── TAB: CREATIVOS ─────────────────────────────────────────── -->
@@ -1677,6 +1678,30 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
         <div style="font-size:12px;color:var(--text2);line-height:1.6">Etiquetá tus anuncios con <strong>🔬 Test A/B</strong> y <strong>🔬 Test B</strong> desde el botón 🏷️ en las tarjetas de creativos. Acá se comparan automáticamente los pares encontrados.</div>
       </div>
       <div id="meta-ab-pairs"><div class="empty" style="font-size:12px">Cargando pares A/B...</div></div>
+    </div>
+
+    <!-- ── TAB: RANKING ──────────────────────────────────────────────── -->
+    <div id="meta-cont-ranking" style="display:none">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <select id="ranking-camp-sel" onchange="metaRankingLoad()" style="font-size:12px;padding:5px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface2);color:var(--text);flex:1;min-width:160px">
+          <option value="">Todas las campañas</option>
+        </select>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm ranking-range ranking-range-active" data-d="7" onclick="metaRankingSetRange(7)">7d</button>
+          <button class="btn btn-sm ranking-range" data-d="14" onclick="metaRankingSetRange(14)">14d</button>
+          <button class="btn btn-sm ranking-range" data-d="30" onclick="metaRankingSetRange(30)">30d</button>
+        </div>
+        <select id="ranking-metric" onchange="metaRankingRender()" style="font-size:12px;padding:5px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+          <option value="leads">Leads</option>
+          <option value="cpl">CPL (menor = mejor)</option>
+          <option value="ctr">CTR %</option>
+          <option value="spend">Gasto</option>
+          <option value="impressions">Impresiones</option>
+        </select>
+        <button class="btn btn-sm" onclick="metaRankingLoad()" style="color:var(--cyan);border-color:rgba(0,229,204,0.3)">↻</button>
+      </div>
+      <div id="ranking-chart-wrap" style="margin-bottom:16px"></div>
+      <div id="ranking-table-wrap"></div>
     </div>
 
     <!-- ── MODAL DETALLE CREATIVO ─────────────────────────────────── -->
@@ -20449,7 +20474,7 @@ async function metaCreateCampaign() {
 // ── CONTENIDO tabs ──
 function metaContTab(tab) {
   document.querySelectorAll('.meta-ctab2').forEach(b => b.classList.toggle('meta-ctab2-active', b.dataset.tab === tab));
-  ['creativos','subir','arbol','comparar','ab'].forEach(t => {
+  ['creativos','subir','arbol','comparar','ab','ranking'].forEach(t => {
     const el = document.getElementById(`meta-cont-${t}`);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
@@ -20458,6 +20483,176 @@ function metaContTab(tab) {
   if (tab === 'arbol')     metaTreeLoad();
   if (tab === 'comparar')  metaComparadorLoad();
   if (tab === 'ab')        metaAbTestLoad();
+  if (tab === 'ranking')   metaRankingLoad();
+}
+
+// ─── RANKING / MÉTRICAS POR CAMPAÑA ───────────────────────────────────────
+let _rankingData = null;
+let _rankingRange = 7;
+
+function metaRankingSetRange(d) {
+  _rankingRange = d;
+  document.querySelectorAll('.ranking-range').forEach(b => {
+    b.classList.toggle('ranking-range-active', +b.dataset.d === d);
+    b.style.color = +b.dataset.d === d ? 'var(--cyan)' : '';
+    b.style.borderColor = +b.dataset.d === d ? 'rgba(0,229,204,0.4)' : '';
+  });
+  metaRankingLoad();
+}
+
+async function metaRankingLoad() {
+  const wrap = document.getElementById('ranking-chart-wrap');
+  const tbl = document.getElementById('ranking-table-wrap');
+  if (!wrap || !tbl) return;
+  wrap.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:20px 0">Cargando métricas...</div>';
+  tbl.innerHTML = '';
+
+  const campSel = document.getElementById('ranking-camp-sel');
+  const selectedCamp = campSel?.value || '';
+  const since = new Date(Date.now() - (_rankingRange - 1) * 86400000).toISOString().slice(0,10);
+
+  try {
+    // Load campaigns for selector
+    const [campaigns, ads, metrics] = await Promise.all([
+      fetch('/api/meta?action=list_campaigns').then(r=>r.json()).catch(()=>({ok:false})),
+      sbFetch(`meta_ads?select=id,name,status,campaign_id${selectedCamp ? '&campaign_id=eq.'+selectedCamp : ''}&limit=200`),
+      sbFetch(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since}&select=entity_id,spend,impressions,clicks,leads,messages_started&limit=5000`),
+    ]);
+
+    // Populate campaign selector
+    if (campaigns.ok && campaigns.campaigns) {
+      const existing = new Set([...campSel.options].map(o => o.value));
+      campaigns.campaigns.forEach(c => {
+        if (!existing.has(c.id)) {
+          const opt = document.createElement('option');
+          opt.value = c.id; opt.textContent = c.name;
+          campSel.appendChild(opt);
+        }
+      });
+      if (selectedCamp) campSel.value = selectedCamp;
+    }
+
+    // Aggregate metrics per ad
+    const agg = {};
+    for (const m of (metrics||[])) {
+      if (!agg[m.entity_id]) agg[m.entity_id] = { spend:0, impressions:0, clicks:0, leads:0, messages:0 };
+      agg[m.entity_id].spend       += parseFloat(m.spend||0);
+      agg[m.entity_id].impressions += parseInt(m.impressions||0);
+      agg[m.entity_id].clicks      += parseInt(m.clicks||0);
+      agg[m.entity_id].leads       += parseInt(m.leads||0);
+      agg[m.entity_id].messages    += parseInt(m.messages_started||0);
+    }
+
+    _rankingData = (ads||[]).map(ad => {
+      const m = agg[ad.id] || { spend:0, impressions:0, clicks:0, leads:0, messages:0 };
+      const ctr = m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0;
+      const cpl = m.leads > 0 ? m.spend / m.leads : 0;
+      return { ...ad, m, ctr, cpl };
+    });
+
+    metaRankingRender();
+  } catch(e) {
+    wrap.innerHTML = `<div style="color:#f87171;font-size:12px">Error: ${e.message}</div>`;
+  }
+}
+
+function metaRankingRender() {
+  const wrap = document.getElementById('ranking-chart-wrap');
+  const tbl = document.getElementById('ranking-table-wrap');
+  if (!wrap || !tbl || !_rankingData) return;
+
+  const metric = document.getElementById('ranking-metric')?.value || 'leads';
+  const fARS = n => '$' + Math.round(n).toLocaleString('es-AR');
+  const cfg = JSON.parse(localStorage.getItem('meta_config')||'{}');
+  const targetCpl = parseFloat(cfg.meta_target_cpl||0);
+
+  // Sort: for CPL, ascending (lower = better); for others, descending
+  const sorted = [..._rankingData].sort((a, b) => {
+    if (metric === 'cpl') {
+      const av = a.cpl || 999999, bv = b.cpl || 999999;
+      return av - bv;
+    }
+    const av = metric === 'ctr' ? a.ctr : metric === 'spend' ? a.m.spend : metric === 'impressions' ? a.m.impressions : a.m.leads;
+    const bv = metric === 'ctr' ? b.ctr : metric === 'spend' ? b.m.spend : metric === 'impressions' ? b.m.impressions : b.m.leads;
+    return bv - av;
+  });
+
+  if (!sorted.length) { wrap.innerHTML = '<div class="empty" style="font-size:12px">Sin anuncios en este rango</div>'; tbl.innerHTML=''; return; }
+
+  // ─── BAR CHART ───
+  const values = sorted.map(r => metric === 'cpl' ? r.cpl : metric === 'ctr' ? r.ctr : metric === 'spend' ? r.m.spend : metric === 'impressions' ? r.m.impressions : r.m.leads);
+  const maxVal = Math.max(...values.filter(v=>v>0), 1);
+  const metricLabel = { leads:'Leads', cpl:'CPL (ARS)', ctr:'CTR %', spend:'Gasto (ARS)', impressions:'Impresiones' }[metric];
+
+  const barHeight = 28, barGap = 6, labelW = 160, chartW = 100; // % widths
+  const chartHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;overflow:hidden">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">${metricLabel} — últimos ${_rankingRange}d</div>
+      ${sorted.map((r, i) => {
+        const v = values[i];
+        const pct = maxVal > 0 ? Math.max((v / maxVal) * 100, v > 0 ? 2 : 0) : 0;
+        const isGood = metric === 'leads' ? v >= 3 : metric === 'cpl' && targetCpl > 0 ? v > 0 && v <= targetCpl : metric === 'ctr' ? v >= 1.5 : false;
+        const isBad  = metric === 'leads' ? (v === 0 && r.m.spend > 300) : metric === 'cpl' && targetCpl > 0 ? v > targetCpl * 2 : metric === 'ctr' ? (v < 0.3 && r.m.impressions > 500) : false;
+        const barColor = isGood ? '#4ade80' : isBad ? '#f87171' : 'var(--cyan)';
+        const displayVal = v === 0 ? '—' : metric === 'cpl' ? fARS(v) : metric === 'ctr' ? v.toFixed(2)+'%' : metric === 'spend' ? fARS(v) : Math.round(v).toLocaleString('es-AR');
+        const shortName = r.name.length > 22 ? r.name.slice(0,20)+'…' : r.name;
+        const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:${barGap}px">
+          <div style="width:16px;font-size:10px;color:var(--text3);text-align:right;flex-shrink:0">${rank}</div>
+          <div style="width:${labelW}px;flex-shrink:0;font-size:11px;color:${r.status==='ACTIVE'?'var(--text)':'var(--text3)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name}">${shortName}</div>
+          <div style="flex:1;background:var(--surface2);border-radius:3px;height:${barHeight}px;overflow:hidden;position:relative">
+            <div style="width:${pct}%;height:100%;background:${barColor};opacity:0.8;border-radius:3px;transition:width 0.4s ease"></div>
+            <div style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:${pct > 25 ? '#fff' : 'var(--text2)'}">${displayVal}</div>
+          </div>
+          <div style="width:14px;flex-shrink:0;font-size:12px">${isGood ? '✅' : isBad ? '⚠️' : ''}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  wrap.innerHTML = chartHTML;
+
+  // ─── TABLE ───
+  const totSpend = sorted.reduce((s,r)=>s+r.m.spend,0);
+  const totLeads = sorted.reduce((s,r)=>s+r.m.leads,0);
+  const totImpr  = sorted.reduce((s,r)=>s+r.m.impressions,0);
+  const avgCpl   = totLeads > 0 ? totSpend/totLeads : 0;
+
+  tbl.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text3)">
+        <span><strong style="color:var(--text)">${sorted.length}</strong> anuncios · <strong style="color:var(--text)">${_rankingRange}d</strong></span>
+        <span>Total: <strong style="color:var(--cyan)">${totLeads} leads</strong> · ${fARS(totSpend)} · CPL prom. ${avgCpl > 0 ? fARS(avgCpl) : '—'}</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:7px 10px;color:var(--text3);font-weight:600">#</th>
+            <th style="text-align:left;padding:7px 10px;color:var(--text3);font-weight:600">Anuncio</th>
+            <th style="text-align:right;padding:7px 10px;color:var(--text3);font-weight:600">Estado</th>
+            <th style="text-align:right;padding:7px 10px;color:var(--text3);font-weight:600">Impr.</th>
+            <th style="text-align:right;padding:7px 10px;color:var(--text3);font-weight:600">CTR</th>
+            <th style="text-align:right;padding:7px 10px;color:var(--text3);font-weight:600">Leads</th>
+            <th style="text-align:right;padding:7px 10px;color:var(--text3);font-weight:600">Gasto</th>
+            <th style="text-align:right;padding:7px 10px;color:var(--text3);font-weight:600">CPL</th>
+          </tr></thead>
+          <tbody>
+            ${sorted.map((r,i) => {
+              const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1)+'';
+              const cplColor = r.cpl > 0 && targetCpl > 0 ? (r.cpl <= targetCpl ? '#4ade80' : r.cpl <= targetCpl*2 ? '#fbbf24' : '#f87171') : 'var(--text2)';
+              return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);opacity:${r.status==='ACTIVE'?1:0.6}">
+                <td style="padding:7px 10px">${rank}</td>
+                <td style="padding:7px 10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name}">${r.name}</td>
+                <td style="padding:7px 10px;text-align:right"><span style="font-size:9px;padding:2px 6px;border-radius:8px;background:${r.status==='ACTIVE'?'rgba(74,222,128,0.1)':'rgba(248,113,113,0.1)'};color:${r.status==='ACTIVE'?'#4ade80':'#f87171'}">${r.status==='ACTIVE'?'ACTIVO':'PAUSADO'}</span></td>
+                <td style="padding:7px 10px;text-align:right;color:var(--text2)">${r.m.impressions > 0 ? r.m.impressions.toLocaleString('es-AR') : '—'}</td>
+                <td style="padding:7px 10px;text-align:right;color:${r.ctr>=1.5?'#4ade80':r.ctr>=0.5?'var(--cyan)':'var(--text3)'}">${r.m.impressions > 0 ? r.ctr.toFixed(2)+'%' : '—'}</td>
+                <td style="padding:7px 10px;text-align:right;font-weight:700;color:${r.m.leads>0?'var(--cyan)':'var(--text3)'}">${r.m.leads}</td>
+                <td style="padding:7px 10px;text-align:right;color:var(--text2)">${r.m.spend > 0 ? fARS(r.m.spend) : '—'}</td>
+                <td style="padding:7px 10px;text-align:right;font-weight:600;color:${cplColor}">${r.cpl > 0 ? fARS(r.cpl) : '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 function metaArbolSubTab(subtab) {
