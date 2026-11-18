@@ -53,7 +53,10 @@ async function metaPost(token, path, body) {
     body: JSON.stringify({ ...body, access_token: token }),
   });
   const j = await r.json();
-  if (j.error) throw new Error(`Meta POST ${path}: ${j.error.message}`);
+  if (j.error) {
+    const detail = [j.error.message, j.error.error_user_msg, j.error.error_user_title].filter(Boolean).join(' | ');
+    throw new Error(`Meta POST ${path}: ${detail}`);
+  }
   return j;
 }
 
@@ -1525,14 +1528,14 @@ async function runBatchLaunchStart(req, res) {
     };
     const { opt, bill } = objMap[obj] || objMap['OUTCOME_TRAFFIC'];
 
-    // 1. Create campaign
-    const campaign = await metaPost(token, `act_${accountId}/campaigns`, {
+    // 1. Create campaign — use OUTCOME_TRAFFIC (broadest support across app access levels)
+    const campaignObj = {
       name: campaign_name,
-      objective: obj,
+      objective: 'OUTCOME_TRAFFIC',
       status: 'PAUSED',
       special_ad_categories: [],
-      buying_type: 'AUCTION',
-    });
+    };
+    const campaign = await metaPost(token, `act_${accountId}/campaigns`, campaignObj);
 
     // 2. Create adset
     const budgetCents = Math.round(parseFloat(budget_daily) * 100);
