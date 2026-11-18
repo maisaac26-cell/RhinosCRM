@@ -1551,8 +1551,8 @@ async function runBatchLaunchStart(req, res) {
         age_min: parseInt(age_min) || 28,
         age_max: parseInt(age_max) || 60,
         geo_locations: { countries: ['AR'] },
-        targeting_automation: { advantage_audience: 0 },
       },
+      targeting_automation: { advantage_audience: 0 },
       status: 'PAUSED',
     });
 
