@@ -19812,6 +19812,73 @@ async function metaDuplicateAd(adId, newName) {
   } catch(e) { metaToast('Error: ' + e.message, 'err'); }
 }
 
+// ── CTA MODAL ────────────────────────────────────────────────────────────────
+let _metaCtaAdId = null;
+
+function metaCtaModal(adId, adName) {
+  _metaCtaAdId = adId;
+  document.getElementById('meta-cta-modal')?.remove();
+  const safe = adName.length > 35 ? adName.slice(0, 35) + '…' : adName;
+  const modal = document.createElement('div');
+  modal.id = 'meta-cta-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:400px;width:100%">
+      <div style="font-weight:700;font-size:13px;margin-bottom:14px">✏️ CTA · <span style="color:var(--cyan)">${safe}</span></div>
+      <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Cambiar CTA del anuncio</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px">
+        <button onclick="metaApplyCtaAction('edit','INSTAGRAM_MESSAGE')" class="btn btn-sm" style="color:var(--cyan)">📸 Instagram DM</button>
+        <button onclick="metaApplyCtaAction('edit','WHATSAPP_MESSAGE')" class="btn btn-sm" style="color:#4ade80">💬 WhatsApp</button>
+        <button onclick="metaApplyCtaAction('edit','MESSENGER_MESSAGE')" class="btn btn-sm">💬 Messenger</button>
+        <button onclick="metaApplyCtaAction('edit','LEARN_MORE')" class="btn btn-sm">🔗 Más información</button>
+        <button onclick="metaApplyCtaAction('edit','CONTACT_US')" class="btn btn-sm">📞 Contactar</button>
+      </div>
+      <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Duplicar con otro CTA (pausado)</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px">
+        <button onclick="metaApplyCtaAction('duplicate','INSTAGRAM_MESSAGE')" class="btn btn-sm" style="border-color:rgba(0,229,204,0.4)">📸 Dupl. IG DM</button>
+        <button onclick="metaApplyCtaAction('duplicate','WHATSAPP_MESSAGE')" class="btn btn-sm" style="border-color:rgba(74,222,128,0.4)">💬 Dupl. WhatsApp</button>
+        <button onclick="metaApplyCtaAction('duplicate','LEARN_MORE')" class="btn btn-sm">🔗 Dupl. Más info</button>
+      </div>
+      <button onclick="document.getElementById('meta-cta-modal').remove()" class="btn btn-sm" style="width:100%">Cancelar</button>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+async function metaApplyCtaAction(mode, ctaType) {
+  const adId = _metaCtaAdId;
+  document.getElementById('meta-cta-modal')?.remove();
+  if (!adId) return;
+  const action = mode === 'edit' ? 'update_ad_cta' : 'duplicate_ad_cta';
+  metaToast(mode === 'edit' ? 'Actualizando CTA...' : 'Duplicando con nuevo CTA...', 'info');
+  try {
+    const r = await fetch(`/api/meta?action=${action}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ad_id: adId, cta_type: ctaType }),
+    }).then(x => x.json());
+    if (r.ok) { metaToast(mode === 'edit' ? '✓ CTA actualizado' : '✓ Duplicado (pausado)', 'ok'); setTimeout(metaLoadAllCampaigns, 1500); }
+    else metaToast('Error: ' + (r.error || 'No se pudo completar'), 'err');
+  } catch(e) { metaToast('Error: ' + e.message, 'err'); }
+}
+
+async function metaBulkDuplicateCta(ctaType, adIds) {
+  if (!confirm(`¿Duplicar ${adIds.length} anuncios con CTA ${ctaType}?\nSe crearán copias pausadas. Puede tardar ~${adIds.length * 3} seg.`)) return;
+  metaToast(`Duplicando ${adIds.length} anuncios...`, 'info');
+  let ok = 0, fail = 0;
+  for (const id of adIds) {
+    try {
+      const r = await fetch('/api/meta?action=duplicate_ad_cta', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ ad_id: id, cta_type: ctaType }),
+      }).then(x => x.json());
+      if (r.ok) ok++; else { fail++; console.warn('dup-cta fail', id, r.error); }
+    } catch { fail++; }
+    metaToast(`Duplicando... ${ok + fail}/${adIds.length}`, 'info');
+  }
+  metaToast(`✓ ${ok} duplicados${fail ? ` · ${fail} errores (ver consola)` : ''}`, ok > 0 ? 'ok' : 'err');
+  if (ok > 0) setTimeout(metaLoadAllCampaigns, 2000);
+}
+
 // ── TODAY REPORT ─────────────────────────────────────────────────────────────
 async function metaTodayReport() {
   const panel   = document.getElementById('meta-today-panel');
@@ -20382,7 +20449,7 @@ async function metaLoadAllCampaigns() {
         <div style="flex:1;min-width:0">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
             <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${ad.name}</div>
-            <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${effectiveStatusBadge(ad.effective_status)}<button title="Ver preview en Instagram" onclick="metaShowAdPreview('${ad.id}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--cyan);cursor:pointer;padding:2px 5px;font-size:11px">👁</button><button title="Duplicar anuncio" onclick="metaDuplicateAdModal('${ad.id}','${ad.name.replace(/'/g,"&#39;")}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text3);cursor:pointer;padding:2px 5px;font-size:11px">📋</button>${togBtn('ad',ad.id,ad.status)}</div>
+            <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${effectiveStatusBadge(ad.effective_status)}<button title="Ver preview en Instagram" onclick="metaShowAdPreview('${ad.id}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--cyan);cursor:pointer;padding:2px 5px;font-size:11px">👁</button><button title="Cambiar CTA / Duplicar con otro CTA" onclick="metaCtaModal('${ad.id}','${ad.name.replace(/'/g,"&#39;")}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:#fbbf24;cursor:pointer;padding:2px 5px;font-size:11px">✏️</button><button title="Duplicar anuncio" onclick="metaDuplicateAdModal('${ad.id}','${ad.name.replace(/'/g,"&#39;")}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text3);cursor:pointer;padding:2px 5px;font-size:11px">📋</button>${togBtn('ad',ad.id,ad.status)}</div>
           </div>
           ${chips(m)}
         </div>
@@ -20421,11 +20488,16 @@ async function metaLoadAllCampaigns() {
       if (withIssues) parts.push(`${withIssues} con problemas`);
       if (disapproved) parts.push(`${disapproved} rechazado${disapproved>1?'s':''}`);
       if (pending) parts.push(`${pending} en revisión`);
+      const issueAdIds = JSON.stringify(adsWithIssues.map(a=>a.id));
       return `<div style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.35);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start">
         <span style="font-size:16px;flex-shrink:0">⚠️</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;font-weight:700;color:#f87171;margin-bottom:3px">${adsWithIssues.length} anuncio${adsWithIssues.length>1?'s':''} con problema de entrega (${parts.join(', ')})</div>
-          <div style="font-size:11px;color:var(--text3)">Los anuncios con estado <strong style="color:#fbbf24">Con problemas</strong> no se están mostrando. Revisá Meta Ads Manager para ver el motivo específico. En tu caso, probablemente el número de WhatsApp está desconectado de la página de Facebook.</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Los anuncios con estado <strong style="color:#fbbf24">Con problemas</strong> no se están mostrando. Revisá Meta Ads Manager para ver el motivo específico. En tu caso, probablemente el número de WhatsApp está desconectado de la página de Facebook.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button onclick='metaBulkDuplicateCta("INSTAGRAM_MESSAGE",${issueAdIds})' class="btn btn-sm" style="font-size:10px;color:var(--cyan);border-color:rgba(0,229,204,0.4)">📸 Duplicar ${adsWithIssues.length} como IG DM</button>
+            <button onclick='metaBulkDuplicateCta("LEARN_MORE",${issueAdIds})' class="btn btn-sm" style="font-size:10px">🔗 Duplicar como Más info</button>
+          </div>
         </div>
       </div>`;
     })() : '';

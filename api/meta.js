@@ -1750,6 +1750,17 @@ async function runBatchLaunchStart(req, res) {
   }
 }
 
+function buildCtaObject(ctaType) {
+  const map = {
+    INSTAGRAM_MESSAGE: { type: 'INSTAGRAM_MESSAGE', value: { app_destination: 'INSTAGRAM_DIRECT' } },
+    WHATSAPP_MESSAGE:  { type: 'WHATSAPP_MESSAGE',  value: { app_destination: 'WHATSAPP' } },
+    MESSENGER_MESSAGE: { type: 'MESSENGER_MESSAGE', value: { app_destination: 'MESSENGER' } },
+    LEARN_MORE:        { type: 'LEARN_MORE' },
+    CONTACT_US:        { type: 'CONTACT_US' },
+  };
+  return map[ctaType] || null;
+}
+
 async function runDeleteCampaign(req, res) {
   try {
     const cfg = await getMetaConfig();
@@ -1758,14 +1769,10 @@ async function runDeleteCampaign(req, res) {
     const { campaign_id } = req.body || {};
     if (!campaign_id) return res.status(200).json({ ok: false, error: 'campaign_id requerido' });
 
-    // Delete from Meta API (token must be URL param — DELETE ignores JSON body)
-    const r = await fetch(`https://graph.facebook.com/${META_V}/${campaign_id}?access_token=${token}`, {
-      method: 'DELETE',
-    });
-    const j = await r.json();
-    if (j.error) return res.status(200).json({ ok: false, error: j.error.message });
+    // POST with status=DELETED is more reliable than HTTP DELETE for Meta Graph API
+    await metaPatch(token, campaign_id, { status: 'DELETED' });
 
-    // Delete from Supabase (cascade: ads + adsets + campaign)
+    // Clean up Supabase
     await Promise.all([
       sbReq('DELETE', `meta_ads?campaign_id=eq.${campaign_id}`),
       sbReq('DELETE', `meta_adsets?campaign_id=eq.${campaign_id}`),
@@ -1774,6 +1781,83 @@ async function runDeleteCampaign(req, res) {
 
     return res.status(200).json({ ok: true });
   } catch(err) {
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
+async function runUpdateAdCta(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { ad_id, cta_type } = req.body || {};
+    if (!ad_id || !cta_type) return res.status(200).json({ ok: false, error: 'ad_id y cta_type requeridos' });
+    const accountId = (cfg.meta_ad_account_id || '').replace('act_', '');
+
+    const ad = await metaGet(token, `${ad_id}?fields=name,adset_id,campaign_id,creative{id,object_story_spec,name}`);
+    const creative = ad.creative;
+    if (!creative?.object_story_spec) return res.status(200).json({ ok: false, error: 'No se pudo obtener el creativo' });
+    const spec = creative.object_story_spec;
+    const field = spec.link_data ? 'link_data' : spec.video_data ? 'video_data' : null;
+    if (!field) return res.status(200).json({ ok: false, error: 'Tipo de creativo no soportado' });
+
+    const ctaObj = buildCtaObject(cta_type);
+    if (!ctaObj) return res.status(200).json({ ok: false, error: `CTA no soportado: ${cta_type}` });
+
+    const newSpec = { ...spec, [field]: { ...spec[field], call_to_action: ctaObj } };
+    const newCreative = await metaPost(token, `act_${accountId}/adcreatives`, {
+      object_story_spec: newSpec,
+      name: `${creative.name || ad.name}_${cta_type}_${Date.now()}`,
+    });
+    await metaPatch(token, ad_id, { creative: { creative_id: newCreative.id } });
+    await sbReq('PATCH', `meta_ads?id=eq.${ad_id}`, { updated_at: new Date().toISOString() }).catch(() => {});
+    return res.status(200).json({ ok: true, ad_id, creative_id: newCreative.id });
+  } catch(err) {
+    console.error('[meta-update-ad-cta]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
+async function runDuplicateAdCta(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { ad_id, cta_type, new_name } = req.body || {};
+    if (!ad_id || !cta_type) return res.status(200).json({ ok: false, error: 'ad_id y cta_type requeridos' });
+    const accountId = (cfg.meta_ad_account_id || '').replace('act_', '');
+
+    const ad = await metaGet(token, `${ad_id}?fields=name,adset_id,campaign_id,creative{id,object_story_spec,name}`);
+    const creative = ad.creative;
+    if (!creative?.object_story_spec) return res.status(200).json({ ok: false, error: 'No se pudo obtener el creativo' });
+    const spec = creative.object_story_spec;
+    const field = spec.link_data ? 'link_data' : spec.video_data ? 'video_data' : null;
+    if (!field) return res.status(200).json({ ok: false, error: 'Tipo de creativo no soportado' });
+
+    const ctaObj = buildCtaObject(cta_type);
+    if (!ctaObj) return res.status(200).json({ ok: false, error: `CTA no soportado: ${cta_type}` });
+
+    const newSpec = { ...spec, [field]: { ...spec[field], call_to_action: ctaObj } };
+    const newCreative = await metaPost(token, `act_${accountId}/adcreatives`, {
+      object_story_spec: newSpec,
+      name: `${creative.name || ad.name}_${cta_type}`,
+    });
+    const ctaLabel = { INSTAGRAM_MESSAGE: 'IG DM', WHATSAPP_MESSAGE: 'WhatsApp', MESSENGER_MESSAGE: 'Messenger', LEARN_MORE: 'Más info', CONTACT_US: 'Contactar' }[cta_type] || cta_type;
+    const finalName = new_name || `${ad.name} [${ctaLabel}]`;
+    const newAd = await metaPost(token, `act_${accountId}/ads`, {
+      name: finalName,
+      adset_id: ad.adset_id,
+      creative: { creative_id: newCreative.id },
+      status: 'PAUSED',
+    });
+    await sbReq('POST', 'meta_ads?on_conflict=id', [{
+      id: newAd.id, adset_id: ad.adset_id, campaign_id: ad.campaign_id || null,
+      name: finalName, status: 'PAUSED', creative_id: newCreative.id,
+      updated_at: new Date().toISOString(),
+    }]).catch(() => {});
+    return res.status(200).json({ ok: true, ad_id: newAd.id, name: finalName });
+  } catch(err) {
+    console.error('[meta-duplicate-ad-cta]', err.message);
     return res.status(200).json({ ok: false, error: err.message });
   }
 }
@@ -1825,6 +1909,8 @@ export default async function handler(req, res) {
   if (action === 'batch_launch_start') return runBatchLaunchStart(req, res);
   if (action === 'create_video_ad')    return runCreateVideoAd(req, res);
   if (action === 'delete_campaign')    return runDeleteCampaign(req, res);
+  if (action === 'update_ad_cta')      return runUpdateAdCta(req, res);
+  if (action === 'duplicate_ad_cta')   return runDuplicateAdCta(req, res);
   if (action === 'get_ad_preview')     return runGetAdPreview(req, res);
   return runSync(res);
 }
