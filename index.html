@@ -735,7 +735,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-top:12px;flex-wrap:wrap">
         <button class="refresh-btn" id="btn-meta-refresh" onclick="metaDashboardLoad()">↻ Sincronizar</button>
-        <button class="btn btn-sm" onclick="metaSendWeeklyReport()" style="font-size:11px;color:#a78bfa;border-color:rgba(139,92,246,0.3)" title="Enviar resumen ahora">📱 Enviar resumen</button>
+        <button class="btn btn-sm" onclick="metaSendWeeklyReport()" style="font-size:11px;color:#a78bfa;border-color:rgba(139,92,246,0.3)" title="Enviar reporte por email">📧 Enviar resumen</button>
         <button class="btn btn-sm" onclick="metaSendMorningBrief()" style="font-size:11px;color:#fbbf24;border-color:rgba(251,191,36,0.3)" title="Enviar brief de ayer ahora">🌅 Brief diario</button>
         <button class="btn btn-sm" onclick="metaLeadsCsvExport()" style="font-size:11px;color:var(--green);border-color:rgba(34,197,94,0.3)" title="Exportar leads como CSV">⬇ Leads CSV</button>
         <button class="btn btn-sm" onclick="metaMetricsCsvExport()" style="font-size:11px;color:var(--cyan);border-color:rgba(0,229,204,0.3)" title="Exportar métricas 90d como CSV">⬇ Métricas CSV</button>
@@ -16875,22 +16875,22 @@ async function _metaAdsetEffSaveAll() {
 async function metaSendWeeklyReport() {
   const btn = document.querySelector('[onclick="metaSendWeeklyReport()"]');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
-  metaToast('Enviando resumen semanal por WhatsApp...', 'info');
+  metaToast('Enviando reporte por email...', 'info');
   try {
-    const r = await fetch('/api/weekly-report', { method: 'GET' }).then(x => x.json());
-    if (r.ok || r.sent) metaToast(`✓ Resumen enviado (${r.sent || 1} destinatario/s)`, 'ok');
-    else metaToast('Error: ' + (r.error || JSON.stringify(r)), 'err');
+    const r = await fetch('/api/meta?action=ad_digest_email').then(x => x.json());
+    if (r.ok) metaToast(`✓ Reporte enviado a ${r.to} (${r.ads} ads · ${r.leads7} leads 7d)`, 'ok');
+    else metaToast('Error: ' + (r.error || r.msg || JSON.stringify(r)), 'err');
   } catch(e) { metaToast('Error: ' + e.message, 'err'); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '📱 Enviar resumen'; } }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '📧 Enviar resumen'; } }
 }
 
 async function metaSendMorningBrief() {
   const btn = document.querySelector('[onclick="metaSendMorningBrief()"]');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
-  metaToast('Enviando brief diario por WhatsApp...', 'info');
+  metaToast('Enviando brief diario por email...', 'info');
   try {
-    const r = await fetch('/api/meta?action=morning_brief').then(x => x.json());
-    if (r.ok) metaToast(`✓ Brief enviado (${r.sent} destinatario/s · ${r.yTotLeads} leads ayer)`, 'ok');
+    const r = await fetch('/api/meta?action=ad_digest_email').then(x => x.json());
+    if (r.ok) metaToast(`✓ Brief enviado a ${r.to} (${r.leads7} leads 7d)`, 'ok');
     else metaToast('Error: ' + (r.error || r.msg || JSON.stringify(r)), 'err');
   } catch(e) { metaToast('Error: ' + e.message, 'err'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🌅 Brief diario'; } }

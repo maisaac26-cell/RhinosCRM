@@ -104,6 +104,32 @@ async function sendMetaDigestEmail(toAddress, subject, htmlBody) {
   return true;
 }
 
+async function getAiDigestAnalysis(metrics) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const prompt = `Sos el agente de marketing de Rhinosapp, un software de gestión comercial en Argentina. Analizá estas métricas de Meta Ads y dá exactamente 3 recomendaciones concretas y accionables en español. Sé directo y específico, sin repetir las métricas.
+
+Período: últimos 7 días
+- Gasto: ARS ${Math.round(metrics.totSpend7).toLocaleString('es-AR')}
+- Leads: ${metrics.totLeads7}
+- CPL promedio: ${metrics.totLeads7 > 0 ? 'ARS ' + Math.round(metrics.totSpend7 / metrics.totLeads7).toLocaleString('es-AR') : 'sin leads'}
+- Ads activos: ${metrics.activeCount}
+- Proyección mensual: ${metrics.projection} leads (objetivo: ${metrics.goalLeads || 'no definido'})
+${metrics.bestAdName ? `- Mejor ad (menor CPL): ${metrics.bestAdName} — ${metrics.bestAdLeads} leads a ARS ${Math.round(metrics.bestAdCpl).toLocaleString('es-AR')} c/u` : ''}
+${metrics.worstAdName ? `- Ad con más gasto sin leads: ${metrics.worstAdName} — ARS ${Math.round(metrics.worstAdSpend).toLocaleString('es-AR')} gastado` : ''}
+
+Respondé con exactamente 3 recomendaciones numeradas, cada una en 1-2 oraciones. Sin introducción ni cierre.`;
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 350, messages: [{ role: 'user', content: prompt }] }),
+    });
+    const j = await r.json();
+    return j.content?.[0]?.text?.trim() || null;
+  } catch(e) { return null; }
+}
+
 async function runAdDigestEmail(res) {
   try {
     const cfg = await getMetaConfig();
@@ -158,6 +184,18 @@ async function runAdDigestEmail(res) {
     const ySpend = Object.values(aggY).reduce((s, m) => s + m.spend, 0);
     const yLeads = Object.values(aggY).reduce((s, m) => s + m.leads, 0);
     const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    const goalLeads = parseFloat(goalMap['meta_goal_leads_month'] || 0);
+    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    const projection = Math.round((totLeads7 / 7) * daysInMonth);
+    const bestAd = rows.filter(r => r.m.leads > 0).sort((a,b) => a.cpl - b.cpl)[0];
+    const worstAd = rows.filter(r => r.m.leads === 0 && r.m.spend > 100).sort((a,b) => b.m.spend - a.m.spend)[0];
+
+    const aiAnalysis = await getAiDigestAnalysis({
+      totSpend7, totLeads7, activeCount: rows.length, projection, goalLeads,
+      bestAdName: bestAd?.name, bestAdLeads: bestAd?.m.leads, bestAdCpl: bestAd?.cpl,
+      worstAdName: worstAd?.name, worstAdSpend: worstAd?.m.spend,
+    });
 
     const tableRows = rows.map(r => `
       <tr style="border-bottom:1px solid #2a2a3a">
@@ -218,6 +256,12 @@ async function runAdDigestEmail(res) {
       </div>
       ${targetCpl > 0 ? `<div style="font-size:11px;color:#6b7280;margin-top:12px">🎯 CPL objetivo: ${fARS(targetCpl)} · 🟢 ≤ ${fARS(targetCpl)} · 🟡 ≤ ${fARS(targetCpl*2)} · 🔴 > ${fARS(targetCpl*2)}</div>` : ''}
     </div>
+
+    ${aiAnalysis ? `
+    <div style="padding:20px 24px;border-top:1px solid #1e293b;background:#0f172a">
+      <div style="font-size:11px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">🤖 Análisis del agente IA</div>
+      <div style="font-size:13px;color:#d1d5db;line-height:1.7;white-space:pre-line">${aiAnalysis}</div>
+    </div>` : ''}
 
     <div style="padding:16px 24px;border-top:1px solid #1e293b;text-align:center">
       <a href="https://rhinos-crm.vercel.app" style="display:inline-block;background:#00e5cc;color:#0d0d1a;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none">Gestionar campañas →</a>
