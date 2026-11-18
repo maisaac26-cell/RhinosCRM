@@ -1758,11 +1758,9 @@ async function runDeleteCampaign(req, res) {
     const { campaign_id } = req.body || {};
     if (!campaign_id) return res.status(200).json({ ok: false, error: 'campaign_id requerido' });
 
-    // Delete from Meta API
-    const r = await fetch(`https://graph.facebook.com/${META_V}/${campaign_id}`, {
+    // Delete from Meta API (token must be URL param — DELETE ignores JSON body)
+    const r = await fetch(`https://graph.facebook.com/${META_V}/${campaign_id}?access_token=${token}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: token }),
     });
     const j = await r.json();
     if (j.error) return res.status(200).json({ ok: false, error: j.error.message });
