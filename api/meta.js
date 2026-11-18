@@ -1532,7 +1532,7 @@ async function runBatchLaunchStart(req, res) {
     const campaignObj = {
       name: campaign_name,
       objective: 'OUTCOME_TRAFFIC',
-      status: 'PAUSED',
+      status: 'ACTIVE',
       special_ad_categories: [],
       is_adset_budget_sharing_enabled: false,
     };
@@ -1553,7 +1553,7 @@ async function runBatchLaunchStart(req, res) {
         geo_locations: { countries: ['AR'] },
         targeting_automation: { advantage_audience: 0 },
       },
-      status: 'PAUSED',
+      status: 'ACTIVE',
     });
 
     // Save to Supabase (non-fatal)
