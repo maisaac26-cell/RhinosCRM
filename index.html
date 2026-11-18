@@ -20185,7 +20185,7 @@ async function metaLoadAllCampaigns() {
                 </div>
                 <div style="font-size:10px;color:var(--text3)">${(c.objective||'').replace('OUTCOME_','').replace('_',' ')||'—'} · ${budgetLink('campaign',c.id,c.budget_daily)}</div>
               </div>
-              <div style="flex-shrink:0">${togBtn('campaign',c.id,c.status)}</div>
+              <div style="flex-shrink:0;display:flex;gap:4px;align-items:center">${togBtn('campaign',c.id,c.status)}<button onclick="metaDeleteCampaign('${c.id}','${c.name.replace(/'/g,`\\'`)}')" class="btn btn-sm" style="font-size:10px;padding:2px 7px;color:#f87171;border-color:rgba(248,113,113,0.3)" title="Eliminar campaña">🗑</button></div>
             </div>
             ${chips(m)}
             ${(()=>{
