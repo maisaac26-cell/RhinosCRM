@@ -777,9 +777,9 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
     </div>
 
     <div class="metrics-row" id="meta-kpis" style="margin-bottom:1.25rem;grid-template-columns:repeat(4,1fr)">
-      <div class="metric-card"><div class="m-label" id="mk-lbl-spend">Gasto 7d</div><div class="m-val cyan" id="mk-spend">—</div><div class="m-sub">ARS total</div><div id="mk-spend-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
+      <div class="metric-card"><div class="m-label" id="mk-lbl-spend">Gasto 7d</div><div class="m-val cyan" id="mk-spend">—</div><div class="m-sub">USD total</div><div id="mk-spend-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
       <div class="metric-card"><div class="m-label" id="mk-lbl-leads">Leads 7d</div><div class="m-val green" id="mk-leads">—</div><div class="m-sub">formularios capturados</div><div id="mk-leads-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
-      <div class="metric-card"><div class="m-label">CPL prom.</div><div class="m-val cyan" id="mk-cpl">—</div><div class="m-sub">costo por lead ARS</div></div>
+      <div class="metric-card"><div class="m-label">CPL prom.</div><div class="m-val cyan" id="mk-cpl">—</div><div class="m-sub">costo por lead USD</div></div>
       <div class="metric-card"><div class="m-label" id="mk-lbl-messages">Mensajes 7d</div><div class="m-val" id="mk-messages">—</div><div class="m-sub">conversaciones WA</div><div id="mk-messages-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
       <div class="metric-card"><div class="m-label" id="mk-lbl-impressions">Impresiones 7d</div><div class="m-val" id="mk-impressions">—</div><div class="m-sub">alcance de impresiones</div><div id="mk-impressions-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
       <div class="metric-card"><div class="m-label" id="mk-lbl-clicks">Clics 7d</div><div class="m-val" id="mk-clicks">—</div><div class="m-sub">al link</div><div id="mk-clicks-wow" style="font-size:10px;color:var(--text3);margin-top:2px"></div></div>
@@ -1165,7 +1165,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="field" style="margin:0">
-          <label>CPL objetivo (ARS) <span style="font-size:10px;color:var(--text3)">— el agente pausa si CPL excede el límite</span></label>
+          <label>CPL objetivo (USD) <span style="font-size:10px;color:var(--text3)">— el agente pausa si CPL excede el límite</span></label>
           <input id="meta-cpl-input" type="number" placeholder="0 = deshabilitado" style="font-size:12px"/>
         </div>
         <div class="field" style="margin:0">
@@ -1180,7 +1180,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
           <input id="meta-goal-leads-input" type="number" placeholder="0 = sin objetivo" style="font-size:12px"/>
         </div>
         <div class="field" style="margin:0">
-          <label style="font-size:10px">Presupuesto mensual (ARS)</label>
+          <label style="font-size:10px">Presupuesto mensual (USD)</label>
           <input id="meta-goal-spend-input" type="number" placeholder="0 = sin límite" style="font-size:12px"/>
         </div>
       </div>
@@ -1262,8 +1262,8 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <option value="OUTCOME_SALES">Ventas</option>
             </select>
           </div>
-          <div class="field"><label>Presupuesto diario (ARS)</label>
-            <input id="nc-budget" type="number" placeholder="2000" min="100"/>
+          <div class="field"><label>Presupuesto diario (USD) <span style="font-size:10px;color:var(--text3)">— la cuenta Meta está en dólares</span></label>
+            <input id="nc-budget" type="number" placeholder="5" min="1"/>
           </div>
           <div class="grid2" style="gap:8px">
             <div class="field" style="margin:0"><label>Fecha inicio</label><input id="nc-start" type="date"/></div>
@@ -1311,15 +1311,15 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
               <input id="bl-name" type="text" placeholder="Distribuidoras CABA — Nov 2026"/>
             </div>
             <div class="field">
-              <label>Presupuesto diario (ARS)</label>
+              <label>Presupuesto diario (USD) <span style="font-size:10px;color:var(--text3)">— la cuenta Meta está en dólares</span></label>
               <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
-                <button class="btn btn-sm bl-preset" data-v="500"   onclick="metaBlPreset(500)"   style="font-size:11px;padding:3px 10px">$500</button>
-                <button class="btn btn-sm bl-preset" data-v="1000"  onclick="metaBlPreset(1000)"  style="font-size:11px;padding:3px 10px">$1.000</button>
-                <button class="btn btn-sm bl-preset" data-v="2000"  onclick="metaBlPreset(2000)"  style="font-size:11px;padding:3px 10px">$2.000</button>
-                <button class="btn btn-sm bl-preset" data-v="5000"  onclick="metaBlPreset(5000)"  style="font-size:11px;padding:3px 10px">$5.000</button>
-                <button class="btn btn-sm bl-preset" data-v="10000" onclick="metaBlPreset(10000)" style="font-size:11px;padding:3px 10px">$10.000</button>
+                <button class="btn btn-sm bl-preset" data-v="3"   onclick="metaBlPreset(3)"   style="font-size:11px;padding:3px 10px">USD 3</button>
+                <button class="btn btn-sm bl-preset" data-v="5"   onclick="metaBlPreset(5)"   style="font-size:11px;padding:3px 10px">USD 5</button>
+                <button class="btn btn-sm bl-preset" data-v="10"  onclick="metaBlPreset(10)"  style="font-size:11px;padding:3px 10px">USD 10</button>
+                <button class="btn btn-sm bl-preset" data-v="20"  onclick="metaBlPreset(20)"  style="font-size:11px;padding:3px 10px">USD 20</button>
+                <button class="btn btn-sm bl-preset" data-v="50"  onclick="metaBlPreset(50)"  style="font-size:11px;padding:3px 10px">USD 50</button>
               </div>
-              <input id="bl-budget" type="number" placeholder="2000" min="100" oninput="metaBlUpdateSummary()"/>
+              <input id="bl-budget" type="number" placeholder="5" min="1" oninput="metaBlUpdateSummary()"/>
             </div>
             <div class="field"><label>Objetivo</label>
               <select id="bl-objective">
@@ -16584,6 +16584,10 @@ function fmtARS(n) {
   if (!n && n !== 0) return '—';
   return '$' + parseFloat(n).toLocaleString('es-AR', { maximumFractionDigits: 0 });
 }
+function fmtMetaUSD(n) {
+  if (!n && n !== 0) return '—';
+  return 'USD ' + parseFloat(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 function fmtPct(n) { return n != null ? parseFloat(n).toFixed(2) + '%' : '—'; }
 function fmtNum(n) { return n != null ? parseInt(n).toLocaleString('es-AR') : '—'; }
 
@@ -16722,7 +16726,7 @@ async function metaAbTestLoad() {
       const ad = adMap[adId]; if (!ad) return '';
       const m = metricAgg[adId] || {};
       const ctr = m.impressions > 0 ? (m.clicks / m.impressions * 100).toFixed(2) : '—';
-      const cpl = m.leads > 0 ? fmtARS(m.spend / m.leads).replace('$ ','$') : '—';
+      const cpl = m.leads > 0 ? fmtMetaUSD(m.spend / m.leads).replace('$ ','$') : '—';
       return `<div style="background:var(--surface2);border-radius:var(--r);padding:12px;flex:1;min-width:0">
         <div style="font-size:10px;font-weight:700;color:${labelCol};margin-bottom:4px;text-transform:uppercase;letter-spacing:0.08em">${label}</div>
         <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:8px">${ad.name}</div>
@@ -16731,7 +16735,7 @@ async function metaAbTestLoad() {
           <div><div style="font-size:13px;font-weight:700;color:var(--green)">${m.leads||0}</div><div style="font-size:9px;color:var(--text3)">Leads</div></div>
           <div><div style="font-size:11px;font-weight:700">${cpl}</div><div style="font-size:9px;color:var(--text3)">CPL</div></div>
         </div>
-        <div style="font-size:10px;color:var(--text3)">${fmtARS(m.spend)} · ${(m.impressions/1000).toFixed(1)}k imp.</div>
+        <div style="font-size:10px;color:var(--text3)">${fmtMetaUSD(m.spend)} · ${(m.impressions/1000).toFixed(1)}k imp.</div>
         <div style="display:flex;gap:5px;margin-top:8px">
           <button onclick="metaCreativoDetail('${adId}')" class="btn btn-sm" style="flex:1;font-size:10px">Ver detalles</button>
           <button onclick="metaAdTagModal('${adId}','${(ad.name||'').replace(/'/g,"\\'")}');event.stopPropagation()" class="btn btn-sm" style="font-size:11px;padding:4px 7px">🏷️</button>
@@ -16820,7 +16824,7 @@ function _metaAdsetEffRender() {
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;padding:6px 8px;background:var(--surface2);border-radius:var(--r)">
         <div style="flex:1;min-width:0">
           <div style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${!isActive?'color:var(--text3)':''}">${r.name}</div>
-          <div style="font-size:9px;color:var(--text3)">Actual: ${r.budget ? fmtARS(r.budget)+'/día' : '—'} · ${r.leads} leads</div>
+          <div style="font-size:9px;color:var(--text3)">Actual: ${r.budget ? fmtMetaUSD(r.budget)+'/día' : '—'} · ${r.leads} leads</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           <span style="font-size:9px;color:var(--text3)">$</span>
@@ -16833,7 +16837,7 @@ function _metaAdsetEffRender() {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
         <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;${!isActive?'color:var(--text3)':''}">${r.name}</span>
         <span style="font-size:11px;font-weight:600;color:var(--cyan);flex-shrink:0;margin-left:8px">${r.leads} leads</span>
-        <span style="font-size:10px;color:var(--text3);flex-shrink:0;margin-left:6px">${r.cpl ? fmtARS(r.cpl).replace('$ ','$') : '—'}</span>
+        <span style="font-size:10px;color:var(--text3);flex-shrink:0;margin-left:6px">${r.cpl ? fmtMetaUSD(r.cpl).replace('$ ','$') : '—'}</span>
       </div>
       <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
         <div style="width:${barW}%;height:100%;background:${barCol};border-radius:3px;transition:width 0.5s"></div>
@@ -17072,7 +17076,7 @@ function metaAutoRulesLoad() {
   el.innerHTML = rules.map((r, i) => `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);font-size:11px">
     <span style="font-size:14px">${r.action === 'alert' ? '🔔' : '⏸'}</span>
     <div style="flex:1">
-      <span style="color:var(--text)">Si gasto &gt; ${fmtARS(r.minSpend)} y leads &lt; ${r.maxLeads} en ${r.days}d</span>
+      <span style="color:var(--text)">Si gasto &gt; ${fmtMetaUSD(r.minSpend)} y leads &lt; ${r.maxLeads} en ${r.days}d</span>
       <span style="color:var(--text3)"> → ${r.action === 'alert' ? 'Alertar' : 'Pausar anuncio'}</span>
     </div>
     <button onclick="metaAutoRuleDelete(${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px" title="Eliminar">✕</button>
@@ -17180,7 +17184,7 @@ async function metaAutoRulesEval() {
         <span style="font-size:14px">${a.rule.action === 'pause' ? '⏸' : '🔔'}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.adName}</div>
-          <div style="font-size:10px;color:var(--text3)">${fmtARS(a.spend)} gastado · ${a.leads} leads en ${a.rule.days}d</div>
+          <div style="font-size:10px;color:var(--text3)">${fmtMetaUSD(a.spend)} gastado · ${a.leads} leads en ${a.rule.days}d</div>
         </div>
         ${a.rule.action === 'pause' ? `<button class="btn btn-sm" onclick="metaToggleAd('${a.adId}','ACTIVE')" style="font-size:10px;color:#f87171;border-color:rgba(248,113,113,0.3);flex-shrink:0">Pausar</button>` : ''}
       </div>`).join('');
@@ -17226,9 +17230,9 @@ function metaLeaderboardRender() {
           <td style="padding:6px 8px;max-width:160px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${statusDot(r.status)}${r.name}</div></td>
           <td style="padding:6px 8px;text-align:center"><span style="font-weight:700;color:${scoreColor(r.score)}">${r.score}</span></td>
           <td style="padding:6px 8px;text-align:center;color:var(--cyan);font-weight:600">${r.leads}</td>
-          <td style="padding:6px 8px;text-align:center;color:var(--text2)">${r.cpl > 0 ? fmtARS(r.cpl).replace('$ ','$') : '—'}</td>
+          <td style="padding:6px 8px;text-align:center;color:var(--text2)">${r.cpl > 0 ? fmtMetaUSD(r.cpl).replace('$ ','$') : '—'}</td>
           <td style="padding:6px 8px;text-align:center;color:${r.ctr>=1?'var(--green)':r.ctr<0.3?'#f87171':'#f59e0b'}">${r.ctr.toFixed(2)}%</td>
-          <td style="padding:6px 8px;text-align:center;color:var(--text2)">${fmtARS(r.spend).replace('$ ','$')}</td>
+          <td style="padding:6px 8px;text-align:center;color:var(--text2)">${fmtMetaUSD(r.spend).replace('$ ','$')}</td>
           <td style="padding:6px 8px;text-align:center;color:${r.freq>3.5?'#f87171':r.freq>2.5?'#f59e0b':'var(--text3)'}">${r.freq > 0 ? r.freq.toFixed(1) : '—'}</td>
         </tr>`).join('')}
       </tbody>
@@ -17308,7 +17312,7 @@ async function metaAnomalyLoad() {
     };
 
     if (!anomalies.length) {
-      el.innerHTML = `<div class="empty" style="color:var(--green);font-size:12px">✓ Todo normal — sin anomalías detectadas<br><span style="font-size:10px;color:var(--text3)">Hoy: ${fmtARS(t.spend)} · ${t.leads} leads · 7d avg: ${fmtARS(a.spend)}/día</span></div>`;
+      el.innerHTML = `<div class="empty" style="color:var(--green);font-size:12px">✓ Todo normal — sin anomalías detectadas<br><span style="font-size:10px;color:var(--text3)">Hoy: ${fmtMetaUSD(t.spend)} · ${t.leads} leads · 7d avg: ${fmtMetaUSD(a.spend)}/día</span></div>`;
     } else {
       el.innerHTML = anomalies.map(an => {
         const c = typeConf[an.type] || typeConf.warn;
@@ -17317,7 +17321,7 @@ async function metaAnomalyLoad() {
           <span style="font-size:16px;flex-shrink:0">${c.icon}</span>
           <div style="flex:1">
             <div style="font-size:12px;font-weight:600;color:${c.col}">${an.label}</div>
-            <div style="font-size:10px;color:var(--text3)">Hoy: ${an.metric === 'ctr' ? an.today.toFixed(2)+'%' : an.metric === 'spend' ? fmtARS(an.today) : an.today.toLocaleString('es-AR')} · Prom.7d: ${an.metric === 'ctr' ? an.avg7.toFixed(2)+'%' : an.metric === 'spend' ? fmtARS(an.avg7) : an.avg7.toFixed(1)} (${pct > 0 ? '+' : ''}${pct}%)</div>
+            <div style="font-size:10px;color:var(--text3)">Hoy: ${an.metric === 'ctr' ? an.today.toFixed(2)+'%' : an.metric === 'spend' ? fmtMetaUSD(an.today) : an.today.toLocaleString('es-AR')} · Prom.7d: ${an.metric === 'ctr' ? an.avg7.toFixed(2)+'%' : an.metric === 'spend' ? fmtMetaUSD(an.avg7) : an.avg7.toFixed(1)} (${pct > 0 ? '+' : ''}${pct}%)</div>
           </div>
         </div>`;
       }).join('');
@@ -17361,7 +17365,7 @@ async function metaCalendarHeatmap() {
       const col3 = l > 0 ? col2 : col;
       const x = (i % cols) * (cellW + gap);
       const y = Math.floor(i / cols) * (cellH + gap) + 20;
-      const title = `${d.slice(5)}: ${fmtARS(s)}${l > 0 ? ` · ${l} leads` : ''}`;
+      const title = `${d.slice(5)}: ${fmtMetaUSD(s)}${l > 0 ? ` · ${l} leads` : ''}`;
       return `<g title="${title}">
         <rect x="${x}" y="${y}" width="${cellW}" height="${cellH}" rx="3" fill="${col3}" style="cursor:default"/>
         ${l > 0 ? `<text x="${x+cellW/2}" y="${y+cellH/2+1}" text-anchor="middle" dominant-baseline="middle" font-size="9" fill="var(--text2)" font-weight="600">${l}</text>` : s > 0 ? `<text x="${x+cellW/2}" y="${y+cellH/2+1}" text-anchor="middle" dominant-baseline="middle" font-size="8" fill="var(--text3)">${(s/1000).toFixed(1)}k</text>` : ''}
@@ -17439,10 +17443,10 @@ async function metaDigestLoad() {
     const lines = [];
     if (tot30.leads > 0) {
       const topPct = topAd ? Math.round(agg30[topAd[0]].leads / tot30.leads * 100) : 0;
-      lines.push(`📊 En los últimos 30 días generaste <strong>${tot30.leads} leads</strong> con un gasto total de <strong>${fmtARS(tot30.spend)}</strong>.`);
-      lines.push(`📈 CTR promedio: <strong>${ctr30.toFixed(2)}%</strong> · CPL promedio: <strong>${fmtARS(cpl30)}</strong>.`);
+      lines.push(`📊 En los últimos 30 días generaste <strong>${tot30.leads} leads</strong> con un gasto total de <strong>${fmtMetaUSD(tot30.spend)}</strong>.`);
+      lines.push(`📈 CTR promedio: <strong>${ctr30.toFixed(2)}%</strong> · CPL promedio: <strong>${fmtMetaUSD(cpl30)}</strong>.`);
       if (topAd) lines.push(`🏆 Tu anuncio más efectivo: <em>"${(adNameMap[topAd[0]]||topAd[0]).slice(0,50)}"</em> con ${topAd[1].leads} leads (${topPct}% del total).`);
-      if (bestCplAd && bestCplAd[0] !== topAd?.[0]) lines.push(`💰 Mejor CPL: <em>"${(adNameMap[bestCplAd[0]]||bestCplAd[0]).slice(0,40)}"</em> a ${fmtARS(agg30[bestCplAd[0]].spend/agg30[bestCplAd[0]].leads)}/lead.`);
+      if (bestCplAd && bestCplAd[0] !== topAd?.[0]) lines.push(`💰 Mejor CPL: <em>"${(adNameMap[bestCplAd[0]]||bestCplAd[0]).slice(0,40)}"</em> a ${fmtMetaUSD(agg30[bestCplAd[0]].spend/agg30[bestCplAd[0]].leads)}/lead.`);
     } else {
       lines.push(`⚠️ Sin leads registrados en los últimos 30 días. Revisá tus campañas y la sincronización.`);
     }
@@ -17452,7 +17456,7 @@ async function metaDigestLoad() {
     }
     if (noLeads30.length > 0) {
       const totalWasted = noLeads30.reduce((s,[,v])=>s+v.spend,0);
-      lines.push(`💸 ${noLeads30.length} anuncio${noLeads30.length>1?'s':''} gastaron ${fmtARS(totalWasted)} sin conseguir leads — considerar pausarlos.`);
+      lines.push(`💸 ${noLeads30.length} anuncio${noLeads30.length>1?'s':''} gastaron ${fmtMetaUSD(totalWasted)} sin conseguir leads — considerar pausarlos.`);
     }
     if (decaying > 0) lines.push(`📉 ${decaying} anuncio${decaying>1?'s están':'está'} en declive de rendimiento esta semana.`);
     if (ctr7 > ctr30 * 1.1) lines.push(`📈 Esta semana el CTR (${ctr7.toFixed(2)}%) está <span style="color:var(--green)">por encima</span> del promedio del mes.`);
@@ -18177,9 +18181,9 @@ async function metaAbTestLoad() {
             ${isWinner ? '🏆 ' : ''}${g.base}
           </td>
           <td style="padding:7px 6px;text-align:center;color:var(--text3)">${g.ads.size}</td>
-          <td style="padding:7px 6px;text-align:right;color:var(--text2)">${fmtARS(g.spend)}</td>
+          <td style="padding:7px 6px;text-align:right;color:var(--text2)">${fmtMetaUSD(g.spend)}</td>
           <td style="padding:7px 6px;text-align:center;font-weight:600;color:${g.leads>0?'var(--cyan)':'var(--text3)'}">${g.leads}</td>
-          <td style="padding:7px 6px;text-align:right;color:${isBestCpl?'var(--green)':'var(--text2)'}">${cpl ? fmtARS(cpl) : '—'}</td>
+          <td style="padding:7px 6px;text-align:right;color:${isBestCpl?'var(--green)':'var(--text2)'}">${cpl ? fmtMetaUSD(cpl) : '—'}</td>
           <td style="padding:7px 6px;text-align:center;color:${ctr&&ctr>=1.5?'var(--green)':ctr&&ctr>=0.5?'var(--cyan)':'var(--text3)'}">${ctr ? ctr.toFixed(2)+'%' : '—'}</td>
           <td style="padding:7px 6px;text-align:center;color:${scoreColor};font-weight:700">${g.leads > 0 ? score : '—'}</td>
         </tr>`;
@@ -18305,7 +18309,7 @@ async function metaWastedLoad() {
       <div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px">
         <span style="color:#f87171;font-weight:600">${wasted.length} anuncio${wasted.length>1?'s':''} activo${wasted.length>1?'s':''}</span>
         <span style="color:var(--text2)"> con </span>
-        <span style="color:#f87171;font-weight:600">${fmtARS(totalWasted)}</span>
+        <span style="color:#f87171;font-weight:600">${fmtMetaUSD(totalWasted)}</span>
         <span style="color:var(--text2)"> gastado${wasted.length>1?'s':''} y 0 leads en 14 días</span>
       </div>
       <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -18321,7 +18325,7 @@ async function metaWastedLoad() {
           const ctr = w.impressions > 0 ? (w.clicks / w.impressions * 100).toFixed(2) : '0.00';
           return `<tr style="border-bottom:1px solid var(--border2)">
             <td style="padding:7px 8px;color:var(--text);font-weight:500;max-width:140px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${w.name}">${w.name}</div></td>
-            <td style="padding:7px 6px;text-align:right;color:#f87171;font-weight:600">${fmtARS(w.spend)}</td>
+            <td style="padding:7px 6px;text-align:right;color:#f87171;font-weight:600">${fmtMetaUSD(w.spend)}</td>
             <td style="padding:7px 6px;text-align:center;color:var(--text2)">${w.impressions.toLocaleString('es-AR')}</td>
             <td style="padding:7px 6px;text-align:center;color:var(--text2)">${w.clicks.toLocaleString('es-AR')}</td>
             <td style="padding:7px 6px;text-align:center;color:${parseFloat(ctr)>=1?'var(--cyan)':'var(--text3)'}">${ctr}%</td>
@@ -18390,7 +18394,7 @@ async function metaWeekdayLoad() {
           <div title="Gasto promedio" style="width:10px;background:var(--purple);opacity:0.5;height:${spendH}px;border-radius:2px 2px 0 0"></div>
         </div>
         <div style="font-size:11px;font-weight:600;color:var(--text)">${n.day}</div>
-        <div style="font-size:9px;color:${cplColor}">${n.cpl ? fmtARS(n.cpl).replace('$ ','$') : '—'}</div>
+        <div style="font-size:9px;color:${cplColor}">${n.cpl ? fmtMetaUSD(n.cpl).replace('$ ','$') : '—'}</div>
       </div>`;
     }).join('');
 
@@ -18406,11 +18410,11 @@ async function metaWeekdayLoad() {
       <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
         ${bestDay ? `<div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:6px;padding:8px 12px;font-size:12px">
           <span style="color:var(--green);font-weight:600">✓ Mejor día: ${bestDay.day}</span>
-          <span style="color:var(--text2);margin-left:8px">${bestDay.leads.toFixed(1)} leads/día · CPL ${fmtARS(bestDay.cpl||0)}</span>
+          <span style="color:var(--text2);margin-left:8px">${bestDay.leads.toFixed(1)} leads/día · CPL ${fmtMetaUSD(bestDay.cpl||0)}</span>
         </div>` : ''}
         ${worstDay ? `<div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:8px 12px;font-size:12px">
           <span style="color:#f87171;font-weight:600">↓ Peor CPL: ${worstDay.day}</span>
-          <span style="color:var(--text2);margin-left:8px">${worstDay.leads.toFixed(1)} leads/día · CPL ${fmtARS(worstDay.cpl||0)}</span>
+          <span style="color:var(--text2);margin-left:8px">${worstDay.leads.toFixed(1)} leads/día · CPL ${fmtMetaUSD(worstDay.cpl||0)}</span>
         </div>` : ''}
       </div>
       <div style="font-size:10px;color:var(--text3);margin-top:8px">Promedio diario últimos 90 días · CPL = costo por lead ese día</div>`;
@@ -19047,7 +19051,7 @@ function _metaAttrRender() {
   const COLS = ['var(--cyan)','#a78bfa','#f59e0b','#f87171','#34d399'];
   el.innerHTML = rows.map((r, i) => {
     const pct = total > 0 ? (r[_metaAttrMetric] / total * 100).toFixed(1) : 0;
-    const val = _metaAttrMetric === 'spend' ? fmtARS(r.spend).replace('$ ','$') : r.leads + ' leads';
+    const val = _metaAttrMetric === 'spend' ? fmtMetaUSD(r.spend).replace('$ ','$') : r.leads + ' leads';
     const col = COLS[i % COLS.length];
     return `<div style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
@@ -19059,7 +19063,7 @@ function _metaAttrRender() {
         <div style="width:${pct}%;height:100%;background:${col};border-radius:3px;transition:width 0.6s"></div>
       </div>
     </div>`;
-  }).join('') + `<div style="font-size:10px;color:var(--text3);text-align:right;margin-top:4px">Total: ${_metaAttrMetric==='spend'?fmtARS(total).replace('$ ','$'):total+' leads'}</div>`;
+  }).join('') + `<div style="font-size:10px;color:var(--text3);text-align:right;margin-top:4px">Total: ${_metaAttrMetric==='spend'?fmtMetaUSD(total).replace('$ ','$'):total+' leads'}</div>`;
 }
 
 let _metaTodayStripInterval = null;
@@ -19070,7 +19074,7 @@ async function metaTodayStripLoad() {
     if (!r.ok) return;
     const { today: t, yesterday: y } = r;
     const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
-    setEl('mts-spend', fmtARS(t.spend||0));
+    setEl('mts-spend', fmtMetaUSD(t.spend||0));
     setEl('mts-leads', `<strong>${t.leads||0}</strong> leads`);
     setEl('mts-msg', `${t.messages||0} msgs`);
     if (y) {
@@ -19130,9 +19134,9 @@ async function metaKpiLoad() {
     const avgCtr      = totImpr > 0 ? (totClicks / totImpr) * 100 : 0;
     const avgCpl      = totLeads > 0 ? totSpend / totLeads : 0;
     const setKpi = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    setKpi('mk-spend', fmtARS(totSpend));
+    setKpi('mk-spend', fmtMetaUSD(totSpend));
     setKpi('mk-leads', fmtNum(totLeads));
-    setKpi('mk-cpl', avgCpl > 0 ? fmtARS(avgCpl) : '—');
+    setKpi('mk-cpl', avgCpl > 0 ? fmtMetaUSD(avgCpl) : '—');
     setKpi('mk-messages', fmtNum(totMessages));
     setKpi('mk-impressions', fmtNum(totImpr));
     setKpi('mk-clicks', fmtNum(totClicks));
@@ -19201,8 +19205,8 @@ async function metaDashboardLoad() {
                 <span style="font-size:9px;padding:2px 7px;border-radius:10px;background:${c.status==='ACTIVE'?'rgba(34,197,94,0.12)':'rgba(248,113,113,0.12)'};color:${c.status==='ACTIVE'?'var(--green)':'#f87171'}">${c.status}</span>
               </td>
               <td style="padding:7px 8px;color:var(--text3);font-size:10px">${(c.objective||'').replace('OUTCOME_','')}</td>
-              <td style="padding:7px 8px;text-align:right;color:var(--text2);font-size:11px">${c.budget_daily ? fmtARS(c.budget_daily) : '—'}</td>
-              <td style="padding:7px 8px;text-align:right;color:var(--cyan);font-size:11px">${m.spend ? fmtARS(m.spend).replace('$ ','$') : '—'}</td>
+              <td style="padding:7px 8px;text-align:right;color:var(--text2);font-size:11px">${c.budget_daily ? fmtMetaUSD(c.budget_daily) : '—'}/día</td>
+              <td style="padding:7px 8px;text-align:right;color:var(--cyan);font-size:11px">${m.spend ? fmtMetaUSD(m.spend) : '—'}</td>
               <td style="padding:7px 8px;text-align:center;font-weight:600;color:${(m.leads||0)>0?'var(--cyan)':'var(--text3)'};font-size:12px">${m.leads||0}</td>
               <td style="padding:7px 8px;text-align:center;color:${ctr&&parseFloat(ctr)>=1.5?'var(--green)':ctr&&parseFloat(ctr)>=0.5?'var(--cyan)':'var(--text3)'};font-size:11px">${ctr ? ctr+'%' : '—'}</td>
               <td style="padding:7px 8px;text-align:center">
@@ -19319,7 +19323,7 @@ async function metaLoadTopAds(since7str) {
     if (lowEl) lowEl.innerHTML = low5.length
       ? low5.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border2);font-size:11px">
           <span style="color:var(--text);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</span>
-          <span style="color:#f87171;font-weight:600">${fmtPct(r.ctr)} · ${fmtARS(r.spend)}</span>
+          <span style="color:#f87171;font-weight:600">${fmtPct(r.ctr)} · ${fmtMetaUSD(r.spend)}</span>
         </div>`).join('')
       : '<div class="empty" style="font-size:12px;color:var(--green)">Sin anuncios a pausar 🎉</div>';
   } catch(e) { /* silent */ }
@@ -19480,9 +19484,10 @@ function metaInlineBudget(entityType, entityId, currentBudget) {
   overlay.id = 'meta-budget-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
   overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;width:300px;max-width:92vw">
-    <div style="font-weight:700;font-size:13px;margin-bottom:4px">Editar presupuesto diario</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Actual: ${fmtARS(currentBudget)}/día · ${entityType === 'campaign' ? 'Campaña' : 'Adset'}</div>
-    <input id="meta-budget-input" type="number" value="${currentBudget||0}" min="100" step="100" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box"/>
+    <div style="font-weight:700;font-size:13px;margin-bottom:4px">Editar presupuesto diario (USD)</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Actual: ${fmtMetaUSD(currentBudget)}/día · ${entityType === 'campaign' ? 'Campaña' : 'Adset'}</div>
+    <div style="font-size:10px;color:#fbbf24;margin-bottom:10px">⚠ La cuenta Meta está en USD. Ingresá el valor en dólares (ej: 5 = USD 5/día).</div>
+    <input id="meta-budget-input" type="number" value="${currentBudget ? parseFloat(currentBudget).toFixed(2) : 5}" min="1" step="1" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box"/>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-cyan btn-full" onclick="metaSaveBudget('${entityType}','${entityId}')">Guardar</button>
       <button class="btn btn-full" onclick="document.getElementById('meta-budget-overlay').remove()">Cancelar</button>
@@ -19499,16 +19504,16 @@ function metaInlineBudget(entityType, entityId, currentBudget) {
 
 async function metaSaveBudget(entityType, entityId) {
   const input = document.getElementById('meta-budget-input');
-  const daily_budget = parseFloat(input?.value || 0);
-  if (!daily_budget || daily_budget < 100) { metaToast('Presupuesto mínimo: $100', 'error'); return; }
+  const usdAmount = parseFloat(input?.value || 0);
+  if (!usdAmount || usdAmount < 1) { metaToast('Presupuesto mínimo: USD 1/día', 'error'); return; }
   document.getElementById('meta-budget-overlay')?.remove();
   metaToast('Actualizando presupuesto...', 'info');
   try {
     const r = await fetch('/api/meta?action=update_budget', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ entity_type: entityType, entity_id: entityId, daily_budget })
+      body: JSON.stringify({ entity_type: entityType, entity_id: entityId, daily_budget: usdAmount })
     }).then(x => x.json());
-    if (r.ok) { metaToast(`Presupuesto actualizado a ${fmtARS(daily_budget)}/día ✓`, 'ok'); metaLoadAllCampaigns(); }
+    if (r.ok) { metaToast(`Presupuesto actualizado a USD ${usdAmount.toFixed(2)}/día ✓`, 'ok'); metaLoadAllCampaigns(); }
     else metaToast('Error: ' + (r.error || r.msg), 'error');
   } catch(e) { metaToast('Error de red: ' + e.message, 'error'); }
 }
@@ -19673,15 +19678,15 @@ async function metaSpendTrendLoad() {
     const area = `${pad},${H-pad} ` + pts + ` ${W-pad},${H-pad}`;
 
     el.innerHTML = `<div style="display:flex;gap:12px;margin-bottom:8px">
-      <div><div style="font-size:10px;color:var(--text3)">Gasto 30d</div><div style="font-size:14px;font-weight:700;color:var(--cyan)">${fmtARS(totSpend30)}</div></div>
+      <div><div style="font-size:10px;color:var(--text3)">Gasto 30d</div><div style="font-size:14px;font-weight:700;color:var(--cyan)">${fmtMetaUSD(totSpend30)}</div></div>
       <div><div style="font-size:10px;color:var(--text3)">Leads 30d</div><div style="font-size:14px;font-weight:700;color:var(--green)">${totLeads30}</div></div>
-      ${totLeads30>0?`<div><div style="font-size:10px;color:var(--text3)">CPL 30d</div><div style="font-size:14px;font-weight:700">${fmtARS(totSpend30/totLeads30)}</div></div>`:''}
+      ${totLeads30>0?`<div><div style="font-size:10px;color:var(--text3)">CPL 30d</div><div style="font-size:14px;font-weight:700">${fmtMetaUSD(totSpend30/totLeads30)}</div></div>`:''}
     </div>
     <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:60px">
       <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,229,204,0.3)"/><stop offset="100%" stop-color="rgba(0,229,204,0.02)"/></linearGradient></defs>
       <polygon points="${area}" fill="url(#sg)"/>
       <polyline points="${pts}" fill="none" stroke="var(--cyan)" stroke-width="1.5" stroke-linejoin="round"/>
-      ${spends.some(s=>s>0)?`<text x="${pad + ((spends.indexOf(Math.max(...spends)))/(days.length-1))*(W-pad*2)}" y="${pad + (1-Math.max(...spends)/maxS)*(H-pad*2)-4}" font-size="8" fill="var(--cyan)" text-anchor="middle">${fmtARS(Math.max(...spends))}</text>`:''}
+      ${spends.some(s=>s>0)?`<text x="${pad + ((spends.indexOf(Math.max(...spends)))/(days.length-1))*(W-pad*2)}" y="${pad + (1-Math.max(...spends)/maxS)*(H-pad*2)-4}" font-size="8" fill="var(--cyan)" text-anchor="middle">${fmtMetaUSD(Math.max(...spends))}</text>`:''}
     </svg>
     <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:3px"><span>${days[0].slice(5)}</span><span>Hoy</span></div>`;
   } catch(e) { el.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
@@ -19704,7 +19709,7 @@ async function metaBudgetRecsLoad() {
     };
     el.innerHTML = recs.map(r => {
       const c = typeConf[r.type] || typeConf.refresh;
-      const budgetAction = r.suggested ? `<button class="btn btn-sm" onclick="metaInlineBudget('adset','${r.id}',${r.budget})" style="font-size:10px;color:var(--cyan);flex-shrink:0">✏️ ${fmtARS(r.suggested)}</button>` : '';
+      const budgetAction = r.suggested ? `<button class="btn btn-sm" onclick="metaInlineBudget('adset','${r.id}',${r.budget})" style="font-size:10px;color:var(--cyan);flex-shrink:0">✏️ ${fmtMetaUSD(r.suggested)}</button>` : '';
       return `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border2)">
         <span style="font-size:16px;flex-shrink:0">${c.icon}</span>
         <div style="flex:1;min-width:0">
@@ -19769,13 +19774,13 @@ async function metaRenderComparador() {
   const renderCol = (ad) => {
     const m = agg[ad.id] || {};
     const ctr = m.impressions>0 ? (m.clicks/m.impressions*100).toFixed(2) : '—';
-    const cpl = m.leads>0 ? fmtARS(m.spend/m.leads) : '—';
+    const cpl = m.leads>0 ? fmtMetaUSD(m.spend/m.leads) : '—';
     const thumb = ad.thumbnail_url ? `<img src="${ad.thumbnail_url}" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px"/>` : '<div style="width:100%;height:80px;background:var(--surface2);border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;font-size:24px">🖼</div>';
     return `<div style="flex:1;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)">
       ${thumb}
       <div style="font-weight:700;font-size:12px;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ad.name}</div>
       <table style="width:100%;font-size:11px;border-collapse:collapse">
-        <tr><td style="color:var(--text3);padding:3px 0">Gasto</td><td style="text-align:right;font-weight:600">${fmtARS(m.spend||0)}</td></tr>
+        <tr><td style="color:var(--text3);padding:3px 0">Gasto</td><td style="text-align:right;font-weight:600">${fmtMetaUSD(m.spend||0)}</td></tr>
         <tr><td style="color:var(--text3);padding:3px 0">Impresiones</td><td style="text-align:right">${(m.impressions||0).toLocaleString('es-AR')}</td></tr>
         <tr><td style="color:var(--text3);padding:3px 0">Clics</td><td style="text-align:right">${(m.clicks||0).toLocaleString('es-AR')}</td></tr>
         <tr><td style="color:var(--text3);padding:3px 0">CTR</td><td style="text-align:right">${ctr}%</td></tr>
@@ -19910,9 +19915,9 @@ async function metaTodayReport() {
         <td style="color:var(--text3);font-size:10px">Sem. ant.</td>
       </tr>
       <tr><td style="color:var(--text3);font-size:11px;padding:4px 0">Gasto</td>
-        <td style="font-weight:600;font-size:12px;padding:4px 8px">${fmtARS(t.spend)}${delta(t.spend,y.spend,fmtARS)}</td>
-        <td style="color:var(--text3);font-size:10px">${fmtARS(y.spend||0)}</td>
-        <td style="color:var(--text3);font-size:10px">${fmtARS(lw?.spend||0)}</td></tr>
+        <td style="font-weight:600;font-size:12px;padding:4px 8px">${fmtMetaUSD(t.spend)}${delta(t.spend,y.spend,fmtARS)}</td>
+        <td style="color:var(--text3);font-size:10px">${fmtMetaUSD(y.spend||0)}</td>
+        <td style="color:var(--text3);font-size:10px">${fmtMetaUSD(lw?.spend||0)}</td></tr>
       <tr><td style="color:var(--text3);font-size:11px;padding:4px 0">Impresiones</td>
         <td style="font-weight:600;font-size:12px;padding:4px 8px">${(t.impressions||0).toLocaleString('es-AR')}${delta(t.impressions,y.impressions,v=>v)}</td>
         <td style="color:var(--text3);font-size:10px">${(y.impressions||0).toLocaleString('es-AR')}</td>
@@ -20380,12 +20385,12 @@ async function metaLoadAllCampaigns() {
 
     function fmtNum(n) { n=Number(n)||0; if(n>=1000000) return (n/1000000).toFixed(1)+'M'; if(n>=1000) return (n/1000).toFixed(1)+'k'; return n.toLocaleString(); }
     function fmtCTR(c,i) { return i>0?((c/i)*100).toFixed(2)+'%':'—'; }
-    function fmtCPL(s,l) { return l>0?fmtARS(s/l):'—'; }
+    function fmtCPL(s,l) { return l>0?fmtMetaUSD(s/l):'—'; }
 
     function chips(m) {
       const ctr=fmtCTR(m.clicks||0,m.impressions||0), cpl=fmtCPL(m.spend||0,m.leads||0);
       return `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">
-        <span class="camp-chip">💰 ${fmtARS(m.spend||0)}</span>
+        <span class="camp-chip">💰 ${fmtMetaUSD(m.spend||0)}</span>
         <span class="camp-chip">👁 ${fmtNum(m.impressions||0)}</span>
         <span class="camp-chip">🖱 ${fmtNum(m.clicks||0)}</span>
         <span class="camp-chip">📊 ${ctr}</span>
@@ -20402,7 +20407,7 @@ async function metaLoadAllCampaigns() {
     function togBtn(type,id,s) { const isA=s==='ACTIVE'; const fn=type==='campaign'?'metaToggleCampaign':type==='adset'?'metaToggleAdset':'metaToggleAd';
       return `<button class="btn btn-sm" onclick="${fn}('${id}','${s}')" style="font-size:10px;padding:2px 7px;color:${isA?'#f87171':'var(--green)'}" title="${isA?'Pausar':'Activar'}">${isA?'⏸':'▶'}</button>`; }
 
-    function budgetLink(type,id,b) { return `<span onclick="metaInlineBudget('${type}','${id}',${b||0})" style="cursor:pointer;color:var(--cyan);font-size:10px" title="Editar presupuesto">${fmtARS(b)}/día ✏️</span>`; }
+    function budgetLink(type,id,b) { return `<span onclick="metaInlineBudget('${type}','${id}',${b||0})" style="cursor:pointer;color:var(--cyan);font-size:10px" title="Editar presupuesto (USD)">${b ? fmtMetaUSD(b) : '—'}/día ✏️</span>`; }
 
     function healthScore(m) {
       if (!m || (!m.impressions && !m.spend)) return null;
@@ -20918,7 +20923,7 @@ async function metaCreativosLoad() {
       const activeCount = ads.filter(a => a.status === 'ACTIVE').length;
       const needsAttn = ads.filter(a => { const m = metricsMap[a.id]||{}; const c = m.ctr_count?m.ctr_sum/m.ctr_count:0; return (c<0.5&&m.spend>=5)||(c<0.3&&m.spend>=10); }).length;
       kpiEl.innerHTML = [
-        ['💰','Gasto total',    fmtARS(totalSpend),                                 'var(--cyan)'],
+        ['💰','Gasto total',    fmtMetaUSD(totalSpend),                                 'var(--cyan)'],
         ['🏆','Mejor CTR',      bestCtr ? bestCtr.toFixed(2)+'%' : '—',             bestCtr&&bestCtr>=1.5?'var(--green)':'var(--cyan)'],
         ['▶', 'Activos',        activeCount.toString(),                              'var(--green)'],
         ['⚠️','Para revisar',   needsAttn.toString(),                                needsAttn>0?'#fbbf24':'var(--text3)'],
@@ -20969,7 +20974,7 @@ function metaCreativosGrid() {
     ${filtered.map(ad => {
       const m     = metricsMap[ad.id] || {};
       const ctr   = m.ctr_count ? (m.ctr_sum / m.ctr_count).toFixed(2) : null;
-      const spend = m.spend ? fmtARS(m.spend) : '$0';
+      const spend = m.spend ? fmtMetaUSD(m.spend) : '$0';
       const imps  = m.impressions ? (m.impressions >= 1000 ? (m.impressions/1000).toFixed(1)+'k' : m.impressions) : '0';
       const campName = campMap[ad.campaign_id] || '—';
       const isActive = ad.status === 'ACTIVE';
@@ -21004,7 +21009,7 @@ function metaCreativosGrid() {
           </div>
           ${(m.leads||0)>0||m.messages>0?`<div style="display:flex;gap:6px;padding:4px 6px;background:rgba(0,229,204,0.06);border-radius:var(--r);margin-bottom:6px">
             ${(m.leads||0)>0?`<div style="text-align:center;flex:1"><div style="font-size:12px;font-weight:700;color:var(--cyan)">${m.leads}</div><div style="font-size:9px;color:var(--text3)">Leads</div></div>`:''}
-            ${(m.leads||0)>0&&m.spend>0?`<div style="text-align:center;flex:1"><div style="font-size:11px;font-weight:700;color:var(--cyan)">${fmtARS(m.spend/m.leads).replace('$ ','$')}</div><div style="font-size:9px;color:var(--text3)">CPL</div></div>`:''}
+            ${(m.leads||0)>0&&m.spend>0?`<div style="text-align:center;flex:1"><div style="font-size:11px;font-weight:700;color:var(--cyan)">${fmtMetaUSD(m.spend/m.leads).replace('$ ','$')}</div><div style="font-size:9px;color:var(--text3)">CPL</div></div>`:''}
             ${(m.messages||0)>0?`<div style="text-align:center;flex:1"><div style="font-size:12px;font-weight:700;color:#a78bfa">${m.messages}</div><div style="font-size:9px;color:var(--text3)">Msgs</div></div>`:''}
           </div>`:''}
           ${metaAdTagsGet(ad.id).length>0||freqBadge?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">${metaAdTagsGet(ad.id).map(t=>`<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(0,229,204,0.1);color:var(--cyan);border:1px solid rgba(0,229,204,0.2)">${t}</span>`).join('')}${freqBadge}</div>`:''}
@@ -21033,7 +21038,7 @@ function metaRenderTable(el, filtered, campMap, metricsMap) {
       const ctrNum = m.ctr_count ? m.ctr_sum/m.ctr_count : null;
       const ctr = ctrNum ? ctrNum.toFixed(2) : null;
       const ctrColor = ctr ? (parseFloat(ctr) >= 1.5 ? 'var(--green)' : parseFloat(ctr) >= 0.5 ? 'var(--cyan)' : '#fbbf24') : 'var(--text3)';
-      const spend = m.spend ? fmtARS(m.spend) : '$0';
+      const spend = m.spend ? fmtMetaUSD(m.spend) : '$0';
       const isActive = ad.status === 'ACTIVE';
       const [bIco,bLbl,bBg,bCol] = metaGetBadge(m);
       const days = ad.created_at ? Math.floor((Date.now()-new Date(ad.created_at))/86400000) : '—';
@@ -21087,7 +21092,7 @@ async function metaCreativoDetail(adId) {
       const h = Math.max(Math.round((parseFloat(m.spend||0)/maxSpend)*44), parseFloat(m.spend||0)>0?2:0);
       const sp = parseFloat(m.spend||0);
       return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1;min-width:0">
-        <div style="font-size:8px;color:var(--cyan);white-space:nowrap;overflow:hidden;max-width:100%">${sp>0?fmtARS(sp):''}</div>
+        <div style="font-size:8px;color:var(--cyan);white-space:nowrap;overflow:hidden;max-width:100%">${sp>0?fmtMetaUSD(sp):''}</div>
         <div style="width:100%;height:${h}px;min-height:${h>0?'2px':'0'};background:rgba(0,229,204,0.25);border-radius:2px 2px 0 0;border-top:${h>0?'1px solid var(--cyan)':'none'}"></div>
         <div style="font-size:8px;color:var(--text3);white-space:nowrap">${(m.date_start||'').slice(5)||''}</div>
       </div>`;
@@ -21114,11 +21119,11 @@ async function metaCreativoDetail(adId) {
           ${iaRec}
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
-          ${[['Gasto total',fmtARS(totSpend),'var(--cyan)'],['Clics',totClicks.toLocaleString('es-AR'),'var(--text)'],['Impresiones',totImps>=1000?(totImps/1000).toFixed(1)+'k':totImps.toString(),'var(--text)'],['Conversiones',totConv.toString(),'#a78bfa']].map(([lbl,val,col])=>
+          ${[['Gasto total',fmtMetaUSD(totSpend),'var(--cyan)'],['Clics',totClicks.toLocaleString('es-AR'),'var(--text)'],['Impresiones',totImps>=1000?(totImps/1000).toFixed(1)+'k':totImps.toString(),'var(--text)'],['Conversiones',totConv.toString(),'#a78bfa']].map(([lbl,val,col])=>
             `<div style="background:var(--surface2);padding:10px 6px;border-radius:var(--r);text-align:center"><div style="font-size:14px;font-weight:700;color:${col}">${val}</div><div style="font-size:9px;color:var(--text3)">${lbl}</div></div>`).join('')}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-          ${[['CTR promedio',avgCtr?avgCtr+'%':'—',avgCtr&&parseFloat(avgCtr)>=1?'var(--green)':'#fbbf24'],['CPC promedio',avgCpc?fmtARS(avgCpc):'—','var(--text)']].map(([lbl,val,col])=>
+          ${[['CTR promedio',avgCtr?avgCtr+'%':'—',avgCtr&&parseFloat(avgCtr)>=1?'var(--green)':'#fbbf24'],['CPC promedio',avgCpc?fmtMetaUSD(avgCpc):'—','var(--text)']].map(([lbl,val,col])=>
             `<div style="background:var(--surface2);padding:10px 8px;border-radius:var(--r);text-align:center"><div style="font-size:17px;font-weight:700;color:${col}">${val}</div><div style="font-size:10px;color:var(--text3)">${lbl}</div></div>`).join('')}
         </div>
         ${last14.length>0?`<div style="margin-bottom:14px">
@@ -21214,7 +21219,7 @@ async function metaNewAdLoadAdsets() {
   try {
     const adsets = await metaSbGet(`meta_adsets?campaign_id=eq.${campId}&select=id,name,status,budget_daily&limit=50`);
     selAdset.innerHTML = '<option value="">— Elegí un conjunto —</option>' +
-      adsets.map(a => `<option value="${a.id}">${a.name} · ${fmtARS(a.budget_daily)}/día (${a.status})</option>`).join('');
+      adsets.map(a => `<option value="${a.id}">${a.name} · ${a.budget_daily ? fmtMetaUSD(a.budget_daily) : '—'}/día (${a.status})</option>`).join('');
   } catch(e) {
     selAdset.innerHTML = '<option value="">Error cargando adsets</option>';
   }

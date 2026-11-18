@@ -111,13 +111,13 @@ async function getAiDigestAnalysis(metrics) {
     const prompt = `Sos el agente de marketing de Rhinosapp, un software de gestión comercial en Argentina. Analizá estas métricas de Meta Ads y dá exactamente 3 recomendaciones concretas y accionables en español. Sé directo y específico, sin repetir las métricas.
 
 Período: últimos 7 días
-- Gasto: ARS ${Math.round(metrics.totSpend7).toLocaleString('es-AR')}
+- Gasto: USD ${parseFloat(metrics.totSpend7).toFixed(2)}
 - Leads: ${metrics.totLeads7}
-- CPL promedio: ${metrics.totLeads7 > 0 ? 'ARS ' + Math.round(metrics.totSpend7 / metrics.totLeads7).toLocaleString('es-AR') : 'sin leads'}
+- CPL promedio: ${metrics.totLeads7 > 0 ? 'USD ' + (metrics.totSpend7 / metrics.totLeads7).toFixed(2) : 'sin leads'}
 - Ads activos: ${metrics.activeCount}
 - Proyección mensual: ${metrics.projection} leads (objetivo: ${metrics.goalLeads || 'no definido'})
-${metrics.bestAdName ? `- Mejor ad (menor CPL): ${metrics.bestAdName} — ${metrics.bestAdLeads} leads a ARS ${Math.round(metrics.bestAdCpl).toLocaleString('es-AR')} c/u` : ''}
-${metrics.worstAdName ? `- Ad con más gasto sin leads: ${metrics.worstAdName} — ARS ${Math.round(metrics.worstAdSpend).toLocaleString('es-AR')} gastado` : ''}
+${metrics.bestAdName ? `- Mejor ad (menor CPL): ${metrics.bestAdName} — ${metrics.bestAdLeads} leads a USD ${parseFloat(metrics.bestAdCpl).toFixed(2)} c/u` : ''}
+${metrics.worstAdName ? `- Ad con más gasto sin leads: ${metrics.worstAdName} — USD ${parseFloat(metrics.worstAdSpend).toFixed(2)} gastado` : ''}
 
 Respondé con exactamente 3 recomendaciones numeradas, cada una en 1-2 oraciones. Sin introducción ni cierre.`;
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -164,7 +164,7 @@ async function runAdDigestEmail(res) {
       aggY[m.entity_id].leads += parseInt(m.leads||0);
     }
 
-    const fARS = n => '$' + Math.round(n).toLocaleString('es-AR');
+    const fARS = n => 'USD ' + parseFloat(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fPct = n => n.toFixed(2) + '%';
 
     // Build rows sorted: best performers first
