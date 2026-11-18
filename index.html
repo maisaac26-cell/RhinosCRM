@@ -1502,7 +1502,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
             </div>
             <div class="field">
               <label>URL destino</label>
-              <input id="new-ad-url" type="url" placeholder="https://rhinosapp.vercel.app" style="font-size:12px" oninput="metaAdPreviewUpdate()"/>
+              <input id="new-ad-url" type="url" value="https://wa.me/5491171234005" placeholder="https://wa.me/5491171234005" style="font-size:12px" oninput="metaAdPreviewUpdate()"/>
             </div>
             <div class="field">
               <label>CTA</label>
@@ -20840,7 +20840,7 @@ async function metaCreateAd() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adset_id: adsetId, campaign_id: campId, image_b64: item.b64,
           image_name: item.file?.name || 'creative.jpg', ad_name: adName,
-          link_url: url || 'https://rhinosapp.vercel.app', headline: headline || '',
+          link_url: url || 'https://wa.me/5491171234005', headline: headline || '',
           body_text: bodyText || '', cta_type: cta || 'LEARN_MORE' })
       }).then(x => x.json());
       if (r.ok) { item.status = 'done'; created++; }
