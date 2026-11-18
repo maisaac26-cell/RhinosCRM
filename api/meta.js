@@ -295,11 +295,12 @@ async function runSync(res) {
     log.push(`adsets: ${adsets.length}`);
 
     // 3. Ads
-    const adsData = await metaGet(token, `act_${accountId}/ads?fields=id,name,status,adset_id,campaign_id,creative{id,thumbnail_url}&limit=500`);
+    const adsData = await metaGet(token, `act_${accountId}/ads?fields=id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url}&limit=500`);
     const ads = adsData.data || [];
     if (ads.length) {
       await sbReq('POST', 'meta_ads?on_conflict=id', ads.map(a => ({
         id: a.id, adset_id: a.adset_id, campaign_id: a.campaign_id, name: a.name, status: a.status,
+        effective_status: a.effective_status || null,
         creative_id: a.creative?.id || null, thumbnail_url: a.creative?.thumbnail_url || null,
         updated_at: new Date().toISOString(),
       })));

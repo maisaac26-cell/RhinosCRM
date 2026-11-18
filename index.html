@@ -20356,6 +20356,24 @@ async function metaLoadAllCampaigns() {
       return `<span title="Health score: leads+CTR+CPL+frecuencia" style="font-size:10px;color:${col};font-weight:700;cursor:default">${label} ${score}</span>`;
     }
 
+    function effectiveStatusBadge(es) {
+      const map = {
+        ACTIVE:           ['En entrega',     '#4ade80','rgba(74,222,128,0.12)'],
+        IN_PROCESS:       ['Aprendiendo',    '#fbbf24','rgba(251,191,36,0.12)'],
+        PENDING_REVIEW:   ['En revisión',    '#60a5fa','rgba(96,165,250,0.12)'],
+        WITH_ISSUES:      ['Con problemas',  '#f87171','rgba(248,113,113,0.15)'],
+        DISAPPROVED:      ['Rechazado',      '#f87171','rgba(248,113,113,0.15)'],
+        CAMPAIGN_PAUSED:  ['Camp. pausada',  '#fb923c','rgba(251,146,60,0.12)'],
+        ADSET_PAUSED:     ['Conj. pausado',  '#fb923c','rgba(251,146,60,0.12)'],
+        PAUSED:           ['Pausado',        '#94a3b8','rgba(148,163,184,0.12)'],
+        DELETED:          ['Eliminado',      '#f87171','rgba(248,113,113,0.12)'],
+        ARCHIVED:         ['Archivado',      '#94a3b8','rgba(148,163,184,0.12)'],
+      };
+      if (!es) return '';
+      const [label, color, bg] = map[es] || [es, '#94a3b8', 'rgba(148,163,184,0.12)'];
+      return `<span style="font-size:9px;padding:1px 5px;border-radius:6px;background:${bg};color:${color};font-weight:600;white-space:nowrap">${label}</span>`;
+    }
+
     function renderAd(ad) {
       const m=adM[ad.id]||{}, isA=ad.status==='ACTIVE';
       const thumb=ad.thumbnail_url?`<img src="${ad.thumbnail_url}" style="width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid var(--border);flex-shrink:0"/>` : '<div style="width:38px;height:38px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🖼</div>';
@@ -20364,7 +20382,7 @@ async function metaLoadAllCampaigns() {
         <div style="flex:1;min-width:0">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
             <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${ad.name}</div>
-            <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${badge(ad.status)}<button title="Ver preview en Instagram" onclick="metaShowAdPreview('${ad.id}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--cyan);cursor:pointer;padding:2px 5px;font-size:11px">👁</button><button title="Duplicar anuncio" onclick="metaDuplicateAdModal('${ad.id}','${ad.name.replace(/'/g,"&#39;")}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text3);cursor:pointer;padding:2px 5px;font-size:11px">📋</button>${togBtn('ad',ad.id,ad.status)}</div>
+            <div style="display:flex;gap:3px;align-items:center;flex-shrink:0">${effectiveStatusBadge(ad.effective_status)}<button title="Ver preview en Instagram" onclick="metaShowAdPreview('${ad.id}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--cyan);cursor:pointer;padding:2px 5px;font-size:11px">👁</button><button title="Duplicar anuncio" onclick="metaDuplicateAdModal('${ad.id}','${ad.name.replace(/'/g,"&#39;")}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text3);cursor:pointer;padding:2px 5px;font-size:11px">📋</button>${togBtn('ad',ad.id,ad.status)}</div>
           </div>
           ${chips(m)}
         </div>
