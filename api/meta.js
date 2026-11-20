@@ -64,6 +64,221 @@ async function metaPost(token, path, body) {
 
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
+// ─── Gmail helper (reutiliza tokens de Supabase igual que vendedor-auto.js) ───
+async function getGmailTokenMeta() {
+  const cfg = await sbGet('rhinos_config?key=in.(gmail_refresh_token,gmail_access_token,gmail_token_expiry,gmail_from)');
+  const map = {}; for (const { key, value } of cfg) map[key] = typeof value === 'string' ? value.replace(/^"|"$/g,'').trim() : value;
+  if (!map.gmail_refresh_token) throw new Error('gmail_refresh_token no configurado');
+  const expired = !map.gmail_token_expiry || new Date(map.gmail_token_expiry) < new Date(Date.now() + 60000);
+  if (!expired && map.gmail_access_token) return { token: map.gmail_access_token, from: map.gmail_from || 'comercial@rhinosapp.com' };
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ refresh_token: map.gmail_refresh_token, client_id: process.env.GMAIL_CLIENT_ID, client_secret: process.env.GMAIL_CLIENT_SECRET, grant_type: 'refresh_token' }),
+  });
+  const refreshed = await r.json();
+  if (!refreshed.access_token) throw new Error('No se pudo refrescar Gmail token');
+  const newExpiry = new Date(Date.now() + (refreshed.expires_in || 3600) * 1000).toISOString();
+  await sbReq('POST', 'rhinos_config?on_conflict=key', [
+    { key: 'gmail_access_token', value: refreshed.access_token, updated_at: new Date().toISOString() },
+    { key: 'gmail_token_expiry', value: newExpiry, updated_at: new Date().toISOString() },
+  ]);
+  return { token: refreshed.access_token, from: map.gmail_from || 'comercial@rhinosapp.com' };
+}
+
+async function sendMetaDigestEmail(toAddress, subject, htmlBody) {
+  const { token, from } = await getGmailTokenMeta();
+  const raw = [
+    `From: Rhinos CRM <${from}>`,
+    `To: ${toAddress}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=utf-8',
+    '',
+    htmlBody,
+  ].join('\r\n');
+  const encoded = Buffer.from(raw).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw: encoded }),
+  });
+  if (!resp.ok) throw new Error(`Gmail send failed: ${resp.status}`);
+  return true;
+}
+
+async function getAiDigestAnalysis(metrics) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const prompt = `Sos el agente de marketing de Rhinosapp, un software de gestión comercial en Argentina. Analizá estas métricas de Meta Ads y dá exactamente 3 recomendaciones concretas y accionables en español. Sé directo y específico, sin repetir las métricas.
+
+Período: últimos 7 días
+- Gasto: USD ${parseFloat(metrics.totSpend7).toFixed(2)}
+- Leads: ${metrics.totLeads7}
+- CPL promedio: ${metrics.totLeads7 > 0 ? 'USD ' + (metrics.totSpend7 / metrics.totLeads7).toFixed(2) : 'sin leads'}
+- Ads activos: ${metrics.activeCount}
+- Proyección mensual: ${metrics.projection} leads (objetivo: ${metrics.goalLeads || 'no definido'})
+${metrics.bestAdName ? `- Mejor ad (menor CPL): ${metrics.bestAdName} — ${metrics.bestAdLeads} leads a USD ${parseFloat(metrics.bestAdCpl).toFixed(2)} c/u` : ''}
+${metrics.worstAdName ? `- Ad con más gasto sin leads: ${metrics.worstAdName} — USD ${parseFloat(metrics.worstAdSpend).toFixed(2)} gastado` : ''}
+
+Respondé con exactamente 3 recomendaciones numeradas, cada una en 1-2 oraciones. Sin introducción ni cierre.`;
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 350, messages: [{ role: 'user', content: prompt }] }),
+    });
+    const j = await r.json();
+    return j.content?.[0]?.text?.trim() || null;
+  } catch(e) { return null; }
+}
+
+async function runAdDigestEmail(res) {
+  try {
+    const cfg = await getMetaConfig();
+    const targetCpl = parseFloat(cfg.meta_target_cpl || 0);
+    const since7 = isoDate(new Date(Date.now() - 6 * 86400000));
+    const yesterday = isoDate(new Date(Date.now() - 86400000));
+
+    const [ads, metrics7, metricsY, goals] = await Promise.all([
+      sbGet('meta_ads?select=id,name,status,campaign_id,adset_id&limit=200'),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=gte.${since7}&select=entity_id,spend,impressions,clicks,leads,messages_started`),
+      sbGet(`meta_ad_metrics?entity_type=eq.ad&date_start=eq.${yesterday}&select=entity_id,spend,leads,impressions,clicks`),
+      sbGet('rhinos_config?key=in.(meta_goal_leads_month,meta_digest_email)&select=key,value'),
+    ]);
+
+    const goalMap = {}; for (const g of goals) goalMap[g.key] = typeof g.value === 'string' ? g.value.replace(/^"|"$/g,'').trim() : String(g.value);
+    const digestEmail = goalMap['meta_digest_email'];
+    if (!digestEmail) return res.status(200).json({ ok: false, msg: 'meta_digest_email no configurado en rhinos_config' });
+
+    // Aggregate 7-day metrics per ad
+    const agg7 = {}, aggY = {};
+    for (const m of metrics7) {
+      if (!agg7[m.entity_id]) agg7[m.entity_id] = { spend:0, impressions:0, clicks:0, leads:0, messages:0 };
+      agg7[m.entity_id].spend       += parseFloat(m.spend||0);
+      agg7[m.entity_id].impressions += parseInt(m.impressions||0);
+      agg7[m.entity_id].clicks      += parseInt(m.clicks||0);
+      agg7[m.entity_id].leads       += parseInt(m.leads||0);
+      agg7[m.entity_id].messages    += parseInt(m.messages_started||0);
+    }
+    for (const m of metricsY) {
+      if (!aggY[m.entity_id]) aggY[m.entity_id] = { spend:0, leads:0 };
+      aggY[m.entity_id].spend += parseFloat(m.spend||0);
+      aggY[m.entity_id].leads += parseInt(m.leads||0);
+    }
+
+    const fARS = n => 'USD ' + parseFloat(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fPct = n => n.toFixed(2) + '%';
+
+    // Build rows sorted: best performers first
+    const activeAds = ads.filter(a => a.status === 'ACTIVE');
+    const rows = activeAds.map(ad => {
+      const m = agg7[ad.id] || { spend:0, impressions:0, clicks:0, leads:0, messages:0 };
+      const ctr = m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0;
+      const cpl = m.leads > 0 ? m.spend / m.leads : 0;
+      const noData = m.spend < 1;
+      const statusEmoji = noData ? '⚪' : m.leads >= 3 && targetCpl > 0 && cpl <= targetCpl * 0.7 ? '🟢' : m.leads === 0 && m.spend > 500 ? '🔴' : m.leads > 0 && targetCpl > 0 && cpl > targetCpl * 2 ? '🔴' : '🟡';
+      const suggestion = noData ? 'Sin datos aún' : statusEmoji === '🟢' ? 'Escalar presupuesto' : statusEmoji === '🔴' ? '⚠️ Considerar pausar' : 'Monitorear';
+      return { ...ad, m, ctr, cpl, statusEmoji, suggestion, score: m.leads * 100 - (cpl || 9999) };
+    }).sort((a, b) => b.score - a.score);
+
+    const totSpend7 = rows.reduce((s, r) => s + r.m.spend, 0);
+    const totLeads7 = rows.reduce((s, r) => s + r.m.leads, 0);
+    const ySpend = Object.values(aggY).reduce((s, m) => s + m.spend, 0);
+    const yLeads = Object.values(aggY).reduce((s, m) => s + m.leads, 0);
+    const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    const goalLeads = parseFloat(goalMap['meta_goal_leads_month'] || 0);
+    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    const projection = Math.round((totLeads7 / 7) * daysInMonth);
+    const bestAd = rows.filter(r => r.m.leads > 0).sort((a,b) => a.cpl - b.cpl)[0];
+    const worstAd = rows.filter(r => r.m.leads === 0 && r.m.spend > 100).sort((a,b) => b.m.spend - a.m.spend)[0];
+
+    const aiAnalysis = await getAiDigestAnalysis({
+      totSpend7, totLeads7, activeCount: rows.length, projection, goalLeads,
+      bestAdName: bestAd?.name, bestAdLeads: bestAd?.m.leads, bestAdCpl: bestAd?.cpl,
+      worstAdName: worstAd?.name, worstAdSpend: worstAd?.m.spend,
+    });
+
+    const tableRows = rows.map(r => `
+      <tr style="border-bottom:1px solid #2a2a3a">
+        <td style="padding:8px 10px;font-size:12px">${r.statusEmoji} ${r.name}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px">${r.m.impressions > 0 ? r.m.impressions.toLocaleString('es-AR') : '—'}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px">${r.m.impressions > 0 ? fPct(r.ctr) : '—'}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:600;color:${r.m.leads > 0 ? '#00e5cc' : '#888'}">${r.m.leads > 0 ? r.m.leads : '0'}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px">${r.m.spend > 0 ? fARS(r.m.spend) : '—'}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:12px;color:${r.cpl > 0 && targetCpl > 0 ? (r.cpl <= targetCpl ? '#4ade80' : r.cpl <= targetCpl * 2 ? '#fbbf24' : '#f87171') : '#888'}">${r.cpl > 0 ? fARS(r.cpl) : '—'}</td>
+        <td style="padding:8px 10px;font-size:11px;color:${r.statusEmoji === '🔴' ? '#f87171' : r.statusEmoji === '🟢' ? '#4ade80' : '#888'}">${r.suggestion}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#0d0d1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e5e7eb">
+<div style="max-width:720px;margin:0 auto;padding:24px 16px">
+  <div style="background:#111827;border:1px solid #1e293b;border-radius:12px;overflow:hidden">
+    <div style="background:linear-gradient(135deg,#1e293b,#0f172a);padding:20px 24px;border-bottom:1px solid #1e293b">
+      <div style="font-size:11px;color:#00e5cc;font-weight:700;letter-spacing:1px;text-transform:uppercase">RHINOS CRM · META ADS</div>
+      <div style="font-size:22px;font-weight:800;margin-top:4px">Resumen de rendimiento</div>
+      <div style="font-size:12px;color:#9ca3af;margin-top:2px">${dateStr}</div>
+    </div>
+
+    <div style="display:flex;gap:0;border-bottom:1px solid #1e293b">
+      <div style="flex:1;padding:16px 20px;border-right:1px solid #1e293b">
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Gasto ayer</div>
+        <div style="font-size:24px;font-weight:700;margin-top:4px">${ySpend > 0 ? fARS(ySpend) : '—'}</div>
+      </div>
+      <div style="flex:1;padding:16px 20px;border-right:1px solid #1e293b">
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Leads ayer</div>
+        <div style="font-size:24px;font-weight:700;color:${yLeads > 0 ? '#00e5cc' : '#6b7280'};margin-top:4px">${yLeads}</div>
+      </div>
+      <div style="flex:1;padding:16px 20px;border-right:1px solid #1e293b">
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Leads 7 días</div>
+        <div style="font-size:24px;font-weight:700;color:${totLeads7 > 0 ? '#00e5cc' : '#6b7280'};margin-top:4px">${totLeads7}</div>
+      </div>
+      <div style="flex:1;padding:16px 20px">
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Gasto 7 días</div>
+        <div style="font-size:24px;font-weight:700;margin-top:4px">${totSpend7 > 0 ? fARS(totSpend7) : '—'}</div>
+      </div>
+    </div>
+
+    <div style="padding:20px 24px">
+      <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Anuncios activos — últimos 7 días</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:1px solid #2a2a3a">
+              <th style="text-align:left;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">ANUNCIO</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">IMPRES.</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">CTR</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">LEADS</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">GASTO</th>
+              <th style="text-align:right;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">CPL</th>
+              <th style="text-align:left;padding:6px 10px;font-size:10px;color:#6b7280;font-weight:600">SUGERENCIA</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+      ${targetCpl > 0 ? `<div style="font-size:11px;color:#6b7280;margin-top:12px">🎯 CPL objetivo: ${fARS(targetCpl)} · 🟢 ≤ ${fARS(targetCpl)} · 🟡 ≤ ${fARS(targetCpl*2)} · 🔴 > ${fARS(targetCpl*2)}</div>` : ''}
+    </div>
+
+    ${aiAnalysis ? `
+    <div style="padding:20px 24px;border-top:1px solid #1e293b;background:#0f172a">
+      <div style="font-size:11px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">🤖 Análisis del agente IA</div>
+      <div style="font-size:13px;color:#d1d5db;line-height:1.7;white-space:pre-line">${aiAnalysis}</div>
+    </div>` : ''}
+
+    <div style="padding:16px 24px;border-top:1px solid #1e293b;text-align:center">
+      <a href="https://rhinos-crm.vercel.app" style="display:inline-block;background:#00e5cc;color:#0d0d1a;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none">Gestionar campañas →</a>
+    </div>
+  </div>
+  <div style="text-align:center;font-size:10px;color:#374151;margin-top:12px">Rhinos CRM · Meta Ads Digest · El agente auto-pausa ads con bajo rendimiento a las 11am</div>
+</div></body></html>`;
+
+    const sent = await sendMetaDigestEmail(digestEmail, `🦏 Meta Ads — ${dateStr}`, html);
+    return res.status(200).json({ ok: true, sent, to: digestEmail, ads: rows.length, leads7: totLeads7, spend7: Math.round(totSpend7) });
+  } catch(err) {
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
 async function getMetaConfig() {
   const keys = 'meta_access_token,meta_ad_account_id,meta_page_id,meta_webhook_verify_token,meta_target_cpl,meta_min_ctr,meta_max_freq,meta_max_cpl_mult,meta_min_spend_pause';
   const rows = await sbGet(`rhinos_config?key=in.(${keys})&select=key,value`);
@@ -126,11 +341,12 @@ async function runSync(res) {
     log.push(`adsets: ${adsets.length}`);
 
     // 3. Ads
-    const adsData = await metaGet(token, `act_${accountId}/ads?fields=id,name,status,adset_id,campaign_id,creative{id,thumbnail_url}&limit=500`);
+    const adsData = await metaGet(token, `act_${accountId}/ads?fields=id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url}&limit=500`);
     const ads = adsData.data || [];
     if (ads.length) {
       await sbReq('POST', 'meta_ads?on_conflict=id', ads.map(a => ({
         id: a.id, adset_id: a.adset_id, campaign_id: a.campaign_id, name: a.name, status: a.status,
+        effective_status: a.effective_status || null,
         creative_id: a.creative?.id || null, thumbnail_url: a.creative?.thumbnail_url || null,
         updated_at: new Date().toISOString(),
       })));
@@ -1537,7 +1753,7 @@ async function runBatchLaunchStart(req, res) {
     const campaignObj = {
       name: campaign_name,
       objective: 'OUTCOME_TRAFFIC',
-      status: 'PAUSED',
+      status: 'ACTIVE',
       special_ad_categories: [],
       is_adset_budget_sharing_enabled: false,
     };
@@ -1556,8 +1772,9 @@ async function runBatchLaunchStart(req, res) {
         age_min: parseInt(age_min) || 28,
         age_max: parseInt(age_max) || 60,
         geo_locations: { countries: ['AR'] },
+        targeting_automation: { advantage_audience: 0 },
       },
-      status: 'PAUSED',
+      status: 'ACTIVE',
     });
 
     // Save to Supabase (non-fatal)
@@ -1578,6 +1795,147 @@ async function runBatchLaunchStart(req, res) {
     return res.status(200).json({ ok: true, campaign_id: campaign.id, adset_id: adset.id });
   } catch (err) {
     console.error('[meta-batch-launch-start]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
+function buildCtaObject(ctaType) {
+  const map = {
+    INSTAGRAM_MESSAGE: { type: 'INSTAGRAM_MESSAGE', value: { app_destination: 'INSTAGRAM_DIRECT' } },
+    WHATSAPP_MESSAGE:  { type: 'WHATSAPP_MESSAGE',  value: { app_destination: 'WHATSAPP' } },
+    MESSENGER_MESSAGE: { type: 'MESSENGER_MESSAGE', value: { app_destination: 'MESSENGER' } },
+    LEARN_MORE:        { type: 'LEARN_MORE' },
+    CONTACT_US:        { type: 'CONTACT_US' },
+  };
+  return map[ctaType] || null;
+}
+
+async function runDeleteCampaign(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { campaign_id } = req.body || {};
+    if (!campaign_id) return res.status(200).json({ ok: false, error: 'campaign_id requerido' });
+
+    // Try to delete/archive in Meta (requires Admin role on ad account)
+    let metaOk = false, metaWarning = null;
+    try {
+      await metaPatch(token, campaign_id, { status: 'DELETED' });
+      metaOk = true;
+    } catch(metaErr) {
+      // Fallback: try ARCHIVED status (lower permission requirement)
+      try {
+        await metaPatch(token, campaign_id, { status: 'ARCHIVED' });
+        metaOk = true;
+        metaWarning = 'Campaña archivada en Meta (para eliminarla definitivamente, necesitás rol Admin en la cuenta de anuncios)';
+      } catch {
+        metaWarning = 'No se pudo eliminar de Meta (el System User necesita rol Admin en la cuenta de anuncios). Eliminado solo del CRM.';
+      }
+    }
+
+    // Always clean up Supabase so it disappears from the CRM
+    await Promise.all([
+      sbReq('DELETE', `meta_ads?campaign_id=eq.${campaign_id}`),
+      sbReq('DELETE', `meta_adsets?campaign_id=eq.${campaign_id}`),
+    ]);
+    await sbReq('DELETE', `meta_campaigns?id=eq.${campaign_id}`);
+
+    return res.status(200).json({ ok: true, warning: metaWarning });
+  } catch(err) {
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
+async function runUpdateAdCta(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { ad_id, cta_type } = req.body || {};
+    if (!ad_id || !cta_type) return res.status(200).json({ ok: false, error: 'ad_id y cta_type requeridos' });
+    const accountId = (cfg.meta_ad_account_id || '').replace('act_', '');
+
+    const ad = await metaGet(token, `${ad_id}?fields=name,adset_id,campaign_id,creative{id,object_story_spec,name}`);
+    const creative = ad.creative;
+    if (!creative?.object_story_spec) return res.status(200).json({ ok: false, error: 'No se pudo obtener el creativo' });
+    const spec = creative.object_story_spec;
+    const field = spec.link_data ? 'link_data' : spec.video_data ? 'video_data' : null;
+    if (!field) return res.status(200).json({ ok: false, error: 'Tipo de creativo no soportado' });
+
+    const ctaObj = buildCtaObject(cta_type);
+    if (!ctaObj) return res.status(200).json({ ok: false, error: `CTA no soportado: ${cta_type}` });
+
+    const newSpec = { ...spec, [field]: { ...spec[field], call_to_action: ctaObj } };
+    const newCreative = await metaPost(token, `act_${accountId}/adcreatives`, {
+      object_story_spec: newSpec,
+      name: `${creative.name || ad.name}_${cta_type}_${Date.now()}`,
+    });
+    await metaPatch(token, ad_id, { creative: { creative_id: newCreative.id } });
+    await sbReq('PATCH', `meta_ads?id=eq.${ad_id}`, { updated_at: new Date().toISOString() }).catch(() => {});
+    return res.status(200).json({ ok: true, ad_id, creative_id: newCreative.id });
+  } catch(err) {
+    console.error('[meta-update-ad-cta]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
+async function runDuplicateAdCta(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { ad_id, cta_type, new_name } = req.body || {};
+    if (!ad_id || !cta_type) return res.status(200).json({ ok: false, error: 'ad_id y cta_type requeridos' });
+    const accountId = (cfg.meta_ad_account_id || '').replace('act_', '');
+
+    const ad = await metaGet(token, `${ad_id}?fields=name,adset_id,campaign_id,creative{id,object_story_spec,name}`);
+    const creative = ad.creative;
+    if (!creative?.object_story_spec) return res.status(200).json({ ok: false, error: 'No se pudo obtener el creativo' });
+    const spec = creative.object_story_spec;
+    const field = spec.link_data ? 'link_data' : spec.video_data ? 'video_data' : null;
+    if (!field) return res.status(200).json({ ok: false, error: 'Tipo de creativo no soportado' });
+
+    const ctaObj = buildCtaObject(cta_type);
+    if (!ctaObj) return res.status(200).json({ ok: false, error: `CTA no soportado: ${cta_type}` });
+
+    const newSpec = { ...spec, [field]: { ...spec[field], call_to_action: ctaObj } };
+    const newCreative = await metaPost(token, `act_${accountId}/adcreatives`, {
+      object_story_spec: newSpec,
+      name: `${creative.name || ad.name}_${cta_type}`,
+    });
+    const ctaLabel = { INSTAGRAM_MESSAGE: 'IG DM', WHATSAPP_MESSAGE: 'WhatsApp', MESSENGER_MESSAGE: 'Messenger', LEARN_MORE: 'Más info', CONTACT_US: 'Contactar' }[cta_type] || cta_type;
+    const finalName = new_name || `${ad.name} [${ctaLabel}]`;
+    const newAd = await metaPost(token, `act_${accountId}/ads`, {
+      name: finalName,
+      adset_id: ad.adset_id,
+      creative: { creative_id: newCreative.id },
+      status: 'PAUSED',
+    });
+    await sbReq('POST', 'meta_ads?on_conflict=id', [{
+      id: newAd.id, adset_id: ad.adset_id, campaign_id: ad.campaign_id || null,
+      name: finalName, status: 'PAUSED', creative_id: newCreative.id,
+      updated_at: new Date().toISOString(),
+    }]).catch(() => {});
+    return res.status(200).json({ ok: true, ad_id: newAd.id, name: finalName });
+  } catch(err) {
+    console.error('[meta-duplicate-ad-cta]', err.message);
+    return res.status(200).json({ ok: false, error: err.message });
+  }
+}
+
+async function runGetAdPreview(req, res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token || '';
+    if (!token || token === 'pending') return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+    const { ad_id, format = 'INSTAGRAM_STANDARD' } = req.body || {};
+    if (!ad_id) return res.status(200).json({ ok: false, error: 'ad_id requerido' });
+    const r = await fetch(`https://graph.facebook.com/${META_V}/${ad_id}/previews?ad_format=${encodeURIComponent(format)}&access_token=${token}`);
+    const j = await r.json();
+    if (j.error) return res.status(200).json({ ok: false, error: j.error.message });
+    return res.status(200).json({ ok: true, preview: j.data?.[0]?.body || '' });
+  } catch(err) {
     return res.status(200).json({ ok: false, error: err.message });
   }
 }
@@ -1605,6 +1963,7 @@ export default async function handler(req, res) {
   if (action === 'decay_check')       return runDecayCheck(res);
   if (action === 'adset_efficiency')  return runAdsetEfficiency(res);
   if (action === 'morning_brief')     return runMorningBrief(res);
+  if (action === 'ad_digest_email')   return runAdDigestEmail(res);
   if (action === 'cpl_trend')         return runCplTrend(res);
   if (action === 'account_health')    return runAccountHealth(res);
   if (action === 'update_lead')        return runUpdateLead(req, res);
@@ -1612,5 +1971,97 @@ export default async function handler(req, res) {
   if (action === 'rebalance_budget')   return runRebalanceBudget(req, res);
   if (action === 'batch_launch_start') return runBatchLaunchStart(req, res);
   if (action === 'create_video_ad')    return runCreateVideoAd(req, res);
+  if (action === 'delete_campaign')    return runDeleteCampaign(req, res);
+  if (action === 'update_ad_cta')      return runUpdateAdCta(req, res);
+  if (action === 'duplicate_ad_cta')   return runDuplicateAdCta(req, res);
+  if (action === 'get_ad_preview')     return runGetAdPreview(req, res);
+  if (action === 'budget_alert')       return runBudgetAlert(res);
   return runSync(res);
+}
+
+async function runBudgetAlert(res) {
+  try {
+    const cfg = await getMetaConfig();
+    const token = cfg.meta_access_token;
+    const accountId = cfg.meta_ad_account_id;
+    if (!token || !accountId) return res.status(200).json({ ok: false, error: 'Meta no configurado' });
+
+    const LIMIT_USD = 5; // alerta si supera este valor
+    const adsetsData = await metaGet(token, `act_${accountId}/adsets?fields=id,name,status,daily_budget&limit=100`);
+    const adsets = (adsetsData.data || []).filter(a => a.status === 'ACTIVE' && a.daily_budget);
+
+    const offenders = adsets
+      .map(a => ({ id: a.id, name: a.name, budget_usd: parseFloat(a.daily_budget) / 100 }))
+      .filter(a => a.budget_usd > LIMIT_USD);
+
+    if (!offenders.length) {
+      return res.status(200).json({ ok: true, alert: false, msg: `Todo OK — ${adsets.length} adsets activos dentro del límite de USD ${LIMIT_USD}/día` });
+    }
+
+    // Build alarm email
+    const rows = offenders.map(a =>
+      `<tr>
+        <td style="padding:12px 16px;border-bottom:1px solid #450a0a;color:#fca5a5;font-size:13px">${a.name}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #450a0a;text-align:right;font-size:16px;font-weight:800;color:#f87171">USD ${a.budget_usd.toFixed(2)}/día</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #450a0a;text-align:right;font-size:13px;color:#fca5a5">USD ${(a.budget_usd * 30).toFixed(0)}/mes estimado</td>
+      </tr>`
+    ).join('');
+
+    const totalDay = offenders.reduce((s, a) => s + a.budget_usd, 0);
+
+    const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#0a0000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<div style="max-width:600px;margin:0 auto;padding:32px 16px">
+
+  <!-- ALARM HEADER -->
+  <div style="background:#7f1d1d;border:3px solid #ef4444;border-radius:16px;padding:32px 28px;text-align:center;margin-bottom:24px">
+    <div style="font-size:48px;margin-bottom:8px">🚨</div>
+    <div style="font-size:11px;font-weight:800;letter-spacing:0.2em;color:#fca5a5;margin-bottom:8px">ALERTA DE PRESUPUESTO META</div>
+    <div style="font-size:28px;font-weight:900;color:#ff4444;line-height:1.1;margin-bottom:12px">PRESUPUESTO EXCEDE USD ${LIMIT_USD}/DÍA</div>
+    <div style="font-size:14px;color:#fca5a5">Revisión automática · ${new Date().toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+  </div>
+
+  <!-- OFFENDERS TABLE -->
+  <div style="background:#1a0000;border:1px solid #7f1d1d;border-radius:12px;overflow:hidden;margin-bottom:20px">
+    <div style="background:#450a0a;padding:14px 16px">
+      <span style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#f87171">⚠️ ADSETS CON PRESUPUESTO EXCEDIDO (${offenders.length})</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#2d0000">
+          <th style="padding:10px 16px;text-align:left;font-size:10px;color:#9ca3af;font-weight:700;letter-spacing:0.1em">ADSET</th>
+          <th style="padding:10px 16px;text-align:right;font-size:10px;color:#9ca3af;font-weight:700;letter-spacing:0.1em">PRESUPUESTO DIARIO</th>
+          <th style="padding:10px 16px;text-align:right;font-size:10px;color:#9ca3af;font-weight:700;letter-spacing:0.1em">ESTIMADO MENSUAL</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="padding:14px 16px;background:#2d0000;border-top:1px solid #450a0a;text-align:right">
+      <span style="font-size:12px;color:#fca5a5">Total diario: </span>
+      <span style="font-size:18px;font-weight:900;color:#ff4444">USD ${totalDay.toFixed(2)}/día</span>
+      <span style="font-size:12px;color:#fca5a5"> · USD ${(totalDay * 30).toFixed(0)}/mes</span>
+    </div>
+  </div>
+
+  <!-- ACTION -->
+  <div style="background:#1c1400;border:1px solid #854d0e;border-radius:12px;padding:20px 20px;margin-bottom:20px">
+    <div style="font-size:13px;font-weight:700;color:#fbbf24;margin-bottom:8px">🛠 Qué hacer ahora</div>
+    <div style="font-size:13px;color:#fde68a;line-height:1.6">
+      Entrá al CRM → módulo <strong>Meta ADS</strong> → hacé clic en el ✏️ del presupuesto de cada adset afectado y bajalo a <strong>USD 5/día o menos</strong>.
+    </div>
+  </div>
+
+  <div style="text-align:center;font-size:11px;color:#6b7280;padding-top:12px">
+    Rhinos CRM · Alerta automática de presupuesto cada 5 días
+  </div>
+</div></body></html>`;
+
+    const gmailCfg = await sbGet('rhinos_config?key=eq.gmail_from');
+    const toAddress = (gmailCfg[0]?.value || '').replace(/^"|"$/g,'') || 'comercial@rhinosapp.com';
+    const subject = `🚨 ALERTA: Presupuesto Meta excede USD ${LIMIT_USD}/día — ${offenders.length} adset${offenders.length > 1 ? 's' : ''} afectado${offenders.length > 1 ? 's' : ''}`;
+
+    await sendMetaDigestEmail(toAddress, subject, html);
+    return res.status(200).json({ ok: true, alert: true, offenders: offenders.length, total_day_usd: totalDay.toFixed(2) });
+  } catch (e) {
+    return res.status(200).json({ ok: false, error: e.message });
+  }
 }

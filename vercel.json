@@ -77,6 +77,14 @@
     {
       "path": "/api/meta?action=morning_brief",
       "schedule": "0 9 * * 1-5"
+    },
+    {
+      "path": "/api/meta?action=ad_digest_email",
+      "schedule": "0 12 * * 1,3,5"
+    },
+    {
+      "path": "/api/meta?action=budget_alert",
+      "schedule": "0 10 */5 * *"
     }
   ],
   "rewrites": [
