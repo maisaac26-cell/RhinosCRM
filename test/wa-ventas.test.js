@@ -186,3 +186,18 @@ test('reconoce el mismo teléfono escrito de distintas formas', () => {
   const wa = phoneTail('5491155556666');
   for (const p of ['+54 9 11 5555-6666', '011 15 5555-6666', '11-5555-6666']) assert.strictEqual(phoneTail(p), wa, p);
 });
+
+test('conectar: suscribe la cuenta de ventas a este webhook', async () => {
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    calls.push({ url, body: opts.body ? JSON.parse(opts.body) : null });
+    return { ok: true, status: 200, json: async () => (url.includes('subscribed_apps') ? { success: true } : { display_phone_number: '+54 9 11 7621-1983' }) };
+  };
+  let status; let body;
+  const res = { status(s) { status = s; return this; }, json(b) { body = b; return this; } };
+  await bot.handle({ method: 'GET', query: { conectar: '1' }, headers: { host: 'rhinos-crm.vercel.app' } }, res);
+  assert.strictEqual(status, 200);
+  assert.strictEqual(body.conectado, true);
+  assert.match(calls[0].url, /1429719312667513\/subscribed_apps/);
+  assert.strictEqual(calls[0].body.override_callback_uri, 'https://rhinos-crm.vercel.app/api/meta?action=wa_ventas');
+});
