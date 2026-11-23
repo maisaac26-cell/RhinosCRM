@@ -104,7 +104,8 @@ test('primer mensaje: crea lead, responde y guarda la conversación', async () =
   assert.match(w.prompts[0].system, /278\.600/);
   assert.match(w.prompts[0].system, /MÁS IVA/);
   assert.match(w.prompts[0].system, /primer mensaje/);
-  assert.strictEqual(w.notified.length, 0);
+  assert.strictEqual(w.notified.length, 1); // push "nuevo contacto", sin WhatsApp
+  assert.match(w.notified[0], /api\/push/);
 });
 
 test('Meta reintenta el mismo mensaje: no responde dos veces', async () => {
@@ -125,8 +126,9 @@ test('al calificar avisa una sola vez y marca el lead', async () => {
   const [r2] = await bot.processWebhook(payload('5491133334444', 'y tiene app?', 'wamid.b'));
   assert.strictEqual(r1.avisado, true);
   assert.strictEqual(r2.avisado, false);
-  assert.strictEqual(w.notified.length, 2); // push + WhatsApp del dueño
-  assert.match(decodeURIComponent(w.notified[1]), /Lácteos Sur/);
+  // push "nuevo contacto" + (push + WhatsApp del dueño al calificar); el 2.º mensaje no avisa
+  assert.strictEqual(w.notified.length, 3);
+  assert.ok(w.notified.some((u) => /callmebot/.test(u) && /Lácteos Sur/.test(decodeURIComponent(u))));
   assert.match(w.db.rhinos_leads[0].tags, /calificado-bot/);
   assert.strictEqual(w.db.rhinos_leads[0].company, 'Lácteos Sur');
   assert.match(w.prompts[1].system, /Ya está calificado/);
@@ -272,4 +274,12 @@ test('CRM: ventana de 24 h cerrada da un error claro', async () => {
   const r = await call({ op: 'enviar', lead_id: 'L9', texto: 'hola' });
   assert.strictEqual(r.status, 400);
   assert.match(r.body.error, /24 h/);
+});
+
+test('bot pausado: cada mensaje avisa al equipo', async () => {
+  const w = world({ leads: [{ id: 'L1', name: 'Pepe', phone: '+54 9 11 5555-6666', status: 'contactado', tags: 'bot-pausado' }] });
+  await bot.processWebhook(payload('5491155556666', 'hola?', 'wamid.p1'));
+  await bot.processWebhook(payload('5491155556666', 'sigo acá', 'wamid.p2'));
+  assert.strictEqual(w.notified.length, 2);
+  assert.strictEqual(w.sent.length, 0);
 });
