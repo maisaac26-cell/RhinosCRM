@@ -7051,7 +7051,25 @@ function showLoginScreen() {
   document.getElementById('mobile-header').style.display = 'none';
 }
 
+// Abre el lead que viene en la URL (?lead=ID), p. ej. al tocar un aviso del bot.
+async function openLeadFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('lead');
+  if (!id) return;
+  params.delete('lead');
+  const qs = params.toString();
+  window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+  try {
+    if (!leadsData.length) await loadLeads();
+    const lead = leadsData.find(l => String(l.id) === id);
+    if (!lead) return showToast('No encontré ese lead');
+    document.querySelector('.nav-btn[data-sec="leads"]')?.click();
+    setTimeout(() => openLead(lead), 300);
+  } catch (e) { console.warn('openLeadFromUrl', e); }
+}
+
 function showApp(session) {
+  setTimeout(openLeadFromUrl, 900);
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-topbar').style.display = 'flex';
   document.getElementById('app-wrap').style.display = 'block';
