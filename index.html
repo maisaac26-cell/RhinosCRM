@@ -7904,7 +7904,7 @@ function waBubble(m) {
 
 function waBotSummary(c) {
   const d = c.datos || {};
-  const bits = [d.rubro, d.zona, d.vendedores ? `${d.vendedores} vendedores` : '', d.sistema_actual ? `hoy usa ${d.sistema_actual}` : '']
+  const bits = [d.rubro, d.zona, d.usuarios ? `${d.usuarios} usuarios` : (d.vendedores ? `${d.vendedores} vendedores` : ''), d.funcionalidades ? `necesita: ${d.funcionalidades}` : '', d.volumen, d.sistema_actual ? `hoy usa ${d.sistema_actual}` : '']
     .filter(Boolean).map(waEsc);
   const pain = d.dolor_principal ? `<div style="margin-top:3px">🔥 ${waEsc(d.dolor_principal)}</div>` : '';
   const ad = c.origen ? `<div style="margin-top:3px;color:var(--text3)">Vino del anuncio: ${waEsc(c.origen)}</div>` : '';
