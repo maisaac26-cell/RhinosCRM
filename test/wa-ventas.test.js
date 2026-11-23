@@ -95,7 +95,7 @@ function payload(from, text, id, extra = {}) {
 test('primer mensaje: crea lead, responde y guarda la conversación', async () => {
   const w = world({ aiReplies: [{ mensaje: 'Hola Juan! Soy el asistente de RhinosApp 🦏 ¿Qué distribuís?', datos: { nombre: 'Juan' }, calificado: false, temperatura: 'tibio', resumen: '' }] });
   const [r] = await bot.processWebhook(payload('5491122334455', 'Hola, info', 'wamid.1', { referral: { headline: 'Dejá el Excel' } }));
-  assert.deepStrictEqual(r, { replied: true, calificado: false, avisado: false });
+  assert.deepStrictEqual(r, { replied: true, calificado: false, avisado: false, derivado: false });
   assert.strictEqual(w.db.rhinos_leads.length, 1);
   assert.match(w.db.rhinos_leads[0].notes, /Dejá el Excel/);
   assert.strictEqual(w.db.rhinos_leads[0].source, 'WhatsApp');
@@ -282,4 +282,30 @@ test('bot pausado: cada mensaje avisa al equipo', async () => {
   await bot.processWebhook(payload('5491155556666', 'sigo acá', 'wamid.p2'));
   assert.strictEqual(w.notified.length, 2);
   assert.strictEqual(w.sent.length, 0);
+});
+
+test('manda la respuesta en varios mensajes, como una persona', async () => {
+  const w = world({ aiReplies: [{ mensaje: 'hola! soy de RhinosApp\n\nte cuento rápido cómo funciona\n\nqué distribuís?', datos: {}, calificado: false, temperatura: 'tibio', resumen: '' }] });
+  await bot.processWebhook(payload('5491100001111', 'hola', 'wamid.s1'));
+  assert.deepStrictEqual(w.sent.map((m) => m.text.body), ['hola! soy de RhinosApp', 'te cuento rápido cómo funciona', 'qué distribuís?']);
+  assert.strictEqual(w.db.rhinos_wa_ventas_msgs.filter((m) => m.role === 'bot').length, 3);
+});
+
+test('lo que no sabe lo deriva al equipo con la consulta', async () => {
+  const w = world({
+    config: { wa_recipients: JSON.stringify([{ phone: '5491111', apikey: 'x' }]) },
+    aiReplies: [{ mensaje: 'eso te lo confirma alguien del equipo, ya les paso tu consulta', datos: {}, calificado: false, temperatura: 'tibio', resumen: '', derivar: true, consulta: '¿se integra con Tango?' }],
+  });
+  const [r] = await bot.processWebhook(payload('5491100002222', 'se integra con tango?', 'wamid.d1'));
+  assert.strictEqual(r.derivado, true);
+  assert.ok(w.notified.some((u) => /callmebot/.test(u) && /Tango/.test(decodeURIComponent(u))));
+  assert.ok(w.db.rhinos_lead_interactions.some((i) => /Tango/.test(i.note)));
+});
+
+test('las instrucciones piden escribir como persona y no inventar', () => {
+  const p = bot._internal.systemPrompt({ extra: '', datos: {}, calificado: false, isNew: true });
+  assert.match(p, /minúscula/);
+  assert.match(p, /Nunca supongas ni inventes/);
+  assert.match(p, /confidencial/);
+  assert.match(p, /no lo niegues/);
 });
