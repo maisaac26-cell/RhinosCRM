@@ -1945,6 +1945,7 @@ export default async function handler(req, res) {
   if (action === 'agent')             return runAgent(res);
   if (action === 'webhook')           return runWebhook(req, res);
   if (action === 'wa_ventas')         return waVentas.handle(req, res);
+  if (action === 'wa_ventas_crm')     return waVentas.handleCrm(req, res);
   if (action === 'create_ad')         return runCreateAd(req, res);
   if (action === 'toggle_ad')         return runToggleAd(req, res);
   if (action === 'toggle_adset')      return runToggleAdset(req, res);

@@ -7836,6 +7836,138 @@ function renderLeadsList() {
   });
 }
 
+// ── Bot de ventas de WhatsApp: conversación en la ficha del lead ──────────────
+function waEsc(t) {
+  return String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function waCrmToken() {
+  try { const t = await getAccessToken(); if (t) return t; } catch(e) {}
+  return _sbSession?.access_token || null;
+}
+
+async function waCrmCall(body) {
+  const token = await waCrmToken();
+  const r = await fetch('/api/meta?action=wa_ventas_crm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'No se pudo conectar con el bot');
+  return data;
+}
+
+function waBotPaused(lead) {
+  return String(lead.tags || '').toLowerCase().split(/[,;\s]+/).includes('bot-pausado');
+}
+
+function waFmtTime(iso) {
+  const d = new Date(iso);
+  const hm = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return new Date().toDateString() === d.toDateString()
+    ? hm
+    : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ' ' + hm;
+}
+
+function waBubble(m) {
+  const mine = m.role !== 'user';
+  const who = m.role === 'bot' ? '🦏 Bot' : m.role === 'equipo' ? '👤 Equipo' : '';
+  const bg = m.role === 'bot' ? 'rgba(0,229,204,0.10)' : m.role === 'equipo' ? 'rgba(99,102,241,0.16)' : 'var(--surface2)';
+  const border = m.role === 'bot' ? 'rgba(0,229,204,0.25)' : m.role === 'equipo' ? 'rgba(99,102,241,0.35)' : 'var(--border)';
+  return `<div style="display:flex;justify-content:${mine ? 'flex-end' : 'flex-start'}">
+    <div style="max-width:82%;background:${bg};border:1px solid ${border};border-radius:10px;padding:6px 10px">
+      ${who ? `<div style="font-size:10px;color:var(--text2);margin-bottom:2px">${who}</div>` : ''}
+      <div style="font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${waEsc(m.texto)}</div>
+      <div style="font-size:10px;color:var(--text3);text-align:right;margin-top:2px">${waFmtTime(m.created_at)}</div>
+    </div>
+  </div>`;
+}
+
+function waBotSummary(c) {
+  const d = c.datos || {};
+  const bits = [d.rubro, d.zona, d.vendedores ? `${d.vendedores} vendedores` : '', d.sistema_actual ? `hoy usa ${d.sistema_actual}` : '']
+    .filter(Boolean).map(waEsc);
+  const pain = d.dolor_principal ? `<div style="margin-top:3px">🔥 ${waEsc(d.dolor_principal)}</div>` : '';
+  const ad = c.origen ? `<div style="margin-top:3px;color:var(--text3)">Vino del anuncio: ${waEsc(c.origen)}</div>` : '';
+  if (!bits.length && !pain && !ad) return '';
+  return `<div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:var(--r);padding:8px 10px;margin-bottom:10px;line-height:1.5">${bits.join(' · ')}${pain}${ad}</div>`;
+}
+
+async function waBotPanelLoad(lead) {
+  const panel = document.getElementById('wa-bot-panel');
+  if (!panel) return;
+  let conv;
+  try {
+    conv = (await waCrmCall({ op: 'conversacion', lead_id: String(lead.id), phone: lead.phone })).conversacion;
+  } catch (e) {
+    if (currentLeadId !== lead.id) return;
+    panel.style.display = 'block';
+    panel.innerHTML = `<div class="card-title">💬 WhatsApp de ventas</div><div style="font-size:12px;color:var(--text2)">${waEsc(e.message)}</div>`;
+    return;
+  }
+  if (currentLeadId !== lead.id) return;
+  if (!conv) { panel.style.display = 'none'; return; }
+  const paused = waBotPaused(lead);
+  panel.style.display = 'block';
+  panel.innerHTML = `
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <span>💬 WhatsApp de ventas ${conv.calificado ? '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,0.15);color:var(--green);margin-left:4px">Calificado</span>' : ''}</span>
+      <span style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11px;font-weight:400;color:${paused ? 'var(--amber)' : 'var(--green)'}">${paused ? '⏸ Bot pausado' : '● Bot respondiendo'}</span>
+        <button class="btn btn-sm" id="wa-bot-toggle">${paused ? 'Activar bot' : 'Pausar bot'}</button>
+        <button class="btn btn-sm" id="wa-bot-refresh" title="Actualizar">↻</button>
+      </span>
+    </div>
+    ${waBotSummary(conv)}
+    <div id="wa-bot-msgs" style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow-y:auto;padding:2px 2px 6px">
+      ${conv.mensajes.length ? conv.mensajes.map(waBubble).join('') : '<div class="empty" style="font-size:12px">Sin mensajes</div>'}
+    </div>
+    ${conv.ventana_abierta ? `
+      <div style="display:flex;gap:6px;align-items:flex-end;margin-top:10px">
+        <textarea id="wa-bot-reply" placeholder="Responderle desde el número de ventas..." style="flex:1;font-size:12px;min-height:52px;resize:vertical;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font);line-height:1.5"></textarea>
+        <button class="btn btn-green btn-sm" id="wa-bot-send" style="padding:8px 14px">Enviar</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">Cuando respondés vos, el bot se pausa con este lead.</div>`
+    : `<div style="font-size:11px;color:var(--text3);margin-top:8px">Pasaron más de 24 h desde su último mensaje: para escribirle usá el botón 💬 WA (desde tu WhatsApp).</div>`}`;
+
+  const box = document.getElementById('wa-bot-msgs');
+  box.scrollTop = box.scrollHeight;
+  document.getElementById('wa-bot-refresh').addEventListener('click', () => waBotPanelLoad(lead));
+  document.getElementById('wa-bot-toggle').addEventListener('click', async function() {
+    this.disabled = true;
+    const tags = String(lead.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    const next = paused ? tags.filter(t => t.toLowerCase() !== 'bot-pausado') : [...tags, 'bot-pausado'];
+    try {
+      await sbFetch(`rhinos_leads?id=eq.${lead.id}`, 'PATCH', { tags: next.join(', '), updated_at: new Date().toISOString() });
+      lead.tags = next.join(', ');
+      leadsData = leadsData.map(l => l.id === lead.id ? {...l, tags: lead.tags} : l);
+      showToast(paused ? '🦏 El bot vuelve a responderle' : '⏸ Bot pausado: le respondés vos');
+      waBotPanelLoad(lead);
+    } catch (e) {
+      showToast('No se pudo cambiar: ' + e.message);
+      this.disabled = false;
+    }
+  });
+  document.getElementById('wa-bot-send')?.addEventListener('click', async function() {
+    const texto = document.getElementById('wa-bot-reply').value.trim();
+    if (!texto) return;
+    this.disabled = true; this.textContent = 'Enviando...';
+    try {
+      await waCrmCall({ op: 'enviar', lead_id: String(lead.id), phone: lead.phone, texto });
+      if (!waBotPaused(lead)) {
+        lead.tags = [lead.tags, 'bot-pausado'].filter(Boolean).join(', ');
+        leadsData = leadsData.map(l => l.id === lead.id ? {...l, tags: lead.tags} : l);
+      }
+      showToast('✓ Mensaje enviado');
+      waBotPanelLoad(lead);
+    } catch (e) {
+      showToast(e.message);
+      this.disabled = false; this.textContent = 'Enviar';
+    }
+  });
+}
+
 async function openLead(lead) {
   currentLeadId = lead.id;
   renderLeadsList();
@@ -7933,6 +8065,7 @@ async function openLead(lead) {
           </div>`).join('') : '<div class="empty" style="padding:1rem">Sin interacciones aún</div>'}
       </div>
     </div>
+    ${lead.phone ? `<div class="card" id="wa-bot-panel" style="display:none;border-color:rgba(34,197,94,0.25)"></div>` : ''}
     <div class="card" style="border-color:rgba(99,102,241,0.2)">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         💬 Notas del equipo
@@ -7946,6 +8079,8 @@ async function openLead(lead) {
         <button class="btn btn-sm" id="btn-add-team-note-lead" style="color:#818cf8;border-color:rgba(99,102,241,0.3)">+ Agregar</button>
       </div>
     </div>`;
+
+  if (lead.phone) waBotPanelLoad(lead);
 
   let pendingStatus = null;
   detail.querySelectorAll('.lead-status-btn').forEach(btn => {
