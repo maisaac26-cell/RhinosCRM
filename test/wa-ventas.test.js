@@ -201,3 +201,75 @@ test('conectar: suscribe la cuenta de ventas a este webhook', async () => {
   assert.match(calls[0].url, /1429719312667513\/subscribed_apps/);
   assert.strictEqual(calls[0].body.override_callback_uri, 'https://rhinos-crm.vercel.app/api/meta?action=wa_ventas');
 });
+
+function crmWorld({ email = 'comercial@rhinosapp.com', sendError = null } = {}) {
+  const db = {
+    rhinos_wa_ventas: [{ phone: '5491133334444', lead_id: 'L9', datos: { rubro: 'quesos' }, calificado: true }],
+    rhinos_wa_ventas_msgs: [
+      { id: 'a', phone: '5491133334444', role: 'user', texto: 'hola', created_at: new Date(Date.now() - 3600e3).toISOString() },
+      { id: 'b', phone: '5491133334444', role: 'bot', texto: '¡Hola!', created_at: new Date().toISOString() },
+    ],
+    rhinos_leads: [{ id: 'L9', tags: 'bot-whatsapp' }],
+    rhinos_lead_interactions: [],
+    rhinos_vendedores: [],
+  };
+  const sent = [];
+  global.fetch = async (url, opts = {}) => {
+    const u = new URL(url);
+    const ok = (b, status = 200) => ({ ok: status < 300, status, json: async () => b, text: async () => JSON.stringify(b) });
+    if (u.hostname === 'www.googleapis.com') return email ? ok({ email }) : ok({}, 401);
+    if (u.pathname === '/auth/v1/user') return ok({}, 401);
+    if (u.hostname === 'graph.facebook.com') {
+      if (sendError) return ok({ error: { message: sendError } }, 400);
+      sent.push(JSON.parse(opts.body)); return ok({ messages: [{ id: 'wamid.eq' }] });
+    }
+    const table = u.pathname.replace('/rest/v1/', '');
+    const method = opts.method || 'GET';
+    if (method === 'POST') { const rows = JSON.parse(opts.body); db[table].push(...rows); return ok(rows, 201); }
+    if (method === 'PATCH') { const id = u.searchParams.get('id').slice(3); Object.assign(db[table].find((r) => r.id === id), JSON.parse(opts.body)); return ok(null, 204); }
+    let rows = db[table];
+    for (const [k, v] of u.searchParams) {
+      if (v.startsWith('eq.')) rows = rows.filter((r) => String(r[k]) === v.slice(3));
+      if (v.startsWith('like.')) rows = rows.filter((r) => String(r[k]).endsWith(v.slice(6)));
+    }
+    return ok(rows);
+  };
+  return { db, sent };
+}
+
+function call(body, auth = 'Bearer ' + 'x'.repeat(30)) {
+  return new Promise((resolve) => {
+    const res = { status(s) { this.s = s; return this; }, json(b) { resolve({ status: this.s, body: b }); return this; } };
+    bot.handleCrm({ method: 'POST', headers: { authorization: auth }, body }, res);
+  });
+}
+
+test('CRM: sin sesión válida no ve conversaciones', async () => {
+  crmWorld({ email: null });
+  const r = await call({ op: 'conversacion', lead_id: 'L9' });
+  assert.strictEqual(r.status, 401);
+});
+
+test('CRM: ve la conversación del lead con la ventana abierta', async () => {
+  crmWorld();
+  const r = await call({ op: 'conversacion', lead_id: 'L9' });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.conversacion.mensajes.length, 2);
+  assert.strictEqual(r.body.conversacion.ventana_abierta, true);
+});
+
+test('CRM: responder manda por WhatsApp, lo guarda y pausa el bot', async () => {
+  const w = crmWorld();
+  const r = await call({ op: 'enviar', lead_id: 'L9', texto: 'Hola, soy Manete' });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(w.sent[0].to, '5491133334444');
+  assert.ok(w.db.rhinos_wa_ventas_msgs.some((m) => m.role === 'equipo'));
+  assert.match(w.db.rhinos_leads[0].tags, /bot-pausado/);
+});
+
+test('CRM: ventana de 24 h cerrada da un error claro', async () => {
+  crmWorld({ sendError: 'Re-engagement message (131047)' });
+  const r = await call({ op: 'enviar', lead_id: 'L9', texto: 'hola' });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.body.error, /24 h/);
+});
