@@ -101,8 +101,8 @@ test('primer mensaje: crea lead, responde y guarda la conversación', async () =
   assert.strictEqual(w.db.rhinos_leads[0].source, 'WhatsApp');
   assert.strictEqual(w.sent[0].to, '5491122334455');
   assert.strictEqual(w.db.rhinos_wa_ventas_msgs.length, 2);
-  assert.match(w.prompts[0].system, /278\.600/);
-  assert.match(w.prompts[0].system, /MÁS IVA/);
+  assert.match(w.prompts[0].system, /NO DES NÚMEROS/);
+  assert.doesNotMatch(w.prompts[0].system, /\$\s?\d/);
   assert.match(w.prompts[0].system, /primer mensaje/);
   assert.strictEqual(w.notified.length, 1); // push "nuevo contacto", sin WhatsApp
   assert.match(w.notified[0], /api\/push/);
