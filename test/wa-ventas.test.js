@@ -126,8 +126,9 @@ test('al calificar avisa una sola vez y marca el lead', async () => {
   const [r2] = await bot.processWebhook(payload('5491133334444', 'y tiene app?', 'wamid.b'));
   assert.strictEqual(r1.avisado, true);
   assert.strictEqual(r2.avisado, false);
-  // push "nuevo contacto" + (push + WhatsApp del dueño al calificar); el 2.º mensaje no avisa
-  assert.strictEqual(w.notified.length, 3);
+  // "nuevo contacto" (push + WhatsApp) + calificado (push + WhatsApp); el 2.º mensaje no avisa
+  assert.strictEqual(w.notified.length, 4);
+  assert.ok(w.notified.some((u) => /callmebot/.test(u) && /Nuevo contacto/.test(decodeURIComponent(u)) && /\?conv=5491133334444/.test(decodeURIComponent(u))));
   assert.ok(w.notified.some((u) => /callmebot/.test(u) && /Lácteos Sur/.test(decodeURIComponent(u))));
   assert.match(w.db.rhinos_leads[0].tags, /calificado-bot/);
   assert.strictEqual(w.db.rhinos_leads[0].company, 'Lácteos Sur');
@@ -228,12 +229,17 @@ function crmWorld({ email = 'comercial@rhinosapp.com', sendError = null } = {}) 
     const table = u.pathname.replace('/rest/v1/', '');
     const method = opts.method || 'GET';
     if (method === 'POST') { const rows = JSON.parse(opts.body); db[table].push(...rows); return ok(rows, 201); }
-    if (method === 'PATCH') { const id = u.searchParams.get('id').slice(3); Object.assign(db[table].find((r) => r.id === id), JSON.parse(opts.body)); return ok(null, 204); }
+    if (method === 'PATCH') {
+      const [[k, v]] = [...u.searchParams];
+      Object.assign(db[table].find((r) => String(r[k]) === v.slice(3)), JSON.parse(opts.body));
+      return ok(null, 204);
+    }
     let rows = db[table];
     for (const [k, v] of u.searchParams) {
       if (v.startsWith('eq.')) rows = rows.filter((r) => String(r[k]) === v.slice(3));
       if (v.startsWith('like.')) rows = rows.filter((r) => String(r[k]).endsWith(v.slice(6)));
     }
+    if (u.searchParams.get('order')?.includes('desc')) rows = [...rows].reverse();
     return ok(rows);
   };
   return { db, sent };
@@ -308,4 +314,32 @@ test('las instrucciones piden escribir como persona y no inventar', () => {
   assert.match(p, /Nunca supongas ni inventes/);
   assert.match(p, /confidencial/);
   assert.match(p, /no lo niegues/);
+});
+
+test('avisos por WhatsApp se pueden apagar', async () => {
+  const w = world({ config: { wa_recipients: JSON.stringify([{ phone: '5491111', apikey: 'x' }]), wa_ventas_avisos_whatsapp: 'false' } });
+  await bot.processWebhook(payload('5491100003333', 'hola', 'wamid.n1'));
+  assert.strictEqual(w.notified.filter((u) => /callmebot/.test(u)).length, 0);
+  assert.strictEqual(w.notified.filter((u) => /api\/push/.test(u)).length, 1);
+});
+
+test('consulta derivada queda pendiente hasta que responde el equipo', async () => {
+  const w = world({ aiReplies: [{ mensaje: 'ya les paso tu consulta', datos: {}, calificado: false, temperatura: 'tibio', resumen: '', derivar: true, consulta: 'tango?' }] });
+  await bot.processWebhook(payload('5491100004444', 'tango?', 'wamid.q1'));
+  assert.strictEqual(w.db.rhinos_wa_ventas[0].datos.consulta_pendiente.texto, 'tango?');
+});
+
+test('CRM: bandeja con último mensaje, sin leer y estado', async () => {
+  const w = crmWorld();
+  w.db.rhinos_leads[0].tags = 'bot-whatsapp, bot-pausado';
+  const r = await call({ op: 'bandeja' });
+  assert.strictEqual(r.status, 200);
+  const [c] = r.body.conversaciones;
+  assert.strictEqual(c.phone, '5491133334444');
+  assert.strictEqual(c.sin_leer, true);
+  assert.strictEqual(c.pausado, true);
+  assert.strictEqual(c.ultimo.texto, '¡Hola!');
+  // Abrir la charla la marca como vista.
+  await call({ op: 'conversacion', phone: '5491133334444' });
+  assert.ok(w.db.rhinos_wa_ventas[0].datos.visto_equipo_at);
 });

@@ -62,6 +62,41 @@ body.pres-mode .db-goals-card{display:none!important}
 #pres-overlay{display:none;position:fixed;bottom:20px;right:20px;z-index:9000;background:rgba(0,229,204,0.1);border:1px solid rgba(0,229,204,0.3);backdrop-filter:blur(8px);border-radius:12px;padding:10px 18px;color:var(--cyan);font-size:13px;font-weight:600;display:none;align-items:center;gap:12px}
 #pres-clock{font-family:var(--display);font-size:28px;font-weight:800;letter-spacing:.04em}
 .section{display:none}.section.active{display:block}
+/* ── Conversaciones (WhatsApp de ventas) ── */
+.wconv-layout{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:12px;align-items:start}
+.wconv-list-card{padding:10px;max-height:calc(100vh - 170px);display:flex;flex-direction:column}
+.wconv-chat-card{padding:0;min-height:420px;max-height:calc(100vh - 170px);display:flex;flex-direction:column;overflow:hidden}
+.wconv-filters{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.wconv-chip{font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:var(--font)}
+.wconv-chip.active{background:rgba(0,229,204,0.12);border-color:rgba(0,229,204,0.4);color:var(--text)}
+.wconv-chip span:not(:empty){margin-left:3px;font-weight:700;color:var(--red)}
+.wconv-list{overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin:0 -4px}
+.wconv-item{display:block;width:100%;box-sizing:border-box;text-align:left;padding:8px 10px;border-radius:var(--r);border:1px solid transparent;background:none;color:var(--text);cursor:pointer;font-family:var(--font)}
+.wconv-item:hover{background:var(--surface2)}
+.wconv-item.active{background:var(--surface2);border-color:var(--border2)}
+.wconv-item-top{display:flex;justify-content:space-between;gap:6px;align-items:baseline}
+.wconv-item-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wconv-item.unread .wconv-item-name::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:middle}
+.wconv-item-time{font-size:10px;color:var(--text3);flex-shrink:0}
+.wconv-item-last{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.wconv-item-tags{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+.wconv-tag{font-size:10px;padding:1px 7px;border-radius:9px;background:var(--surface2);color:var(--text2)}
+.wconv-tag.q{background:rgba(245,158,11,0.15);color:var(--amber)}
+.wconv-tag.ok{background:rgba(34,197,94,0.15);color:var(--green)}
+.wconv-tag.p{background:rgba(99,102,241,0.15);color:#a5b4fc}
+.wconv-chat-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.wconv-chat-msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.wconv-chat-foot{padding:10px 14px;border-top:1px solid var(--border)}
+#conv-chat .wconv-back{display:none}
+@media (max-width: 768px){
+  .wconv-layout{grid-template-columns:1fr}
+  .wconv-layout.chat-open .wconv-list-card{display:none}
+  .wconv-layout:not(.chat-open) .wconv-chat-card{display:none}
+  #conv-chat .wconv-back{display:inline-flex}
+  .wconv-list-card,.wconv-chat-card{max-height:none}
+  .wconv-chat-msgs{max-height:60vh}
+}
+
 .page-title{font-family:var(--display);font-size:40px;font-weight:800;letter-spacing:0.02em;line-height:1;text-transform:uppercase;margin-bottom:4px}
 .page-title span{color:var(--cyan)}
 .page-sub{font-size:13px;color:var(--text2);margin-bottom:1.5rem}
@@ -528,6 +563,7 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
 
     <div class="nav-group-label">Comercial</div>
     <button class="nav-btn" data-sec="leads"><span class="nav-icon">🎯</span>Leads<span id="nav-leads-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;line-height:1.4"></span></button>
+    <button class="nav-btn" data-sec="conversaciones"><span class="nav-icon">💬</span>Conversaciones<span id="nav-conv-badge" style="display:none;margin-left:auto;background:var(--green);color:#04130b;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;line-height:1.4"></span></button>
     <button class="nav-btn" data-sec="clientes-comercial"><span class="nav-icon">🏢</span>Clientes</button>
     <button class="nav-btn" data-sec="vendedores"><span class="nav-icon">👤</span>Vendedores</button>
     <button class="nav-btn" data-sec="prospectos"><span class="nav-icon">🔍</span>Prospectos</button>
@@ -2014,6 +2050,28 @@ label{font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:upp
   </div>
 
   <!-- LEADS -->
+  <div class="section" id="s-conversaciones">
+    <div class="section-header">
+      <div class="page-title">💬 <span>CONVERSACIONES</span></div>
+      <div class="page-sub">Todo lo que entra por el WhatsApp de ventas. Respondé, pausá el bot o abrí el lead.</div>
+    </div>
+    <div class="wconv-layout" id="wconv-layout">
+      <div class="card wconv-list-card">
+        <input id="conv-search" placeholder="Buscar por nombre, empresa o teléfono..." style="width:100%;font-size:12px;padding:7px 10px;margin-bottom:8px"/>
+        <div class="wconv-filters" id="wconv-filters">
+          <button class="wconv-chip active" data-f="todas">Todas</button>
+          <button class="wconv-chip" data-f="responder">Para responder <span id="conv-count-responder"></span></button>
+          <button class="wconv-chip" data-f="sin_leer">Sin leer <span id="conv-count-sin_leer"></span></button>
+          <button class="wconv-chip" data-f="calificados">Calificados</button>
+        </div>
+        <div id="wconv-list" class="wconv-list"><div class="empty" style="font-size:12px">Cargando...</div></div>
+      </div>
+      <div class="card wconv-chat-card" id="conv-chat">
+        <div class="empty" style="font-size:13px;padding:3rem 1rem;text-align:center">Elegí una conversación de la izquierda.</div>
+      </div>
+    </div>
+  </div>
+
   <div class="section" id="s-leads">
     <div class="section-header" style="display:flex;align-items:flex-start;justify-content:space-between">
       <div><div class="page-title">🎯 <span>LEADS</span></div>
@@ -6915,6 +6973,7 @@ const MODULES_PERMISOS = [
   { key: 'dashboard',          label: 'Dashboard',        group: 'General' },
   // Comercial
   { key: 'leads',              label: 'Leads',            group: 'Comercial' },
+  { key: 'conversaciones',     label: 'Conversaciones',   group: 'Comercial' },
   { key: 'clientes-comercial', label: 'Clientes',         group: 'Comercial' },
   { key: 'prospectos',         label: 'Prospectos',       group: 'Comercial' },
   { key: 'presupuestos',       label: 'Presupuestos',     group: 'Comercial' },
@@ -7051,6 +7110,220 @@ function showLoginScreen() {
   document.getElementById('mobile-header').style.display = 'none';
 }
 
+// ── Conversaciones: bandeja del WhatsApp de ventas ────────────────────────────
+let _convData = [];
+let _convFilter = 'todas';
+let _convOpen = null;
+let _convTimer = null;
+
+function convNeedsReply(c) {
+  return Boolean(c.consulta) || (c.pausado && c.sin_leer);
+}
+
+function convAgo(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const mins = Math.round((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return 'ahora';
+  if (mins < 60) return `${mins} min`;
+  if (mins < 24 * 60 && new Date().toDateString() === d.toDateString()) return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+}
+
+function convFiltered() {
+  const q = (document.getElementById('conv-search')?.value || '').toLowerCase().trim();
+  return _convData.filter(c => {
+    if (_convFilter === 'responder' && !convNeedsReply(c)) return false;
+    if (_convFilter === 'sin_leer' && !c.sin_leer) return false;
+    if (_convFilter === 'calificados' && !c.calificado) return false;
+    if (!q) return true;
+    return [c.nombre, c.empresa, c.phone].some(v => String(v || '').toLowerCase().includes(q));
+  });
+}
+
+function convUpdateBadges() {
+  const responder = _convData.filter(convNeedsReply).length;
+  const sinLeer = _convData.filter(c => c.sin_leer).length;
+  const set = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n ? n : ''; };
+  set('conv-count-responder', responder);
+  set('conv-count-sin_leer', sinLeer);
+  const badge = document.getElementById('nav-conv-badge');
+  if (badge) { badge.textContent = sinLeer + responder; badge.style.display = (sinLeer + responder) ? '' : 'none'; }
+}
+
+function convRenderList() {
+  const box = document.getElementById('wconv-list');
+  if (!box) return;
+  const items = convFiltered();
+  convUpdateBadges();
+  if (!items.length) {
+    box.innerHTML = `<div class="empty" style="font-size:12px;padding:1.5rem .5rem">${_convData.length ? 'No hay conversaciones con ese filtro.' : 'Todavía no escribió nadie al WhatsApp de ventas.'}</div>`;
+    return;
+  }
+  box.innerHTML = items.map(c => {
+    const who = c.ultimo?.role === 'user' ? '' : (c.ultimo?.role === 'bot' ? '🦏 ' : '👤 ');
+    const tags = [
+      c.consulta ? '<span class="wconv-tag q">❓ Para responder</span>' : '',
+      c.calificado ? '<span class="wconv-tag ok">Calificado</span>' : '',
+      c.pausado ? '<span class="wconv-tag p">⏸ Bot pausado</span>' : '',
+    ].join('');
+    return `<div role="button" tabindex="0" class="wconv-item ${c.sin_leer ? 'unread' : ''} ${_convOpen === c.phone ? 'active' : ''}" data-phone="${waEsc(c.phone)}">
+      <div class="wconv-item-top"><span class="wconv-item-name">${waEsc(c.nombre)}${c.empresa ? ` <span style="font-weight:400;color:var(--text2)">· ${waEsc(c.empresa)}</span>` : ''}</span><span class="wconv-item-time">${convAgo(c.updated_at)}</span></div>
+      <div class="wconv-item-last">${who}${waEsc(c.ultimo?.texto || '')}</div>
+      ${tags ? `<div class="wconv-item-tags">${tags}</div>` : ''}
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.wconv-item').forEach(el => {
+    el.addEventListener('click', () => convOpen(el.dataset.phone));
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') convOpen(el.dataset.phone); });
+  });
+}
+
+async function loadConversaciones(silent) {
+  try {
+    const data = await waCrmCall({ op: 'bandeja' });
+    _convData = data.conversaciones || [];
+    convRenderList();
+  } catch (e) {
+    if (!silent) {
+      const box = document.getElementById('wconv-list');
+      if (box) box.innerHTML = `<div class="empty" style="font-size:12px">${waEsc(e.message)}</div>`;
+    }
+  }
+}
+
+function convLeadFor(c) {
+  return c?.lead_id ? leadsData.find(l => String(l.id) === String(c.lead_id)) : null;
+}
+
+async function convOpen(phone) {
+  _convOpen = phone;
+  document.getElementById('wconv-layout')?.classList.add('chat-open');
+  convRenderList();
+  const pane = document.getElementById('conv-chat');
+  pane.innerHTML = '<div class="empty" style="font-size:12px;padding:2rem">Cargando...</div>';
+  let conv;
+  try {
+    conv = (await waCrmCall({ op: 'conversacion', phone })).conversacion;
+  } catch (e) {
+    pane.innerHTML = `<div class="empty" style="font-size:12px;padding:2rem">${waEsc(e.message)}</div>`;
+    return;
+  }
+  if (_convOpen !== phone || !conv) return;
+  // Ya la viste: se apaga el "sin leer".
+  _convData = _convData.map(c => c.phone === phone ? { ...c, sin_leer: false } : c);
+  convRenderList();
+  if (!leadsData.length) { try { await loadLeads(); } catch (e) {} }
+  const item = _convData.find(c => c.phone === phone) || {};
+  const lead = convLeadFor({ lead_id: conv.lead_id });
+  const paused = lead ? waBotPaused(lead) : false;
+  const consulta = conv.datos?.consulta_pendiente?.texto;
+  pane.innerHTML = `
+    <div class="wconv-chat-head">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0">
+        <button class="btn btn-sm wconv-back" id="wconv-back">←</button>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${waEsc(item.nombre || conv.nombre || '+' + conv.phone)}</div>
+          <div style="font-size:11px;color:var(--text2)">+${waEsc(conv.phone)}${item.empresa ? ' · ' + waEsc(item.empresa) : ''}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${lead ? `<span style="font-size:11px;color:${paused ? 'var(--amber)' : 'var(--green)'}">${paused ? '⏸ Bot pausado' : '● Bot respondiendo'}</span>
+        <button class="btn btn-sm" id="conv-toggle">${paused ? 'Activar bot' : 'Pausar bot'}</button>
+        <button class="btn btn-sm" id="conv-lead">Ver lead</button>` : ''}
+        <a class="btn btn-sm" href="https://wa.me/${waEsc(conv.phone)}" target="_blank" rel="noopener">💬 WA</a>
+      </div>
+    </div>
+    ${consulta ? `<div style="margin:10px 14px 0;padding:8px 10px;border-radius:var(--r);background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);font-size:12px">❓ <strong>Consulta para responder:</strong> ${waEsc(consulta)}</div>` : ''}
+    ${waBotSummary(conv) ? `<div style="padding:10px 14px 0">${waBotSummary(conv)}</div>` : ''}
+    <div class="wconv-chat-msgs" id="conv-msgs">${conv.mensajes.map(waBubble).join('') || '<div class="empty">Sin mensajes</div>'}</div>
+    <div class="wconv-chat-foot">
+      ${conv.ventana_abierta ? `
+        <div style="display:flex;gap:6px;align-items:flex-end">
+          <textarea id="conv-reply" placeholder="Escribile desde el número de ventas..." style="flex:1;font-size:12px;min-height:52px;resize:vertical;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font);line-height:1.5"></textarea>
+          <button class="btn btn-green btn-sm" id="conv-send" style="padding:8px 14px">Enviar</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Cuando respondés vos, el bot se pausa con este contacto. Enter + Ctrl para enviar.</div>`
+      : `<div style="font-size:12px;color:var(--text2)">Pasaron más de 24 h desde su último mensaje: WhatsApp no deja escribirle desde el número de ventas hasta que vuelva a escribir. Usá <strong>💬 WA</strong> para hablarle desde tu WhatsApp.</div>`}
+    </div>`;
+  const msgs = document.getElementById('conv-msgs');
+  msgs.scrollTop = msgs.scrollHeight;
+  document.getElementById('wconv-back')?.addEventListener('click', () => {
+    _convOpen = null;
+    document.getElementById('wconv-layout')?.classList.remove('chat-open');
+    convRenderList();
+  });
+  document.getElementById('conv-lead')?.addEventListener('click', () => {
+    document.querySelector('.nav-btn[data-sec="leads"]')?.click();
+    setTimeout(() => openLead(lead), 300);
+  });
+  document.getElementById('conv-toggle')?.addEventListener('click', async function() {
+    this.disabled = true;
+    const tags = String(lead.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    const next = paused ? tags.filter(t => t.toLowerCase() !== 'bot-pausado') : [...tags, 'bot-pausado'];
+    try {
+      await sbFetch(`rhinos_leads?id=eq.${lead.id}`, 'PATCH', { tags: next.join(', '), updated_at: new Date().toISOString() });
+      lead.tags = next.join(', ');
+      leadsData = leadsData.map(l => l.id === lead.id ? { ...l, tags: lead.tags } : l);
+      _convData = _convData.map(c => c.phone === phone ? { ...c, pausado: !paused } : c);
+      showToast(paused ? '🦏 El bot vuelve a responderle' : '⏸ Bot pausado: le respondés vos');
+      convOpen(phone);
+    } catch (e) { showToast('No se pudo cambiar: ' + e.message); this.disabled = false; }
+  });
+  const send = async () => {
+    const input = document.getElementById('conv-reply');
+    const btn = document.getElementById('conv-send');
+    const texto = input.value.trim();
+    if (!texto) return;
+    btn.disabled = true; btn.textContent = 'Enviando...';
+    try {
+      await waCrmCall({ op: 'enviar', lead_id: conv.lead_id, phone: conv.phone, texto });
+      if (lead && !waBotPaused(lead)) {
+        lead.tags = [lead.tags, 'bot-pausado'].filter(Boolean).join(', ');
+        leadsData = leadsData.map(l => l.id === lead.id ? { ...l, tags: lead.tags } : l);
+      }
+      _convData = _convData.map(c => c.phone === phone ? { ...c, consulta: null, pausado: true } : c);
+      showToast('✓ Mensaje enviado');
+      convOpen(phone);
+      loadConversaciones(true);
+    } catch (e) { showToast(e.message); btn.disabled = false; btn.textContent = 'Enviar'; }
+  };
+  document.getElementById('conv-send')?.addEventListener('click', send);
+  document.getElementById('conv-reply')?.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) send(); });
+}
+
+function convStartAutoRefresh() {
+  clearInterval(_convTimer);
+  _convTimer = setInterval(() => {
+    const visible = document.getElementById('s-conversaciones')?.classList.contains('active');
+    if (visible && !document.hidden) loadConversaciones(true);
+  }, 20000);
+}
+
+document.getElementById('conv-search')?.addEventListener('input', convRenderList);
+document.querySelectorAll('#wconv-filters .wconv-chip').forEach(chip => chip.addEventListener('click', () => {
+  _convFilter = chip.dataset.f;
+  document.querySelectorAll('#wconv-filters .wconv-chip').forEach(c => c.classList.toggle('active', c === chip));
+  convRenderList();
+}));
+document.querySelector('.nav-btn[data-sec="conversaciones"]')?.addEventListener('click', () => {
+  loadConversaciones();
+  convStartAutoRefresh();
+});
+
+// Abre una charla que viene en la URL (?conv=TELÉFONO), p. ej. desde un aviso.
+async function openConvFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const phone = params.get('conv');
+  if (!phone) return;
+  params.delete('conv');
+  const qs = params.toString();
+  window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+  document.querySelector('.nav-btn[data-sec="conversaciones"]')?.click();
+  await loadConversaciones(true);
+  convOpen(phone.replace(/\D/g, ''));
+}
+
 // Abre el lead que viene en la URL (?lead=ID), p. ej. al tocar un aviso del bot.
 async function openLeadFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -7070,6 +7343,7 @@ async function openLeadFromUrl() {
 
 function showApp(session) {
   setTimeout(openLeadFromUrl, 900);
+  setTimeout(openConvFromUrl, 900);
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-topbar').style.display = 'flex';
   document.getElementById('app-wrap').style.display = 'block';
